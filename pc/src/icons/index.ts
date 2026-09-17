@@ -1,6 +1,0 @@
-export { default as IconDashboard } from './IconDashboard.vue'
-export { default as IconMenu } from './IconMenu.vue'
-export { default as IconChevron } from './IconChevron.vue'
-export { default as IconSearch } from './IconSearch.vue'
-export { default as IconBell } from './IconBell.vue'
-export { default as IconLogout } from './IconLogout.vue'
