@@ -43,8 +43,10 @@ dependencies:
   go_router: ^13.2.0
   # 网络请求（对接接口文档 RESTful API）
   dio: ^5.4.0
-  # 登录态持久化（token / 用户信息）
+  # 登录态持久化（非敏感展示字段）
   shared_preferences: ^2.2.2
+  # A3：平台安全存储（Token/Refresh Token）；经负责人批准引入
+  flutter_secure_storage: ^9.2.2
 
 dev_dependencies:
   flutter_test:

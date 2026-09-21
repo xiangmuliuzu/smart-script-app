@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// 登录页（接口文档 2.1.3）。
-///
-/// 这是框架层给出的**可运行参考实现**：演示如何调用 AuthController.login、
-/// 如何处理统一异常、如何触发全局登录态刷新（成功后 redirect 自动进首页）。
-/// 登录注册负责人可在此基础上补齐：验证码登录、注册跳转、找回密码、第三方登录等。
-/// 登录按钮下方的“测试进入”为免登录调试入口，直达书城，正式接入后可删除。
+/// A3 登录页：密码登录 + 验证码登录。无免登录入口。
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -22,12 +20,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
   bool _loading = false;
+  bool _useSms = false;
+  int _cooldown = 0;
 
   @override
   void dispose() {
     _phoneCtrl.dispose();
     _pwdCtrl.dispose();
+    _codeCtrl.dispose();
     super.dispose();
   }
 
@@ -35,10 +37,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .login(_phoneCtrl.text.trim(), _pwdCtrl.text);
-      // 登录成功后 redirect 会自动跳转到首页，无需手动导航。
+      final phone = _phoneCtrl.text.trim();
+      final auth = ref.read(authControllerProvider.notifier);
+      if (_useSms) {
+        await auth.loginWithSms(phone: phone, code: _codeCtrl.text.trim());
+      } else {
+        await auth.loginWithPassword(phone, _pwdCtrl.text);
+      }
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {
@@ -48,15 +53,39 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  void _toast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+  Future<void> _sendSms() async {
+    final phone = _phoneCtrl.text.trim();
+    if (!RegExp(r'^1\d{10}$').hasMatch(phone)) {
+      _toast('请输入正确的手机号');
+      return;
+    }
+    if (_cooldown > 0) return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(authRepositoryProvider).sendSms(phone: phone, scene: 'LOGIN');
+      if (!mounted) return;
+      setState(() => _cooldown = 60);
+      _toast('验证码已发送');
+      Future.doWhile(() async {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (!mounted) return false;
+        setState(() => _cooldown -= 1);
+        return _cooldown > 0;
+      });
+    } on ApiException catch (e) {
+      final retry = e.data is Map ? (e.data as Map)['retryAfterSeconds'] : null;
+      if (retry is num) setState(() => _cooldown = retry.toInt());
+      _toast(e.message);
+    } catch (_) {
+      _toast('发送失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  /// 免登录测试入口：置为已登录后 redirect 自动进书城，无需手动导航。
-  void _enterTest() {
-    ref.read(authControllerProvider.notifier).enterTestSession();
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -67,10 +96,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
-                const SizedBox(height: 64),
+                const SizedBox(height: 48),
                 const Text(
                   '欢迎回来',
                   style: TextStyle(
@@ -79,42 +107,82 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     color: AppColors.text1,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  _useSms ? '使用验证码登录' : '使用密码登录',
+                  style: const TextStyle(color: AppColors.text3),
+                ),
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(hintText: '手机号'),
+                  decoration: const InputDecoration(labelText: '手机号'),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return '请输入手机号';
-                    if (v.trim().length != 11) return '手机号应为 11 位';
+                    final s = (v ?? '').trim();
+                    if (!RegExp(r'^1\d{10}$').hasMatch(s)) {
+                      return '请输入 11 位手机号';
+                    }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _pwdCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(hintText: '密码'),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? '请输入密码' : null,
-                  onFieldSubmitted: (_) => _submit(),
-                ),
-                const SizedBox(height: 32),
-                FilledButton(
+                if (!_useSms)
+                  TextFormField(
+                    controller: _pwdCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: '密码'),
+                    validator: (v) {
+                      if ((v ?? '').isEmpty) return '请输入密码';
+                      return null;
+                    },
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _codeCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: '验证码'),
+                          validator: (v) {
+                            if ((v ?? '').trim().length < 4) return '请输入验证码';
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: _cooldown > 0 || _loading ? null : _sendSms,
+                        child: Text(_cooldown > 0 ? '${_cooldown}s' : '获取验证码'),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 24),
+                ElevatedButton(
                   onPressed: _loading ? null : _submit,
                   child: _loading
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Text('登录'),
                 ),
-                const SizedBox(height: 12),
                 TextButton(
-                  onPressed: _loading ? null : _enterTest,
-                  child: const Text('测试进入（免登录，直达书城）'),
+                  onPressed: () {
+                    if (mounted) {
+                      setState(() => _useSms = !_useSms);
+                    }
+                  },
+                  child: Text(_useSms ? '改用密码登录' : '改用验证码登录'),
+                ),
+                TextButton(
+                  onPressed: () => context.go(RoutePath.register),
+                  child: const Text('没有账号？去注册'),
+                ),
+                TextButton(
+                  onPressed: () => context.go(RoutePath.forgotPassword),
+                  child: const Text('忘记密码'),
                 ),
               ],
             ),
