@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -44,18 +43,17 @@ class UserCenterRepository {
     return UserProfile.fromJson(data);
   }
 
-  /// 上传头像到平台统一上传接口，返回可直接展示与保存的地址。
+  /// 上传头像，返回可直接展示与保存的地址。
   ///
-  /// 该接口是若依原生 `/common/upload`，位于 `/api/v1` 之外，且响应结构为
-  /// 若依 `AjaxResult`（成功 code=200、数据在顶层字段）而非 App 的
-  /// `{code,message,data}` 信封，因此这里直接使用底层 Dio，不复用 [ApiClient] 的解包逻辑。
-  /// 认证头仍由全局拦截器注入，归属当前用户。
+  /// 走 App 凭证域专用端点 `POST /api/v1/users/me/avatar`：
+  /// 平台原生的 `/common/upload` 属于 PC 凭证链，App Token 在其上无法通过鉴权，
+  /// 且其响应为若依 AjaxResult（url 在顶层），与 App 的 `{code,message,data}` 信封不一致。
+  /// 本端点复用同一上传目录与校验规则，响应为 App 信封，因此走统一的 [ApiClient.upload]。
   Future<String> uploadAvatar({
     required List<int> bytes,
     required String filename,
     String? contentType,
   }) async {
-    final origin = Uri.parse(AppConfig.baseUrl).origin;
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(
         bytes,
@@ -64,12 +62,12 @@ class UserCenterRepository {
       ),
     });
     try {
-      final response = await _api.uploadAbsolute<Map<String, dynamic>>(
-        '$origin${ApiEndpoints.commonUpload}',
+      final data = await _api.upload<Map<String, dynamic>>(
+        ApiEndpoints.myAvatar,
         formData: formData,
         parser: _mapParser,
       );
-      final url = response?['url'] as String?;
+      final url = data?['url'] as String?;
       if (url == null || url.isEmpty) {
         throw ApiException('头像上传失败，请稍后重试');
       }
@@ -80,11 +78,6 @@ class UserCenterRepository {
   }
 
   String _uploadErrorMessage(DioException e) {
-    final data = e.response?.data;
-    if (data is Map && data['msg'] is String) {
-      final message = data['msg'] as String;
-      if (message.isNotEmpty) return message;
-    }
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:

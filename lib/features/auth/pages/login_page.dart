@@ -69,7 +69,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       context.go(RoutePath.home);
       return;
     }
-    context.go(target);
+    // 回跳用 push：目标页需要真实历史栈，按返回键能回到上一页而不是退出应用
+    context.go(RoutePath.home);
+    context.push(target);
   }
 
   Future<void> _sendSms() async {

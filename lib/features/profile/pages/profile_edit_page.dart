@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 个人资料（规格 §8.3，契约 §1.2）。
 ///
@@ -119,10 +120,10 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('个人资料')),
-      body: profileAsync.when(
+    return UserCenterScaffold(
+        title: '个人资料',
+        actions: null,
+        body: profileAsync.when(
         loading: () => const LoadingView(message: '加载中'),
         error: (error, _) => ErrorView(
           message: error is ApiException ? error.message : '加载失败，请稍后重试',

@@ -7,6 +7,7 @@ import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
 import '../../user_center/widgets/user_center_widgets.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 消息详情（规格 §8.6，契约 §1.5）。
 ///
@@ -77,10 +78,10 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('消息详情')),
-      body: _buildBody(),
+    return UserCenterScaffold(
+        title: '消息详情',
+        actions: null,
+        body: _buildBody(),
     );
   }
 

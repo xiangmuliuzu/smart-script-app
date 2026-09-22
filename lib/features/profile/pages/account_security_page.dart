@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 账号安全（规格 §8.5，契约 §1.4）。
 ///
@@ -22,10 +23,10 @@ class AccountSecurityPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('账号安全')),
-      body: profileAsync.when(
+    return UserCenterScaffold(
+        title: '账号安全',
+        actions: null,
+        body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (error, _) => Center(
           child: Padding(
@@ -53,7 +54,7 @@ class AccountSecurityPage extends ConsumerWidget {
               _Row(
                 label: '手机号',
                 value: profile.phoneMasked ?? '-',
-                onTap: () => context.go(RoutePath.phoneChange),
+                onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.phoneChange),
               ),
               _Row(
                 label: hasPassword ? '登录密码' : '设置密码',

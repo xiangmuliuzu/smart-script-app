@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 通知偏好（规格 §8.6，契约 §1.5）。
 ///
@@ -29,10 +30,10 @@ class _NotificationPreferencePageState extends ConsumerState<NotificationPrefere
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(notificationPreferencesProvider);
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('通知偏好')),
-      body: async.when(
+    return UserCenterScaffold(
+        title: '通知偏好',
+        actions: null,
+        body: async.when(
         loading: () => const LoadingView(message: '加载中'),
         error: (error, _) => ErrorView(
           message: error is ApiException ? error.message : '加载失败，请稍后重试',

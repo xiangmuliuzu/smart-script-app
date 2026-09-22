@@ -44,9 +44,25 @@ class AuthGuard {
     return false;
   }
 
+  /// 打开受保护的应用内页面。
+  ///
+  /// 用 `push` 而不是 `go`：用户中心的子页面需要真实的历史栈，
+  /// 这样 AppBar 返回箭头与系统返回键都能自然回到上一页。
+  /// 用 `go` 打开根级页面会让历史栈只剩当前一条，按返回键会直接退出应用。
+  ///
+  /// 已登录：直接 push；未登录：保存意图后去登录页，登录成功再由
+  /// [consumeAndResolve] 交回目标并跳转。
+  static void pushProtected(BuildContext context, WidgetRef ref, {required String target}) {
+    if (requireLogin(context, ref, target: target)) {
+      context.push(target);
+    }
+  }
+
   /// 消费回跳意图并给出最终目标，供登录页在登录成功后调用。
   ///
   /// 无意图、意图非法或目标不允许恢复时返回 null，由调用方走安全默认首页。
+  /// 返回的定位串由调用方 push：用户中心子页面需要真实历史栈，
+  /// 这样登录回跳后按返回键能回到上一页而不是退出应用。
   static String? consumeAndResolve(WidgetRef ref) {
     final intent = ref.read(routeIntentStoreProvider).consume();
     if (intent == null) return null;

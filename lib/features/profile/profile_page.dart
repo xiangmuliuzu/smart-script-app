@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/providers/auth_providers.dart';
 import '../../core/router/auth_guard.dart';
@@ -47,19 +46,19 @@ class ProfilePage extends ConsumerWidget {
                   UserEntryRow(
                     icon: Icons.person_outline,
                     label: '个人资料',
-                    onTap: () => context.go(RoutePath.profileEdit),
+                    onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.profileEdit),
                   ),
                   UserEntryRow(
                     icon: Icons.verified_user_outlined,
                     label: '实名认证',
                     trailingText: RealNameState.fromCode(user?.realNameStatus).label,
                     trailingColor: _realNameColor(user?.realNameStatus),
-                    onTap: () => context.go(RoutePath.realName),
+                    onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.realName),
                   ),
                   UserEntryRow(
                     icon: Icons.lock_outline,
                     label: '账号安全',
-                    onTap: () => context.go(RoutePath.accountSecurity),
+                    onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.accountSecurity),
                   ),
                 ],
               ),
@@ -70,17 +69,17 @@ class ProfilePage extends ConsumerWidget {
                     icon: Icons.notifications_none,
                     label: '消息中心',
                     badge: unread.valueOrNull?.total ?? 0,
-                    onTap: () => context.go(RoutePath.messages),
+                    onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.messages),
                   ),
                   UserEntryRow(
                     icon: Icons.tune,
                     label: '通知偏好',
-                    onTap: () => context.go(RoutePath.notificationPreferences),
+                    onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.notificationPreferences),
                   ),
                   UserEntryRow(
                     icon: Icons.feedback_outlined,
                     label: '意见反馈',
-                    onTap: () => context.go(RoutePath.feedback),
+                    onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.feedback),
                   ),
                 ],
               ),

@@ -9,6 +9,7 @@ import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
 import '../../user_center/widgets/paged_list_controller.dart';
 import '../../user_center/widgets/user_center_widgets.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 意见反馈列表（规格 §8.7，契约 §1.6）。
 ///
@@ -61,14 +62,11 @@ class _FeedbackListPageState extends ConsumerState<FeedbackListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(
-        title: const Text('意见反馈'),
-        actions: [
-          TextButton(onPressed: _openCreate, child: const Text('新建')),
-        ],
-      ),
+    return UserCenterScaffold(
+      title: '意见反馈',
+      actions: [
+        TextButton(onPressed: _openCreate, child: const Text('新建')),
+      ],
       body: Column(
         children: [
           Container(

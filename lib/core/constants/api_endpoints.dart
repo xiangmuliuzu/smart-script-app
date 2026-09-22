@@ -38,9 +38,11 @@ class ApiEndpoints {
   static const String feedback = '/feedback';
   static String feedbackById(int feedbackId) => '/feedback/$feedbackId';
 
-  /// 平台统一上传接口（若依 CommonController）。它位于 `/api/v1` 之外，
-  /// 因此调用方用 [ApiClient.uploadAbsolute] 以绝对地址覆盖 baseUrl。
-  static const String commonUpload = '/common/upload';
+  /// App 域头像上传（multipart，字段名 `file`）。
+  ///
+  /// 不走平台原生的 `/common/upload`：该端点属于 PC 凭证链，App Token 无法通过鉴权，
+  /// 且响应是若依 AjaxResult 而非 App 信封。
+  static const String myAvatar = '/users/me/avatar';
 
   // ===== 业务端点（非 A3 认证范围，保持既有命名） =====
   static const String userProfile = '/user/profile';

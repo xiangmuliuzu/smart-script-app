@@ -8,6 +8,7 @@ import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
 import '../../user_center/widgets/user_center_widgets.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 实名认证（规格 §8.4，契约 §1.3）。
 ///
@@ -21,10 +22,10 @@ class RealNamePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statusAsync = ref.watch(realNameStatusProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('实名认证')),
-      body: statusAsync.when(
+    return UserCenterScaffold(
+        title: '实名认证',
+        actions: null,
+        body: statusAsync.when(
         loading: () => const LoadingView(message: '加载中'),
         error: (error, _) => ErrorView(
           message: error is ApiException ? error.message : '加载失败，请稍后重试',

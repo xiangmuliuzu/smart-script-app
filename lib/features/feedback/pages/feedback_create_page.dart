@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 提交意见反馈（规格 §8.7，契约 §1.6）。
 ///
@@ -71,10 +72,10 @@ class _FeedbackCreatePageState extends ConsumerState<FeedbackCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('意见反馈')),
-      body: ListView(
+    return UserCenterScaffold(
+        title: '意见反馈',
+        actions: null,
+        body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
           Container(

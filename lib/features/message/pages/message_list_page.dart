@@ -9,6 +9,7 @@ import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
 import '../../user_center/widgets/paged_list_controller.dart';
 import '../../user_center/widgets/user_center_widgets.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 消息中心（规格 §8.6，契约 §1.5）。
 ///
@@ -72,17 +73,14 @@ class _MessageListPageState extends ConsumerState<MessageListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(
-        title: const Text('消息中心'),
-        actions: [
-          TextButton(
-            onPressed: _controller.isEmpty ? null : _markAllRead,
-            child: const Text('全部已读'),
-          ),
-        ],
-      ),
+    return UserCenterScaffold(
+      title: '消息中心',
+      actions: [
+        TextButton(
+          onPressed: _controller.isEmpty ? null : _markAllRead,
+          child: const Text('全部已读'),
+        ),
+      ],
       body: Column(
         children: [
           _buildFilters(),

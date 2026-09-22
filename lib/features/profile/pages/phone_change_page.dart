@@ -7,9 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../user_center/data/user_center_providers.dart';
 import '../../user_center/widgets/user_center_widgets.dart';
+import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 换绑手机号（规格 §8.5，契约 §1.4）。
 ///
@@ -181,10 +181,10 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
   Widget build(BuildContext context) {
     final phoneMasked = ref.watch(authControllerProvider).user?.phoneMasked;
 
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      appBar: AppBar(title: const Text('更换手机号')),
-      body: ListView(
+    return UserCenterScaffold(
+        title: '更换手机号',
+        actions: null,
+        body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
           UserStepCard(
