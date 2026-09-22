@@ -24,6 +24,7 @@ class User {
     this.avatar,
     this.realNameStatus = 'NOT_SUBMITTED',
     this.roles = const [],
+    this.hasPassword = false,
   });
 
   final int userId;
@@ -34,8 +35,17 @@ class User {
   final String realNameStatus;
   final List<String> roles;
 
+  /// 是否已设置密码（A5）：账号安全页据此在「首次设置密码」与「修改密码」间选择入口。
+  final bool hasPassword;
+
   bool get isCreator => userType == UserType.creator;
   bool get isClient => userType == UserType.client;
+
+  /// 规格 §10 的统一身份能力：实名是否已通过。
+  bool get isRealNameApproved => realNameStatus == 'APPROVED';
+
+  /// 规格 §10 的统一身份能力：是否具备某角色。
+  bool hasRole(String roleCode) => roles.contains(roleCode);
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         userId: (json['userId'] as num?)?.toInt() ?? 0,
@@ -45,6 +55,7 @@ class User {
         avatar: json['avatar'] as String?,
         realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
         roles: (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
+        hasPassword: json['hasPassword'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +66,7 @@ class User {
         'avatar': avatar,
         'realNameStatus': realNameStatus,
         'roles': roles,
+        'hasPassword': hasPassword,
       };
 }
 

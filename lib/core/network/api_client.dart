@@ -134,6 +134,27 @@ class ApiClient {
               )),
           parser);
 
+  /// 以绝对地址上传（用于不在 [AppConfig.baseUrl] 前缀下的平台接口，
+  /// 例如若依 `/common/upload`）。
+  ///
+  /// dio 的 [Options] 没有 baseUrl 参数，只能通过一个新的拒绝相对路径的 Dio 实例
+  /// 发起请求：baseUrl 置空后 [absoluteUrl] 必须是完整 http(s) 地址。
+  /// 认证头仍由全局拦截器注入（本方法的 options 仍经过同一 [AuthInterceptor]）。
+  Future<T?> uploadAbsolute<T>(
+    String absoluteUrl, {
+    required FormData formData,
+    Map<String, dynamic>? headers,
+    T Function(dynamic raw)? parser,
+  }) =>
+      _send<T>(
+          _dio.post<dynamic>(absoluteUrl,
+              data: formData,
+              options: Options(
+                headers: headers,
+                contentType: Headers.multipartFormDataContentType,
+              )),
+          parser);
+
   /// 统一的响应解析与错误处理。
   Future<T?> _send<T>(
     Future<Response<dynamic>> future,

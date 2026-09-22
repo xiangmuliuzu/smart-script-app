@@ -5,10 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// A3 登录页：密码登录 + 验证码登录。无免登录入口。
+///
+/// A5：登录成功后消费一次守卫保存的回跳意图（规格 §8.1）。
+/// 意图不存在、参数非法或目标不允许恢复时进入安全默认首页并提示。
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -44,6 +48,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       } else {
         await auth.loginWithPassword(phone, _pwdCtrl.text);
       }
+      if (!mounted) return;
+      _resolvePostLoginTarget();
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {
@@ -51,6 +57,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// 登录成功后的去向：消费一次回跳意图，否则回安全默认首页。
+  ///
+  /// 取消登录、登录失败与网络错误都不会走到这里，因此意图被保留到下一次成功登录；
+  /// 成功登录才消费，保证同一个意图只回跳一次。
+  void _resolvePostLoginTarget() {
+    final target = AuthGuard.consumeAndResolve(ref);
+    if (target == null) {
+      context.go(RoutePath.home);
+      return;
+    }
+    context.go(target);
   }
 
   Future<void> _sendSms() async {

@@ -1,6 +1,7 @@
 /// 路由路径与名称常量（集中管理，避免多人合并时互相覆盖）。
 ///
 /// 新增页面：① 在此登记 path/name；② 在 app_router.dart 注册对应 GoRoute。
+/// A5 新增用户中心页面：个人资料、实名、账号安全、换绑、消息、偏好、反馈。
 class RoutePath {
   RoutePath._();
 
@@ -19,6 +20,20 @@ class RoutePath {
   static const String create = '/create';
   static const String category = '/category';
   static const String profile = '/profile';
+
+  // A5 用户中心（Shell 之外的独立页面，受登录守卫保护）
+  static const String profileEdit = '/profile/edit';
+  static const String realName = '/profile/real-name';
+  static const String accountSecurity = '/profile/security';
+  static const String phoneChange = '/profile/security/phone';
+  static const String notificationPreferences = '/profile/notification-preferences';
+
+  // A5 消息中心（列表与详情用查询参数区分，便于登录回跳时整串还原）
+  static const String messages = '/profile/messages';
+  static const String messageDetail = '/profile/messages/detail';
+  static const String feedback = '/profile/feedback';
+  static const String feedbackDetail = '/profile/feedback/detail';
+  static const String feedbackCreate = '/profile/feedback/create';
 }
 
 class RouteName {
@@ -34,4 +49,51 @@ class RouteName {
   static const String create = 'create';
   static const String category = 'category';
   static const String profile = 'profile';
+
+  static const String profileEdit = 'profileEdit';
+  static const String realName = 'realName';
+  static const String accountSecurity = 'accountSecurity';
+  static const String phoneChange = 'phoneChange';
+  static const String notificationPreferences = 'notificationPreferences';
+  static const String messages = 'messages';
+  static const String messageDetail = 'messageDetail';
+  static const String feedback = 'feedback';
+  static const String feedbackDetail = 'feedbackDetail';
+  static const String feedbackCreate = 'feedbackCreate';
+}
+
+/// 需要登录才能访问的路径前缀（规格 §8.1 守卫清单）。
+///
+/// 收藏、书架、福利、AI、上传、询盘、订单、合同和印章等 B/C/D/E 入口
+/// 后续接入时沿用 [RoutePath.profile] 之外的前缀，在此登记即可。
+class ProtectedRoutes {
+  ProtectedRoutes._();
+
+  /// 需要登录的路径前缀。
+  static const List<String> prefixes = <String>[
+    RoutePath.profile, // 我的及用户中心全部子页面
+  ];
+
+  static bool isProtected(String location) {
+    final path = Uri.parse(location).path;
+    for (final prefix in prefixes) {
+      if (path == prefix || path.startsWith('$prefix/')) return true;
+    }
+    return false;
+  }
+
+  /// 强制退出后不允许自动回跳的路径前缀（规格 §8.1 末条）：
+  /// 换绑、修改密码等敏感提交页在会话失效后不应被自动重放。
+  static const List<String> noResumePrefixes = <String>[
+    RoutePath.phoneChange,
+    RoutePath.accountSecurity,
+  ];
+
+  static bool canResume(String location) {
+    final path = Uri.parse(location).path;
+    for (final prefix in noResumePrefixes) {
+      if (path == prefix || path.startsWith('$prefix/')) return false;
+    }
+    return true;
+  }
 }

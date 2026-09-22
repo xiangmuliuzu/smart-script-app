@@ -1,4 +1,5 @@
-/// A3-AUTH-CONTRACT-v1 端点（相对 [AppConfig.baseUrl]，已含 `/api/v1`）。
+/// A3-AUTH-CONTRACT-v1 与 A5-USER-CENTER-CONTRACT-v1 端点
+/// （相对 [AppConfig.baseUrl]，已含 `/api/v1`）。
 class ApiEndpoints {
   ApiEndpoints._();
 
@@ -15,6 +16,31 @@ class ApiEndpoints {
   static const String passwordReset = '/auth/password/reset';
   static const String agreements = '/auth/agreements';
   static String oauthLogin(String provider) => '/auth/oauth/$provider/login';
+
+  // ===== A5 用户中心契约：个人资料与账号安全 =====
+  static const String myProfile = '/users/me/profile';
+  static const String myRealName = '/users/me/real-name';
+  static const String myRealNameResubmit = '/users/me/real-name/resubmit';
+  static const String phoneChangeOldSend = '/users/me/phone/change/old/send';
+  static const String phoneChangeOldVerify = '/users/me/phone/change/old/verify';
+  static const String phoneChangeNewSend = '/users/me/phone/change/new/send';
+  static const String phoneChangeConfirm = '/users/me/phone/change/confirm';
+  static const String myNotificationPreferences = '/users/me/notification-preferences';
+
+  // ===== A5 用户中心契约：消息中心 =====
+  static const String messages = '/messages';
+  static const String messagesUnreadCount = '/messages/unread-count';
+  static const String messagesReadAll = '/messages/read-all';
+  static String messageById(int messageId) => '/messages/$messageId';
+  static String messageRead(int messageId) => '/messages/$messageId/read';
+
+  // ===== A5 用户中心契约：意见反馈 =====
+  static const String feedback = '/feedback';
+  static String feedbackById(int feedbackId) => '/feedback/$feedbackId';
+
+  /// 平台统一上传接口（若依 CommonController）。它位于 `/api/v1` 之外，
+  /// 因此调用方用 [ApiClient.uploadAbsolute] 以绝对地址覆盖 baseUrl。
+  static const String commonUpload = '/common/upload';
 
   // ===== 业务端点（非 A3 认证范围，保持既有命名） =====
   static const String userProfile = '/user/profile';
