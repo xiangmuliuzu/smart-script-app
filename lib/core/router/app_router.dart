@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
@@ -73,6 +74,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.register,
         name: RouteName.register,
         builder: (_, __) => const RegisterPage(),
+      ),
+      GoRoute(
+        path: RoutePath.forgotPassword,
+        name: RouteName.forgotPassword,
+        builder: (_, __) => const ForgotPasswordPage(),
       ),
       // 底部导航五格：书城 / 漫剧 / 创作(+) / 分类 / 我的
       StatefulShellRoute.indexedStack(

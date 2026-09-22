@@ -6,6 +6,31 @@ import 'api_response.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'session_events.dart';
 
+/// 日志拦截器（仅显式开启时使用；禁止打印 Token/密码/验证码）。
+class AppLogInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    // 仅记录方法与路径，不记录 header/body。
+    // ignore: avoid_print
+    print('--> ${options.method} ${options.uri.path}');
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    // ignore: avoid_print
+    print('<-- ${response.statusCode} ${response.requestOptions.uri.path}');
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    // ignore: avoid_print
+    print('<-- ERROR ${err.type} ${err.requestOptions.uri.path}');
+    handler.next(err);
+  }
+}
+
 /// 网络客户端封装（框架层唯一出口）。
 ///
 /// 页面开发者通过 [ApiClient] 的 get/post/put/delete/upload 发起请求，
@@ -16,6 +41,9 @@ class ApiClient {
 
   final Dio _dio;
 
+  /// Test/DI access to the underlying Dio (not for business pages).
+  Dio get dioForTest => _dio;
+
   /// 构造一个绑定了拦截器的 Dio（供 provider 调用）。
   static Dio buildDio(AuthInterceptor authInterceptor) {
     final dio = Dio(
@@ -24,8 +52,9 @@ class ApiClient {
         connectTimeout: AppConfig.connectTimeout,
         receiveTimeout: AppConfig.receiveTimeout,
         contentType: Headers.jsonContentType,
-        // 让所有状态码都进入统一处理，不自动抛异常
-        validateStatus: (status) => status != null && status < 500,
+        // 让业务 4xx 进入统一处理；401 抛给 AuthInterceptor 做单飞刷新
+        validateStatus: (status) =>
+            status != null && status < 500 && status != 401,
       ),
     );
     dio.interceptors.add(authInterceptor);
@@ -130,8 +159,11 @@ class ApiClient {
       );
 
       if (!apiResp.isSuccess) {
-        // 业务层 401：同样视为登录态失效
-        if (apiResp.code == 401) SessionEvents.instance.sessionExpired();
+        // 业务层 40100/40102/40103/40301：会话不可恢复
+        final code = apiResp.code;
+        if (code == 40100 || code == 40102 || code == 40103 || code == 40301) {
+          SessionEvents.instance.sessionExpired();
+        }
         throw ApiException(
           apiResp.message.isEmpty ? '请求失败' : apiResp.message,
           code: apiResp.code,

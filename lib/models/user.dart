@@ -1,9 +1,8 @@
-/// 账号类型（接口文档 2.1.3 / 数据库 sys_user.user_type）。
+/// A3 CurrentUser / AuthSession models (A3-AUTH-CONTRACT-v1).
 enum UserType {
-  user('user', '普通用户'),
-  creator('creator', '创作者'),
-  client('client', '甲方'),
-  admin('admin', '管理员');
+  user('01', '普通用户'),
+  creator('02', '创作者'),
+  client('03', '甲方');
 
   const UserType(this.code, this.label);
 
@@ -16,33 +15,24 @@ enum UserType {
       );
 }
 
-/// 用户核心模型（对照数据库 sys_user 与接口 2.1.3 / 2.2.1 输出字段）。
-///
-/// 这是框架层提供的**基础模型**，各业务模块可在此之上扩展自己的 DTO。
 class User {
   const User({
     required this.userId,
     required this.userType,
-    this.phone,
+    this.phoneMasked,
     this.nickname,
     this.avatar,
-    this.bio,
-    this.status,
-    this.authStatus,
+    this.realNameStatus = 'NOT_SUBMITTED',
+    this.roles = const [],
   });
 
   final int userId;
   final UserType userType;
-  final String? phone;
+  final String? phoneMasked;
   final String? nickname;
   final String? avatar;
-  final String? bio;
-
-  /// 账号状态：0 禁用 / 1 正常 / 2 冻结。
-  final int? status;
-
-  /// 实名认证状态：none/pending/approved/rejected（接口 2.2.1）。
-  final String? authStatus;
+  final String realNameStatus;
+  final List<String> roles;
 
   bool get isCreator => userType == UserType.creator;
   bool get isClient => userType == UserType.client;
@@ -50,22 +40,47 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) => User(
         userId: (json['userId'] as num?)?.toInt() ?? 0,
         userType: UserType.fromCode(json['userType'] as String?),
-        phone: json['phone'] as String?,
+        phoneMasked: json['phoneMasked'] as String?,
         nickname: json['nickname'] as String?,
         avatar: json['avatar'] as String?,
-        bio: json['bio'] as String?,
-        status: (json['status'] as num?)?.toInt(),
-        authStatus: json['authStatus'] as String?,
+        realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
+        roles: (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
       );
 
   Map<String, dynamic> toJson() => {
         'userId': userId,
         'userType': userType.code,
-        'phone': phone,
+        'phoneMasked': phoneMasked,
         'nickname': nickname,
         'avatar': avatar,
-        'bio': bio,
-        'status': status,
-        'authStatus': authStatus,
+        'realNameStatus': realNameStatus,
+        'roles': roles,
       };
+}
+
+class AuthSession {
+  const AuthSession({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.tokenType,
+    required this.expiresIn,
+    required this.refreshExpiresIn,
+    required this.user,
+  });
+
+  final String accessToken;
+  final String refreshToken;
+  final String tokenType;
+  final int expiresIn;
+  final int refreshExpiresIn;
+  final User user;
+
+  factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
+        accessToken: json['accessToken'] as String? ?? '',
+        refreshToken: json['refreshToken'] as String? ?? '',
+        tokenType: json['tokenType'] as String? ?? 'Bearer',
+        expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 0,
+        refreshExpiresIn: (json['refreshExpiresIn'] as num?)?.toInt() ?? 0,
+        user: User.fromJson(Map<String, dynamic>.from(json['user'] as Map? ?? {})),
+      );
 }
