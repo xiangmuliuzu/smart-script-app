@@ -26,6 +26,7 @@ class RoutePath {
   static const String realName = '/profile/real-name';
   static const String accountSecurity = '/profile/security';
   static const String phoneChange = '/profile/security/phone';
+  static const String passwordEdit = '/profile/security/password';
   static const String notificationPreferences = '/profile/notification-preferences';
 
   // A5 消息中心（列表与详情用查询参数区分，便于登录回跳时整串还原）
@@ -54,6 +55,7 @@ class RouteName {
   static const String realName = 'realName';
   static const String accountSecurity = 'accountSecurity';
   static const String phoneChange = 'phoneChange';
+  static const String passwordEdit = 'passwordEdit';
   static const String notificationPreferences = 'notificationPreferences';
   static const String messages = 'messages';
   static const String messageDetail = 'messageDetail';
@@ -87,6 +89,7 @@ class ProtectedRoutes {
   static const List<String> noResumePrefixes = <String>[
     RoutePath.phoneChange,
     RoutePath.accountSecurity,
+    RoutePath.passwordEdit,
   ];
 
   static bool canResume(String location) {

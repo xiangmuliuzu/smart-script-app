@@ -59,7 +59,7 @@ class AccountSecurityPage extends ConsumerWidget {
               _Row(
                 label: hasPassword ? '登录密码' : '设置密码',
                 value: hasPassword ? '已设置' : '未设置',
-                onTap: () => _showPasswordSheet(context, ref, hasPassword: hasPassword),
+                onTap: () => _openPasswordPage(context, ref, hasPassword),
               ),
             ],
           ),
@@ -75,14 +75,13 @@ class AccountSecurityPage extends ConsumerWidget {
     );
   }
 
-  void _showPasswordSheet(BuildContext context, WidgetRef ref, {required bool hasPassword}) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _PasswordSheet(hasPassword: hasPassword),
-      ),
+  void _openPasswordPage(BuildContext context, WidgetRef ref, bool hasPassword) {
+    // 独立页面而不是底部弹窗：弹窗在软键盘弹出后命中区域错位，
+    // 人工冒烟中无法完成提交（点击「确定」会被判为点击遮罩）。
+    AuthGuard.pushProtected(
+      context,
+      ref,
+      target: '${RoutePath.passwordEdit}?hasPassword=${hasPassword ? '1' : '0'}',
     );
   }
 }
@@ -109,138 +108,6 @@ class _Row extends StatelessWidget {
             Text(value, style: const TextStyle(color: AppColors.text3, fontSize: 13)),
             const SizedBox(width: 6),
             const Icon(Icons.chevron_right, size: 18, color: AppColors.text3),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 设置/修改密码表单。与后端密码策略一致：8–64 位且同时含字母与数字。
-class _PasswordSheet extends ConsumerStatefulWidget {
-  const _PasswordSheet({required this.hasPassword});
-
-  final bool hasPassword;
-
-  @override
-  ConsumerState<_PasswordSheet> createState() => _PasswordSheetState();
-}
-
-class _PasswordSheetState extends ConsumerState<_PasswordSheet> {
-  final _oldCtrl = TextEditingController();
-  final _newCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  bool _submitting = false;
-
-  @override
-  void dispose() {
-    _oldCtrl.dispose();
-    _newCtrl.dispose();
-    _confirmCtrl.dispose();
-    super.dispose();
-  }
-
-  String? _validateNew(String? value) {
-    final v = value ?? '';
-    if (v.length < 8 || v.length > 64) return '密码长度需为 8–64 位';
-    if (!RegExp(r'[A-Za-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
-      return '密码需同时包含字母与数字';
-    }
-    return null;
-  }
-
-  Future<void> _submit() async {
-    final newPassword = _newCtrl.text;
-    if (widget.hasPassword && _oldCtrl.text.isEmpty) {
-      _toast('请输入当前密码');
-      return;
-    }
-    final error = _validateNew(newPassword);
-    if (error != null) {
-      _toast(error);
-      return;
-    }
-    if (newPassword != _confirmCtrl.text) {
-      _toast('两次输入的新密码不一致');
-      return;
-    }
-    setState(() => _submitting = true);
-    final auth = ref.read(authControllerProvider.notifier);
-    // 在异步间隙前取出 Navigator/Messenger：登出会让本页 context 失效，
-    // 之后再从 context 取会触发 use_build_context_synchronously 并可能崩溃。
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      if (widget.hasPassword) {
-        await auth.passwordChange(oldPassword: _oldCtrl.text, newPassword: newPassword);
-        // 修改密码后后端吊销全部 App 会话：本地凭证立即失效，守卫回登录页。
-        // 该路径不生成回跳意图（账号安全属不可恢复路径）。
-        navigator.pop();
-        await auth.forceLocalSignOut();
-        messenger.showSnackBar(const SnackBar(content: Text('密码已修改，请重新登录')));
-      } else {
-        await auth.passwordSet(newPassword);
-        await auth.refreshMe();
-        navigator.pop();
-        messenger.showSnackBar(const SnackBar(content: Text('密码设置成功')));
-      }
-    } on ApiException catch (e) {
-      _toast(e.message);
-    } catch (_) {
-      _toast('操作失败，请稍后重试');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  void _toast(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              widget.hasPassword ? '修改密码' : '设置密码',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            if (widget.hasPassword)
-              TextField(
-                controller: _oldCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: '当前密码'),
-              ),
-            if (widget.hasPassword) const SizedBox(height: 12),
-            TextField(
-              controller: _newCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: '新密码'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _confirmCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: '确认新密码'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('确定'),
-            ),
           ],
         ),
       ),
