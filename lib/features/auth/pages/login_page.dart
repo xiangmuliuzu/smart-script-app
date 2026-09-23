@@ -1,16 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/auth_validators.dart';
+import '../../../core/widgets/app_toast.dart';
+import '../auth_feedback.dart';
+import '../auth_navigation.dart';
+import '../widgets/agreement_checkbox.dart';
+import '../widgets/auth_buttons.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/auth_page_scaffold.dart';
+import '../widgets/phone_input.dart';
+import '../widgets/social_login_area.dart';
+import '../widgets/verify_code_input.dart';
 
-/// 登录页（接口文档 2.1.3）。
+/// 登录首页（主流程：手机号 + 验证码）。
 ///
-/// 这是框架层给出的**可运行参考实现**：演示如何调用 AuthController.login、
-/// 如何处理统一异常、如何触发全局登录态刷新（成功后 redirect 自动进首页）。
-/// 登录注册负责人可在此基础上补齐：验证码登录、注册跳转、找回密码、第三方登录等。
-/// 登录按钮下方的“测试进入”为免登录调试入口，直达书城，正式接入后可删除。
+/// 信息架构参考同类 App 登录页：返回 -> Logo -> 主标题 -> 手机号 -> 验证码 ->
+/// 协议勾选 -> 主按钮 -> 次按钮（账号密码登录）-> 注册入口 -> 第三方登录。
+///
+/// 登录成功后消费一次守卫保存的回跳意图（规格 §8.1），保持既有登录回跳行为。
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -19,107 +33,184 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _phoneCtrl = TextEditingController();
-  final _pwdCtrl = TextEditingController();
-  bool _loading = false;
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  final FocusNode _codeFocusNode = FocusNode();
+
+  bool _agreed = false;
+  bool _submitting = false;
+  int _shakeSignal = 0;
+  String? _phoneError;
+  String? _codeError;
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
-    _pwdCtrl.dispose();
+    _phoneController.dispose();
+    _codeController.dispose();
+    _codeFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+  /// 获取验证码：先本地校验手机号，再请求既有 `/auth/sms/send`（scene=LOGIN）。
+  /// 返回是否发送成功，失败时按钮立即恢复可点（不倒计时）。
+  Future<bool> _handleRequestCode() async {
+    FocusScope.of(context).unfocus();
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    if (phoneError != null) {
+      setState(() => _phoneError = phoneError);
+      return false;
+    }
+    setState(() => _phoneError = null);
+
     try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .login(_phoneCtrl.text.trim(), _pwdCtrl.text);
-      // 登录成功后 redirect 会自动跳转到首页，无需手动导航。
+      await ref.read(authRepositoryProvider).sendSms(
+            phone: _phoneController.text.trim(),
+            scene: 'LOGIN',
+          );
+      if (!mounted) {
+        return true;
+      }
+      showAppToast(context, '验证码已发送，请注意查收短信');
+      return true;
     } on ApiException catch (e) {
-      _toast(e.message);
+      if (mounted) {
+        showAppToast(context, AuthFeedback.smsSendError(e));
+      }
+      return false;
     } catch (_) {
-      _toast('登录失败，请稍后重试');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        showAppToast(context, '验证码发送失败，请稍后重试');
+      }
+      return false;
     }
   }
 
-  void _toast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+  /// 登录：未勾选协议时只做提示与抖动，绝不提交接口。
+  Future<void> _handleLogin() async {
+    FocusScope.of(context).unfocus();
+    if (!_agreed) {
+      setState(() => _shakeSignal += 1);
+      showAppToast(context, '请先阅读并同意用户协议和隐私政策');
+      return;
+    }
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    final codeError = AuthValidators.smsCode(_codeController.text);
+    setState(() {
+      _phoneError = phoneError;
+      _codeError = codeError;
+    });
+    if (phoneError != null || codeError != null) {
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await ref.read(authControllerProvider.notifier).loginWithSms(
+            phone: _phoneController.text.trim(),
+            code: _codeController.text.trim(),
+          );
+      if (!mounted) {
+        return;
+      }
+      // 登录成功后消费一次回跳意图，否则回安全默认首页
+      resolvePostLoginTarget(context, ref);
+    } on ApiException catch (e) {
+      if (mounted) {
+        showAppToast(context, e.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppToast(context, '登录失败，请稍后重试');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
   }
 
-  /// 免登录测试入口：置为已登录后 redirect 自动进书城，无需手动导航。
-  void _enterTest() {
-    ref.read(authControllerProvider.notifier).enterTestSession();
+  /// 微信 / QQ 入口：后端 OAuth 当前固定返回「暂未开放」，只提示，不做假登录。
+  void _handleSocialLogin(String providerName) {
+    showAppToast(context, '$providerName登录暂未开放，敬请期待');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 64),
-                const Text(
-                  '欢迎回来',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.text1,
+    return AuthPageScaffold(
+      bottom: SocialLoginArea(
+        onWechatTap: () => _handleSocialLogin('微信'),
+        onQqTap: () => _handleSocialLogin('QQ'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AuthHeader(
+            title: '登录后体验完整功能',
+            onBack: () => leaveAuthHome(context),
+          ),
+          PhoneInput(
+            controller: _phoneController,
+            errorText: _phoneError,
+            onChanged: (_) {
+              if (_phoneError != null) {
+                setState(() => _phoneError = null);
+              }
+            },
+            onSubmitted: (_) => _codeFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          VerifyCodeInput(
+            controller: _codeController,
+            focusNode: _codeFocusNode,
+            errorText: _codeError,
+            onRequestCode: _handleRequestCode,
+            onSubmitted: (_) => _handleLogin(),
+          ),
+          const SizedBox(height: 20),
+          AgreementCheckbox(
+            value: _agreed,
+            shakeSignal: _shakeSignal,
+            onChanged: (value) => setState(() => _agreed = value),
+            onUserAgreementTap: () => context.push(RoutePath.agreement),
+            onPrivacyPolicyTap: () => context.push(RoutePath.privacyPolicy),
+          ),
+          const SizedBox(height: 24),
+          PrimaryButton(
+            label: '登录',
+            loading: _submitting,
+            onPressed: _handleLogin,
+          ),
+          const SizedBox(height: 14),
+          SecondaryButton(
+            label: '账号密码登录',
+            onPressed: () => context.go(RoutePath.passwordLogin),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                '未拥有账号？',
+                style: TextStyle(fontSize: 13, color: AppColors.text3),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => context.go(RoutePath.register),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Text(
+                    '点击注册',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 32),
-                TextFormField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(hintText: '手机号'),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return '请输入手机号';
-                    if (v.trim().length != 11) return '手机号应为 11 位';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _pwdCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(hintText: '密码'),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? '请输入密码' : null,
-                  onFieldSubmitted: (_) => _submit(),
-                ),
-                const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('登录'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _loading ? null : _enterTest,
-                  child: const Text('测试进入（免登录，直达书城）'),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
+        ],
       ),
     );
   }

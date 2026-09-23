@@ -1,72 +1,182 @@
-import 'dart:developer' as developer;
+import 'dart:async';
 
 import 'package:dio/dio.dart';
 
+import '../../../features/auth/data/auth_repository.dart';
 import '../../storage/token_storage.dart';
 
-/// 认证拦截器：自动为业务请求注入 `Authorization: Bearer {token}`。
-///
-/// 登录/注册等无需鉴权的接口通过 [_publicPaths] 跳过。
+/// A3 AuthInterceptor:
+/// - Bearer inject only for non-public App API requests
+/// - single-flight refresh + waiter queue
+/// - at most one retry after successful refresh
+/// - non-retryable classification clears credentials once
 class AuthInterceptor extends Interceptor {
-  AuthInterceptor(this._storage);
+  AuthInterceptor(
+    this._storage,
+    this._repositoryResolver, [
+    this._refreshCountProbe,
+  ]);
 
   final TokenStorage _storage;
+  final AuthRepository Function() _repositoryResolver;
+  final int Function()? _refreshCountProbe;
 
-  /// 无需携带 token 的公开接口。
   static const List<String> _publicPaths = [
-    '/auth/sms-code',
+    '/auth/sms/send',
+    '/auth/sms/login',
+    '/auth/password/login',
     '/auth/register',
-    '/auth/login',
-    '/auth/login-sms',
+    '/auth/token/refresh',
     '/auth/password/reset',
-    '/auth/refresh',
+    '/auth/agreements',
   ];
 
-  bool _isPublic(String path) =>
-      _publicPaths.any((p) => path.startsWith(p));
+  static const String _retryHeader = 'X-Auth-Retry';
+  static const String _deviceId = 'flutter-device';
+
+  /// Test seam: when set, retry requests use this adapter (unit tests only).
+  static HttpClientAdapter? debugRetryAdapter;
+
+  Completer<bool>? _refreshInFlight;
+  int _refreshCount = 0;
+
+  AuthRepository get _repo => _repositoryResolver();
+
+  bool isPublic(String path) {
+    final p = path.startsWith('/api/v1') ? path.substring('/api/v1'.length) : path;
+    if (p.startsWith('/auth/oauth/')) return true;
+    return _publicPaths.any((e) => p == e || p.startsWith(e));
+  }
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final token = _storage.token;
-    if (token != null && token.isNotEmpty && !_isPublic(options.path)) {
+    if (token != null && token.isNotEmpty && !isPublic(options.path)) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    // 401：登录态失效，交由上层 auth 状态处理（清 token + 跳登录）。
-    if (err.response?.statusCode == 401) {
-      developer.log('收到 401，登录态可能已失效', name: 'AuthInterceptor');
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    final status = err.response?.statusCode;
+    final options = err.requestOptions;
+    final alreadyRetried = options.headers[_retryHeader] == true;
+
+    if (status != 401 || isPublic(options.path) || alreadyRetried) {
+      handler.next(err);
+      return;
     }
-    handler.next(err);
-  }
-}
 
-/// 日志拦截器（仅 debug 使用）。
-class AppLogInterceptor extends Interceptor {
-  @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    developer.log('--> ${options.method} ${options.uri}', name: 'HTTP');
-    handler.next(options);
+    final code = _businessCode(err);
+    final hasRefresh = _storage.refreshToken != null && _storage.refreshToken!.isNotEmpty;
+    // 40101 allows refresh; unknown 401 with refresh token also tries once.
+    // 40100/40102/40103/40300/40301 must not refresh.
+    final nonRetryable = code == 40100 ||
+        code == 40102 ||
+        code == 40103 ||
+        code == 40300 ||
+        code == 40301;
+    final canRefresh = hasRefresh && !nonRetryable && (code == 40101 || code == null);
+    if (!canRefresh) {
+      await _storage.clear();
+      handler.next(err);
+      return;
+    }
+
+    final authHeader = options.headers['Authorization'];
+    final oldToken = authHeader is String && authHeader.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : (_storage.token ?? '');
+    final ok = await _singleFlightRefresh(oldToken: oldToken);
+    if (!ok) {
+      await _storage.clear();
+      handler.next(err);
+      return;
+    }
+
+    final token = _storage.token;
+    if (token == null || token.isEmpty) {
+      await _storage.clear();
+      handler.next(err);
+      return;
+    }
+
+    options.headers['Authorization'] = 'Bearer $token';
+    options.headers[_retryHeader] = true;
+    try {
+      final retryDio = Dio(BaseOptions(
+        baseUrl: options.baseUrl,
+        contentType: Headers.jsonContentType,
+        validateStatus: (s) => s != null && s < 500 && s != 401,
+      ));
+      final adapter = debugRetryAdapter;
+      if (adapter != null) {
+        retryDio.httpClientAdapter = adapter;
+      }
+      final resp = await retryDio.fetch<dynamic>(options);
+      if (resp.statusCode != null && resp.statusCode! >= 400) {
+        // Treat post-refresh error as non-retryable; clear once (APP-08).
+        await _storage.clear();
+        handler.next(err);
+        return;
+      }
+      handler.resolve(resp);
+    } catch (_) {
+      // APP-08: second 401 after refresh must not loop.
+      await _storage.clear();
+      handler.next(err);
+    }
   }
 
-  @override
-  void onResponse(Response response, ResponseInterceptorHandler handler) {
-    developer.log(
-      '<-- ${response.statusCode} ${response.requestOptions.uri}\n${response.data}',
-      name: 'HTTP',
-    );
-    handler.next(response);
+  /// APP-05: concurrent 401s share one refresh request.
+  /// If a prior refresh already rotated the token, return success without a second call.
+  Future<bool> _singleFlightRefresh({required String oldToken}) {
+    final inflight = _refreshInFlight;
+    if (inflight != null && !inflight.isCompleted) {
+      return inflight.future;
+    }
+    final current = _storage.token;
+    if (current != null && current.isNotEmpty && current != oldToken) {
+      return Future<bool>.value(true);
+    }
+    final c = Completer<bool>();
+    _refreshInFlight = c;
+    _doRefresh().then((ok) {
+      if (!c.isCompleted) c.complete(ok);
+    }).catchError((Object _) {
+      if (!c.isCompleted) c.complete(false);
+    });
+    return c.future;
   }
 
-  @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    developer.log(
-      '<-- ERROR ${err.type} ${err.requestOptions.uri}\n${err.message}',
-      name: 'HTTP',
-    );
-    handler.next(err);
+  Future<bool> _doRefresh() async {
+    final refresh = _storage.refreshToken;
+    if (refresh == null || refresh.isEmpty) return false;
+    try {
+      final session = await _repo.refresh(
+        refreshToken: refresh,
+        deviceId: _deviceId,
+      );
+      await _storage.updateTokens(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      );
+      await _storage.cacheUser(session.user.toJson());
+      _refreshCount++;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  int get refreshCountForTest => _refreshCountProbe?.call() ?? _refreshCount;
+
+  static int? _businessCode(DioException err) {
+    final data = err.response?.data;
+    if (data is Map && data['code'] is num) {
+      return (data['code'] as num).toInt();
+    }
+    return null;
   }
 }

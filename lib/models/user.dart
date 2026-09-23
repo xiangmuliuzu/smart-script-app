@@ -1,9 +1,8 @@
-/// 账号类型（接口文档 2.1.3 / 数据库 sys_user.user_type）。
+/// A3 CurrentUser / AuthSession models (A3-AUTH-CONTRACT-v1).
 enum UserType {
-  user('user', '普通用户'),
-  creator('creator', '创作者'),
-  client('client', '甲方'),
-  admin('admin', '管理员');
+  user('01', '普通用户'),
+  creator('02', '创作者'),
+  client('03', '甲方');
 
   const UserType(this.code, this.label);
 
@@ -16,56 +15,106 @@ enum UserType {
       );
 }
 
-/// 用户核心模型（对照数据库 sys_user 与接口 2.1.3 / 2.2.1 输出字段）。
-///
-/// 这是框架层提供的**基础模型**，各业务模块可在此之上扩展自己的 DTO。
 class User {
   const User({
     required this.userId,
     required this.userType,
-    this.phone,
+    this.phoneMasked,
     this.nickname,
     this.avatar,
-    this.bio,
-    this.status,
-    this.authStatus,
+    this.realNameStatus = 'NOT_SUBMITTED',
+    this.roles = const [],
+    this.permissions = const [],
+    this.authorCapability = false,
+    this.hasPassword = false,
   });
 
   final int userId;
   final UserType userType;
-  final String? phone;
+  final String? phoneMasked;
   final String? nickname;
   final String? avatar;
-  final String? bio;
+  final String realNameStatus;
 
-  /// 账号状态：0 禁用 / 1 正常 / 2 冻结。
-  final int? status;
+  /// 角色编码：用于**授权**判断（规格 §10）。与实名状态互相独立。
+  final List<String> roles;
 
-  /// 实名认证状态：none/pending/approved/rejected（接口 2.2.1）。
-  final String? authStatus;
+  /// 权限标识：用于入口/按钮级授权判断；接口侧仍会独立校验，客户端判断只控制展示。
+  final List<String> permissions;
+
+  /// 作者能力：账号是否已开通作者能力，与角色、实名均独立。
+  final bool authorCapability;
+
+  /// 是否已设置密码（A5）：账号安全页据此在「首次设置密码」与「修改密码」间选择入口。
+  final bool hasPassword;
 
   bool get isCreator => userType == UserType.creator;
   bool get isClient => userType == UserType.client;
 
+  /// 规格 §10 的统一身份能力：实名是否已通过。
+  bool get isRealNameApproved => realNameStatus == 'APPROVED';
+
+  /// 规格 §10 的统一身份能力：是否具备某角色（授权判断）。
+  bool hasRole(String roleCode) => roles.contains(roleCode);
+
+  /// 规格 §10 的统一身份能力：是否具备某权限（入口/按钮级授权判断）。
+  ///
+  /// 支持若依通配权限 `*:*:*`。接口侧仍必须独立校验，此处只用于展示控制。
+  bool hasPermission(String permission) {
+    if (permission.isEmpty) return false;
+    return permissions.contains(permission) || permissions.contains('*:*:*');
+  }
+
   factory User.fromJson(Map<String, dynamic> json) => User(
         userId: (json['userId'] as num?)?.toInt() ?? 0,
         userType: UserType.fromCode(json['userType'] as String?),
-        phone: json['phone'] as String?,
+        phoneMasked: json['phoneMasked'] as String?,
         nickname: json['nickname'] as String?,
         avatar: json['avatar'] as String?,
-        bio: json['bio'] as String?,
-        status: (json['status'] as num?)?.toInt(),
-        authStatus: json['authStatus'] as String?,
+        realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
+        roles: (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
+        permissions: (json['permissions'] as List?)?.whereType<String>().toList() ?? const [],
+        authorCapability: json['authorCapability'] as bool? ?? false,
+        hasPassword: json['hasPassword'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
         'userId': userId,
         'userType': userType.code,
-        'phone': phone,
+        'phoneMasked': phoneMasked,
         'nickname': nickname,
         'avatar': avatar,
-        'bio': bio,
-        'status': status,
-        'authStatus': authStatus,
+        'realNameStatus': realNameStatus,
+        'roles': roles,
+        'permissions': permissions,
+        'authorCapability': authorCapability,
+        'hasPassword': hasPassword,
       };
+}
+
+class AuthSession {
+  const AuthSession({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.tokenType,
+    required this.expiresIn,
+    required this.refreshExpiresIn,
+    required this.user,
+  });
+
+  final String accessToken;
+  final String refreshToken;
+  final String tokenType;
+  final int expiresIn;
+  final int refreshExpiresIn;
+  final User user;
+
+  factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
+        accessToken: json['accessToken'] as String? ?? '',
+        refreshToken: json['refreshToken'] as String? ?? '',
+        tokenType: json['tokenType'] as String? ?? 'Bearer',
+        expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 0,
+        refreshExpiresIn: (json['refreshExpiresIn'] as num?)?.toInt() ?? 0,
+        user: User.fromJson(Map<String, dynamic>.from(json['user'] as Map? ?? {})),
+      );
 }

@@ -43,8 +43,10 @@ dependencies:
   go_router: ^13.2.0
   # 网络请求（对接接口文档 RESTful API）
   dio: ^5.4.0
-  # 登录态持久化（token / 用户信息）
+  # 登录态持久化（非敏感展示字段）
   shared_preferences: ^2.2.2
+  # A3：平台安全存储（Token/Refresh Token）；经负责人批准引入
+  flutter_secure_storage: ^9.2.2
 
 dev_dependencies:
   flutter_test:
@@ -68,10 +70,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # 认证页品牌资源：Logo 与第三方登录入口图标（与参考 Flutter 项目同源）。
+  assets:
+    - assets/images/logo_script.png
+    - assets/images/icon_wechat.png
+    - assets/images/icon_qq.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
