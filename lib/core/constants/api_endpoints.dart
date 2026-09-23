@@ -38,6 +38,12 @@ class ApiEndpoints {
   static const String feedback = '/feedback';
   static String feedbackById(int feedbackId) => '/feedback/$feedbackId';
 
+  // ===== A6 内容域契约（B 模块示例）=====
+  /// 公开作品列表（游客可读）
+  static const String contentWorks = '/content/works';
+  /// 我的书架（需 App Token）
+  static const String contentShelf = '/content/shelf';
+
   /// App 域头像上传（multipart，字段名 `file`）。
   ///
   /// 不走平台原生的 `/common/upload`：该端点属于 PC 凭证链，App Token 无法通过鉴权，

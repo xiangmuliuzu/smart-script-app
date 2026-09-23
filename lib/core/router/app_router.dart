@@ -6,6 +6,7 @@ import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
+import '../../features/bookstore/pages/bookshelf_page.dart';
 import '../../features/category/category_page.dart';
 import '../../features/comic/comic_page.dart';
 import '../../features/create/create_page.dart';
@@ -72,10 +73,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           return isSplash ? null : RoutePath.splash;
         case AuthStatus.unauthenticated:
           if (isAuthPage) return null;
-          // 受保护入口：保存回跳意图后进入登录页
-          if (ProtectedRoutes.isProtected(loc)) {
-            _rememberIntent(ref, state);
-          }
+          // 启动页只是会话恢复期的中转：判定完成后进入公开首页（游客可浏览书城）
+          if (isSplash) return RoutePath.home;
+          // 未登录：
+          //   - 受保护入口（书架、收藏、福利、AI、上传、询盘、订单、合同、印章等）
+          //     -> 保存回跳意图后进入登录页；
+          //   - 公开入口（书城、漫剧、分类等）-> 允许游客浏览，不做跳转。
+          //     规格 §8.1 只要求受保护入口走守卫，公开内容不强制登录。
+          if (!ProtectedRoutes.isProtected(loc)) return null;
+          _rememberIntent(ref, state);
           return RoutePath.login;
         case AuthStatus.authenticated:
           return (isAuthPage || isSplash) ? RoutePath.home : null;
@@ -152,6 +158,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      // ===== A6 示例业务入口（B 模块）=====
+      GoRoute(
+        path: RoutePath.bookshelf,
+        name: RouteName.bookshelf,
+        builder: (_, __) => const BookshelfPage(),
       ),
       // ===== A5 用户中心 =====
       // 列表与详情拆成两个静态路径，用查询参数区分记录：

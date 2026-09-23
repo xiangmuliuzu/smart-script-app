@@ -19,7 +19,10 @@ void main() {
         child: const ScriptApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    // 用固定时长 pump 而不是 pumpAndSettle：书城会发起网络请求，
+    // 在测试环境不会有响应，settle 会一直等待。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     expect(find.byType(MaterialApp), findsWidgets);
     expect(find.textContaining('测试进入'), findsNothing);
   });

@@ -29,6 +29,9 @@ class RoutePath {
   static const String passwordEdit = '/profile/security/password';
   static const String notificationPreferences = '/profile/notification-preferences';
 
+  // A6 示例业务入口（B 模块：内容/书城），受登录与实名守卫保护
+  static const String bookshelf = '/bookshelf';
+
   // A5 消息中心（列表与详情用查询参数区分，便于登录回跳时整串还原）
   static const String messages = '/profile/messages';
   static const String messageDetail = '/profile/messages/detail';
@@ -57,6 +60,7 @@ class RouteName {
   static const String phoneChange = 'phoneChange';
   static const String passwordEdit = 'passwordEdit';
   static const String notificationPreferences = 'notificationPreferences';
+  static const String bookshelf = 'bookshelf';
   static const String messages = 'messages';
   static const String messageDetail = 'messageDetail';
   static const String feedback = 'feedback';
@@ -74,6 +78,7 @@ class ProtectedRoutes {
   /// 需要登录的路径前缀。
   static const List<String> prefixes = <String>[
     RoutePath.profile, // 我的及用户中心全部子页面
+    RoutePath.bookshelf, // A6 示例（B 模块）受保护入口
   ];
 
   static bool isProtected(String location) {

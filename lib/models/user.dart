@@ -24,6 +24,8 @@ class User {
     this.avatar,
     this.realNameStatus = 'NOT_SUBMITTED',
     this.roles = const [],
+    this.permissions = const [],
+    this.authorCapability = false,
     this.hasPassword = false,
   });
 
@@ -33,7 +35,15 @@ class User {
   final String? nickname;
   final String? avatar;
   final String realNameStatus;
+
+  /// 角色编码：用于**授权**判断（规格 §10）。与实名状态互相独立。
   final List<String> roles;
+
+  /// 权限标识：用于入口/按钮级授权判断；接口侧仍会独立校验，客户端判断只控制展示。
+  final List<String> permissions;
+
+  /// 作者能力：账号是否已开通作者能力，与角色、实名均独立。
+  final bool authorCapability;
 
   /// 是否已设置密码（A5）：账号安全页据此在「首次设置密码」与「修改密码」间选择入口。
   final bool hasPassword;
@@ -44,8 +54,16 @@ class User {
   /// 规格 §10 的统一身份能力：实名是否已通过。
   bool get isRealNameApproved => realNameStatus == 'APPROVED';
 
-  /// 规格 §10 的统一身份能力：是否具备某角色。
+  /// 规格 §10 的统一身份能力：是否具备某角色（授权判断）。
   bool hasRole(String roleCode) => roles.contains(roleCode);
+
+  /// 规格 §10 的统一身份能力：是否具备某权限（入口/按钮级授权判断）。
+  ///
+  /// 支持若依通配权限 `*:*:*`。接口侧仍必须独立校验，此处只用于展示控制。
+  bool hasPermission(String permission) {
+    if (permission.isEmpty) return false;
+    return permissions.contains(permission) || permissions.contains('*:*:*');
+  }
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         userId: (json['userId'] as num?)?.toInt() ?? 0,
@@ -55,6 +73,8 @@ class User {
         avatar: json['avatar'] as String?,
         realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
         roles: (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
+        permissions: (json['permissions'] as List?)?.whereType<String>().toList() ?? const [],
+        authorCapability: json['authorCapability'] as bool? ?? false,
         hasPassword: json['hasPassword'] as bool? ?? false,
       );
 
@@ -66,6 +86,8 @@ class User {
         'avatar': avatar,
         'realNameStatus': realNameStatus,
         'roles': roles,
+        'permissions': permissions,
+        'authorCapability': authorCapability,
         'hasPassword': hasPassword,
       };
 }

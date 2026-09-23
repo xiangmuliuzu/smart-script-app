@@ -72,7 +72,7 @@ Future<ProviderContainer> _container() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('A5 无凭据冷启动：应用可构建并停在登录页', (tester) async {
+  testWidgets('A5/A6 无凭据冷启动：应用可构建，游客可浏览公开入口', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final storage = TokenStorage(_FakeSecureStorage(), prefs);
@@ -90,11 +90,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    // 未登录冷启动最终落在登录页（启动页 -> 会话校验 -> 登录页）
-    expect(find.text('欢迎回来'), findsOneWidget);
+    // A6 起：未登录冷启动落在公开入口（书城），不再强制跳登录页。
+    // 规格 §8.1 只要求书架、收藏、福利、AI、上传、询盘、订单、合同、印章等入口走守卫。
+    expect(find.text('书城'), findsWidgets);
+    expect(find.text('欢迎回来'), findsNothing);
   });
 
-  testWidgets('A5 守卫拦截受保护入口并保存回跳意图，登录页带 redirect 参数', (tester) async {
+  testWidgets('A5/A6 守卫拦截受保护入口并保存回跳意图', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final storage = TokenStorage(_FakeSecureStorage(), prefs);
@@ -111,7 +113,6 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    expect(find.text('欢迎回来'), findsOneWidget);
 
     // 未登录访问受保护的用户中心页面
     final context = tester.element(find.byType(MaterialApp));
