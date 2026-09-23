@@ -15,6 +15,28 @@
 
 共享区是跨仓语义的唯一来源。本仓不复制或自行修改 API 语义。
 
+## 后端与数据库初始化
+
+App 依赖的后端、数据库结构与菜单数据全部来自 `smart-script-backend`：
+
+| 内容 | 位置 |
+| --- | --- |
+| 环境准备、环境变量、**数据库初始化命令**、启动命令 | [smart-script-backend/README.md](https://github.com/xiangmuliuzu/smart-script-backend/blob/main/README.md) |
+| 初始化步骤清单（A2 → A1 → A4 → PC，每步校验 `SUMMARY=PASS`） | [scripts/db/init-steps.txt](https://github.com/xiangmuliuzu/smart-script-backend/blob/main/scripts/db/init-steps.txt) |
+| 已有数据库的升级与回滚说明 | [sql/migrations/README.md](https://github.com/xiangmuliuzu/smart-script-backend/blob/main/sql/migrations/README.md) |
+
+要点：初始化**只允许**写入不存在或完全为空的库，检测到已有表会安全拒绝；
+已有数据的库走迁移路径，不要导入 `ry_20260320.sql`。数据库就绪后按后端 README
+设置 `DB_URL` / `REDIS_*` / `TOKEN_SECRET` / `APP_*` 等环境变量再启动后端，然后
+指向该后端地址运行本仓：
+
+```bash
+flutter run --dart-define=BASE_URL=http://10.0.2.2:8080/api/v1
+```
+
+（`BASE_URL` 默认值见 `lib/core/config/app_config.dart`；Android 模拟器访问宿主机用
+`10.0.2.2`，真机或桌面端改用后端实际地址。）
+
 ## A3 基线与边界
 
 - 基线：`main@96a497e4a9dce9ad6949cff22c5f7317f188ee11`
