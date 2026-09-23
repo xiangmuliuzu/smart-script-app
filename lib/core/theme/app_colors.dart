@@ -32,6 +32,13 @@ class AppColors {
   static const Color success = Color(0xFF3D8B5F);
   static const Color warning = Color(0xFFC98A2D);
   static const Color danger = Color(0xFFD54941);
+
+  /// 表单错误态（认证页下划线输入行与提示文案使用）。
+  static const Color error = Color(0xFFB54A44);
+
+  /// 第三方登录入口占位色。
+  static const Color wechatGreen = Color(0xFF07C160);
+  static const Color qqBlue = Color(0xFF12B7F5);
 }
 
 /// 圆角规范。

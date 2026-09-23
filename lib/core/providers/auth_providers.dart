@@ -148,6 +148,28 @@ class AuthController extends StateNotifier<AuthState> {
     if (mounted) state = const AuthState(AuthStatus.unauthenticated);
   }
 
+  /// A5 账号安全：首次设置密码（原验证码注册未设密码的账号）。
+  ///
+  /// 后端在首次设置后会吊销其它会话，因此设置完成后刷新身份摘要即可，
+  /// 当前设备会话保留。
+  Future<void> passwordSet(String password) => _repository.passwordSet(password);
+
+  /// A5 账号安全：修改已有密码。后端会吊销该用户全部 App 会话，
+  /// 因此成功返回后本地凭证已经无效，由调用方触发 [forceLocalSignOut]。
+  Future<void> passwordChange({
+    required String oldPassword,
+    required String newPassword,
+  }) =>
+      _repository.passwordChange(oldPassword: oldPassword, newPassword: newPassword);
+
+  /// 服务端已吊销会话时的本地登出（不再调用后端 logout）。
+  ///
+  /// 换绑手机号、修改密码后使用：清本地凭证并置为未登录，由路由守卫回登录页。
+  Future<void> forceLocalSignOut() async {
+    await _storage.clear();
+    if (mounted) state = const AuthState(AuthStatus.unauthenticated);
+  }
+
   Future<bool> prefsContainCredentials() => _storage.prefsContainCredentials();
 
   /// APP-14: production package must not expose free-login / preview session.

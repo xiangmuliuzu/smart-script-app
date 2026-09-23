@@ -6,6 +6,9 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
 /// 应用根组件。使用 go_router 作为路由来源，主题全局统一。
+///
+/// 返回键不需要在这里处理：用户中心子页面通过 [AuthGuard.pushProtected] 以
+/// `push` 打开，历史栈中有上一页，系统返回键与 AppBar 返回箭头都能自然回退。
 class ScriptApp extends ConsumerWidget {
   const ScriptApp({super.key});
 

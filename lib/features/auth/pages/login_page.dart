@@ -7,8 +7,24 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/auth_validators.dart';
+import '../../../core/widgets/app_toast.dart';
+import '../auth_feedback.dart';
+import '../auth_navigation.dart';
+import '../widgets/agreement_checkbox.dart';
+import '../widgets/auth_buttons.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/auth_page_scaffold.dart';
+import '../widgets/phone_input.dart';
+import '../widgets/social_login_area.dart';
+import '../widgets/verify_code_input.dart';
 
-/// A3 登录页：密码登录 + 验证码登录。无免登录入口。
+/// 登录首页（主流程：手机号 + 验证码）。
+///
+/// 信息架构参考同类 App 登录页：返回 -> Logo -> 主标题 -> 手机号 -> 验证码 ->
+/// 协议勾选 -> 主按钮 -> 次按钮（账号密码登录）-> 注册入口 -> 第三方登录。
+///
+/// 登录成功后消费一次守卫保存的回跳意图（规格 §8.1），保持既有登录回跳行为。
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -17,177 +33,184 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _phoneCtrl = TextEditingController();
-  final _pwdCtrl = TextEditingController();
-  final _codeCtrl = TextEditingController();
-  bool _loading = false;
-  bool _useSms = false;
-  int _cooldown = 0;
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  final FocusNode _codeFocusNode = FocusNode();
+
+  bool _agreed = false;
+  bool _submitting = false;
+  int _shakeSignal = 0;
+  String? _phoneError;
+  String? _codeError;
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
-    _pwdCtrl.dispose();
-    _codeCtrl.dispose();
+    _phoneController.dispose();
+    _codeController.dispose();
+    _codeFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+  /// 获取验证码：先本地校验手机号，再请求既有 `/auth/sms/send`（scene=LOGIN）。
+  /// 返回是否发送成功，失败时按钮立即恢复可点（不倒计时）。
+  Future<bool> _handleRequestCode() async {
+    FocusScope.of(context).unfocus();
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    if (phoneError != null) {
+      setState(() => _phoneError = phoneError);
+      return false;
+    }
+    setState(() => _phoneError = null);
+
     try {
-      final phone = _phoneCtrl.text.trim();
-      final auth = ref.read(authControllerProvider.notifier);
-      if (_useSms) {
-        await auth.loginWithSms(phone: phone, code: _codeCtrl.text.trim());
-      } else {
-        await auth.loginWithPassword(phone, _pwdCtrl.text);
+      await ref.read(authRepositoryProvider).sendSms(
+            phone: _phoneController.text.trim(),
+            scene: 'LOGIN',
+          );
+      if (!mounted) {
+        return true;
       }
+      showAppToast(context, '验证码已发送，请注意查收短信');
+      return true;
     } on ApiException catch (e) {
-      _toast(e.message);
+      if (mounted) {
+        showAppToast(context, AuthFeedback.smsSendError(e));
+      }
+      return false;
     } catch (_) {
-      _toast('登录失败，请稍后重试');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        showAppToast(context, '验证码发送失败，请稍后重试');
+      }
+      return false;
     }
   }
 
-  Future<void> _sendSms() async {
-    final phone = _phoneCtrl.text.trim();
-    if (!RegExp(r'^1\d{10}$').hasMatch(phone)) {
-      _toast('请输入正确的手机号');
+  /// 登录：未勾选协议时只做提示与抖动，绝不提交接口。
+  Future<void> _handleLogin() async {
+    FocusScope.of(context).unfocus();
+    if (!_agreed) {
+      setState(() => _shakeSignal += 1);
+      showAppToast(context, '请先阅读并同意用户协议和隐私政策');
       return;
     }
-    if (_cooldown > 0) return;
-    setState(() => _loading = true);
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    final codeError = AuthValidators.smsCode(_codeController.text);
+    setState(() {
+      _phoneError = phoneError;
+      _codeError = codeError;
+    });
+    if (phoneError != null || codeError != null) {
+      return;
+    }
+
+    setState(() => _submitting = true);
     try {
-      await ref.read(authRepositoryProvider).sendSms(phone: phone, scene: 'LOGIN');
-      if (!mounted) return;
-      setState(() => _cooldown = 60);
-      _toast('验证码已发送');
-      Future.doWhile(() async {
-        await Future<void>.delayed(const Duration(seconds: 1));
-        if (!mounted) return false;
-        setState(() => _cooldown -= 1);
-        return _cooldown > 0;
-      });
+      await ref.read(authControllerProvider.notifier).loginWithSms(
+            phone: _phoneController.text.trim(),
+            code: _codeController.text.trim(),
+          );
+      if (!mounted) {
+        return;
+      }
+      // 登录成功后消费一次回跳意图，否则回安全默认首页
+      resolvePostLoginTarget(context, ref);
     } on ApiException catch (e) {
-      final retry = e.data is Map ? (e.data as Map)['retryAfterSeconds'] : null;
-      if (retry is num) setState(() => _cooldown = retry.toInt());
-      _toast(e.message);
+      if (mounted) {
+        showAppToast(context, e.message);
+      }
     } catch (_) {
-      _toast('发送失败，请稍后重试');
+      if (mounted) {
+        showAppToast(context, '登录失败，请稍后重试');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
-  void _toast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  /// 微信 / QQ 入口：后端 OAuth 当前固定返回「暂未开放」，只提示，不做假登录。
+  void _handleSocialLogin(String providerName) {
+    showAppToast(context, '$providerName登录暂未开放，敬请期待');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              children: [
-                const SizedBox(height: 48),
-                const Text(
-                  '欢迎回来',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.text1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _useSms ? '使用验证码登录' : '使用密码登录',
-                  style: const TextStyle(color: AppColors.text3),
-                ),
-                const SizedBox(height: 32),
-                TextFormField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: '手机号'),
-                  validator: (v) {
-                    final s = (v ?? '').trim();
-                    if (!RegExp(r'^1\d{10}$').hasMatch(s)) {
-                      return '请输入 11 位手机号';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                if (!_useSms)
-                  TextFormField(
-                    controller: _pwdCtrl,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: '密码'),
-                    validator: (v) {
-                      if ((v ?? '').isEmpty) return '请输入密码';
-                      return null;
-                    },
-                  )
-                else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _codeCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: '验证码'),
-                          validator: (v) {
-                            if ((v ?? '').trim().length < 4) return '请输入验证码';
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      TextButton(
-                        onPressed: _cooldown > 0 || _loading ? null : _sendSms,
-                        child: Text(_cooldown > 0 ? '${_cooldown}s' : '获取验证码'),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('登录'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    if (mounted) {
-                      setState(() => _useSms = !_useSms);
-                    }
-                  },
-                  child: Text(_useSms ? '改用密码登录' : '改用验证码登录'),
-                ),
-                TextButton(
-                  onPressed: () => context.go(RoutePath.register),
-                  child: const Text('没有账号？去注册'),
-                ),
-                TextButton(
-                  onPressed: () => context.go(RoutePath.forgotPassword),
-                  child: const Text('忘记密码'),
-                ),
-              ],
-            ),
+    return AuthPageScaffold(
+      bottom: SocialLoginArea(
+        onWechatTap: () => _handleSocialLogin('微信'),
+        onQqTap: () => _handleSocialLogin('QQ'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AuthHeader(
+            title: '登录后体验完整功能',
+            onBack: () => leaveAuthHome(context),
           ),
-        ),
+          PhoneInput(
+            controller: _phoneController,
+            errorText: _phoneError,
+            onChanged: (_) {
+              if (_phoneError != null) {
+                setState(() => _phoneError = null);
+              }
+            },
+            onSubmitted: (_) => _codeFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          VerifyCodeInput(
+            controller: _codeController,
+            focusNode: _codeFocusNode,
+            errorText: _codeError,
+            onRequestCode: _handleRequestCode,
+            onSubmitted: (_) => _handleLogin(),
+          ),
+          const SizedBox(height: 20),
+          AgreementCheckbox(
+            value: _agreed,
+            shakeSignal: _shakeSignal,
+            onChanged: (value) => setState(() => _agreed = value),
+            onUserAgreementTap: () => context.push(RoutePath.agreement),
+            onPrivacyPolicyTap: () => context.push(RoutePath.privacyPolicy),
+          ),
+          const SizedBox(height: 24),
+          PrimaryButton(
+            label: '登录',
+            loading: _submitting,
+            onPressed: _handleLogin,
+          ),
+          const SizedBox(height: 14),
+          SecondaryButton(
+            label: '账号密码登录',
+            onPressed: () => context.go(RoutePath.passwordLogin),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                '未拥有账号？',
+                style: TextStyle(fontSize: 13, color: AppColors.text3),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => context.go(RoutePath.register),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Text(
+                    '点击注册',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
