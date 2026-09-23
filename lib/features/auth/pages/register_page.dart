@@ -3,12 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../../../core/providers/auth_providers.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/auth_validators.dart';
+import '../../../core/widgets/app_toast.dart';
+import '../auth_feedback.dart';
+import '../auth_navigation.dart';
+import '../widgets/agreement_checkbox.dart';
+import '../widgets/auth_buttons.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/auth_page_scaffold.dart';
+import '../widgets/phone_input.dart';
+import '../widgets/underlined_input.dart';
+import '../widgets/verify_code_input.dart';
 
-/// A3 注册页：手机号 + 验证码 + 密码 + 协议（服务端校验当前版本）。
+/// 注册页：手机号 -> 验证码 -> 设置密码 -> 确认密码 -> 注册并登录。
+///
+/// 注册成功后服务端直接下发会话，登录守卫随即把根路由切到首页（不额外回跳）。
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
@@ -17,160 +30,191 @@ class RegisterPage extends ConsumerStatefulWidget {
 }
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _phoneCtrl = TextEditingController();
-  final _codeCtrl = TextEditingController();
-  final _pwdCtrl = TextEditingController();
-  bool _agree = false;
-  bool _loading = false;
-  int _cooldown = 0;
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmController = TextEditingController();
+  final FocusNode _codeFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
+
+  bool _agreed = false;
+  bool _obscure = true;
+  bool _submitting = false;
+  int _shakeSignal = 0;
+  String? _phoneError;
+  String? _codeError;
+  String? _passwordError;
+  String? _confirmError;
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
-    _codeCtrl.dispose();
-    _pwdCtrl.dispose();
+    _phoneController.dispose();
+    _codeController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    _codeFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _sendSms() async {
-    final phone = _phoneCtrl.text.trim();
-    if (!RegExp(r'^1\d{10}$').hasMatch(phone)) {
-      _toast('请输入正确的手机号');
-      return;
+  /// 获取验证码：先本地校验手机号，再请求既有 `/auth/sms/send`（scene=REGISTER）。
+  Future<bool> _handleRequestCode() async {
+    FocusScope.of(context).unfocus();
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    if (phoneError != null) {
+      setState(() => _phoneError = phoneError);
+      return false;
     }
-    if (_cooldown > 0) return;
-    setState(() => _loading = true);
+    setState(() => _phoneError = null);
+
     try {
-      await ref.read(authRepositoryProvider).sendSms(phone: phone, scene: 'REGISTER');
-      if (!mounted) return;
-      setState(() => _cooldown = 60);
-      Future.doWhile(() async {
-        await Future<void>.delayed(const Duration(seconds: 1));
-        if (!mounted) return false;
-        setState(() => _cooldown -= 1);
-        return _cooldown > 0;
-      });
+      await ref.read(authRepositoryProvider).sendSms(
+            phone: _phoneController.text.trim(),
+            scene: 'REGISTER',
+          );
+      if (!mounted) {
+        return true;
+      }
+      showAppToast(context, '验证码已发送，请注意查收短信');
+      return true;
     } on ApiException catch (e) {
-      _toast(e.message);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        showAppToast(context, AuthFeedback.smsSendError(e));
+      }
+      return false;
+    } catch (_) {
+      if (mounted) {
+        showAppToast(context, '验证码发送失败，请稍后重试');
+      }
+      return false;
     }
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (!_agree) {
-      _toast('请先同意用户协议与隐私政策');
+  /// 注册：未勾选协议时只做提示与抖动，绝不提交接口。
+  Future<void> _handleRegister() async {
+    FocusScope.of(context).unfocus();
+    if (!_agreed) {
+      setState(() => _shakeSignal += 1);
+      showAppToast(context, '请先阅读并同意用户协议和隐私政策');
       return;
     }
-    setState(() => _loading = true);
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    final codeError = AuthValidators.smsCode(_codeController.text);
+    final passwordError = AuthValidators.password(_passwordController.text);
+    final confirmError = AuthValidators.confirmPassword(
+      _confirmController.text,
+      _passwordController.text,
+    );
+    setState(() {
+      _phoneError = phoneError;
+      _codeError = codeError;
+      _passwordError = passwordError;
+      _confirmError = confirmError;
+    });
+    if (phoneError != null ||
+        codeError != null ||
+        passwordError != null ||
+        confirmError != null) {
+      return;
+    }
+
+    setState(() => _submitting = true);
     try {
       await ref.read(authControllerProvider.notifier).register(
-            phone: _phoneCtrl.text.trim(),
-            code: _codeCtrl.text.trim(),
-            password: _pwdCtrl.text,
+            phone: _phoneController.text.trim(),
+            code: _codeController.text.trim(),
+            password: _passwordController.text,
           );
+      // 注册成功后服务端直接下发令牌，登录守卫把根路由切到首页
     } on ApiException catch (e) {
-      _toast(e.message);
+      if (mounted) {
+        showAppToast(context, e.message);
+      }
     } catch (_) {
-      _toast('注册失败，请稍后重试');
+      if (mounted) {
+        showAppToast(context, '注册失败，请稍后重试');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
-  }
-
-  void _toast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('注册'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(RoutePath.login),
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              children: [
-                TextFormField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: '手机号'),
-                  validator: (v) =>
-                      RegExp(r'^1\d{10}$').hasMatch((v ?? '').trim()) ? null : '请输入 11 位手机号',
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _codeCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '验证码'),
-                        validator: (v) => (v ?? '').trim().length >= 4 ? null : '请输入验证码',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _cooldown > 0 || _loading ? null : _sendSms,
-                      child: Text(_cooldown > 0 ? '${_cooldown}s' : '获取验证码'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _pwdCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: '密码（8-64位，含字母与数字）'),
-                  validator: (v) {
-                    final s = v ?? '';
-                    if (s.length < 8 || s.length > 64) return '密码长度 8-64';
-                    if (!RegExp(r'[A-Za-z]').hasMatch(s) || !RegExp(r'\d').hasMatch(s)) {
-                      return '密码需同时包含字母与数字';
-                    }
-                    return null;
-                  },
-                ),
-                CheckboxListTile(
-                  value: _agree,
-                  onChanged: (v) => setState(() => _agree = v ?? false),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('我已阅读并同意《用户协议》与《隐私政策》', style: TextStyle(fontSize: 13)),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('注册并登录'),
-                ),
-                TextButton(
-                  onPressed: () => context.go(RoutePath.login),
-                  child: const Text('已有账号？去登录'),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '协议版本由服务端 /auth/agreements 下发；自动注册须提交当前两类协议。',
-                  style: TextStyle(fontSize: 12, color: AppColors.text3),
-                ),
-              ],
+    return AuthPageScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AuthHeader(
+            title: '注册新账号',
+            subtitle: '验证手机号后设置登录密码',
+            onBack: () => backToLogin(context),
+          ),
+          PhoneInput(
+            controller: _phoneController,
+            errorText: _phoneError,
+            onChanged: (_) {
+              if (_phoneError != null) {
+                setState(() => _phoneError = null);
+              }
+            },
+            onSubmitted: (_) => _codeFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          VerifyCodeInput(
+            controller: _codeController,
+            focusNode: _codeFocusNode,
+            errorText: _codeError,
+            onRequestCode: _handleRequestCode,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _passwordFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          UnderlinedInput(
+            controller: _passwordController,
+            focusNode: _passwordFocusNode,
+            hintText: '8-64 位，含字母和数字',
+            label: '密码',
+            errorText: _passwordError,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.next,
+            trailing: IconButton(
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(
+                _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                size: 20,
+                color: AppColors.text3,
+              ),
+              tooltip: _obscure ? '显示密码' : '隐藏密码',
             ),
           ),
-        ),
+          const SizedBox(height: 8),
+          UnderlinedInput(
+            controller: _confirmController,
+            hintText: '请再次输入密码',
+            label: '确认',
+            errorText: _confirmError,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _handleRegister(),
+          ),
+          const SizedBox(height: 20),
+          AgreementCheckbox(
+            value: _agreed,
+            shakeSignal: _shakeSignal,
+            onChanged: (value) => setState(() => _agreed = value),
+            onUserAgreementTap: () => context.push(RoutePath.agreement),
+            onPrivacyPolicyTap: () => context.push(RoutePath.privacyPolicy),
+          ),
+          const SizedBox(height: 24),
+          PrimaryButton(
+            label: '注册并登录',
+            loading: _submitting,
+            onPressed: _handleRegister,
+          ),
+        ],
       ),
     );
   }

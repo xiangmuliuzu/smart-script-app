@@ -9,8 +9,12 @@ class RoutePath {
 
   // 认证（不属于底部导航）
   static const String login = '/login';
+  static const String passwordLogin = '/login/password';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
+  // 登录前即可阅读的协议正文（协议勾选区域的两个链接）
+  static const String agreement = '/agreement';
+  static const String privacyPolicy = '/privacy-policy';
 
   // 主入口（Shell 内）：底部导航默认落在第一个分支书城，
   // 因此 home 必须是一个真实注册过的路由（不能是未注册的 '/'）。
@@ -45,8 +49,11 @@ class RouteName {
 
   static const String splash = 'splash';
   static const String login = 'login';
+  static const String passwordLogin = 'passwordLogin';
   static const String register = 'register';
   static const String forgotPassword = 'forgotPassword';
+  static const String agreement = 'agreement';
+  static const String privacyPolicy = 'privacyPolicy';
   static const String home = 'home';
   static const String bookstore = 'bookstore';
   static const String comic = 'comic';

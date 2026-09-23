@@ -2,8 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/pages/agreement_page.dart';
 import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_page.dart';
+import '../../features/auth/pages/password_login_page.dart';
+import '../../features/auth/pages/privacy_policy_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
@@ -63,8 +66,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final loc = state.matchedLocation;
-      final isAuthPage =
-          loc == RoutePath.login || loc == RoutePath.register || loc == RoutePath.forgotPassword;
+      final isAuthPage = loc == RoutePath.login ||
+          loc == RoutePath.passwordLogin ||
+          loc == RoutePath.register ||
+          loc == RoutePath.forgotPassword;
       final isSplash = loc == RoutePath.splash;
 
       switch (auth.status) {
@@ -99,6 +104,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const LoginPage(),
       ),
       GoRoute(
+        path: RoutePath.passwordLogin,
+        name: RouteName.passwordLogin,
+        builder: (_, __) => const PasswordLoginPage(),
+      ),
+      GoRoute(
         path: RoutePath.register,
         name: RouteName.register,
         builder: (_, __) => const RegisterPage(),
@@ -107,6 +117,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.forgotPassword,
         name: RouteName.forgotPassword,
         builder: (_, __) => const ForgotPasswordPage(),
+      ),
+      // 协议正文：登录前即可阅读，由协议勾选区域的两个链接进入
+      GoRoute(
+        path: RoutePath.agreement,
+        name: RouteName.agreement,
+        builder: (_, __) => const AgreementPage(),
+      ),
+      GoRoute(
+        path: RoutePath.privacyPolicy,
+        name: RouteName.privacyPolicy,
+        builder: (_, __) => const PrivacyPolicyPage(),
       ),
       // 底部导航五格：书城 / 漫剧 / 创作(+) / 分类 / 我的
       StatefulShellRoute.indexedStack(

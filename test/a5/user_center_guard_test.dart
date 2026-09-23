@@ -11,6 +11,7 @@ import 'package:script_app/core/router/route_paths.dart';
 import 'package:script_app/core/storage/secure_token_storage.dart';
 import 'package:script_app/core/storage/token_storage.dart';
 import 'package:script_app/features/user_center/data/user_center_models.dart';
+import 'package:script_app/features/auth/pages/login_page.dart';
 import 'package:script_app/models/user.dart';
 import 'package:script_app/features/user_center/data/user_center_providers.dart';
 import 'package:script_app/features/user_center/data/user_center_repository.dart';
@@ -93,7 +94,7 @@ void main() {
     // A6 起：未登录冷启动落在公开入口（书城），不再强制跳登录页。
     // 规格 §8.1 只要求书架、收藏、福利、AI、上传、询盘、订单、合同、印章等入口走守卫。
     expect(find.text('书城'), findsWidgets);
-    expect(find.text('欢迎回来'), findsNothing);
+    expect(find.byType(LoginPage), findsNothing);
   });
 
   testWidgets('A5/A6 守卫拦截受保护入口并保存回跳意图', (tester) async {
@@ -123,7 +124,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     // 仍停在登录页，且意图已保存（结构化定位串，含查询参数）
-    expect(find.text('欢迎回来'), findsOneWidget);
+    expect(find.byType(LoginPage), findsOneWidget);
     expect(container.read(routeIntentStoreProvider).pending?.target,
         '${RoutePath.feedbackDetail}?id=42');
   });
