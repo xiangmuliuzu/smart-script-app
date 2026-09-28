@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
 import 'api_exception.dart';
 import 'api_response.dart';
 import 'interceptors/auth_interceptor.dart';
@@ -159,9 +160,14 @@ class ApiClient {
       );
 
       if (!apiResp.isSuccess) {
-        // 业务层 40100/40102/40103/40301：会话不可恢复
+        // 会话不可恢复：40100/40102/40103 需重新登录，40301 为账号被禁用。
         final code = apiResp.code;
-        if (code == 40100 || code == 40102 || code == 40103 || code == 40301) {
+        if (code == AppAuthErrorCodes.accountDisabled) {
+          SessionEvents.instance
+              .sessionExpired(SessionExpiryReason.accountDisabled);
+        } else if (code == AppAuthErrorCodes.unauthorized ||
+            code == AppAuthErrorCodes.refreshInvalid ||
+            code == AppAuthErrorCodes.refreshReplay) {
           SessionEvents.instance.sessionExpired();
         }
         throw ApiException(

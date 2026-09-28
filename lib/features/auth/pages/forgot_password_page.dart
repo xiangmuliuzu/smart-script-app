@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../auth_feedback.dart';
 
 /// A3 密码重置：成功后清会话并要求重新登录（APP-12）。
 class ForgotPasswordPage extends ConsumerStatefulWidget {
@@ -52,7 +53,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         return _cooldown > 0;
       });
     } on ApiException catch (e) {
-      _toast(e.message);
+      _toast(AuthFeedback.apiMessage(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -71,7 +72,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
       _toast('密码已重置，请重新登录');
       context.go(RoutePath.login);
     } on ApiException catch (e) {
-      _toast(e.message);
+      _toast(AuthFeedback.apiMessage(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

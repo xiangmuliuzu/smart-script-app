@@ -52,6 +52,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # H-05 设备级集成测试（Flutter SDK 自带包；经负责人 2026-09-25 批准引入，
+  # 随之将传递依赖 file 固定为 7.0.0，属本次接入的一部分）
+  integration_test:
+    sdk: flutter
+
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your

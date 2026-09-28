@@ -8,6 +8,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/auth_validators.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../auth_feedback.dart';
 import '../auth_navigation.dart';
 import '../widgets/auth_buttons.dart';
 import '../widgets/auth_header.dart';
@@ -68,7 +69,7 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
       resolvePostLoginTarget(context, ref);
     } on ApiException catch (e) {
       if (mounted) {
-        showAppToast(context, e.message);
+        showAppToast(context, AuthFeedback.apiMessage(e));
       }
     } catch (_) {
       if (mounted) {

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
+import 'paged_list_controller.dart';
+
 /// A5 用户中心公共组件。
 ///
 /// 抽离原因：资料页、实名页、账号安全、换绑、消息与反馈页共用同一批
@@ -273,5 +275,51 @@ class UserSubmitButton extends StatelessWidget {
             )
           : Text(label),
     );
+  }
+}
+
+/// 分页列表触底槽位：加载中 spinner；追加失败时提示原因并提供重试
+/// （A5-06 修复，第 18 批）。已加载数据与分页游标由 [PagedListController] 保留。
+class LoadMoreFooter<T> extends StatelessWidget {
+  const LoadMoreFooter({super.key, required this.controller});
+
+  final PagedListController<T> controller;
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller.loadingMore) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    final error = controller.loadMoreError;
+    if (error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          children: [
+            Text(
+              '加载更多失败：$error',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.text3),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              key: const Key('load_more_retry'),
+              onPressed: controller.retryLoadMore,
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }

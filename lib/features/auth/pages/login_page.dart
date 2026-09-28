@@ -116,7 +116,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       resolvePostLoginTarget(context, ref);
     } on ApiException catch (e) {
       if (mounted) {
-        showAppToast(context, e.message);
+        showAppToast(context, AuthFeedback.apiMessage(e));
       }
     } catch (_) {
       if (mounted) {
@@ -183,7 +183,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           const SizedBox(height: 14),
           SecondaryButton(
             label: '账号密码登录',
-            onPressed: () => context.go(RoutePath.passwordLogin),
+            // push 而非 go：子页须保留历史栈，系统返回键/手势应回登录页而不是退出应用
+            onPressed: () => context.push(RoutePath.passwordLogin),
           ),
           const SizedBox(height: 16),
           Row(
@@ -195,7 +196,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => context.go(RoutePath.register),
+                // push 而非 go：注册是子页，返回键应回登录页（同账号密码登录）
+                onTap: () => context.push(RoutePath.register),
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                   child: Text(
