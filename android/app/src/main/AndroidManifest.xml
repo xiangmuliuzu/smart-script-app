@@ -1,5 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- INTERNET 权限必须声明在主 manifest：此前只写在 debug manifest，
+         导致 release/profile 包完全没有网络权限，任何请求都抛 SocketException。 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 后端本地联调走 http 明文；debug 变体已有同样配置。
+         如需上架生产环境请改用 https 并移除此项。 -->
     <application
+        android:usesCleartextTraffic="true"
         android:label="剧本创作"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
