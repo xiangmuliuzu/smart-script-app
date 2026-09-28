@@ -22,6 +22,7 @@ class User {
     this.phoneMasked,
     this.nickname,
     this.avatar,
+    this.bio,
     this.realNameStatus = 'NOT_SUBMITTED',
     this.roles = const [],
     this.permissions = const [],
@@ -34,6 +35,9 @@ class User {
   final String? phoneMasked;
   final String? nickname;
   final String? avatar;
+
+  /// 个人简介；null 表示未填写（2026-09-28 契约修订新增）。
+  final String? bio;
   final String realNameStatus;
 
   /// 角色编码：用于**授权**判断（规格 §10）。与实名状态互相独立。
@@ -71,6 +75,7 @@ class User {
         phoneMasked: json['phoneMasked'] as String?,
         nickname: json['nickname'] as String?,
         avatar: json['avatar'] as String?,
+        bio: json['bio'] as String?,
         realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
         roles: (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
         permissions: (json['permissions'] as List?)?.whereType<String>().toList() ?? const [],
@@ -84,6 +89,7 @@ class User {
         'phoneMasked': phoneMasked,
         'nickname': nickname,
         'avatar': avatar,
+        'bio': bio,
         'realNameStatus': realNameStatus,
         'roles': roles,
         'permissions': permissions,

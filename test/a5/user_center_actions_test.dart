@@ -23,6 +23,7 @@ import 'package:script_app/features/auth/data/auth_repository.dart';
 import 'package:script_app/features/feedback/pages/feedback_create_page.dart';
 import 'package:script_app/features/profile/pages/profile_edit_page.dart';
 import 'package:script_app/features/user_center/data/message_repository.dart';
+import 'package:script_app/features/user_center/data/user_center_models.dart';
 import 'package:script_app/features/user_center/data/user_center_repository.dart';
 import 'package:script_app/models/user.dart';
 
@@ -343,6 +344,167 @@ void main() {
       expect(repo.meCalls, 0, reason: '未保存成功不得刷新全局 currentUser');
       // 保活的 Scaffold 可能各渲染一份 toast，故不断言唯一
       expect(find.text('没有需要保存的修改'), findsWidgets);
+    });
+  });
+
+  // ================================================================
+  group('A-bio 个人简介（2026-09-28 契约修订）', () {
+    UserProfile bioProfile(Map<String, dynamic> extra) => UserProfile.fromJson(Map.from({
+          'userId': 601,
+          'userType': '01',
+          'nickname': '剧本小王',
+          'phoneMasked': '138****8000',
+          'realNameStatus': 'NOT_SUBMITTED',
+        }..addAll(extra)));
+
+    test('模型：bio 缺省/null 解析为 null，有值时透传', () {
+      expect(bioProfile({}).bio, isNull);
+      expect(bioProfile({'bio': null}).bio, isNull);
+      expect(bioProfile({'bio': '热爱剧本创作'}).bio, '热爱剧本创作');
+    });
+
+    test('新增简介：只提交 bio，未变更字段不上送', () async {
+      final api = ScriptedApi();
+      api.reply('/users/me/profile', Envelope.ok({
+        'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+        'bio': '热爱剧本创作', 'phoneMasked': '138****8000',
+      }));
+      final updated = await _ucRepo(api).updateProfile(bio: '热爱剧本创作');
+      expect(updated.bio, '热爱剧本创作');
+      final body = api.requests.first.data as Map;
+      expect(body['bio'], '热爱剧本创作');
+      expect(body.containsKey('nickname'), isFalse, reason: '未变更的昵称不应提交');
+      expect(body.containsKey('avatar'), isFalse, reason: '未变更的头像不应提交');
+    });
+
+    test('清空简介：提交空串 bio（契约允许清空）', () async {
+      final api = ScriptedApi();
+      api.reply('/users/me/profile', Envelope.ok({
+        'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+        'phoneMasked': '138****8000',
+      }));
+      final updated = await _ucRepo(api).updateProfile(bio: '');
+      expect(updated.bio, isNull, reason: '服务端空简介返回 null（未填写）');
+      final body = api.requests.first.data as Map;
+      expect(body['bio'], '', reason: '清空必须显式提交空串，而非省略字段');
+    });
+
+    test('简介与昵称同时修改：两个字段都上送', () async {
+      final api = ScriptedApi();
+      api.reply('/users/me/profile', Envelope.ok({
+        'userId': 601, 'userType': '01', 'nickname': '新昵称', 'bio': '新简介',
+        'phoneMasked': '138****8000',
+      }));
+      await _ucRepo(api).updateProfile(nickname: '新昵称', bio: '新简介');
+      final body = api.requests.first.data as Map;
+      expect(body['nickname'], '新昵称');
+      expect(body['bio'], '新简介');
+    });
+
+    test('简介超长在本地即被拒绝，不发请求', () async {
+      final api = ScriptedApi();
+      await expectLater(
+        _ucRepo(api).updateProfile(bio: 'x' * 201),
+        throwsA(isA<ApiException>()),
+      );
+      expect(api.requests, isEmpty, reason: '超长简介不得发起请求');
+    });
+
+    testWidgets('编辑页：加载简介、保存提交 bio 并刷新全局资料', (tester) async {
+      final api = ScriptedApi();
+      api.handle('/users/me/profile', (req) {
+        if (req.method == 'PUT') {
+          return Envelope.ok({
+            'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+            'bio': '热爱剧本创作', 'phoneMasked': '138****8000',
+          });
+        }
+        return Envelope.ok({
+          'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+          'phoneMasked': '138****8000',
+        });
+      });
+      final repo = await _pumpProfileEdit(tester, api);
+
+      // 简介输入框是第二个 TextField（昵称、简介）
+      final bioField = find.byType(TextField).at(1);
+      expect(tester.widget<TextField>(bioField).maxLength, 200,
+          reason: '简介输入框上限必须与服务端一致（200）');
+
+      repo.meCalls = 0;
+      await tester.enterText(bioField, '热爱剧本创作');
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final puts = api.requests.where((req) => req.method == 'PUT').toList();
+      expect(puts, hasLength(1));
+      expect((puts.single.data as Map)['bio'], '热爱剧本创作');
+      expect((puts.single.data as Map).containsKey('nickname'), isFalse);
+      expect(repo.meCalls, 1, reason: '保存成功后必须刷新全局 currentUser');
+
+      // 与既有成功用例一致：冲刷退出动画与网络定时器
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('home'), findsOneWidget);
+    });
+
+    testWidgets('清空简介后保存：PUT 提交空串 bio', (tester) async {
+      final api = ScriptedApi();
+      api.handle('/users/me/profile', (req) {
+        if (req.method == 'PUT') {
+          return Envelope.ok({
+            'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+            'phoneMasked': '138****8000',
+          });
+        }
+        return Envelope.ok({
+          'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+          'bio': '旧简介', 'phoneMasked': '138****8000',
+        });
+      });
+      final repo = await _pumpProfileEdit(tester, api);
+
+      final bioField = find.byType(TextField).at(1);
+      expect(find.text('旧简介'), findsOneWidget, reason: '进入页面应展示当前简介');
+
+      repo.meCalls = 0;
+      await tester.enterText(bioField, '');
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final puts = api.requests.where((req) => req.method == 'PUT').toList();
+      expect(puts, hasLength(1), reason: '清空也是一次真实变更');
+      expect((puts.single.data as Map)['bio'], '');
+      expect(repo.meCalls, 1);
+
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('home'), findsOneWidget);
+    });
+
+    testWidgets('保存失败（超长被服务端拒绝）：提示错误、不刷新、不退出', (tester) async {
+      final api = ScriptedApi();
+      api.handle('/users/me/profile', (req) {
+        if (req.method == 'PUT') {
+          return Envelope.fail(40000, 'bio too long');
+        }
+        return Envelope.ok({
+          'userId': 601, 'userType': '01', 'nickname': '剧本小王',
+          'bio': '旧简介', 'phoneMasked': '138****8000',
+        });
+      });
+      final repo = await _pumpProfileEdit(tester, api);
+
+      repo.meCalls = 0;
+      await tester.enterText(find.byType(TextField).at(1), '新简介');
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.textContaining('bio too long'), findsWidgets,
+          reason: '应展示服务端错误信息');
+      expect(repo.meCalls, 0, reason: '保存失败不得刷新全局资料');
+      expect(find.byType(ProfileEditPage), findsOneWidget, reason: '失败不应退出编辑页');
     });
   });
 }

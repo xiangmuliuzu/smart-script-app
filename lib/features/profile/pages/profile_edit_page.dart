@@ -13,7 +13,7 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 个人资料（规格 §8.3，契约 §1.2）。
 ///
-/// 只允许修改头像与昵称；手机号、角色、实名状态为只读展示。
+/// 允许修改头像、昵称与简介；手机号、角色、实名状态为只读展示。
 /// 保存成功后刷新全局 currentUser，使其它页面立即显示新资料。
 class ProfileEditPage extends ConsumerStatefulWidget {
   const ProfileEditPage({super.key});
@@ -24,6 +24,7 @@ class ProfileEditPage extends ConsumerStatefulWidget {
 
 class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   final _nicknameCtrl = TextEditingController();
+  final _bioCtrl = TextEditingController();
   bool _initialized = false;
   bool _saving = false;
   bool _uploading = false;
@@ -35,12 +36,17 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   /// 进入页面时的昵称原文，用于判断本次是否真的改动了昵称。
   String _initialNickname = '';
 
-  /// 与后端昵称列宽一致的本地预校验上限。
+  /// 进入页面时的简介原文；简介可清空，因此用「是否改过」而不是「是否为空」判断。
+  String _initialBio = '';
+
+  /// 与后端昵称/简介上限一致的本地预校验上限（sys_user.nick_name=30、bio=200）。
   static const int _nicknameMax = 30;
+  static const int _bioMax = 200;
 
   @override
   void dispose() {
     _nicknameCtrl.dispose();
+    _bioCtrl.dispose();
     super.dispose();
   }
 
@@ -54,9 +60,16 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
       _toast('昵称不能超过 $_nicknameMax 个字符');
       return;
     }
+    final bio = _bioCtrl.text.trim();
+    if (bio.length > _bioMax) {
+      _toast('简介不能超过 $_bioMax 个字符');
+      return;
+    }
     final avatarChanged = _pendingAvatar != null && _pendingAvatar != _loadedAvatar;
     final nicknameChanged = nickname != _initialNickname;
-    if (!avatarChanged && !nicknameChanged) {
+    // 简介允许清空：内容与初始值不同即视为改动（含清空为空串）
+    final bioChanged = bio != _initialBio.trim();
+    if (!avatarChanged && !nicknameChanged && !bioChanged) {
       _toast('没有需要保存的修改');
       return;
     }
@@ -65,6 +78,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
       final profile = await ref.read(userCenterRepositoryProvider).updateProfile(
             nickname: nicknameChanged ? nickname : null,
             avatar: avatarChanged ? _pendingAvatar : null,
+            bio: bioChanged ? bio : null,
           );
       // 刷新全局 currentUser，所有页面立即显示新资料（规格 §8.3）
       await ref.read(authControllerProvider.notifier).refreshMe();
@@ -75,6 +89,8 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
         _pendingAvatar = profile.avatar;
         _nicknameCtrl.text = profile.nickname ?? nickname;
         _initialNickname = _nicknameCtrl.text;
+        _bioCtrl.text = profile.bio ?? '';
+        _initialBio = _bioCtrl.text;
       });
       _toast('保存成功');
       if (mounted) context.pop();
@@ -136,6 +152,8 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
             _initialNickname = _nicknameCtrl.text;
             _loadedAvatar = profile.avatar;
             _pendingAvatar = profile.avatar;
+            _bioCtrl.text = profile.bio ?? '';
+            _initialBio = _bioCtrl.text;
           }
           return _buildForm(profile);
         },
@@ -224,6 +242,20 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                 ),
               ),
               _Field(
+                label: '简介',
+                child: TextField(
+                  controller: _bioCtrl,
+                  maxLines: 3,
+                  minLines: 1,
+                  maxLength: _bioMax,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    counterText: '',
+                    hintText: '介绍一下自己（可留空）',
+                  ),
+                ),
+              ),
+              _Field(
                 label: '手机号',
                 child: Text(
                   profile.phoneMasked ?? '-',
@@ -243,7 +275,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            '手机号与实名状态需在账号安全、实名认证中单独办理，不能在此修改。',
+            '简介可留空或清空，最长 $_bioMax 个字符；手机号与实名状态需在账号安全、实名认证中单独办理，不能在此修改。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),

@@ -11,6 +11,7 @@ class UserProfile {
     required this.userType,
     this.nickname,
     this.avatar,
+    this.bio,
     this.phoneMasked,
     this.realNameStatus = 'NOT_SUBMITTED',
   });
@@ -19,6 +20,9 @@ class UserProfile {
   final String userType;
   final String? nickname;
   final String? avatar;
+
+  /// 个人简介；null 表示未填写（2026-09-28 契约修订新增）。
+  final String? bio;
   final String? phoneMasked;
   final String realNameStatus;
 
@@ -27,6 +31,7 @@ class UserProfile {
         userType: json['userType'] as String? ?? '01',
         nickname: json['nickname'] as String?,
         avatar: json['avatar'] as String?,
+        bio: json['bio'] as String?,
         phoneMasked: json['phoneMasked'] as String?,
         realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
       );

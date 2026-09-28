@@ -26,16 +26,22 @@ class UserCenterRepository {
     return UserProfile.fromJson(data);
   }
 
-  /// 只提交需要修改的字段；两个字段都不传时后端返回 400，此处提前拦截。
-  Future<UserProfile> updateProfile({String? nickname, String? avatar}) async {
-    if (nickname == null && avatar == null) {
+  /// 只提交需要修改的字段；三个字段都不传时后端返回 400，此处提前拦截。
+  /// [bio] 传空串表示清空简介（后端契约允许），传 null 表示不修改；
+  /// 超过 200 字符（后端上限）在本地直接拒绝，不发请求。
+  Future<UserProfile> updateProfile({String? nickname, String? avatar, String? bio}) async {
+    if (nickname == null && avatar == null && bio == null) {
       throw ApiException('没有需要保存的修改');
+    }
+    if (bio != null && bio.length > 200) {
+      throw ApiException('简介不能超过 200 个字符');
     }
     final data = await _api.put<Map<String, dynamic>>(
       ApiEndpoints.myProfile,
       data: {
         if (nickname != null) 'nickname': nickname,
         if (avatar != null) 'avatar': avatar,
+        if (bio != null) 'bio': bio,
       },
       parser: _mapParser,
     );

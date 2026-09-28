@@ -307,15 +307,16 @@ void main() {
     final account = await _registerAccount(stack);
 
     final admin = await _adminDio();
+    // A4 契约：App 用户只能授予 app_grantable=1 的角色（role_id=2 默认为 0，不可授）
     await admin.put('/api/v1/admin/app-users/${account.userId}/roles',
-        data: {'roleIds': [2], 'reason': '第3批真实联调'});
+        data: {'roleIds': [100], 'reason': 'A 模块实时联调'});
 
     // 重新登录后角色必须生效
     final relogin = await _loginAccount(stack, account.phone);
     expect(relogin.userId, account.userId, reason: '同一账号重新登录');
     final me = await stack.repository.me();
-    expect(me.roles, contains('common'), reason: '重新登录后角色必须生效');
-    expect(me.hasRole('common'), isTrue);
+    expect(me.roles, contains('app_creator'), reason: '重新登录后角色必须生效');
+    expect(me.hasRole('app_creator'), isTrue);
     expect(me.permissions, isNotEmpty, reason: '有角色应带权限集');
     expect(me.isRealNameApproved, isFalse, reason: '有角色不等于已实名（互不推导）');
   });

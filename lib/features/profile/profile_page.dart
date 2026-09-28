@@ -37,6 +37,7 @@ class ProfilePage extends ConsumerWidget {
               _Header(
                 nickname: user?.nickname,
                 avatar: user?.avatar,
+                bio: user?.bio,
                 phoneMasked: user?.phoneMasked,
                 userTypeLabel: user?.userType.label,
               ),
@@ -120,12 +121,16 @@ class _Header extends StatelessWidget {
   const _Header({
     this.nickname,
     this.avatar,
+    this.bio,
     this.phoneMasked,
     this.userTypeLabel,
   });
 
   final String? nickname;
   final String? avatar;
+
+  /// 个人简介；null/空串不显示该行。
+  final String? bio;
   final String? phoneMasked;
   final String? userTypeLabel;
 
@@ -162,6 +167,13 @@ class _Header extends StatelessWidget {
                     color: AppColors.text1,
                   ),
                 ),
+                if (bio != null && bio!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    bio!,
+                    style: const TextStyle(color: AppColors.text2, fontSize: 13),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   phoneMasked ?? '手机号未获取',
