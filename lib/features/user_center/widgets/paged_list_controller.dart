@@ -20,6 +20,10 @@ class PagedListController<T> extends ChangeNotifier {
   bool loading = false;
   bool loadingMore = false;
   String? error;
+
+  /// 触底追加失败的原因（非空时 footer 显示提示与重试，已加载数据不动）。
+  /// 首屏错误用 [error]；两者互不覆盖。
+  String? loadMoreError;
   bool _end = false;
   int _page = 0;
   int _generation = 0;
@@ -38,6 +42,7 @@ class PagedListController<T> extends ChangeNotifier {
     }
     loading = true;
     error = null;
+    loadMoreError = null;
     notifyListeners();
     try {
       final data = await fetchPage(1, pageSize);
@@ -63,6 +68,7 @@ class PagedListController<T> extends ChangeNotifier {
   /// 触底追加下一页。
   Future<void> loadMore() async {
     if (loading || loadingMore || _end) return;
+    if (loadMoreError != null) return; // 失败驻留时不再自动重试，等 [retryLoadMore]
     final generation = _generation;
     loadingMore = true;
     notifyListeners();
@@ -73,15 +79,27 @@ class PagedListController<T> extends ChangeNotifier {
       total = data.total;
       _page += 1;
       _end = data.list.isEmpty || items.length >= data.total;
-    } catch (_) {
-      // 追加失败不覆盖首屏结果，仅停止继续加载，用户可下拉刷新重试
-      _end = true;
+    } catch (e) {
+      // 追加失败不覆盖首屏结果：保留已加载数据与分页游标，给出明确提示与重试。
+      // 刷新或切换筛选已使本请求作废时（generation 变化），失败不得覆盖新列表状态。
+      if (generation != _generation) return;
+      loadMoreError = e is Exception ? _messageOf(e) : '加载失败，请稍后重试';
     } finally {
+      // loadingMore 是本调用自身的在途标记，无条件复位；
+      // 通知仍按代际收敛，过期代际的 UI 状态由当次 load 负责刷新。
+      loadingMore = false;
       if (generation == _generation) {
-        loadingMore = false;
         notifyListeners();
       }
     }
+  }
+
+  /// 触底失败后的重试：按同一页码重取（失败时未曾追加，天然无重复项）。
+  Future<void> retryLoadMore() async {
+    if (loading || loadingMore) return;
+    loadMoreError = null;
+    notifyListeners();
+    await loadMore();
   }
 
   static String _messageOf(Object e) {

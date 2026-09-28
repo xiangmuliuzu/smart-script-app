@@ -119,16 +119,7 @@ class _FeedbackListPageState extends ConsumerState<FeedbackListPage> {
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           if (index >= _controller.items.length) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            );
+            return LoadMoreFooter<FeedbackItem>(controller: _controller);
           }
           final item = _controller.items[index];
           return _FeedbackTile(
@@ -200,10 +191,16 @@ class _FeedbackTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 UserStatusChip(text: item.status.label, color: _statusColor(item.status)),
                 const Spacer(),
+                // Flexible：小屏（如 320 宽）下芯片 + 完整时间戳会超出行宽（实测溢出 22px），
+                // 允许时间戳收缩省略；宽屏下时间戳仍是自然宽度，外观不变。
                 if (item.submittedAt != null)
-                  Text(
-                    item.submittedAt!,
-                    style: const TextStyle(fontSize: 11, color: AppColors.text3),
+                  Flexible(
+                    child: Text(
+                      item.submittedAt!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: AppColors.text3),
+                    ),
                   ),
               ],
             ),

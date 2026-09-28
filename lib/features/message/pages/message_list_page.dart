@@ -140,16 +140,7 @@ class _MessageListPageState extends ConsumerState<MessageListPage> {
         separatorBuilder: (_, __) => const Divider(height: 0.5, color: AppColors.divider),
         itemBuilder: (context, index) {
           if (index >= _controller.items.length) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            );
+            return LoadMoreFooter<MessageItem>(controller: _controller);
           }
           final item = _controller.items[index];
           return _MessageTile(

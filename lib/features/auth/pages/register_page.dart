@@ -128,7 +128,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       // 注册成功后服务端直接下发令牌，登录守卫把根路由切到首页
     } on ApiException catch (e) {
       if (mounted) {
-        showAppToast(context, e.message);
+        showAppToast(context, AuthFeedback.apiMessage(e));
       }
     } catch (_) {
       if (mounted) {

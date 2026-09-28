@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:script_app/app.dart';
+import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/core/providers/app_providers.dart';
 import 'package:script_app/core/providers/auth_providers.dart';
 import 'package:script_app/core/router/app_router.dart';
@@ -41,11 +42,15 @@ class _FakeSecureStorage implements TokenSecureStorage {
 }
 
 /// 记录调用次数的 AuthController：登录直接置为已认证，不发网络请求。
+/// 可通过 [smsLoginError] / [passwordLoginError] 注入失败，用于验证
+/// 「登录失败不得消费回跳意图」。
 class _RecordingAuthController extends AuthController {
   _RecordingAuthController(super.storage, super.repository);
 
   int smsLoginCalls = 0;
   int passwordLoginCalls = 0;
+  Object? smsLoginError;
+  Object? passwordLoginError;
 
   @override
   Future<void> loginWithSms({
@@ -54,12 +59,16 @@ class _RecordingAuthController extends AuthController {
     String? deviceId,
   }) async {
     smsLoginCalls += 1;
+    final error = smsLoginError;
+    if (error != null) throw error;
     state = const AuthState(AuthStatus.authenticated);
   }
 
   @override
   Future<void> loginWithPassword(String phone, String password, {String? deviceId}) async {
     passwordLoginCalls += 1;
+    final error = passwordLoginError;
+    if (error != null) throw error;
     state = const AuthState(AuthStatus.authenticated);
   }
 }
@@ -219,5 +228,66 @@ void main() {
 
     expect(harness.auth.passwordLoginCalls, 1);
     expect(harness.container.read(routeIntentStoreProvider).pending, isNull);
+  });
+
+  // H-05：登录失败必须保留回跳意图，供下一次成功登录继续回跳（规格 §8.1）。
+  testWidgets('验证码登录失败：停留在登录页且不消费回跳意图', (tester) async {
+    final harness = await _pumpApp(tester);
+    _seedIntentViaGuard(harness);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(
+      harness.container.read(routeIntentStoreProvider).pending?.target,
+      '${RoutePath.feedbackDetail}?id=42',
+    );
+
+    harness.auth.smsLoginError = ApiException('手机号或验证码错误', code: 40000);
+
+    await tester.enterText(find.byType(TextField).at(0), '13800001111');
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await _tapAgreement(tester);
+    await tester.tap(find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(harness.auth.smsLoginCalls, 1);
+    expect(find.byType(LoginPage), findsOneWidget, reason: '登录失败不得离开登录页');
+    expect(
+      harness.container.read(routeIntentStoreProvider).pending?.target,
+      '${RoutePath.feedbackDetail}?id=42',
+      reason: '登录失败不得消费回跳意图，下一次成功登录仍应回跳',
+    );
+    expect(find.text('手机号或验证码错误'), findsWidgets);
+  });
+
+  testWidgets('账号密码登录失败：同样保留回跳意图', (tester) async {
+    final harness = await _pumpApp(tester);
+    _seedIntentViaGuard(harness);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    harness.container.read(routerProvider).go(RoutePath.passwordLogin);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    harness.auth.passwordLoginError = ApiException('手机号或密码错误', code: 40000);
+
+    await tester.enterText(find.byType(TextField).at(0), '13800001111');
+    await tester.enterText(find.byType(TextField).at(1), 'Passw0rd1');
+    await tester.tap(
+      find.descendant(of: find.byType(PasswordLoginPage), matching: find.text('登录')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(harness.auth.passwordLoginCalls, 1);
+    expect(find.byType(PasswordLoginPage), findsOneWidget);
+    expect(
+      harness.container.read(routeIntentStoreProvider).pending?.target,
+      '${RoutePath.feedbackDetail}?id=42',
+      reason: '密码登录失败不得消费回跳意图',
+    );
   });
 }
