@@ -1,16 +1,23 @@
-# script_app
+# smart-script-app
 
-A new Flutter project.
+智能剧本创作平台 Flutter App。功能源码位于 `lib/`，资源由 `pubspec.yaml` 声明，普通测试与设备集成测试分别位于 `test/`、`integration_test/`。
 
-## Getting Started
+## 依赖与启动
 
-This project is a starting point for a Flutter application.
+后端环境变量、数据库初始化及启动流程见 [后端 README](../smart-script-backend/README.md)。App 的接口约定见 [共享资源](../shared/README.md)。
 
-A few resources to get you started if this is your first Flutter project:
+```powershell
+flutter pub get
+flutter run --dart-define=BASE_URL=http://10.0.2.2:8080/api/v1
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Android 模拟器访问宿主机使用 `10.0.2.2`；真机使用后端实际地址。构建 Android 时按 `rules.md` 使用 JDK 17。
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 校验
+
+```powershell
+flutter analyze
+flutter test test/a5 test/a6 test/auth test/widget_test.dart
+```
+
+`test/live/` 要求运行中的后端及 `LIVE_SMS_CODE` 等联调环境变量；其设置要求见测试文件。`integration_test/` 在设备或模拟器上运行。

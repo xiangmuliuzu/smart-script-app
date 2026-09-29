@@ -4,4 +4,14 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!--
+      A5：仅 debug 构建允许明文 HTTP。
+      背景：Android 9（API 28）起应用默认禁止明文流量，而开发期后端地址是
+      http://10.0.2.2:8080（模拟器访问宿主机）。不在 debug 变体显式开启，
+      真机/模拟器就无法连上联调后端。
+      该属性只存在于 debug 变体：release 保持默认的「禁止明文」，
+      生产必须使用 HTTPS（跟踪项见 A5-A7-后续加固清单 H-09）。
+    -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
