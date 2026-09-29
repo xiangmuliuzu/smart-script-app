@@ -6,9 +6,20 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/auth_validators.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../auth_feedback.dart';
+import '../widgets/auth_buttons.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/auth_page_scaffold.dart';
+import '../widgets/phone_input.dart';
+import '../widgets/underlined_input.dart';
+import '../widgets/verify_code_input.dart';
 
 /// A3 密码重置：成功后清会话并要求重新登录（APP-12）。
+///
+/// 与登录 / 注册页共用同一套输入行 / 按钮组件，保证背景、间距、字号与错误态完全一致。
 class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
 
@@ -17,50 +28,72 @@ class ForgotPasswordPage extends ConsumerStatefulWidget {
 }
 
 class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
-  final _formKey = GlobalKey<FormState>();
   final _phoneCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
+  final _pwdFocusNode = FocusNode();
+
   bool _loading = false;
-  int _cooldown = 0;
+  bool _obscure = true;
+  String? _phoneError;
+  String? _codeError;
+  String? _pwdError;
 
   @override
   void dispose() {
     _phoneCtrl.dispose();
     _codeCtrl.dispose();
     _pwdCtrl.dispose();
+    _pwdFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _sendSms() async {
-    final phone = _phoneCtrl.text.trim();
-    if (!RegExp(r'^1\d{10}$').hasMatch(phone)) {
-      _toast('请输入正确的手机号');
-      return;
+  /// 发送验证码：先本地校验手机号，成功返回 true 交给 VerifyCodeInput 倒计时，
+  /// 失败时按钮立即恢复可点（不倒计时），与登录页行为一致。
+  Future<bool> _sendSms() async {
+    final phoneError = AuthValidators.phone(_phoneCtrl.text);
+    if (phoneError != null) {
+      setState(() => _phoneError = phoneError);
+      return false;
     }
-    if (_cooldown > 0) return;
-    setState(() => _loading = true);
+    setState(() => _phoneError = null);
+
     try {
       await ref
           .read(authRepositoryProvider)
-          .sendSms(phone: phone, scene: 'RESET_PASSWORD');
-      if (!mounted) return;
-      setState(() => _cooldown = 60);
-      Future.doWhile(() async {
-        await Future<void>.delayed(const Duration(seconds: 1));
-        if (!mounted) return false;
-        setState(() => _cooldown -= 1);
-        return _cooldown > 0;
-      });
+          .sendSms(phone: _phoneCtrl.text.trim(), scene: 'RESET_PASSWORD');
+      if (!mounted) {
+        return true;
+      }
+      showAppToast(context, '验证码已发送，请注意查收短信');
+      return true;
     } on ApiException catch (e) {
-      _toast(AuthFeedback.apiMessage(e));
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        showAppToast(context, AuthFeedback.smsSendError(e));
+      }
+      return false;
+    } catch (_) {
+      if (mounted) {
+        showAppToast(context, '验证码发送失败，请稍后重试');
+      }
+      return false;
     }
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    final phoneError = AuthValidators.phone(_phoneCtrl.text);
+    final codeError = AuthValidators.smsCode(_codeCtrl.text);
+    final pwdError = AuthValidators.password(_pwdCtrl.text);
+    setState(() {
+      _phoneError = phoneError;
+      _codeError = codeError;
+      _pwdError = pwdError;
+    });
+    if (phoneError != null || codeError != null || pwdError != null) {
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       await ref.read(authControllerProvider.notifier).resetPassword(
@@ -68,83 +101,78 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             code: _codeCtrl.text.trim(),
             newPassword: _pwdCtrl.text,
           );
-      if (!mounted) return;
-      _toast('密码已重置，请重新登录');
+      if (!mounted) {
+        return;
+      }
+      showAppToast(context, '密码已重置，请重新登录');
       context.go(RoutePath.login);
     } on ApiException catch (e) {
-      _toast(AuthFeedback.apiMessage(e));
+      if (mounted) {
+        showAppToast(context, AuthFeedback.apiMessage(e));
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
-  }
-
-  void _toast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('重置密码'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(RoutePath.login),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: '手机号'),
-                validator: (v) =>
-                    RegExp(r'^1\d{10}$').hasMatch((v ?? '').trim()) ? null : '请输入 11 位手机号',
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _codeCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '验证码'),
-                      validator: (v) => (v ?? '').trim().length >= 4 ? null : '请输入验证码',
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _cooldown > 0 || _loading ? null : _sendSms,
-                    child: Text(_cooldown > 0 ? '${_cooldown}s' : '获取验证码'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _pwdCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: '新密码（8-64位，含字母与数字）'),
-                validator: (v) {
-                  final s = v ?? '';
-                  if (s.length < 8 || s.length > 64) return '密码长度 8-64';
-                  if (!RegExp(r'[A-Za-z]').hasMatch(s) || !RegExp(r'\d').hasMatch(s)) {
-                    return '密码需同时包含字母与数字';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                child: const Text('重置密码'),
-              ),
-            ],
+    return AuthPageScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AuthHeader(
+            title: '重置密码',
+            onBack: () => context.go(RoutePath.login),
           ),
-        ),
+          PhoneInput(
+            controller: _phoneCtrl,
+            errorText: _phoneError,
+            onChanged: (_) {
+              if (_phoneError != null) {
+                setState(() => _phoneError = null);
+              }
+            },
+            onSubmitted: (_) => _pwdFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          VerifyCodeInput(
+            controller: _codeCtrl,
+            errorText: _codeError,
+            onRequestCode: _sendSms,
+            onSubmitted: (_) => _pwdFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          UnderlinedInput(
+            controller: _pwdCtrl,
+            focusNode: _pwdFocusNode,
+            hintText: '8-64位，含字母与数字',
+            label: '新密码',
+            errorText: _pwdError,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            trailing: IconButton(
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 20,
+                color: AppColors.text3,
+              ),
+              tooltip: _obscure ? '显示密码' : '隐藏密码',
+            ),
+          ),
+          const SizedBox(height: 24),
+          PrimaryButton(
+            label: '重置密码',
+            loading: _loading,
+            onPressed: _submit,
+          ),
+        ],
       ),
     );
   }
