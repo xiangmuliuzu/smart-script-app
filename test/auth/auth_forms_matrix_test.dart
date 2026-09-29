@@ -25,6 +25,7 @@ import 'package:script_app/core/theme/app_colors.dart';
 import 'package:script_app/features/auth/auth_feedback.dart';
 import 'package:script_app/features/auth/data/auth_repository.dart';
 import 'package:script_app/features/auth/pages/password_login_page.dart';
+import 'package:script_app/features/auth/pages/forgot_password_page.dart';
 import 'package:script_app/features/auth/pages/register_page.dart';
 import 'package:script_app/features/auth/widgets/agreement_checkbox.dart';
 import 'package:script_app/models/user.dart';
@@ -62,8 +63,7 @@ class _FakeAuthRepo implements AuthRepository {
   }
 
   @override
-  Future<User> me() async =>
-      const User(userId: 1, userType: UserType.user);
+  Future<User> me() async => const User(userId: 1, userType: UserType.user);
 
   @override
   Future<void> logout() async {}
@@ -78,6 +78,7 @@ class _ScriptedAuthController extends AuthController {
 
   int registerCalls = 0;
   int passwordLoginCalls = 0;
+  int resetPasswordCalls = 0;
   Completer<void>? gate;
   Object? registerError;
   Object? passwordLoginError;
@@ -102,7 +103,8 @@ class _ScriptedAuthController extends AuthController {
   }
 
   @override
-  Future<void> loginWithPassword(String phone, String password, {String? deviceId}) async {
+  Future<void> loginWithPassword(String phone, String password,
+      {String? deviceId}) async {
     passwordLoginCalls++;
     final error = passwordLoginError;
     if (error != null) throw error;
@@ -116,6 +118,14 @@ class _ScriptedAuthController extends AuthController {
     String? deviceId,
   }) async {
     await _maybeFinish();
+  }
+
+  @override
+  Future<void> resetPassword(
+      {required String phone,
+      required String code,
+      required String newPassword}) async {
+    resetPasswordCalls++;
   }
 }
 
@@ -138,6 +148,10 @@ Future<_Harness> _pump(WidgetTester tester, Widget Function() page) async {
     initialLocation: '/auth',
     routes: [
       GoRoute(path: '/auth', builder: (_, __) => page()),
+      GoRoute(
+        path: RoutePath.login,
+        builder: (_, __) => const Scaffold(body: Text('登录页')),
+      ),
       // resolvePostLoginTarget 登录成功后回安全默认首页，必须可导航
       GoRoute(
         path: RoutePath.home,
@@ -209,6 +223,45 @@ Finder _errorText(String text) => find.byWidgetPredicate(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('认证错误码显示对应中文提示', () {
+    expect(
+        AuthFeedback.apiMessage(ApiException('sms code invalid', code: 40001)),
+        '验证码错误');
+    expect(
+        AuthFeedback.apiMessage(ApiException('sms code expired', code: 40002)),
+        '验证码已失效，请重新获取');
+    expect(
+        AuthFeedback.passwordLoginError(
+            ApiException('invalid request', code: 40000)),
+        '手机号或密码错误');
+  });
+
+  testWidgets('重置密码要求确认新密码一致才提交', (tester) async {
+    final h = await _pump(tester, () => const ForgotPasswordPage());
+    expect(find.text('确认密码'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).at(0), '13800001111');
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await tester.enterText(find.byType(TextField).at(2), 'Password123');
+    await tester.enterText(find.byType(TextField).at(3), 'Password124');
+    await tester.tap(_primaryButtonOf(ForgotPasswordPage));
+    await tester.pump();
+    expect(_errorText('两次输入的密码不一致'), findsOneWidget);
+    expect(h.controller.resetPasswordCalls, 0);
+  });
+
+  testWidgets('重置密码确认一致后提交并返回登录页', (tester) async {
+    final h = await _pump(tester, () => const ForgotPasswordPage());
+    await tester.enterText(find.byType(TextField).at(0), '13800001111');
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await tester.enterText(find.byType(TextField).at(2), 'Password123');
+    await tester.enterText(find.byType(TextField).at(3), 'Password123');
+    await tester.tap(_primaryButtonOf(ForgotPasswordPage));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(h.controller.resetPasswordCalls, 1);
+    expect(find.text('登录页'), findsOneWidget);
+  });
+
   // ==================================================================
   group('H-05-F 注册页表单矩阵', () {
     Future<_Harness> pumpRegister(WidgetTester tester) =>
@@ -263,8 +316,10 @@ void main() {
       await tester.pump();
 
       expect(h.controller.registerCalls, 1);
-      expect(_loadingSpinner(RegisterPage), findsOneWidget, reason: '提交中按钮应展示 Loading');
-      expect(_primaryDisabled(tester, RegisterPage), isTrue, reason: '提交中主按钮必须禁用');
+      expect(_loadingSpinner(RegisterPage), findsOneWidget,
+          reason: '提交中按钮应展示 Loading');
+      expect(_primaryDisabled(tester, RegisterPage), isTrue,
+          reason: '提交中主按钮必须禁用');
 
       gate.complete();
       await tester.pump();
@@ -298,7 +353,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('该手机号已注册'), findsOneWidget);
-      expect(_primaryDisabled(tester, RegisterPage), isFalse, reason: '失败后按钮应恢复可点');
+      expect(_primaryDisabled(tester, RegisterPage), isFalse,
+          reason: '失败后按钮应恢复可点');
     });
 
     testWidgets('获取验证码：手机号非法不发请求，合法则调用发送接口', (tester) async {
@@ -370,7 +426,8 @@ void main() {
       expect(_primaryDisabled(tester, PasswordLoginPage), isTrue);
 
       // 提交中按钮文案已替换为 Loading，按控件定位后重复点击
-      await tester.tap(_primaryButtonOf(PasswordLoginPage), warnIfMissed: false);
+      await tester.tap(_primaryButtonOf(PasswordLoginPage),
+          warnIfMissed: false);
       await tester.pump();
       expect(h.controller.passwordLoginCalls, 1, reason: '提交中重复点击不得重复提交');
     });
@@ -390,7 +447,8 @@ void main() {
 
     testWidgets('账号禁用（40301）：展示中文禁用提示，不出现英文 account disabled', (tester) async {
       final h = await pumpPasswordLogin(tester);
-      h.controller.passwordLoginError = ApiException('account disabled', code: 40301);
+      h.controller.passwordLoginError =
+          ApiException('account disabled', code: 40301);
       await tester.enterText(find.byType(TextField).at(0), '13800001111');
       await tester.enterText(find.byType(TextField).at(1), 'Passw0rd1');
 

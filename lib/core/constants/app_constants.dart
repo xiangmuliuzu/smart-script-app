@@ -28,6 +28,10 @@ class AppConstants {
 class AppAuthErrorCodes {
   AppAuthErrorCodes._();
 
+  static const int invalidRequest = 40000;
+  static const int smsCodeInvalid = 40001;
+  static const int smsCodeExpired = 40002;
+  static const int smsCodeUsed = 40901;
   static const int unauthorized = 40100;
   static const int refreshInvalid = 40102;
   static const int refreshReplay = 40103;

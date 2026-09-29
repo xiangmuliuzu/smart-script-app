@@ -47,7 +47,8 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
     final phoneError = AuthValidators.phone(_phoneController.text);
-    final passwordError = AuthValidators.loginPassword(_passwordController.text);
+    final passwordError =
+        AuthValidators.loginPassword(_passwordController.text);
     setState(() {
       _phoneError = phoneError;
       _passwordError = passwordError;
@@ -69,7 +70,7 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
       resolvePostLoginTarget(context, ref);
     } on ApiException catch (e) {
       if (mounted) {
-        showAppToast(context, AuthFeedback.apiMessage(e));
+        showAppToast(context, AuthFeedback.passwordLoginError(e));
       }
     } catch (_) {
       if (mounted) {
@@ -116,7 +117,9 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
             trailing: IconButton(
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
-                _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                _obscure
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 size: 20,
                 color: AppColors.text3,
               ),

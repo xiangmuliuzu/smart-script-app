@@ -25,10 +25,26 @@ class AuthFeedback {
   /// 后端对 A3 码沿用英文文案（如 40301 -> `account disabled`），
   /// 直接展示会露出英文，故此处按码覆盖；其余错误仍用服务端文案。
   static String apiMessage(ApiException e) {
+    if (e.code == AppAuthErrorCodes.smsCodeInvalid) {
+      return '验证码错误';
+    }
+    if (e.code == AppAuthErrorCodes.smsCodeExpired) {
+      return '验证码已失效，请重新获取';
+    }
+    if (e.code == AppAuthErrorCodes.smsCodeUsed) {
+      return '验证码已使用，请重新获取';
+    }
     if (e.code == AppAuthErrorCodes.accountDisabled) {
       return accountDisabledHint;
     }
     return e.message;
+  }
+
+  static String passwordLoginError(ApiException e) {
+    if (e.code == AppAuthErrorCodes.invalidRequest) {
+      return '手机号或密码错误';
+    }
+    return apiMessage(e);
   }
 
   /// 账号被禁用（40301）的提示文案。

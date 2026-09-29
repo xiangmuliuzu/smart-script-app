@@ -31,6 +31,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final _phoneCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
   final _pwdFocusNode = FocusNode();
 
   bool _loading = false;
@@ -38,12 +39,14 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   String? _phoneError;
   String? _codeError;
   String? _pwdError;
+  String? _confirmError;
 
   @override
   void dispose() {
     _phoneCtrl.dispose();
     _codeCtrl.dispose();
     _pwdCtrl.dispose();
+    _confirmCtrl.dispose();
     _pwdFocusNode.dispose();
     super.dispose();
   }
@@ -85,12 +88,18 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     final phoneError = AuthValidators.phone(_phoneCtrl.text);
     final codeError = AuthValidators.smsCode(_codeCtrl.text);
     final pwdError = AuthValidators.password(_pwdCtrl.text);
+    final confirmError =
+        AuthValidators.confirmPassword(_confirmCtrl.text, _pwdCtrl.text);
     setState(() {
       _phoneError = phoneError;
       _codeError = codeError;
       _pwdError = pwdError;
+      _confirmError = confirmError;
     });
-    if (phoneError != null || codeError != null || pwdError != null) {
+    if (phoneError != null ||
+        codeError != null ||
+        pwdError != null ||
+        confirmError != null) {
       return;
     }
 
@@ -152,8 +161,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             label: '新密码',
             errorText: _pwdError,
             obscureText: _obscure,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
+            textInputAction: TextInputAction.next,
             trailing: IconButton(
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
@@ -165,6 +173,16 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
               ),
               tooltip: _obscure ? '显示密码' : '隐藏密码',
             ),
+          ),
+          const SizedBox(height: 8),
+          UnderlinedInput(
+            controller: _confirmCtrl,
+            hintText: '请再次输入新密码',
+            label: '确认密码',
+            errorText: _confirmError,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 24),
           PrimaryButton(
