@@ -96,6 +96,8 @@ class UnderlinedInput extends StatelessWidget {
                 decoration: InputDecoration(
                   isDense: true,
                   counterText: '',
+                  // 覆盖全局主题的白色填充：认证页下划线输入行背景需透明，融入页面渐变
+                  filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
