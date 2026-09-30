@@ -1,25 +1,126 @@
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../user_center/data/paged_data.dart';
+import 'bookstore_models.dart';
 
-/// A6 示例业务数据层（B 模块：内容/书城）。
+/// B 模块书城数据层（内容与作品）。
 ///
-/// 演示下游模块如何消费统一身份：
-///   - 页面只调用本仓库，不直接接触 Dio / Token；
-///   - `works` 为公开接口，游客可读，响应里的 identity 摘要用于展示登录态；
-///   - `shelf` 为受保护接口，未登录会被后端拒绝（401），因此调用前必须过守卫。
+/// 只做三件事：拼查询参数、解析 App 信封里的 `data`、把 JSON 映射成页面模型。
+/// 鉴权与 Token 由 [ApiClient] 统一处理；书城浏览链路全部对游客开放，不需要登录态。
 class ContentRepository {
   ContentRepository(this._api);
 
   final ApiClient _api;
 
-  /// 公开作品列表；返回作品与身份摘要（游客时 authenticated=false、userId 为空）。
-  Future<WorksPayload> listWorks() async {
+  /// 首页 Banner 轮播（后端只返回已启用且在展示时间窗内的 Banner）。
+  Future<List<BannerItem>> listBanners({String? position}) async {
     final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.contentWorks,
+      ApiEndpoints.contentBanners,
+      query: _compact({'position': position}),
       parser: _mapParser,
     );
-    return WorksPayload.fromJson(data ?? const {});
+    return _items(data, BannerItem.fromJson);
+  }
+
+  /// 分类列表；[parentId] 传 0 取顶级分类，[categoryType] 用于限定分类用途。
+  Future<List<CategoryItem>> listCategories({String? categoryType, int? parentId}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentCategories,
+      query: _compact({'categoryType': categoryType, 'parentId': parentId}),
+      parser: _mapParser,
+    );
+    return _items(data, CategoryItem.fromJson);
+  }
+
+  /// 标签列表（后端按使用量降序下发）。
+  Future<List<TagItem>> listTags({String? tagType}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentTags,
+      query: _compact({'tagType': tagType}),
+      parser: _mapParser,
+    );
+    return _items(data, TagItem.fromJson);
+  }
+
+  /// 作品列表（分页 + 筛选 + 排序）。
+  ///
+  /// [sort] 为空时由后端回落 `latest`；非法值同样回落，客户端不需要做白名单校验。
+  Future<PagedData<BookItem>> pageWorks({
+    int? categoryId,
+    int? tagId,
+    String? keyword,
+    String? sort,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorks,
+      query: _compact({
+        'categoryId': categoryId,
+        'tagId': tagId,
+        'keyword': keyword,
+        'sort': sort,
+        'page': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取作品列表失败');
+    return PagedData.parse<BookItem>(data, BookItem.fromJson);
+  }
+
+  /// 作品详情；未上架或不存在时后端按 404 拒绝，由 [ApiClient] 抛 [ApiException]。
+  Future<BookItem> workDetail(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkById(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取作品详情失败');
+    return BookItem.fromJson(data);
+  }
+
+  /// 作品章节目录；payload 附带作品试读配置，目录页无需再取详情。
+  ///
+  /// [ChapterSummary.readable] 由服务端按试读范围判定，客户端不自行推算。
+  Future<ChapterListPayload> listChapters(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkChapters(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取章节目录失败');
+    return ChapterListPayload.fromJson(data);
+  }
+
+  /// 章节正文；超出试读范围时后端返回 code=403 且 data 不含 content，
+  /// 由 [ApiClient] 抛 [ApiException]，阅读页据此展示「试读结束」提示。
+  Future<ChapterDetail> chapterDetail(int chapterId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentChapter(chapterId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取章节正文失败');
+    return ChapterDetail.fromJson(data);
+  }
+
+  /// 作品试读包：可读章节 + 试读文件（游客可读）。
+  Future<PreviewPayload> workPreview(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkPreview(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取试读内容失败');
+    return PreviewPayload.fromJson(data);
+  }
+
+  /// 作品榜单；[type] 取 view/favorite/sale/rating，空值由后端回落 view。
+  Future<List<RankingItem>> listRankings({String? type, int? limit}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentRankings,
+      query: _compact({'type': type, 'limit': limit}),
+      parser: _mapParser,
+    );
+    return _items(data, RankingItem.fromJson);
   }
 
   /// 我的书架；需 App Token，归属由服务端身份决定。
@@ -36,34 +137,29 @@ class ContentRepository {
     if (raw is Map) return Map<String, dynamic>.from(raw);
     return <String, dynamic>{};
   }
-}
 
-/// 作品摘要（字段与后端示例模型一致；内容表确定后随契约调整）。
-class WorkItem {
-  const WorkItem({
-    required this.workId,
-    required this.title,
-    required this.authorName,
-    required this.category,
-    required this.wordCount,
-    required this.freeToRead,
-  });
+  /// 去掉空值参数：后端按「参数缺失 = 不过滤」处理，传空串会变成无效条件。
+  static Map<String, dynamic> _compact(Map<String, dynamic> raw) {
+    final query = <String, dynamic>{};
+    raw.forEach((key, value) {
+      if (value == null) return;
+      if (value is String && value.trim().isEmpty) return;
+      query[key] = value;
+    });
+    return query;
+  }
 
-  final int workId;
-  final String title;
-  final String authorName;
-  final String category;
-  final int wordCount;
-  final bool freeToRead;
-
-  factory WorkItem.fromJson(Map<String, dynamic> json) => WorkItem(
-        workId: (json['workId'] as num?)?.toInt() ?? 0,
-        title: json['title'] as String? ?? '',
-        authorName: json['authorName'] as String? ?? '',
-        category: json['category'] as String? ?? '',
-        wordCount: (json['wordCount'] as num?)?.toInt() ?? 0,
-        freeToRead: json['freeToRead'] as bool? ?? false,
-      );
+  static List<T> _items<T>(
+    Map<String, dynamic>? data,
+    T Function(Map<String, dynamic> item) parser,
+  ) {
+    final raw = data?['list'];
+    if (raw is! List) return <T>[];
+    return raw
+        .whereType<Map>()
+        .map((e) => parser(Map<String, dynamic>.from(e)))
+        .toList();
+  }
 }
 
 /// 后端下发的身份摘要（规格 §10：身份由服务端提供，客户端不自行拼装）。
@@ -101,29 +197,32 @@ class IdentitySummary {
       );
 }
 
-class WorksPayload {
-  const WorksPayload({
-    required this.identity,
-    required this.works,
-    required this.personalized,
+/// 书架作品条目（书架接口尚未迁到真实库，批次 3 替换为 BookItem）。
+class WorkItem {
+  const WorkItem({
+    required this.workId,
+    required this.title,
+    required this.authorName,
+    required this.category,
+    required this.wordCount,
+    required this.freeToRead,
   });
 
-  final IdentitySummary identity;
-  final List<WorkItem> works;
-  final bool personalized;
+  final int workId;
+  final String title;
+  final String authorName;
+  final String category;
+  final int wordCount;
+  final bool freeToRead;
 
-  factory WorksPayload.fromJson(Map<String, dynamic> json) {
-    final rawWorks = json['works'];
-    return WorksPayload(
-      identity: IdentitySummary.fromJson(
-        json['identity'] is Map ? Map<String, dynamic>.from(json['identity'] as Map) : const {},
-      ),
-      works: rawWorks is List
-          ? rawWorks.whereType<Map>().map((e) => WorkItem.fromJson(Map<String, dynamic>.from(e))).toList()
-          : const [],
-      personalized: json['personalized'] as bool? ?? false,
-    );
-  }
+  factory WorkItem.fromJson(Map<String, dynamic> json) => WorkItem(
+        workId: (json['workId'] as num?)?.toInt() ?? 0,
+        title: json['title'] as String? ?? '',
+        authorName: json['authorName'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        wordCount: (json['wordCount'] as num?)?.toInt() ?? 0,
+        freeToRead: json['freeToRead'] as bool? ?? false,
+      );
 }
 
 class ShelfPayload {

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:script_app/core/providers/app_providers.dart';
 
 import 'package:script_app/core/router/route_paths.dart';
+import 'package:script_app/features/bookstore/data/bookstore_models.dart';
 import 'package:script_app/features/bookstore/data/content_providers.dart';
 import 'package:script_app/features/bookstore/data/content_repository.dart';
 import 'package:script_app/models/user.dart';
@@ -142,24 +143,24 @@ void main() {
     expect(ProtectedRoutes.canResume(RoutePath.bookshelf), isTrue);
   });
 
-  test('A6 作品列表与书架载荷解析稳定', () {
-    final works = WorksPayload.fromJson(const {
-      'identity': {'authenticated': false, 'guest': true},
-      'personalized': false,
-      'works': [
-        {
-          'workId': 1,
-          'title': '示例剧本·长夜',
-          'authorName': '示例作者甲',
-          'category': '都市',
-          'wordCount': 128000,
-          'freeToRead': true,
-        }
-      ],
+  test('A6 作品与书架载荷解析稳定', () {
+    // 作品字段来自真实库（AppWorkDto）；tinyint 以字符串 "0"/"1" 下发。
+    final work = BookItem.fromJson(const {
+      'workId': 1,
+      'title': '示例剧本·长夜',
+      'authorName': '示例作者甲',
+      'genreName': '都市',
+      'wordCount': 128000,
+      'isFree': '1',
+      'price': 0,
+      'rating': 4.5,
     });
-    expect(works.personalized, isFalse);
-    expect(works.works.single.title, '示例剧本·长夜');
-    expect(works.works.single.freeToRead, isTrue);
+    expect(work.workId, 1);
+    expect(work.title, '示例剧本·长夜');
+    expect(work.genreName, '都市');
+    expect(work.isFree, isTrue, reason: 'tinyint 字符串 1 表示免费');
+    expect(work.priceLabel, '免费');
+    expect(work.rating, 4.5);
 
     final shelf = ShelfPayload.fromJson(const {
       'identity': {'authenticated': true, 'guest': false, 'userId': 9},

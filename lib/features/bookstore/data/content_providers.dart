@@ -1,26 +1,62 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/app_providers.dart';
-import '../../../core/providers/auth_providers.dart';
+import 'bookstore_models.dart';
 import 'content_repository.dart';
 
-/// A6 示例业务模块依赖注入（与框架层同源，不新建网络栈）。
+/// B 模块书城依赖注入（复用框架层网络栈，不新建 Dio）。
 
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => ContentRepository(ref.watch(apiClientProvider)),
 );
 
-/// 公开作品列表：游客也可读取，进入书城时拉取。
-///
-/// 订阅登录态：公开接口对已登录用户返回个性化摘要，若不在登录态变化时重新拉取，
-/// 用户在书城停留期间登录后会继续看到游客视角的摘要（接口本身允许匿名，
-/// 因此这属于客户端刷新问题）。`.select(status)` 只在登录态真正变化时触发重取。
-final worksProvider = FutureProvider.autoDispose<WorksPayload>((ref) {
-  ref.watch(authControllerProvider.select((state) => state.status));
-  return ref.watch(contentRepositoryProvider).listWorks();
-});
+/// 首页 Banner 轮播；不传 position，后端已按状态与展示时间窗过滤。
+final bannersProvider = FutureProvider.autoDispose<List<BannerItem>>(
+  (ref) => ref.watch(contentRepositoryProvider).listBanners(),
+);
+
+/// 顶级分类（书城分类入口）。parent_id=0 与后端新增分类的默认值一致。
+final categoriesProvider = FutureProvider.autoDispose<List<CategoryItem>>(
+  (ref) => ref.watch(contentRepositoryProvider).listCategories(parentId: 0),
+);
+
+/// 标签（作品列表的标签筛选项）。
+final tagsProvider = FutureProvider.autoDispose<List<TagItem>>(
+  (ref) => ref.watch(contentRepositoryProvider).listTags(),
+);
+
+/// 榜单：首页预览与榜单页共用；type 取 view/favorite/sale/rating。
+final rankingProvider = FutureProvider.autoDispose.family<List<RankingItem>, String>(
+  (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
+);
+
+/// 首页推荐流（最新上架前 6 部）。
+final recommendedWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
+  (ref) async {
+    final page = await ref
+        .watch(contentRepositoryProvider)
+        .pageWorks(pageNum: 1, pageSize: 6, sort: 'latest');
+    return page.list;
+  },
+);
+
+/// 作品详情；未上架/不存在时后端按 404 拒绝，页面展示错误态。
+final workDetailProvider = FutureProvider.autoDispose.family<BookItem, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).workDetail(workId),
+);
 
 /// 我的书架：受保护内容，仅在守卫放行后拉取。
 final shelfProvider = FutureProvider.autoDispose<ShelfPayload>(
   (ref) => ref.watch(contentRepositoryProvider).shelf(),
 );
+
+/// 作品章节目录；payload 含试读配置，每条章节自带 readable 标记。
+final chapterListProvider = FutureProvider.autoDispose.family<ChapterListPayload, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).listChapters(workId),
+);
+
+/// 章节正文；超出试读范围时抛 [ApiException]（code=403），阅读页据此展示提示。
+final chapterDetailProvider = FutureProvider.autoDispose.family<ChapterDetail, int>(
+  (ref, chapterId) => ref.watch(contentRepositoryProvider).chapterDetail(chapterId),
+);
+

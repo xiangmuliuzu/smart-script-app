@@ -10,6 +10,11 @@ import '../../features/auth/pages/privacy_policy_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
+import '../../features/bookstore/pages/chapter_list_page.dart';
+import '../../features/bookstore/pages/chapter_read_page.dart';
+import '../../features/bookstore/pages/ranking_page.dart';
+import '../../features/bookstore/pages/work_detail_page.dart';
+import '../../features/bookstore/pages/work_list_page.dart';
 import '../../features/category/category_page.dart';
 import '../../features/comic/comic_page.dart';
 import '../../features/create/create_page.dart';
@@ -185,6 +190,58 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.bookshelf,
         name: RouteName.bookshelf,
         builder: (_, __) => const BookshelfPage(),
+      ),
+      // ===== B 模块书城浏览链路（公开页，游客可浏览）=====
+      // 详情用查询参数而非路径参数：与消息/反馈详情同风格，登录回跳只需还原整串。
+      GoRoute(
+        path: RoutePath.workList,
+        name: RouteName.workList,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return WorkListPage(
+            title: query['title'],
+            categoryId: int.tryParse(query['categoryId'] ?? ''),
+            tagId: int.tryParse(query['tagId'] ?? ''),
+            keyword: query['keyword'],
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePath.workDetail,
+        name: RouteName.workDetail,
+        builder: (context, state) => WorkDetailPage(
+          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.ranking,
+        name: RouteName.ranking,
+        builder: (context, state) => RankingPage(
+          type: state.uri.queryParameters['type'],
+        ),
+      ),
+      // ===== B 模块试读链路（公开页，游客可试读）=====
+      GoRoute(
+        path: RoutePath.chapterList,
+        name: RouteName.chapterList,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return ChapterListPage(
+            workId: int.tryParse(query['id'] ?? '') ?? 0,
+            title: query['title'],
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePath.chapterRead,
+        name: RouteName.chapterRead,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return ChapterReadPage(
+            chapterId: int.tryParse(query['id'] ?? '') ?? 0,
+            title: query['title'],
+          );
+        },
       ),
       // ===== A5 用户中心 =====
       // 列表与详情拆成两个静态路径，用查询参数区分记录：

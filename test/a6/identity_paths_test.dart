@@ -166,11 +166,11 @@ void main() {
       expect(id.accountType, '99');
     });
 
-    test('工作区载荷缺 identity 时按游客处理（不崩溃）', () {
-      final payload = WorksPayload.fromJson({
+    test('载荷缺 identity 时按游客处理（不崩溃）', () {
+      final payload = ShelfPayload.fromJson({
         'works': [_work],
-        'total': 1,
-        'personalized': false,
+        'downloadable': false,
+        'realNameRequired': true,
       });
       expect(payload.identity.guest, isTrue);
       expect(payload.identity.authenticated, isFalse);

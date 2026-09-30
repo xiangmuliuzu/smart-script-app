@@ -151,15 +151,14 @@ void main() {
     }
   });
 
-  test('游客路径：公开列表可读、身份为游客、私有接口被拒', () async {
+  test('游客路径：公开列表可读、私有接口被拒', () async {
     final stack = await _stack();
     final content = ContentRepository(stack.apiClient);
 
-    final works = await content.listWorks();
-    expect(works.identity.authenticated, isFalse);
-    expect(works.identity.guest, isTrue);
-    expect(works.identity.userId, isNull, reason: '游客不得携带用户 ID');
-    expect(works.identity.roleCodes, isEmpty);
+    // 书城作品列表是公开接口，游客可读；载荷为 {total, list}，不下发身份摘要。
+    final works = await content.pageWorks(pageNum: 1, pageSize: 5);
+    expect(works.total, greaterThanOrEqualTo(0));
+    expect(works.list.length, lessThanOrEqualTo(5));
 
     await expectLater(content.shelf(), throwsA(isA<ApiException>()),
         reason: '游客访问需登录的书架接口必须被拒绝');

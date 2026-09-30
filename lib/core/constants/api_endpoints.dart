@@ -38,9 +38,25 @@ class ApiEndpoints {
   static const String feedback = '/feedback';
   static String feedbackById(int feedbackId) => '/feedback/$feedbackId';
 
-  // ===== A6 内容域契约（B 模块示例）=====
-  /// 公开作品列表（游客可读）
+  // ===== B 模块书城契约（App 公开只读，游客可读）=====
+  /// 首页 Banner 轮播（可传 position）
+  static const String contentBanners = '/content/banners';
+  /// 分类列表（可传 categoryType / parentId，parentId=0 取顶级）
+  static const String contentCategories = '/content/categories';
+  /// 标签列表（可传 tagType）
+  static const String contentTags = '/content/tags';
+  /// 作品列表（分页 {total, list}；可传 categoryId/tagId/keyword/sort/page/pageSize）
   static const String contentWorks = '/content/works';
+  /// 作品详情
+  static String contentWorkById(int workId) => '/content/works/$workId';
+  /// 作品章节目录（含试读可读标记；游客可读）
+  static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
+  /// 作品试读包（可读章节 + 试读文件；游客可读）
+  static String contentWorkPreview(int workId) => '/content/works/$workId/preview';
+  /// 章节正文（超出试读范围时后端按 403 拒绝，data 不含 content）
+  static String contentChapter(int chapterId) => '/content/chapters/$chapterId';
+  /// 作品榜单（可传 type=view/favorite/sale/rating 与 limit）
+  static const String contentRankings = '/content/rankings';
   /// 我的书架（需 App Token）
   static const String contentShelf = '/content/shelf';
 

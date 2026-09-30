@@ -36,6 +36,50 @@ class RoutePath {
   // A6 示例业务入口（B 模块：内容/书城），受登录与实名守卫保护
   static const String bookshelf = '/bookshelf';
 
+  // B 模块书城浏览链路（公开页，游客可浏览）
+  static const String workList = '/works';
+  static const String workDetail = '/work';
+  static const String ranking = '/ranking';
+
+  // B 模块试读链路（公开页，游客可试读）
+  static const String chapterList = '/chapters';
+  static const String chapterRead = '/chapter';
+
+  /// 作品列表 URL；[title] 只用于列表页标题展示，不参与后端筛选。
+  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title}) {
+    final query = <String, String>{
+      if (categoryId != null) 'categoryId': '$categoryId',
+      if (tagId != null) 'tagId': '$tagId',
+      if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
+      if (title != null && title.isNotEmpty) 'title': title,
+    };
+    return Uri(path: workList, queryParameters: query.isEmpty ? null : query).toString();
+  }
+
+  /// 作品详情 URL。
+  static String workDetailUrl(int workId) => '$workDetail?id=$workId';
+
+  /// 榜单 URL；[type] 取 view/favorite/sale/rating。
+  static String rankingUrl(String type) => '$ranking?type=$type';
+
+  /// 作品章节目录 URL；[title] 只用于页面标题展示。
+  static String chapterListUrl(int workId, {String? title}) => Uri(
+        path: chapterList,
+        queryParameters: <String, String>{
+          'id': '$workId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 章节阅读 URL；[title] 只用于页面标题展示。
+  static String chapterReadUrl(int chapterId, {String? title}) => Uri(
+        path: chapterRead,
+        queryParameters: <String, String>{
+          'id': '$chapterId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
   // A5 消息中心（列表与详情用查询参数区分，便于登录回跳时整串还原）
   static const String messages = '/profile/messages';
   static const String messageDetail = '/profile/messages/detail';
@@ -68,6 +112,11 @@ class RouteName {
   static const String passwordEdit = 'passwordEdit';
   static const String notificationPreferences = 'notificationPreferences';
   static const String bookshelf = 'bookshelf';
+  static const String workList = 'workList';
+  static const String workDetail = 'workDetail';
+  static const String ranking = 'ranking';
+  static const String chapterList = 'chapterList';
+  static const String chapterRead = 'chapterRead';
   static const String messages = 'messages';
   static const String messageDetail = 'messageDetail';
   static const String feedback = 'feedback';
