@@ -306,9 +306,14 @@ void main() {
     final account = await _registerAccount(stack);
 
     final admin = await _adminDio();
-    // A4 契约：App 用户只能授予 app_grantable=1 的角色（role_id=2 默认为 0，不可授）
+    // A4 契约：从管理端读取可授予角色；角色 ID 由数据库分配，不能固定写成 100。
+    final rolesResp = await admin.get('/api/v1/admin/app-users/grantable-roles');
+    final grantableRoles = ((rolesResp.data as Map)['data'] as List).cast<Map>();
+    final creatorRoles = grantableRoles.where((r) => r['roleKey'] == 'app_creator').toList();
+    expect(creatorRoles, isNotEmpty, reason: '测试库应配置可授予的 app_creator 角色');
+    final creatorRoleId = creatorRoles.first['roleId'];
     await admin.put('/api/v1/admin/app-users/${account.userId}/roles',
-        data: {'roleIds': [100], 'reason': 'A 模块实时联调'});
+        data: {'roleIds': [creatorRoleId], 'reason': 'A 模块实时联调'});
 
     // 重新登录后角色必须生效
     final relogin = await _loginAccount(stack, account.phone);
