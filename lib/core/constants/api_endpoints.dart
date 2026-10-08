@@ -65,6 +65,10 @@ class ApiEndpoints {
   static const String contentSearchHistory = '/content/search/history';
   /// 删除单条搜索历史（需 App Token，接口 2.7.5）
   static String contentSearchHistoryById(int id) => '/content/search/history/$id';
+  /// 我的收藏列表（需 App Token，分页 {total, list}，接口 2.7.11）
+  static const String contentFavorites = '/content/favorites';
+  /// 收藏 / 取消收藏 / 收藏态（需 App Token，接口 2.7.10）
+  static String contentFavoriteByWorkId(int workId) => '/content/favorites/$workId';
 
   /// App 域头像上传（multipart，字段名 `file`）。
   ///
@@ -131,7 +135,6 @@ class ApiEndpoints {
   static const String booksFilter = '/books/filter';
   static const String booksRanking = '/books/ranking';
   static String bookFreeRead(int workId) => '/books/$workId/free-read';
-  static const String favorites = '/favorites';
   static const String bookshelf = '/bookshelf';
   static const String banners = '/banners';
   static const String dramaFeed = '/dramas/feed';

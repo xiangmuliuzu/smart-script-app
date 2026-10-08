@@ -63,6 +63,14 @@ final searchHistoryProvider = FutureProvider.autoDispose<List<SearchHistoryItem>
   (ref) => ref.watch(contentRepositoryProvider).listSearchHistory(),
 );
 
+/// 作品收藏态（需 App Token，接口 2.7.10）。
+///
+/// 详情页是公开页，游客不 watch（收藏按钮点击时由 AuthGuard 引导登录），
+/// 避免为必然 401 的请求往返。
+final favoriteStatusProvider = FutureProvider.autoDispose.family<FavoriteState, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).favoriteStatus(workId),
+);
+
 /// 作品章节目录；payload 含试读配置，每条章节自带 readable 标记。
 final chapterListProvider = FutureProvider.autoDispose.family<ChapterListPayload, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).listChapters(workId),

@@ -45,10 +45,13 @@ class WorkCover extends StatelessWidget {
 
 /// 作品列表行（书城推荐流、作品列表页共用）。
 class WorkListTile extends StatelessWidget {
-  const WorkListTile({super.key, required this.work, this.onTap});
+  const WorkListTile({super.key, required this.work, this.onTap, this.trailing});
 
   final BookItem work;
   final VoidCallback? onTap;
+
+  /// 行尾扩展动作（如收藏列表的「取消收藏」）；为空时只展示价格。
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +103,7 @@ class WorkListTile extends StatelessWidget {
                 color: work.isFree ? AppColors.success : AppColors.warning,
               ),
             ),
+            if (trailing != null) trailing!,
           ],
         ),
       ),

@@ -36,6 +36,9 @@ class RoutePath {
   // A6 示例业务入口（B 模块：内容/书城），受登录与实名守卫保护
   static const String bookshelf = '/bookshelf';
 
+  // B 模块我的收藏列表（受登录守卫保护）
+  static const String favorites = '/favorites';
+
   // B 模块书城浏览链路（公开页，游客可浏览）
   static const String workList = '/works';
   static const String workDetail = '/work';
@@ -114,6 +117,7 @@ class RouteName {
   static const String passwordEdit = 'passwordEdit';
   static const String notificationPreferences = 'notificationPreferences';
   static const String bookshelf = 'bookshelf';
+  static const String favorites = 'favorites';
   static const String workList = 'workList';
   static const String workDetail = 'workDetail';
   static const String ranking = 'ranking';
@@ -138,6 +142,7 @@ class ProtectedRoutes {
   static const List<String> prefixes = <String>[
     RoutePath.profile, // 我的及用户中心全部子页面
     RoutePath.bookshelf, // A6 示例（B 模块）受保护入口
+    RoutePath.favorites, // B 模块我的收藏列表（需登录）
   ];
 
   static bool isProtected(String location) {

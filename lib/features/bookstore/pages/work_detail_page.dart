@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -23,7 +24,10 @@ class WorkDetailPage extends ConsumerWidget {
     final detailAsync = ref.watch(workDetailProvider(workId));
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('作品详情')),
+      appBar: AppBar(
+        title: const Text('作品详情'),
+        actions: [_FavoriteButton(workId: workId)],
+      ),
       body: detailAsync.when(
         loading: () => const LoadingView(message: '加载中'),
         error: (error, _) => ErrorView(
@@ -49,6 +53,72 @@ class WorkDetailPage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 收藏按钮（接口 2.7.10）。
+///
+/// 详情页是公开页：游客点击时先经 [AuthGuard.pushProtected] 引导登录并回跳，
+/// 不为必然 401 的请求往返；登录态下按服务端下发的收藏态切换。
+class _FavoriteButton extends ConsumerStatefulWidget {
+  const _FavoriteButton({required this.workId});
+
+  final int workId;
+
+  @override
+  ConsumerState<_FavoriteButton> createState() => _FavoriteButtonState();
+}
+
+class _FavoriteButtonState extends ConsumerState<_FavoriteButton> {
+  bool _busy = false;
+
+  Future<void> _toggle(BuildContext context) async {
+    if (!AuthGuard.isLoggedIn(ref)) {
+      // 登录成功后回到本作品详情（RouteIntent 会还原整串）。
+      AuthGuard.pushProtected(
+        context,
+        ref,
+        target: RoutePath.workDetailUrl(widget.workId),
+      );
+      return;
+    }
+    if (_busy) return;
+    final favorited =
+        ref.read(favoriteStatusProvider(widget.workId)).valueOrNull?.favorited ?? false;
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(contentRepositoryProvider);
+      if (favorited) {
+        await repo.removeFavorite(widget.workId);
+      } else {
+        await repo.addFavorite(widget.workId);
+      }
+      ref.invalidate(favoriteStatusProvider(widget.workId));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(favorited ? '已取消收藏' : '已收藏')),
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final favorited = AuthGuard.isLoggedIn(ref)
+        ? ref.watch(favoriteStatusProvider(widget.workId)).valueOrNull?.favorited ?? false
+        : false;
+    return IconButton(
+      onPressed: _busy ? null : () => _toggle(context),
+      icon: Icon(
+        favorited ? Icons.star : Icons.star_border,
+        color: favorited ? AppColors.warning : null,
+      ),
+      tooltip: favorited ? '取消收藏' : '收藏',
     );
   }
 }

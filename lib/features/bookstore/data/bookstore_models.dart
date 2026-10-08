@@ -507,6 +507,16 @@ class SearchHistoryItem {
       );
 }
 
+/// 收藏状态（接口 2.7.10 的收藏态查询，data 只有 `favorited`）。
+class FavoriteState {
+  const FavoriteState({required this.favorited});
+
+  final bool favorited;
+
+  factory FavoriteState.fromJson(Map<String, dynamic> json) =>
+      FavoriteState(favorited: _flag(json['favorited']));
+}
+
 /// 作品试读包（AppPreviewDto）：可读章节 + 试读文件。
 class PreviewPayload {
   const PreviewPayload({

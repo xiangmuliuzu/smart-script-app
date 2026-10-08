@@ -410,7 +410,9 @@ class _QuickGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final entries = <_QuickEntry>[
-      _QuickEntry(ref, Icons.star_outline, '收藏'),
+      _QuickEntry(ref, Icons.star_outline, '收藏',
+          onTap: (ctx, ref) =>
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.favorites)),
       _QuickEntry(ref, Icons.chat_bubble_outline, '消息',
           badge: unread,
           onTap: (ctx, ref) =>

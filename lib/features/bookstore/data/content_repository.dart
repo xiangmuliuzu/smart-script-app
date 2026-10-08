@@ -182,6 +182,50 @@ class ContentRepository {
     );
   }
 
+  /// 我的收藏列表（需 App Token，接口 2.7.11，分页 {total, list}）。
+  ///
+  /// 只回上架未删除的作品，按收藏时间倒序；归属由服务端身份决定。
+  Future<PagedData<BookItem>> pageFavorites({
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentFavorites,
+      query: _compact({'page': pageNum, 'pageSize': pageSize}),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取收藏列表失败');
+    return PagedData.parse<BookItem>(data, BookItem.fromJson);
+  }
+
+  /// 收藏作品（需 App Token，接口 2.7.10）；作品不存在或未上架时后端按 404 拒绝。
+  ///
+  /// 重复收藏为幂等成功（后端不因已收藏而失败）。
+  Future<void> addFavorite(int workId) async {
+    await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentFavoriteByWorkId(workId),
+      parser: _mapParser,
+    );
+  }
+
+  /// 取消收藏（需 App Token，接口 2.7.10）；未收藏时为幂等成功。
+  Future<void> removeFavorite(int workId) async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentFavoriteByWorkId(workId),
+      parser: _mapParser,
+    );
+  }
+
+  /// 查询当前身份是否已收藏该作品（需 App Token）。
+  Future<FavoriteState> favoriteStatus(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentFavoriteByWorkId(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取收藏状态失败');
+    return FavoriteState.fromJson(data);
+  }
+
   static Map<String, dynamic> _mapParser(dynamic raw) {
     if (raw is Map) return Map<String, dynamic>.from(raw);
     return <String, dynamic>{};

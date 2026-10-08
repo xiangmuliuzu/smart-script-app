@@ -12,6 +12,7 @@ import '../../features/bookstore/bookstore_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
 import '../../features/bookstore/pages/chapter_list_page.dart';
 import '../../features/bookstore/pages/chapter_read_page.dart';
+import '../../features/bookstore/pages/favorite_list_page.dart';
 import '../../features/bookstore/pages/ranking_page.dart';
 import '../../features/bookstore/pages/search_page.dart';
 import '../../features/bookstore/pages/work_detail_page.dart';
@@ -191,6 +192,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.bookshelf,
         name: RouteName.bookshelf,
         builder: (_, __) => const BookshelfPage(),
+      ),
+      // 我的收藏（受登录守卫保护）
+      GoRoute(
+        path: RoutePath.favorites,
+        name: RouteName.favorites,
+        builder: (_, __) => const FavoriteListPage(),
       ),
       // ===== B 模块书城浏览链路（公开页，游客可浏览）=====
       // 详情用查询参数而非路径参数：与消息/反馈详情同风格，登录回跳只需还原整串。
