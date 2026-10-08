@@ -168,13 +168,13 @@ void main() {
 
     test('载荷缺 identity 时按游客处理（不崩溃）', () {
       final payload = ShelfPayload.fromJson({
-        'works': [_work],
+        'list': [_work],
         'downloadable': false,
         'realNameRequired': true,
       });
       expect(payload.identity.guest, isTrue);
       expect(payload.identity.authenticated, isFalse);
-      expect(payload.works, hasLength(1));
+      expect(payload.list, hasLength(1));
     });
   });
 
@@ -190,7 +190,7 @@ void main() {
             'realNameStatus': status,
             'roleCodes': const <String>[],
           },
-          'works': [_work],
+          'list': [_work],
           'downloadable': downloadable ?? (status == 'APPROVED'),
           'realNameRequired': realNameRequired ?? (status != 'APPROVED'),
         });
@@ -198,7 +198,7 @@ void main() {
     test('游客：不可下载且需要实名', () {
       final p = ShelfPayload.fromJson({
         'identity': _guestIdentity,
-        'works': [_work],
+        'list': [_work],
         'downloadable': false,
         'realNameRequired': true,
       });
@@ -350,54 +350,50 @@ void main() {
             'realNameStatus': u.realNameStatus,
             'roleCodes': u.roles,
           },
-          'works': [_work],
+          'list': [_work],
           'downloadable': u.isRealNameApproved,
           'realNameRequired': !u.isRealNameApproved,
         };
 
-    testWidgets('已登录未实名：书架展示「需实名认证」并展示身份摘要', (tester) async {
+    testWidgets('已登录未实名：身份卡片展示「需先完成实名认证」且作品可移出书架', (tester) async {
       final api = ScriptedApi();
       await pumpShelf(tester, api, user: notVerifiedUser, shelfPayload: shelfOf(notVerifiedUser));
 
       expect(find.text('我的书架'), findsOneWidget);
-      expect(find.byTooltip('需实名认证'), findsOneWidget);
-      expect(find.byTooltip('下载素材'), findsNothing);
-      // 身份摘要由服务端下发
+      // 身份摘要与准入结论均由服务端下发，客户端不做推导
       expect(find.text('身份摘要（由服务端下发）'), findsOneWidget);
+      expect(find.text('素材下载'), findsOneWidget);
+      expect(find.text('需先完成实名认证'), findsOneWidget);
+      expect(find.text('已开放（实名通过）'), findsNothing);
       expect(find.text('示例剧本·长夜'), findsOneWidget);
+      expect(find.byTooltip('移出书架'), findsOneWidget);
     });
 
-    testWidgets('已实名：书架展示「下载素材」入口', (tester) async {
+    testWidgets('已实名：身份卡片展示「已开放（实名通过）」', (tester) async {
       final api = ScriptedApi();
       await pumpShelf(tester, api, user: verifiedUser, shelfPayload: shelfOf(verifiedUser));
 
-      expect(find.byTooltip('下载素材'), findsOneWidget);
-      expect(find.byTooltip('需实名认证'), findsNothing);
+      expect(find.text('已开放（实名通过）'), findsOneWidget);
+      expect(find.text('需先完成实名认证'), findsNothing, reason: '已实名不应再显示实名引导');
     });
 
-    testWidgets('未实名点击下载：被实名准入拦截并弹出引导（不放行下载）', (tester) async {
-      final api = ScriptedApi();
-      await pumpShelf(tester, api, user: notVerifiedUser, shelfPayload: shelfOf(notVerifiedUser));
-
-      await tester.tap(find.byTooltip('需实名认证'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.text('需要实名认证'), findsOneWidget, reason: '未实名必须被准入守卫拦截');
-      expect(find.textContaining('下载《示例剧本·长夜》素材需要先完成实名认证。'), findsOneWidget);
-      expect(find.textContaining('已开始下载'), findsNothing, reason: '未实名不得执行下载');
-    });
-
-    testWidgets('已实名点击下载：直接放行（不出现实名引导）', (tester) async {
+    testWidgets('移出书架：调用删除接口并回到空态', (tester) async {
       final api = ScriptedApi();
       await pumpShelf(tester, api, user: verifiedUser, shelfPayload: shelfOf(verifiedUser));
+      // 移出后的列表响应：空书架，载荷仍带身份摘要
+      api.reply('/content/shelf', Envelope.ok({
+        ...shelfOf(verifiedUser),
+        'list': const <Object?>[],
+        'total': 0,
+      }));
 
-      await tester.tap(find.byTooltip('下载素材'));
+      await tester.tap(find.byTooltip('移出书架'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('需要实名认证'), findsNothing, reason: '已实名不应再被实名准入拦截');
-      expect(find.textContaining('已开始下载'), findsOneWidget);
+      expect(find.text('已移出书架'), findsOneWidget);
+      expect(api.countOf('/content/shelf/1'), 1,
+          reason: '移出应走作品维度接口（DELETE /content/shelf/{workId}）');
     });
 
     testWidgets('书架数据归属取自服务端身份（请求不携带 userId）', (tester) async {

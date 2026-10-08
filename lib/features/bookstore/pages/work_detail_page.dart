@@ -26,7 +26,7 @@ class WorkDetailPage extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('作品详情'),
-        actions: [_FavoriteButton(workId: workId)],
+        actions: [_ShelfButton(workId: workId), _FavoriteButton(workId: workId)],
       ),
       body: detailAsync.when(
         loading: () => const LoadingView(message: '加载中'),
@@ -53,6 +53,70 @@ class WorkDetailPage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 加入/移出书架按钮（接口 2.7.12）。
+///
+/// 与收藏按钮同为公开页上的登录态动作：游客点击时先经 [AuthGuard.pushProtected]
+/// 引导登录并回跳，不为必然 401 的请求往返；登录态下按服务端下发的书架态切换。
+class _ShelfButton extends ConsumerStatefulWidget {
+  const _ShelfButton({required this.workId});
+
+  final int workId;
+
+  @override
+  ConsumerState<_ShelfButton> createState() => _ShelfButtonState();
+}
+
+class _ShelfButtonState extends ConsumerState<_ShelfButton> {
+  bool _busy = false;
+
+  Future<void> _toggle(BuildContext context) async {
+    if (!AuthGuard.isLoggedIn(ref)) {
+      AuthGuard.pushProtected(
+        context,
+        ref,
+        target: RoutePath.workDetailUrl(widget.workId),
+      );
+      return;
+    }
+    if (_busy) return;
+    final onShelf =
+        ref.read(shelfStatusProvider(widget.workId)).valueOrNull?.onShelf ?? false;
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(contentRepositoryProvider);
+      if (onShelf) {
+        await repo.removeShelf(widget.workId);
+      } else {
+        await repo.addShelf(widget.workId);
+      }
+      ref.invalidate(shelfStatusProvider(widget.workId));
+      // 书架页与个人中心书架预览同步失效，避免回显过期列表。
+      ref.invalidate(shelfProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(onShelf ? '已移出书架' : '已加入书架')),
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onShelf = AuthGuard.isLoggedIn(ref)
+        ? ref.watch(shelfStatusProvider(widget.workId)).valueOrNull?.onShelf ?? false
+        : false;
+    return IconButton(
+      onPressed: _busy ? null : () => _toggle(context),
+      icon: Icon(onShelf ? Icons.bookmark : Icons.bookmark_add_outlined),
+      tooltip: onShelf ? '移出书架' : '加入书架',
     );
   }
 }

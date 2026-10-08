@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/providers/auth_providers.dart';
 import '../../core/router/auth_guard.dart';
@@ -7,6 +8,7 @@ import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../models/user.dart';
+import '../bookstore/data/bookstore_models.dart';
 import '../bookstore/data/content_providers.dart';
 import '../bookstore/data/content_repository.dart';
 import '../user_center/data/user_center_models.dart';
@@ -557,7 +559,7 @@ class _ShelfSection extends StatelessWidget {
             ),
           ),
           data: (payload) {
-            if (payload.works.isEmpty) {
+            if (payload.list.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
@@ -575,8 +577,8 @@ class _ShelfSection extends StatelessWidget {
               childAspectRatio: 0.62,
               padding: EdgeInsets.zero,
               children: [
-                for (var i = 0; i < payload.works.length; i++)
-                  _ShelfBook(work: payload.works[i], gradientIndex: i),
+                for (var i = 0; i < payload.list.length; i++)
+                  _ShelfBook(work: payload.list[i], gradientIndex: i),
               ],
             );
           },
@@ -590,7 +592,7 @@ class _ShelfSection extends StatelessWidget {
 class _ShelfBook extends StatelessWidget {
   const _ShelfBook({required this.work, required this.gradientIndex});
 
-  final WorkItem work;
+  final BookItem work;
   final int gradientIndex;
 
   // 对照原型 app.css `.book .cv.g1/g2/g3` 的三套蓝色系书封渐变。
@@ -603,7 +605,7 @@ class _ShelfBook extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => showAppToast(context, '「${work.title}」作品详情建设中'),
+      onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

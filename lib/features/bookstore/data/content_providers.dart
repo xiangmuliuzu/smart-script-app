@@ -50,9 +50,20 @@ final workContactProvider = FutureProvider.autoDispose.family<WorkContact, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).workContact(workId),
 );
 
-/// 我的书架：受保护内容，仅在守卫放行后拉取。
+/// 我的书架首屏（受保护内容，仅在守卫放行后拉取）。
+///
+/// 书架页的分页由页面内的 PagedListController 驱动（接口 2.7.12 返回真实分页），
+/// 本 provider 供个人中心书架预览区块读取首屏数据。
 final shelfProvider = FutureProvider.autoDispose<ShelfPayload>(
-  (ref) => ref.watch(contentRepositoryProvider).shelf(),
+  (ref) => ref.watch(contentRepositoryProvider).shelf(pageNum: 1, pageSize: 6),
+);
+
+/// 作品书架态（需 App Token，接口 2.7.12）。
+///
+/// 详情页是公开页，游客不 watch（书架按钮点击时由 AuthGuard 引导登录），
+/// 避免为必然 401 的请求往返。
+final shelfStatusProvider = FutureProvider.autoDispose.family<ShelfState, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).shelfStatus(workId),
 );
 
 /// 搜索历史（需 App Token）。

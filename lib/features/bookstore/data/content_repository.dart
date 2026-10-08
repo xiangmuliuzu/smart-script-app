@@ -133,14 +133,46 @@ class ContentRepository {
     return _items(data, RankingItem.fromJson);
   }
 
-  /// 我的书架；需 App Token，归属由服务端身份决定。
-  Future<ShelfPayload> shelf() async {
+  /// 我的书架列表（需 App Token，接口 2.7.12，分页 {total, list}）。
+  ///
+  /// 响应同时携带身份摘要块（identity / downloadable / realNameRequired），
+  /// 书架页一次请求即可渲染身份卡片与列表；只回上架未删除作品，按加入时间倒序。
+  Future<ShelfPayload> shelf({int pageNum = 1, int pageSize = 20}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentShelf,
+      query: {'page': pageNum, 'pageSize': pageSize},
       parser: _mapParser,
     );
     if (data == null || data.isEmpty) throw ApiException('获取书架失败');
     return ShelfPayload.fromJson(data);
+  }
+
+  /// 加入书架（需 App Token，接口 2.7.12，幂等：重复加入不产生重复记录）。
+  ///
+  /// 作品不存在或未上架时后端按 404 拒绝。
+  Future<void> addShelf(int workId) async {
+    await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentShelfByWorkId(workId),
+      parser: _mapParser,
+    );
+  }
+
+  /// 移出书架（需 App Token，接口 2.7.12，物理删除）；不在书架时为幂等成功。
+  Future<void> removeShelf(int workId) async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentShelfByWorkId(workId),
+      parser: _mapParser,
+    );
+  }
+
+  /// 查询当前身份是否已在书架（需 App Token）。
+  Future<ShelfState> shelfStatus(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentShelfByWorkId(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取书架状态失败');
+    return ShelfState.fromJson(data);
   }
 
   /// 搜索历史列表（需 App Token，接口 2.7.4）。
@@ -290,58 +322,44 @@ class IdentitySummary {
       );
 }
 
-/// 书架作品条目（书架接口尚未迁到真实库，批次 3 替换为 BookItem）。
-class WorkItem {
-  const WorkItem({
-    required this.workId,
-    required this.title,
-    required this.authorName,
-    required this.category,
-    required this.wordCount,
-    required this.freeToRead,
-  });
-
-  final int workId;
-  final String title;
-  final String authorName;
-  final String category;
-  final int wordCount;
-  final bool freeToRead;
-
-  factory WorkItem.fromJson(Map<String, dynamic> json) => WorkItem(
-        workId: (json['workId'] as num?)?.toInt() ?? 0,
-        title: json['title'] as String? ?? '',
-        authorName: json['authorName'] as String? ?? '',
-        category: json['category'] as String? ?? '',
-        wordCount: (json['wordCount'] as num?)?.toInt() ?? 0,
-        freeToRead: json['freeToRead'] as bool? ?? false,
-      );
-}
-
+/// 我的书架载荷（接口 2.7.12）：身份摘要块 + 真实分页作品。
+///
+/// 作品元素与 2.7.1 作品列表同为 [BookItem]（后端复用 AppWorkDto），
+/// 书架页因此可与书城其它列表共用渲染组件。
 class ShelfPayload {
   const ShelfPayload({
     required this.identity,
-    required this.works,
+    required this.total,
+    required this.list,
     required this.downloadable,
     required this.realNameRequired,
   });
 
   final IdentitySummary identity;
-  final List<WorkItem> works;
+
+  /// 书架总条数（用于分页）。
+  final int total;
+
+  /// 当前页作品（只含上架未删除作品）。
+  final List<BookItem> list;
 
   /// 是否可下载素材：由实名状态决定（业务准入），与角色无关。
   final bool downloadable;
   final bool realNameRequired;
 
   factory ShelfPayload.fromJson(Map<String, dynamic> json) {
-    final rawWorks = json['works'];
+    final rawWorks = json['list'];
     return ShelfPayload(
       identity: IdentitySummary.fromJson(
         json['identity'] is Map ? Map<String, dynamic>.from(json['identity'] as Map) : const {},
       ),
-      works: rawWorks is List
-          ? rawWorks.whereType<Map>().map((e) => WorkItem.fromJson(Map<String, dynamic>.from(e))).toList()
-          : const [],
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      list: rawWorks is List
+          ? rawWorks
+              .whereType<Map>()
+              .map((e) => BookItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const <BookItem>[],
       downloadable: json['downloadable'] as bool? ?? false,
       realNameRequired: json['realNameRequired'] as bool? ?? true,
     );

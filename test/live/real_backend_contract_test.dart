@@ -187,7 +187,7 @@ void main() {
     expect(shelf.downloadable, isFalse, reason: '未实名不得放行下载');
     expect(shelf.realNameRequired, isTrue);
     expect(shelf.identity.userId, account.userId, reason: '归属必须来自服务端下发的身份');
-    expect(shelf.works, isNotEmpty, reason: '书架应返回作品列表');
+    expect(shelf.list, isEmpty, reason: '新注册账号的书架应为空列表（归属由服务端身份决定）');
   });
 
   test('无角色路径：角色判定与实名判定取不同字段，互不推导', () async {
