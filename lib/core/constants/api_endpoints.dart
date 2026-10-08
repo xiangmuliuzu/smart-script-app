@@ -53,6 +53,8 @@ class ApiEndpoints {
   static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
   /// 作品试读包（可读章节 + 试读文件；游客可读）
   static String contentWorkPreview(int workId) => '/content/works/$workId/preview';
+  /// 版权合作联系方式（{workId, hasContact, displayScope}；游客可读，不下发明文）
+  static String contentWorkContact(int workId) => '/content/works/$workId/contact';
   /// 章节正文（超出试读范围时后端按 403 拒绝，data 不含 content）
   static String contentChapter(int chapterId) => '/content/chapters/$chapterId';
   /// 作品榜单（可传 type=view/favorite/sale/rating 与 limit）

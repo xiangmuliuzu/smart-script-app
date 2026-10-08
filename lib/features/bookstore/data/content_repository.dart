@@ -113,6 +113,16 @@ class ContentRepository {
     return PreviewPayload.fromJson(data);
   }
 
+  /// 版权合作联系方式：只返回「是否登记 + 展示范围」，不含明文联系方式。
+  Future<WorkContact> workContact(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkContact(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取合作联系方式失败');
+    return WorkContact.fromJson(data);
+  }
+
   /// 作品榜单；[type] 取 view/favorite/sale/rating，空值由后端回落 view。
   Future<List<RankingItem>> listRankings({String? type, int? limit}) async {
     final data = await _api.get<Map<String, dynamic>>(

@@ -45,6 +45,11 @@ final workDetailProvider = FutureProvider.autoDispose.family<BookItem, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).workDetail(workId),
 );
 
+/// 版权合作联系方式；无档案时 hasContact=false，展示范围为空。
+final workContactProvider = FutureProvider.autoDispose.family<WorkContact, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).workContact(workId),
+);
+
 /// 我的书架：受保护内容，仅在守卫放行后拉取。
 final shelfProvider = FutureProvider.autoDispose<ShelfPayload>(
   (ref) => ref.watch(contentRepositoryProvider).shelf(),

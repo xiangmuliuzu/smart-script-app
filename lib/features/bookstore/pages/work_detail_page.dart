@@ -37,6 +37,7 @@ class WorkDetailPage extends ConsumerWidget {
             children: [
               _Header(work: work),
               _ChapterEntry(work: work),
+              _ContactEntry(workId: work.workId),
               if (work.summary.isNotEmpty)
                 _Block(title: '作品简介', content: work.summary),
               if (work.coreSetting.isNotEmpty)
@@ -174,6 +175,59 @@ class _ChapterEntry extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 版权合作联系方式（B 模块接口 2.7.9）。
+///
+/// 只展示「是否登记 + 展示范围」，本批不含明文联系方式与跳转入口；
+/// 拉取失败按提示文案静默回落，不阻塞详情页其它内容。
+class _ContactEntry extends ConsumerWidget {
+  const _ContactEntry({required this.workId});
+
+  final int workId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contactAsync = ref.watch(workContactProvider(workId));
+    final contact = contactAsync.valueOrNull;
+    final String subtitle;
+    if (contact == null) {
+      subtitle = contactAsync.hasError ? '联系方式加载失败' : '加载中';
+    } else if (!contact.hasContact) {
+      subtitle = '作者暂未登记联系方式';
+    } else {
+      subtitle = '作者已登记，展示范围：${contact.displayScopeLabel}';
+    }
+    return Container(
+      color: AppColors.card,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        children: [
+          const Icon(Icons.contact_mail_outlined, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          const Text(
+            '版权合作联系方式',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text1,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 12, color: AppColors.text3),
+            ),
+          ),
+        ],
       ),
     );
   }

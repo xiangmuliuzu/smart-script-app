@@ -434,6 +434,49 @@ class PreviewFile {
       );
 }
 
+/// 版权合作联系方式（AppContactDto，接口 2.7.9）。
+///
+/// 后端只下发「是否登记」与「展示范围」，**不含明文联系方式**
+/// （作者三列密文在服务端只用于判定是否登记，不解密不输出）。
+/// 展示范围取值见接口文档 2.4.14 / 2.5.6。
+class WorkContact {
+  const WorkContact({
+    required this.workId,
+    this.hasContact = false,
+    this.displayScope = '',
+  });
+
+  final int workId;
+
+  /// 作者是否登记了联系方式。
+  final bool hasContact;
+
+  /// 展示范围：public / certified_partner / platform_forward / hidden。
+  final String displayScope;
+
+  /// 展示范围文案；未知取值回落为范围原值，避免后端新增范围时前端丢失信息。
+  String get displayScopeLabel {
+    switch (displayScope) {
+      case 'public':
+        return '公开展示';
+      case 'certified_partner':
+        return '认证合作方可见';
+      case 'platform_forward':
+        return '平台转接';
+      case 'hidden':
+        return '不公开';
+      default:
+        return displayScope;
+    }
+  }
+
+  factory WorkContact.fromJson(Map<String, dynamic> json) => WorkContact(
+        workId: _int(json['workId']),
+        hasContact: _flag(json['hasContact']),
+        displayScope: _text(json['displayScope']),
+      );
+}
+
 /// 作品试读包（AppPreviewDto）：可读章节 + 试读文件。
 class PreviewPayload {
   const PreviewPayload({
