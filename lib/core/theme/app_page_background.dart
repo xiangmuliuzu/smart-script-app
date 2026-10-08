@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'app_colors.dart';
-
 /// 页面背景：纵向渐变打底，顶部叠加一个径向渐变高光。
 ///
 /// 全 App 统一使用，替代各页面的纯色 `pageBackground`，
@@ -49,8 +47,8 @@ class _TopRadialGlow extends StatelessWidget {
             center: const Alignment(-0.3, -1.05),
             radius: 1.6,
             colors: [
-              Color(0xFF9DBCE8).withOpacity(0.50),
-              Color(0xFF9DBCE8).withOpacity(0.0),
+              const Color(0xFF9DBCE8).withOpacity(0.50),
+              const Color(0xFF9DBCE8).withOpacity(0.0),
             ],
           ),
         ),

@@ -22,7 +22,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/core/network/api_exception.dart';
-import 'package:script_app/features/bookstore/data/bookstore_models.dart';
 import 'package:script_app/features/bookstore/data/content_repository.dart';
 
 final String kBase =
