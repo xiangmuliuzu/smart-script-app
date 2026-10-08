@@ -46,16 +46,18 @@ class BookstorePage extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(bannersProvider);
           ref.invalidate(categoriesProvider);
-          ref.invalidate(recommendedWorksProvider);
+          ref.invalidate(hotWorksProvider);
+          ref.invalidate(latestWorksProvider);
         },
         child: ListView(
           padding: const EdgeInsets.only(bottom: 16),
-          children: const [
-            SizedBox(height: 12),
-            _BannerCarousel(),
-            _CategoryEntries(),
-            _RankingPreview(),
-            _RecommendedWorks(),
+          children: [
+            const SizedBox(height: 12),
+            const _BannerCarousel(),
+            const _CategoryEntries(),
+            const _RankingPreview(),
+            _WorkSection(title: '热门作品', provider: hotWorksProvider),
+            _WorkSection(title: '最新作品', provider: latestWorksProvider),
           ],
         ),
       ),
@@ -311,25 +313,28 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
       _type == 'rating' ? '${item.score.toStringAsFixed(1)} 分' : '${item.score.toInt()}';
 }
 
-/// 推荐流：最新上架前 6 部，完整列表进作品列表页。
-class _RecommendedWorks extends ConsumerWidget {
-  const _RecommendedWorks();
+/// 首页作品区块（热门 / 最新共用）：按 provider 取前若干部，完整列表进作品列表页。
+class _WorkSection extends ConsumerWidget {
+  const _WorkSection({required this.title, required this.provider});
+
+  final String title;
+  final AutoDisposeFutureProvider<List<BookItem>> provider;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final worksAsync = ref.watch(recommendedWorksProvider);
+    final worksAsync = ref.watch(provider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: '推荐作品',
+          title: title,
           onMore: () => context.push(RoutePath.workListUrl()),
         ),
         worksAsync.when(
           loading: () => const _SectionLoading(),
           error: (error, _) => _SectionError(
             message: error is ApiException ? error.message : '作品加载失败',
-            onRetry: () => ref.invalidate(recommendedWorksProvider),
+            onRetry: () => ref.invalidate(provider),
           ),
           data: (works) {
             if (works.isEmpty) return const _SectionEmpty(message: '暂无作品');

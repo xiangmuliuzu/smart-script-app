@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/providers/auth_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../data/bookstore_models.dart';
@@ -12,7 +15,10 @@ import '../data/content_providers.dart';
 ///
 /// 公开页，游客可试读。超出试读范围时后端返回 code=403 且 data 不含正文，
 /// 由 [ApiClient] 抛 [ApiException]，本页落到「试读结束」提示而非通用错误态。
-class ChapterReadPage extends ConsumerWidget {
+///
+/// 正文载入成功后按当前登录身份上报阅读进度（PUT /content/shelf/{workId}/progress）：
+/// 游客不报（避免必然 401），作品不在书架时后端返回 404，均视为正常，不影响阅读。
+class ChapterReadPage extends ConsumerStatefulWidget {
   const ChapterReadPage({super.key, required this.chapterId, this.title});
 
   final int chapterId;
@@ -21,12 +27,36 @@ class ChapterReadPage extends ConsumerWidget {
   final String? title;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(chapterDetailProvider(chapterId));
+  ConsumerState<ChapterReadPage> createState() => _ChapterReadPageState();
+}
+
+class _ChapterReadPageState extends ConsumerState<ChapterReadPage> {
+  /// 已上报的章节ID：同一章在 build 重建时不重复上报。
+  int? _reportedChapterId;
+
+  /// 上报阅读进度；失败静默（进度是附加信息，不应打断阅读）。
+  void _reportProgress(ChapterDetail detail) {
+    if (_reportedChapterId == detail.chapterId) return;
+    if (!ref.read(authControllerProvider).isAuthenticated) return;
+    _reportedChapterId = detail.chapterId;
+    unawaited(_send(detail.workId, detail.chapterId));
+  }
+
+  Future<void> _send(int workId, int chapterId) async {
+    try {
+      await ref.read(contentRepositoryProvider).saveShelfProgress(workId, chapterId);
+    } catch (_) {
+      // 忽略：未加入书架（404）或网络异常都不影响正文展示。
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detailAsync = ref.watch(chapterDetailProvider(widget.chapterId));
     return Scaffold(
       backgroundColor: AppColors.card,
       appBar: AppBar(
-        title: Text((title == null || title!.isEmpty) ? '正文' : title!),
+        title: Text((widget.title == null || widget.title!.isEmpty) ? '正文' : widget.title!),
       ),
       body: detailAsync.when(
         loading: () => const LoadingView(message: '加载中'),
@@ -37,7 +67,7 @@ class ChapterReadPage extends ConsumerWidget {
           }
           return ErrorView(
             message: error is ApiException ? error.message : '加载失败，请稍后重试',
-            onRetry: () => ref.invalidate(chapterDetailProvider(chapterId)),
+            onRetry: () => ref.invalidate(chapterDetailProvider(widget.chapterId)),
           );
         },
         data: (detail) {
@@ -45,6 +75,7 @@ class ChapterReadPage extends ConsumerWidget {
           if (!detail.readable || content == null || content.isEmpty) {
             return const _LockedView(message: '试读结束，请合作或授权后查看完整剧本');
           }
+          WidgetsBinding.instance.addPostFrameCallback((_) => _reportProgress(detail));
           return _Reader(detail: detail, content: content);
         },
       ),

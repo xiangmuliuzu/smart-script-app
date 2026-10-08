@@ -30,8 +30,18 @@ final rankingProvider = FutureProvider.autoDispose.family<List<RankingItem>, Str
   (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
 );
 
-/// 首页推荐流（最新上架前 6 部）。
-final recommendedWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
+/// 首页热门作品（按浏览量取前 6 部）。
+final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
+  (ref) async {
+    final page = await ref
+        .watch(contentRepositoryProvider)
+        .pageWorks(pageNum: 1, pageSize: 6, sort: 'view');
+    return page.list;
+  },
+);
+
+/// 首页最新作品（最新上架前 6 部）。
+final latestWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final page = await ref
         .watch(contentRepositoryProvider)

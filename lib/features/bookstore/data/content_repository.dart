@@ -175,6 +175,17 @@ class ContentRepository {
     return ShelfState.fromJson(data);
   }
 
+  /// 记录阅读进度（需 App Token，接口 2.7.12 补充写入）。
+  ///
+  /// 只更新已加入书架的作品：不在书架时后端按 404 拒绝（阅读页忽略该错误）。
+  Future<void> saveShelfProgress(int workId, int chapterId) async {
+    await _api.put<Map<String, dynamic>>(
+      ApiEndpoints.contentShelfProgress(workId),
+      data: {'chapterId': chapterId},
+      parser: _mapParser,
+    );
+  }
+
   /// 搜索历史列表（需 App Token，接口 2.7.4）。
   ///
   /// 后端按最近搜索时间倒序下发最近若干条（不做分页），故无 total。
@@ -324,7 +335,8 @@ class IdentitySummary {
 
 /// 我的书架载荷（接口 2.7.12）：身份摘要块 + 真实分页作品。
 ///
-/// 作品元素与 2.7.1 作品列表同为 [BookItem]（后端复用 AppWorkDto），
+/// 作品元素与 2.7.1 作品列表同为 [BookItem]（后端在书城作品字段上追加本书架阅读进度，
+/// 故 [BookItem.lastReadChapterId] 等进度字段仅书架列表有值），
 /// 书架页因此可与书城其它列表共用渲染组件。
 class ShelfPayload {
   const ShelfPayload({

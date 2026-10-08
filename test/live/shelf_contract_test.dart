@@ -1,5 +1,6 @@
 // B 模块书架真实联调（App 端）：2.7.12 书架管理（列表 / 加入书架 / 移出书架），
-// 以及契约未单列、按约定补充的书架态查询（GET /content/shelf/{workId}）。
+// 以及契约未单列、按约定补充的书架态查询（GET /content/shelf/{workId}）
+// 与阅读进度上报（PUT /content/shelf/{workId}/progress）。
 //
 // 这与收藏联调同属 App 私有接口（需 App Access Token），故同样用随机手机号真实注册建号
 // （书架天然为空），断言只覆盖契约行为，并在结束时移出书架，避免污染真实库。
@@ -116,6 +117,24 @@ void main() {
     expect(afterDup.total, 1, reason: '重复加入应幂等，不产生重复记录');
     expect(afterDup.list.where((e) => e.workId == workId).length, 1);
 
+    // 阅读进度：上报后随书架列表下发（2.7.12 补充写入，PUT /content/shelf/{workId}/progress）。
+    // 取该作品的首章作为进度目标；无章节时用任意正整数，仅验证写入链路。
+    final chapters = await repo.listChapters(workId);
+    final chapterId =
+        chapters.chapters.isNotEmpty ? chapters.chapters.first.chapterId : 1;
+    await repo.saveShelfProgress(workId, chapterId);
+    final afterProgress = await repo.shelf(pageNum: 1, pageSize: 10);
+    final progressed = afterProgress.list.firstWhere((e) => e.workId == workId);
+    expect(progressed.lastReadChapterId, chapterId, reason: '上报的章节应回填到书架行');
+    expect(progressed.lastReadAt, isNotNull, reason: '上报后应回填最近阅读时间');
+    expect(progressed.readingProgressLabel, isNotNull, reason: '有进度时页面可展示进度文案');
+
+    // 非法 chapterId（非正整数）按 400 拒绝：入参校验先于书架判定（此时作品确实在书架）。
+    await expectLater(
+      repo.saveShelfProgress(workId, 0),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 400)),
+    );
+
     // 移出书架：书架态翻转，列表不再包含。
     await repo.removeShelf(workId);
     expect((await repo.shelfStatus(workId)).onShelf, isFalse);
@@ -133,6 +152,17 @@ void main() {
     );
   });
 
+  test('书架：未加入书架的作品上报阅读进度按 404 拒绝', () async {
+    final repo = await _loggedInRepo();
+    // 新账号书架为空：上报进度不应隐式加入书架，而是 404。
+    final works = await repo.pageWorks(pageNum: 1, pageSize: 1);
+    expect(works.list, isNotEmpty, reason: '书城无上架作品，无法进行进度联调');
+    await expectLater(
+      repo.saveShelfProgress(works.list.first.workId, 1),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 404)),
+    );
+  });
+
   test('书架：未登录（无 Token）被拒', () async {
     final guest = _guestRepo();
     await expectLater(
@@ -145,6 +175,10 @@ void main() {
     );
     await expectLater(
       guest.shelfStatus(1),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 401)),
+    );
+    await expectLater(
+      guest.saveShelfProgress(1, 1),
       throwsA(isA<ApiException>().having((e) => e.code, 'code', 401)),
     );
   });

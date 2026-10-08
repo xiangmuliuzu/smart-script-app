@@ -45,13 +45,22 @@ class WorkCover extends StatelessWidget {
 
 /// 作品列表行（书城推荐流、作品列表页共用）。
 class WorkListTile extends StatelessWidget {
-  const WorkListTile({super.key, required this.work, this.onTap, this.trailing});
+  const WorkListTile({
+    super.key,
+    required this.work,
+    this.onTap,
+    this.trailing,
+    this.progressText,
+  });
 
   final BookItem work;
   final VoidCallback? onTap;
 
   /// 行尾扩展动作（如收藏列表的「取消收藏」）；为空时只展示价格。
   final Widget? trailing;
+
+  /// 额外的阅读进度行（仅书架列表传入，如「读到第 3 章 · 时间」）；为空则不占位。
+  final String? progressText;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +100,15 @@ class WorkListTile extends StatelessWidget {
                     '${work.wordCount} 字 · ${work.episodeCount} 集 · 评分 ${work.rating.toStringAsFixed(1)}',
                     style: const TextStyle(fontSize: 12, color: AppColors.text3),
                   ),
+                  if (progressText != null && progressText!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      progressText!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                    ),
+                  ],
                 ],
               ),
             ),

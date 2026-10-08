@@ -59,6 +59,9 @@ class BookItem {
     this.saleCount = 0,
     this.rating = 0,
     this.createTime,
+    this.lastReadChapterId,
+    this.lastReadChapterNo,
+    this.lastReadAt,
   });
 
   final int workId;
@@ -87,8 +90,25 @@ class BookItem {
   final double rating;
   final String? createTime;
 
+  /// 最近阅读章节ID（书架列表专属，接口 2.7.12；未读或非书架场景为 null）。
+  final int? lastReadChapterId;
+
+  /// 最近阅读章节序号（书架列表专属；章节被删时为 null）。
+  final int? lastReadChapterNo;
+
+  /// 最近阅读时间（书架列表专属，"yyyy-MM-dd HH:mm:ss"）。
+  final String? lastReadAt;
+
   /// 价格展示文案：免费作品不展示金额。
   String get priceLabel => isFree ? '免费' : '¥${price.toStringAsFixed(2)}';
+
+  /// 阅读进度文案；未产生进度（无 lastReadChapterId）时为 null，页面据此隐藏该行。
+  String? get readingProgressLabel {
+    if (lastReadChapterId == null) return null;
+    final where = lastReadChapterNo == null ? '上次阅读' : '读到第 $lastReadChapterNo 章';
+    final when = lastReadAt;
+    return (when == null || when.isEmpty) ? where : '$where · $when';
+  }
 
   factory BookItem.fromJson(Map<String, dynamic> json) => BookItem(
         workId: _int(json['workId']),
@@ -116,6 +136,9 @@ class BookItem {
         saleCount: _int(json['saleCount']),
         rating: _decimal(json['rating']),
         createTime: json['createTime'] as String?,
+        lastReadChapterId: _intOrNull(json['lastReadChapterId']),
+        lastReadChapterNo: _intOrNull(json['lastReadChapterNo']),
+        lastReadAt: json['lastReadAt'] as String?,
       );
 }
 
@@ -290,10 +313,10 @@ class RankingType {
   final String label;
 
   static const List<RankingType> all = <RankingType>[
-    RankingType('view', '人气榜'),
+    RankingType('view', '热门榜'),
     RankingType('favorite', '收藏榜'),
-    RankingType('sale', '销量榜'),
-    RankingType('rating', '好评榜'),
+    RankingType('sale', '交易热度榜'),
+    RankingType('rating', '评分榜'),
   ];
 
   static RankingType of(String? code) =>

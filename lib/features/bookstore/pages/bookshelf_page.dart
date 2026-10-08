@@ -20,6 +20,9 @@ import '../widgets/bookstore_widgets.dart';
 /// 受登录守卫保护（见 [ProtectedRoutes]）。列表为真实分页数据（只含服务端判定的
 /// 上架未删除作品，按加入书架时间倒序）；移出书架为物理删除，归属由服务端身份决定。
 ///
+/// 每行展示本书架阅读进度（读到第 X 章 · 时间，来自服务端 last_read_* 列），
+/// 「继续阅读」按进度回章节正文，无进度时回章节目录。
+///
 /// 身份摘要块（identity / downloadable / realNameRequired）随列表接口一并下发，
 /// 首屏即具备，用于展示实名准入等身份信息（与角色授权分开判断）。
 class BookshelfPage extends ConsumerStatefulWidget {
@@ -92,6 +95,18 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
         .showSnackBar(const SnackBar(content: Text('已移出书架')));
   }
 
+  /// 继续阅读：有进度回章节正文，否则回章节目录（未读过时无从续读）。
+  ///
+  /// 返回书架后刷新列表，让本次阅读上报的进度立即体现在卡片上。
+  Future<void> _continueRead(BookItem work) async {
+    final chapterId = work.lastReadChapterId;
+    await context.push(chapterId == null
+        ? RoutePath.chapterListUrl(work.workId, title: work.title)
+        : RoutePath.chapterReadUrl(chapterId));
+    if (!mounted) return;
+    _controller.load(refresh: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     return UserCenterScaffold(
@@ -134,11 +149,21 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
           return WorkListTile(
             work: work,
             onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
-            trailing: IconButton(
-              onPressed: () => _remove(work),
-              icon: const Icon(Icons.bookmark_remove_outlined,
-                  size: 20, color: AppColors.text3),
-              tooltip: '移出书架',
+            progressText: work.readingProgressLabel,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () => _continueRead(work),
+                  child: const Text('继续阅读', style: TextStyle(fontSize: 13)),
+                ),
+                IconButton(
+                  onPressed: () => _remove(work),
+                  icon: const Icon(Icons.bookmark_remove_outlined,
+                      size: 20, color: AppColors.text3),
+                  tooltip: '移出书架',
+                ),
+              ],
             ),
           );
         },
