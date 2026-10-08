@@ -22,7 +22,7 @@ class WorkDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(workDetailProvider(workId));
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('作品详情')),
       body: detailAsync.when(
         loading: () => const LoadingView(message: '加载中'),

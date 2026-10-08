@@ -15,7 +15,8 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.pageBackground,
+      // 页面背景由 AppPageBackground 的渐变提供，Scaffold 须透明透出。
+      scaffoldBackgroundColor: Colors.transparent,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.card,
         foregroundColor: AppColors.text1,

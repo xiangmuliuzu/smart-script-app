@@ -26,7 +26,7 @@ class ChapterListPage extends ConsumerWidget {
     final listAsync = ref.watch(chapterListProvider(workId));
     final appBarTitle = (title == null || title!.isEmpty) ? '章节目录' : title!;
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: Text(appBarTitle)),
       body: listAsync.when(
         loading: () => const LoadingView(message: '加载中'),

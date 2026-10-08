@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/router/route_paths.dart';
-import '../../../core/theme/app_colors.dart';
 
 /// 用户中心子页面外壳：统一 AppBar 与页面底色。
 ///
@@ -25,7 +24,7 @@ class UserCenterScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: Text(title), actions: actions),
       body: body,
       bottomNavigationBar: bottomNavigationBar,

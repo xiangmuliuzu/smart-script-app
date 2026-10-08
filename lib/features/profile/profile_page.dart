@@ -32,7 +32,7 @@ class ProfilePage extends ConsumerWidget {
     final shelf = ref.watch(shelfProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       drawer: _ProfileDrawer(user: user, ref: ref),
       body: SafeArea(
         // Builder 使 Scaffold.of 取到本页的 Scaffold；

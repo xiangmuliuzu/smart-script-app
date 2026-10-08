@@ -22,7 +22,7 @@ class BookstorePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('书城'),
         actions: [

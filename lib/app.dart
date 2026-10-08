@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
+import 'core/theme/app_page_background.dart';
 import 'core/theme/app_theme.dart';
 
 /// 应用根组件。使用 go_router 作为路由来源，主题全局统一。
@@ -48,6 +49,8 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       scaffoldMessengerKey: _messengerKey,
+      builder: (context, child) =>
+          AppPageBackground(child: child ?? const SizedBox.shrink()),
       routerConfig: ref.watch(routerProvider),
     );
   }

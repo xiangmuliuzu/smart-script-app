@@ -36,7 +36,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
   Widget build(BuildContext context) {
     final rankingAsync = ref.watch(rankingProvider(_type));
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('作品榜单')),
       body: Column(
         children: [

@@ -99,7 +99,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: Text(widget.title ?? '作品列表')),
       body: Column(
         children: [
