@@ -50,6 +50,7 @@ class ChapterListPage extends ConsumerWidget {
                 for (final chapter in payload.chapters)
                   _ChapterTile(
                     chapter: chapter,
+                    unlocked: payload.unlocked,
                     onTap: () => _openChapter(context, chapter),
                   ),
               ],
@@ -72,7 +73,7 @@ class ChapterListPage extends ConsumerWidget {
   }
 }
 
-/// 试读状态提示条：明确告知可读范围，避免用户逐章试错。
+/// 可读范围提示条：优先展示「已授权」，否则展示试读范围，避免用户逐章试错。
 class _PreviewBanner extends StatelessWidget {
   const _PreviewBanner({required this.payload});
 
@@ -80,30 +81,39 @@ class _PreviewBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 已获授权时全文可读，试读范围不再是限制条件，故优先展示授权态
+    final bool unlocked = payload.unlocked;
     final bool opened = payload.previewEnabled && payload.previewEpisodes > 0;
+    final bool highlighted = unlocked || opened;
+    final IconData icon = unlocked
+        ? Icons.verified_outlined
+        : (opened ? Icons.lock_open_outlined : Icons.lock_outline);
+    final String message = unlocked
+        ? '已获授权：可阅读全部章节'
+        : (opened
+            ? '已开启试读：前 ${payload.previewEpisodes} 集可免费阅读'
+            : '本作品未开启试读，仅可查看章节目录');
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: opened ? AppColors.primaryTint : AppColors.fill,
+        color: highlighted ? AppColors.primaryTint : AppColors.fill,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
       ),
       child: Row(
         children: [
           Icon(
-            opened ? Icons.lock_open_outlined : Icons.lock_outline,
+            icon,
             size: 16,
-            color: opened ? AppColors.primary : AppColors.text3,
+            color: highlighted ? AppColors.primary : AppColors.text3,
           ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              opened
-                  ? '已开启试读：前 ${payload.previewEpisodes} 集可免费阅读'
-                  : '本作品未开启试读，仅可查看章节目录',
+              message,
               style: TextStyle(
                 fontSize: 12,
-                color: opened ? AppColors.primary : AppColors.text3,
+                color: highlighted ? AppColors.primary : AppColors.text3,
               ),
             ),
           ),
@@ -117,17 +127,28 @@ class _PreviewBanner extends StatelessWidget {
   }
 }
 
-/// 目录行：可读章节带「试读」标记，未开读章节带锁。
+/// 目录行：可读章节带「免费 / 试读 / 已授权」标记，不可读章节带锁。
 class _ChapterTile extends StatelessWidget {
-  const _ChapterTile({required this.chapter, required this.onTap});
+  const _ChapterTile({required this.chapter, required this.unlocked, required this.onTap});
 
   final ChapterSummary chapter;
+
+  /// 作品是否已授权全文：为 true 时非免费章节的可读原因记为「已授权」。
+  final bool unlocked;
   final VoidCallback onTap;
+
+  /// 可读原因标记；不可读返回 null。
+  String? get _readableTag {
+    if (!chapter.readable) return null;
+    if (chapter.isFree) return '免费';
+    return unlocked ? '已授权' : '试读';
+  }
 
   @override
   Widget build(BuildContext context) {
     final String name =
         chapter.chapterTitle.isEmpty ? '第 ${chapter.chapterNo} 章' : chapter.chapterTitle;
+    final String? tag = _readableTag;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -156,9 +177,9 @@ class _ChapterTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (chapter.readable) ...[
+                      if (tag != null) ...[
                         const SizedBox(width: 8),
-                        _Tag(text: chapter.isFree ? '免费' : '试读'),
+                        _Tag(text: tag),
                       ],
                     ],
                   ),

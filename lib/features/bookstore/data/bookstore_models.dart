@@ -317,7 +317,8 @@ class ChapterSummary {
   final int wordCount;
   final bool isFree;
 
-  /// 是否落在试读范围内（由服务端按作品试读配置判定，客户端不自行推算）。
+  /// 当前身份是否可读本章：由服务端判定（试读范围内 或 已获版权授权），
+  /// 客户端不自行推算。
   final bool readable;
 
   factory ChapterSummary.fromJson(Map<String, dynamic> json) => ChapterSummary(
@@ -363,12 +364,14 @@ class ChapterDetail {
       );
 }
 
-/// 作品章节目录 payload（含试读配置，目录页一次请求即可完成展示）。
+/// 作品章节目录 payload（含试读配置与当前身份的访问范围，目录页一次请求即可完成展示）。
 class ChapterListPayload {
   const ChapterListPayload({
     required this.workId,
     this.previewEnabled = false,
     this.previewEpisodes = 0,
+    this.accessScope = 'preview',
+    this.unlocked = false,
     this.total = 0,
     this.chapters = const <ChapterSummary>[],
   });
@@ -376,6 +379,12 @@ class ChapterListPayload {
   final int workId;
   final bool previewEnabled;
   final int previewEpisodes;
+
+  /// 访问范围：preview（仅试读）/ full（已获授权全文），由服务端按当前身份下发。
+  final String accessScope;
+
+  /// 是否已获版权授权；等价于 [accessScope] == 'full'。
+  final bool unlocked;
   final int total;
   final List<ChapterSummary> chapters;
 
@@ -385,6 +394,10 @@ class ChapterListPayload {
       workId: _int(json['workId']),
       previewEnabled: _flag(json['previewEnabled']),
       previewEpisodes: _int(json['previewEpisodes']),
+      accessScope: _text(json['accessScope']).isEmpty
+          ? 'preview'
+          : _text(json['accessScope']),
+      unlocked: _flag(json['unlocked']),
       total: _int(json['total']),
       chapters: raw is List
           ? raw
