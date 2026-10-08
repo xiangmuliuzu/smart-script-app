@@ -477,6 +477,36 @@ class WorkContact {
       );
 }
 
+/// 搜索历史条目（AppSearchHistoryItem，接口 2.7.4）。
+///
+/// 契约只声明 data.list 为数组、未定义元素字段，字段按 sys_search_history
+/// 实际业务列对齐后端下发口径：id / keyword / searchCount / lastSearchAt。
+class SearchHistoryItem {
+  const SearchHistoryItem({
+    required this.id,
+    this.keyword = '',
+    this.searchCount = 0,
+    this.lastSearchAt,
+  });
+
+  /// 历史记录ID（删除单条时回传）。
+  final int id;
+  final String keyword;
+
+  /// 累计搜索次数。
+  final int searchCount;
+
+  /// 最近一次搜索时间（"yyyy-MM-dd HH:mm:ss"）。
+  final String? lastSearchAt;
+
+  factory SearchHistoryItem.fromJson(Map<String, dynamic> json) => SearchHistoryItem(
+        id: _int(json['id']),
+        keyword: _text(json['keyword']),
+        searchCount: _int(json['searchCount']),
+        lastSearchAt: json['lastSearchAt'] as String?,
+      );
+}
+
 /// 作品试读包（AppPreviewDto）：可读章节 + 试读文件。
 class PreviewPayload {
   const PreviewPayload({

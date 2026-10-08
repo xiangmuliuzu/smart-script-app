@@ -40,6 +40,8 @@ class RoutePath {
   static const String workList = '/works';
   static const String workDetail = '/work';
   static const String ranking = '/ranking';
+  // 搜索页（公开可搜索；搜索历史区块仅登录可见）
+  static const String search = '/search';
 
   // B 模块试读链路（公开页，游客可试读）
   static const String chapterList = '/chapters';
@@ -115,6 +117,7 @@ class RouteName {
   static const String workList = 'workList';
   static const String workDetail = 'workDetail';
   static const String ranking = 'ranking';
+  static const String search = 'search';
   static const String chapterList = 'chapterList';
   static const String chapterRead = 'chapterRead';
   static const String messages = 'messages';

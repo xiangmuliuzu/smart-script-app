@@ -26,6 +26,11 @@ class BookstorePage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('书城'),
         actions: [
+          IconButton(
+            onPressed: () => context.push(RoutePath.search),
+            icon: const Icon(Icons.search),
+            tooltip: '搜索',
+          ),
           TextButton.icon(
             onPressed: () => AuthGuard.pushProtected(
               context,

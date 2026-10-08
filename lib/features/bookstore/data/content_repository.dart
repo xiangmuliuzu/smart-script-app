@@ -143,6 +143,45 @@ class ContentRepository {
     return ShelfPayload.fromJson(data);
   }
 
+  /// 搜索历史列表（需 App Token，接口 2.7.4）。
+  ///
+  /// 后端按最近搜索时间倒序下发最近若干条（不做分页），故无 total。
+  Future<List<SearchHistoryItem>> listSearchHistory() async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistory,
+      parser: _mapParser,
+    );
+    return _items(data, SearchHistoryItem.fromJson);
+  }
+
+  /// 记录搜索历史（需 App Token）。
+  ///
+  /// 契约未定义写入接口，按 sys_search_history 表补齐；同关键词已存在时
+  /// 由后端合并计数并刷新时间。关键词长度上限由后端校验（超 100 字按 400 拒绝）。
+  Future<void> recordSearchHistory(String keyword) async {
+    await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistory,
+      data: {'keyword': keyword},
+      parser: _mapParser,
+    );
+  }
+
+  /// 删除单条搜索历史（需 App Token，接口 2.7.5）；不存在或非本人时后端按 404 拒绝。
+  Future<void> removeSearchHistory(int id) async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistoryById(id),
+      parser: _mapParser,
+    );
+  }
+
+  /// 清空全部搜索历史（需 App Token，接口 2.7.6）；无历史时为幂等成功。
+  Future<void> clearSearchHistory() async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistory,
+      parser: _mapParser,
+    );
+  }
+
   static Map<String, dynamic> _mapParser(dynamic raw) {
     if (raw is Map) return Map<String, dynamic>.from(raw);
     return <String, dynamic>{};

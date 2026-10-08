@@ -13,6 +13,7 @@ import '../../features/bookstore/pages/bookshelf_page.dart';
 import '../../features/bookstore/pages/chapter_list_page.dart';
 import '../../features/bookstore/pages/chapter_read_page.dart';
 import '../../features/bookstore/pages/ranking_page.dart';
+import '../../features/bookstore/pages/search_page.dart';
 import '../../features/bookstore/pages/work_detail_page.dart';
 import '../../features/bookstore/pages/work_list_page.dart';
 import '../../features/category/category_page.dart';
@@ -218,6 +219,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.ranking,
         builder: (context, state) => RankingPage(
           type: state.uri.queryParameters['type'],
+        ),
+      ),
+      // 搜索页（公开页）：关键词搜索 + 搜索历史（历史区块仅登录可见）
+      GoRoute(
+        path: RoutePath.search,
+        name: RouteName.search,
+        builder: (context, state) => SearchPage(
+          keyword: state.uri.queryParameters['keyword'],
         ),
       ),
       // ===== B 模块试读链路（公开页，游客可试读）=====

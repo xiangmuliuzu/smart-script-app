@@ -55,6 +55,14 @@ final shelfProvider = FutureProvider.autoDispose<ShelfPayload>(
   (ref) => ref.watch(contentRepositoryProvider).shelf(),
 );
 
+/// 搜索历史（需 App Token）。
+///
+/// autoDispose：搜索页进入后拉取；游客不 watch（历史区块隐藏），
+/// 页面退出自动释放，不残留过期数据。
+final searchHistoryProvider = FutureProvider.autoDispose<List<SearchHistoryItem>>(
+  (ref) => ref.watch(contentRepositoryProvider).listSearchHistory(),
+);
+
 /// 作品章节目录；payload 含试读配置，每条章节自带 readable 标记。
 final chapterListProvider = FutureProvider.autoDispose.family<ChapterListPayload, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).listChapters(workId),
