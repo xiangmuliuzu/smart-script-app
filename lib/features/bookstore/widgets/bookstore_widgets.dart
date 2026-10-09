@@ -43,6 +43,91 @@ class WorkCover extends StatelessWidget {
       );
 }
 
+/// 分类 + 标签胶囊组（作品卡片、详情页共用）。
+///
+/// [genreName] 为分类（题材），用主色描边突出；[tags] 为标签，用中性填充。
+/// 两者均可在传入对应回调后点击，跳转「按该分类/标签筛选的作品列表」；
+/// 回调为空时仅作展示。分类与标签都为空时整块不占位。
+class WorkTagChips extends StatelessWidget {
+  const WorkTagChips({
+    super.key,
+    this.genreName = '',
+    this.tags = const <TagItem>[],
+    this.onGenreTap,
+    this.onTagTap,
+    this.spacing = 6,
+    this.fontSize = 11,
+  });
+
+  final String genreName;
+  final List<TagItem> tags;
+
+  /// 分类点击（传入则分类胶囊可点）。
+  final VoidCallback? onGenreTap;
+
+  /// 标签点击（传入则标签胶囊可点）。
+  final void Function(TagItem tag)? onTagTap;
+  final double spacing;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    if (genreName.isEmpty && tags.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: spacing,
+      runSpacing: spacing,
+      children: [
+        if (genreName.isNotEmpty)
+          _WorkChip(
+            label: genreName,
+            color: AppColors.primary,
+            background: AppColors.primaryTint,
+            fontSize: fontSize,
+            onTap: onGenreTap,
+          ),
+        for (final tag in tags)
+          _WorkChip(
+            label: tag.tagName,
+            color: AppColors.text2,
+            background: AppColors.fill,
+            fontSize: fontSize,
+            onTap: onTagTap == null ? null : () => onTagTap!(tag),
+          ),
+      ],
+    );
+  }
+}
+
+class _WorkChip extends StatelessWidget {
+  const _WorkChip({
+    required this.label,
+    required this.color,
+    required this.background,
+    required this.fontSize,
+    this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+  final double fontSize;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label, style: TextStyle(fontSize: fontSize, color: color)),
+    );
+    if (onTap == null) return chip;
+    return GestureDetector(onTap: onTap, child: chip);
+  }
+}
+
 /// 作品列表行（书城推荐流、作品列表页共用）。
 class WorkListTile extends StatelessWidget {
   const WorkListTile({
@@ -95,6 +180,10 @@ class WorkListTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: AppColors.text3),
                   ),
+                  if (work.tags.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    WorkTagChips(tags: work.tags),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     '${work.wordCount} 字 · ${work.episodeCount} 集 · 评分 ${work.rating.toStringAsFixed(1)}',

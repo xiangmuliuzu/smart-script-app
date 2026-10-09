@@ -222,19 +222,23 @@ class _Header extends StatelessWidget {
                       work.authorName.isEmpty ? '未知作者' : work.authorName,
                       style: const TextStyle(fontSize: 13, color: AppColors.text2),
                     ),
-                    const SizedBox(height: 6),
-                    if (work.genreName.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryTint,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          work.genreName,
-                          style: const TextStyle(fontSize: 11, color: AppColors.primary),
-                        ),
+                    if (work.genreName.isNotEmpty || work.tags.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      WorkTagChips(
+                        genreName: work.genreName,
+                        tags: work.tags,
+                        onGenreTap: work.genreId > 0
+                            ? () => context.push(RoutePath.workListUrl(
+                                  categoryId: work.genreId,
+                                  title: work.genreName,
+                                ))
+                            : null,
+                        onTagTap: (tag) => context.push(RoutePath.workListUrl(
+                              tagId: tag.tagId,
+                              title: tag.tagName,
+                            )),
                       ),
+                    ],
                     const SizedBox(height: 10),
                     Text(
                       work.priceLabel,

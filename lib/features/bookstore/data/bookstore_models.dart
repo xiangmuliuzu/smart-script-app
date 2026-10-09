@@ -33,6 +33,15 @@ double _decimal(dynamic value) {
   return double.tryParse(value?.toString() ?? '') ?? 0;
 }
 
+/// 标签数组解析：非数组或元素非对象时按空集合处理，页面无需判空。
+List<TagItem> _tags(dynamic value) {
+  if (value is! List) return const <TagItem>[];
+  return value
+      .whereType<Map>()
+      .map((e) => TagItem.fromJson(Map<String, dynamic>.from(e)))
+      .toList();
+}
+
 /// 书城作品（列表与详情共用；详情才带 coreSetting/characterSetting）。
 class BookItem {
   const BookItem({
@@ -40,7 +49,9 @@ class BookItem {
     this.title = '',
     this.cover = '',
     this.authorName = '',
+    this.genreId = 0,
     this.genreName = '',
+    this.tags = const <TagItem>[],
     this.workType = '',
     this.uploadType = '',
     this.lengthType = '',
@@ -70,7 +81,13 @@ class BookItem {
   final String title;
   final String cover;
   final String authorName;
+
+  /// 题材ID（对应 sys_work.genre_id），用于「按分类筛选」跳转。
+  final int genreId;
   final String genreName;
+
+  /// 作品标签（sys_work_tag 关联 sys_tag，仅启用标签）。
+  final List<TagItem> tags;
   final String workType;
   final String uploadType;
   final String lengthType;
@@ -117,7 +134,9 @@ class BookItem {
         title: _text(json['title']),
         cover: AppConfig.resolveAssetUrl(_text(json['cover'])),
         authorName: _text(json['authorName']),
+        genreId: _int(json['genreId']),
         genreName: _text(json['genreName']),
+        tags: _tags(json['tags']),
         workType: _text(json['workType']),
         uploadType: _text(json['uploadType']),
         lengthType: _text(json['lengthType']),
