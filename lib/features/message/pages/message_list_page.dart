@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,25 +22,32 @@ class MessageListPage extends ConsumerStatefulWidget {
   ConsumerState<MessageListPage> createState() => _MessageListPageState();
 }
 
-class _MessageListPageState extends ConsumerState<MessageListPage> {
+class _MessageListPageState extends ConsumerState<MessageListPage>
+    with WidgetsBindingObserver {
   late final PagedListController<MessageItem> _controller;
   final _scrollController = ScrollController();
 
   /// 当前筛选类型；null 表示全部。
   MessageType? _filter;
+  Timer? _timer;
+  bool _foreground = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = PagedListController<MessageItem>(
-      fetchPage: (pageNum, pageSize) => ref.read(messageRepositoryProvider).list(
-            type: _filter?.code,
-            pageNum: pageNum,
-            pageSize: pageSize,
-          ),
+      fetchPage: (pageNum, pageSize) =>
+          ref.read(messageRepositoryProvider).list(
+                type: _filter?.code,
+                pageNum: pageNum,
+                pageSize: pageSize,
+                includeAnnouncements: true,
+              ),
     );
     _controller.addListener(() => setState(() {}));
     _controller.load();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
@@ -50,14 +58,40 @@ class _MessageListPageState extends ConsumerState<MessageListPage> {
 
   @override
   void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) _poll();
+  }
+
+  void _poll() {
+    if (!mounted ||
+        !_foreground ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    ref.invalidate(unreadCountProvider);
+    _controller.refreshSilently();
+  }
+
+  Future<void> _refresh() async {
+    ref.invalidate(unreadCountProvider);
+    await _controller.load(refresh: true);
+  }
+
   Future<void> _markAllRead() async {
     try {
-      await ref.read(messageRepositoryProvider).markAllRead();
+      await ref
+          .read(messageRepositoryProvider)
+          .markAllRead(includeAnnouncements: true);
+      if (!mounted) return;
       ref.invalidate(unreadCountProvider);
       await _controller.load(refresh: true);
       _toast('已全部标记为已读');
@@ -68,7 +102,8 @@ class _MessageListPageState extends ConsumerState<MessageListPage> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -76,24 +111,21 @@ class _MessageListPageState extends ConsumerState<MessageListPage> {
     return UserCenterScaffold(
       title: '消息中心',
       actions: [
+        IconButton(
+            onPressed: _refresh,
+            tooltip: '刷新通知',
+            icon: const Icon(Icons.refresh)),
         TextButton(
-          onPressed: _controller.isEmpty ? null : _markAllRead,
-          child: const Text('全部已读'),
-        ),
+            onPressed: _controller.isEmpty ? null : _markAllRead,
+            child: const Text('全部已读')),
       ],
-      body: Column(
-        children: [
-          _buildFilters(),
-          Expanded(child: _buildList()),
-        ],
-      ),
+      body: Column(children: [_buildFilters(), Expanded(child: _buildList())]),
     );
   }
 
   Widget _buildFilters() {
     final unread = ref.watch(unreadCountProvider).valueOrNull;
     return Container(
-      color: AppColors.card,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -127,26 +159,31 @@ class _MessageListPageState extends ConsumerState<MessageListPage> {
   Widget _buildList() {
     if (_controller.loading) return const LoadingView(message: '加载中');
     if (_controller.error != null) {
-      return ErrorView(message: _controller.error!, onRetry: () => _controller.load(refresh: true));
+      return ErrorView(
+          message: _controller.error!,
+          onRetry: () => _controller.load(refresh: true));
     }
     if (_controller.isEmpty) {
       return const EmptyView(message: '暂无消息', icon: Icons.notifications_none);
     }
     return RefreshIndicator(
-      onRefresh: () => _controller.load(refresh: true),
+      onRefresh: _refresh,
       child: ListView.separated(
         controller: _scrollController,
         itemCount: _controller.items.length + (_controller.hasMore ? 1 : 0),
-        separatorBuilder: (_, __) => const Divider(height: 0.5, color: AppColors.divider),
+        separatorBuilder: (_, __) =>
+            const Divider(height: 0.5, color: AppColors.divider),
         itemBuilder: (context, index) {
           if (index >= _controller.items.length) {
             return LoadMoreFooter<MessageItem>(controller: _controller);
           }
           final item = _controller.items[index];
           return _MessageTile(
+            key: ValueKey('${item.source}:${item.messageId}'),
             item: item,
             onTap: () async {
-              await context.push('${RoutePath.messageDetail}?id=${item.messageId}');
+              await context.push(
+                  '${RoutePath.messageDetail}?id=${item.messageId}&source=${item.source}');
               // 详情页可能标记已读：返回后刷新列表与未读数
               if (!mounted) return;
               ref.invalidate(unreadCountProvider);
@@ -183,7 +220,8 @@ class _FilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? AppColors.primaryTint : AppColors.fill,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: selected ? AppColors.primary : Colors.transparent),
+            border: Border.all(
+                color: selected ? AppColors.primary : Colors.transparent),
           ),
           child: Text(
             count > 0 ? '$label $count' : label,
@@ -199,7 +237,7 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _MessageTile extends StatelessWidget {
-  const _MessageTile({required this.item, required this.onTap});
+  const _MessageTile({super.key, required this.item, required this.onTap});
 
   final MessageItem item;
   final VoidCallback onTap;
@@ -209,7 +247,6 @@ class _MessageTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: AppColors.card,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,7 +257,8 @@ class _MessageTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      UserStatusChip(text: item.typeLabel, color: AppColors.primary),
+                      UserStatusChip(
+                          text: item.typeLabel, color: AppColors.primary),
                       const SizedBox(width: 8),
                       if (!item.read)
                         Container(
@@ -248,14 +286,16 @@ class _MessageTile extends StatelessWidget {
                       item.summary,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, color: AppColors.text3),
+                      style:
+                          const TextStyle(fontSize: 13, color: AppColors.text3),
                     ),
                   ],
                   if (item.createdAt != null) ...[
                     const SizedBox(height: 6),
                     Text(
                       item.createdAt!,
-                      style: const TextStyle(fontSize: 11, color: AppColors.text3),
+                      style:
+                          const TextStyle(fontSize: 11, color: AppColors.text3),
                     ),
                   ],
                 ],

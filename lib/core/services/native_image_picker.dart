@@ -9,7 +9,9 @@ import 'package:flutter/services.dart';
 class NativeImagePicker {
   NativeImagePicker._();
 
-  static const MethodChannel _channel = MethodChannel('smartscript/native_image');
+  static const MethodChannel _channel =
+      MethodChannel('smartscript/native_image');
+  static const int maxImageBytes = 5 * 1024 * 1024;
 
   /// 调起系统选择器。
   ///
@@ -30,6 +32,9 @@ class NativeImagePicker {
     final file = File(path);
     try {
       if (!await file.exists()) return null;
+      final size = await file.length();
+      if (size == 0) throw NativeImageException('图片不能为空');
+      if (size > maxImageBytes) throw NativeImageException('图片不能超过 5 MB');
       final bytes = await file.readAsBytes();
       return PickedImage(bytes: bytes, filename: _fileName(file.path));
     } finally {
@@ -46,8 +51,11 @@ class NativeImagePicker {
   static String _fileName(String path) {
     final base = path.split(Platform.pathSeparator).last;
     final dot = base.lastIndexOf('.');
-    final ext = dot >= 0 ? base.substring(dot) : '.jpg';
-    return 'avatar${ext == '.img' ? '.jpg' : ext}';
+    final ext = dot >= 0 ? base.substring(dot).toLowerCase() : '';
+    if (!const ['.jpg', '.jpeg', '.png', '.gif', '.bmp'].contains(ext)) {
+      throw NativeImageException('请选择 JPG、PNG、GIF 或 BMP 图片');
+    }
+    return 'avatar$ext';
   }
 }
 

@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/services/native_image_picker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/avatar_url.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
 import '../../user_center/data/user_center_providers.dart';
@@ -51,6 +52,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   }
 
   Future<void> _save() async {
+    if (_saving || _uploading) return;
     final nickname = _nicknameCtrl.text.trim();
     if (nickname.isEmpty) {
       _toast('昵称不能为空');
@@ -104,11 +106,11 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   }
 
   Future<void> _pickAvatar() async {
-    if (_uploading) return;
+    if (_uploading || _saving) return;
     setState(() => _uploading = true);
     try {
       final picked = await NativeImagePicker.pickImage();
-      if (picked == null) return;
+      if (picked == null || !mounted) return;
       final url = await ref.read(userCenterRepositoryProvider).uploadAvatar(
             bytes: picked.bytes,
             filename: picked.filename,
@@ -187,7 +189,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _pickAvatar,
+                  onTap: _saving || _uploading ? null : _pickAvatar,
                   child: Stack(
                     alignment: Alignment.bottomRight,
                     children: [
@@ -197,7 +199,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                           height: 84,
                           child: (_pendingAvatar != null && _pendingAvatar!.isNotEmpty)
                               ? Image.network(
-                                  _pendingAvatar!,
+                                  avatarUrl(_pendingAvatar),
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => const _AvatarFallback(),
                                 )
