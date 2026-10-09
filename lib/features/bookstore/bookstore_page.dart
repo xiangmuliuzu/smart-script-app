@@ -53,9 +53,10 @@ class BookstorePage extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 16),
           children: [
             const SizedBox(height: 12),
-            const _BannerCarousel(),
+            const _BannerCarousel(position: 'home_top'),
             const _CategoryEntries(),
             const _RankingPreview(),
+            const _BannerCarousel(position: 'home_middle'),
             _WorkSection(title: '热门作品', provider: hotWorksProvider),
             _WorkSection(title: '最新作品', provider: latestWorksProvider),
           ],
@@ -65,9 +66,12 @@ class BookstorePage extends ConsumerWidget {
   }
 }
 
-/// 首页 Banner 轮播：多于一张时每 4 秒自动切换，可手动滑动。
+/// 首页 Banner 轮播（顶部/中部共用）：多于一张时每 4 秒自动切换，可手动滑动。
+/// [position] 决定取哪个展示位的 Banner，空位不占高度。
 class _BannerCarousel extends ConsumerStatefulWidget {
-  const _BannerCarousel();
+  const _BannerCarousel({required this.position});
+
+  final String position;
 
   @override
   ConsumerState<_BannerCarousel> createState() => _BannerCarouselState();
@@ -106,7 +110,7 @@ class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final bannersAsync = ref.watch(bannersProvider);
+    final bannersAsync = ref.watch(bannersProvider(widget.position));
     final banners = bannersAsync.valueOrNull ?? const <BannerItem>[];
 
     // 定时器只在数据就绪后启动，且不在 build 过程中直接创建。

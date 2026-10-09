@@ -10,9 +10,10 @@ final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => ContentRepository(ref.watch(apiClientProvider)),
 );
 
-/// 首页 Banner 轮播；不传 position，后端已按状态与展示时间窗过滤。
-final bannersProvider = FutureProvider.autoDispose<List<BannerItem>>(
-  (ref) => ref.watch(contentRepositoryProvider).listBanners(),
+/// 首页 Banner 轮播，按展示位置取数：home_top 顶部 / home_middle 中部
+/// （接口文档 2.7.13 的 position 入参；后端已按状态与展示时间窗过滤）。
+final bannersProvider = FutureProvider.autoDispose.family<List<BannerItem>, String>(
+  (ref, position) => ref.watch(contentRepositoryProvider).listBanners(position: position),
 );
 
 /// 顶级分类（书城分类入口）。parent_id=0 与后端新增分类的默认值一致。
