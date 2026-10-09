@@ -19,7 +19,20 @@ import '../../features/bookstore/pages/work_detail_page.dart';
 import '../../features/bookstore/pages/work_list_page.dart';
 import '../../features/category/category_page.dart';
 import '../../features/comic/comic_page.dart';
+import '../../features/comic/pages/drama_detail_page.dart';
+import '../../features/comic/pages/drama_history_page.dart';
+import '../../features/comic/pages/drama_play_page.dart';
+import '../../features/comic/pages/drama_related_work_page.dart';
+import '../../features/comic/pages/drama_report_page.dart';
+import '../../features/comic/pages/drama_subscription_page.dart';
 import '../../features/create/create_page.dart';
+import '../../features/create/pages/chapter_edit_page.dart';
+import '../../features/create/pages/draft_list_page.dart';
+import '../../features/create/pages/review_status_page.dart';
+import '../../features/create/pages/work_edit_page.dart';
+import '../../features/create/pages/work_upload_page.dart';
+import '../../features/create/pages/work_version_detail_page.dart';
+import '../../features/create/pages/work_version_page.dart';
 import '../../features/feedback/pages/feedback_create_page.dart';
 import '../../features/feedback/pages/feedback_detail_page.dart';
 import '../../features/feedback/pages/feedback_list_page.dart';
@@ -258,6 +271,107 @@ final routerProvider = Provider<GoRouter>((ref) {
             title: query['title'],
           );
         },
+      ),
+      // ===== B 模块漫剧（外部视频）链路（接口 2.8）=====
+      // 详情统一用查询参数 ?id=n；播放页额外支持 ?episodeId=n 指定起始集。
+      GoRoute(
+        path: RoutePath.dramaDetail,
+        name: RouteName.dramaDetail,
+        builder: (context, state) => DramaDetailPage(
+          dramaId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.dramaRelatedWork,
+        name: RouteName.dramaRelatedWork,
+        builder: (context, state) => DramaRelatedWorkPage(
+          dramaId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.dramaPlay,
+        name: RouteName.dramaPlay,
+        builder: (context, state) => DramaPlayPage(
+          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          episodeId: int.tryParse(state.uri.queryParameters['episodeId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.dramaHistory,
+        name: RouteName.dramaHistory,
+        builder: (_, __) => const DramaHistoryPage(),
+      ),
+      GoRoute(
+        path: RoutePath.dramaSubscriptions,
+        name: RouteName.dramaSubscriptions,
+        builder: (_, __) => const DramaSubscriptionPage(),
+      ),
+      GoRoute(
+        path: RoutePath.dramaReport,
+        name: RouteName.dramaReport,
+        builder: (context, state) => DramaReportPage(
+          dramaId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      // ===== B 模块创作链路（受登录守卫保护，见 ProtectedRoutes）=====
+      GoRoute(
+        path: RoutePath.workUpload,
+        name: RouteName.workUpload,
+        builder: (_, __) => const WorkUploadPage(),
+      ),
+      GoRoute(
+        path: RoutePath.workEdit,
+        name: RouteName.workEdit,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return WorkEditPage(
+            workId: int.tryParse(query['id'] ?? '') ?? 0,
+            title: query['title'],
+            description: query['description'],
+            price: double.tryParse(query['price'] ?? ''),
+            genreId: int.tryParse(query['genreId'] ?? ''),
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePath.draftList,
+        name: RouteName.draftList,
+        builder: (_, __) => const DraftListPage(),
+      ),
+      // 版本管理（/create/versions）与版本详情（/create/versions/detail）
+      // 拆成两条静态路径，用查询参数区分记录，登录回跳只需还原 /path?id=n。
+      GoRoute(
+        path: RoutePath.workVersions,
+        name: RouteName.workVersions,
+        builder: (context, state) => WorkVersionPage(
+          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          title: state.uri.queryParameters['title'],
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.workVersionDetail,
+        name: RouteName.workVersionDetail,
+        builder: (context, state) => WorkVersionDetailPage(
+          versionId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          title: state.uri.queryParameters['title'],
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.reviewStatus,
+        name: RouteName.reviewStatus,
+        builder: (context, state) => ReviewStatusPage(
+          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          title: state.uri.queryParameters['title'],
+        ),
+      ),
+      // 章节管理（接口文档无规格，按模块约定补齐；受登录守卫保护）
+      GoRoute(
+        path: RoutePath.chapterEdit,
+        name: RouteName.chapterEdit,
+        builder: (context, state) => ChapterEditPage(
+          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          title: state.uri.queryParameters['title'],
+        ),
       ),
       // ===== A5 用户中心 =====
       // 列表与详情拆成两个静态路径，用查询参数区分记录：

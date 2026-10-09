@@ -11,6 +11,8 @@
 /// 页面不再接触原始取值。
 library;
 
+import '../../../core/config/app_config.dart';
+
 bool _flag(dynamic value) => value == '1' || value == 1 || value == true;
 
 String _text(dynamic value) => value == null ? '' : value.toString();
@@ -113,7 +115,7 @@ class BookItem {
   factory BookItem.fromJson(Map<String, dynamic> json) => BookItem(
         workId: _int(json['workId']),
         title: _text(json['title']),
-        cover: _text(json['cover']),
+        cover: AppConfig.resolveAssetUrl(_text(json['cover'])),
         authorName: _text(json['authorName']),
         genreName: _text(json['genreName']),
         workType: _text(json['workType']),
@@ -167,7 +169,7 @@ class BannerItem {
   factory BannerItem.fromJson(Map<String, dynamic> json) => BannerItem(
         bannerId: _int(json['bannerId']),
         title: _text(json['title']),
-        imageUrl: _text(json['imageUrl']),
+        imageUrl: AppConfig.resolveAssetUrl(_text(json['imageUrl'])),
         linkType: _text(json['linkType']),
         linkId: _intOrNull(json['linkId']),
         linkUrl: _text(json['linkUrl']),
@@ -270,7 +272,7 @@ class RankingItem {
         rankNo: _int(json['rankNo']),
         workId: _int(json['workId']),
         title: _text(json['title']),
-        cover: _text(json['cover']),
+        cover: AppConfig.resolveAssetUrl(_text(json['cover'])),
         authorName: _text(json['authorName']),
         genreName: _text(json['genreName']),
         score: _decimal(json['score']),

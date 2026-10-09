@@ -51,6 +51,9 @@ class ApiEndpoints {
   static String contentWorkById(int workId) => '/content/works/$workId';
   /// 作品章节目录（含试读可读标记；游客可读）
   static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
+  /// 作者视角章节管理列表（不过滤 status，隐藏章节也在列；需 App Token，接口文档无 CRUD 规格按模块约定补齐）
+  static String contentWorkChaptersManage(int workId) =>
+      '/content/works/$workId/chapters/manage';
   /// 作品试读包（可读章节 + 试读文件；游客可读）
   static String contentWorkPreview(int workId) => '/content/works/$workId/preview';
   /// 版权合作联系方式（{workId, hasContact, displayScope}；游客可读，不下发明文）
@@ -73,6 +76,56 @@ class ApiEndpoints {
   static const String contentFavorites = '/content/favorites';
   /// 收藏 / 取消收藏 / 收藏态（需 App Token，接口 2.7.10）
   static String contentFavoriteByWorkId(int workId) => '/content/favorites/$workId';
+  /// 内容文件上传（需 App Token，multipart 字段 file；type=cover/script，接口 2.9.1）
+  static const String contentUpload = '/content/upload';
+  /// 我的草稿箱列表（需 App Token，分页，接口 2.9.5）
+  static const String contentDrafts = '/content/works/drafts';
+  /// 作品审核状态（需 App Token，接口 2.9.6）
+  static String contentReviewStatus(int workId) => '/content/works/$workId/review-status';
+  /// 作品版本列表 / 新建版本（需 App Token，接口 2.9.7 / 2.9.8）
+  static String contentWorkVersions(int workId) => '/content/works/$workId/versions';
+  /// 作品版本详情（需 App Token，接口 2.9.9）
+  static String contentWorkVersionDetail(int versionId) => '/content/works/versions/$versionId';
+
+  // ===== B 模块外部视频/漫剧契约（2.8）=====
+  /// 短剧信息流（公开，分页 {total, list}，接口 2.8.1）
+  static const String contentDramaFeed = '/content/drama-feed';
+  /// 剧集列表（公开，{list}，接口 2.8.2）
+  static String contentWorkEpisodes(int workId) => '/content/works/$workId/episodes';
+  /// 剧集详情（公开，接口 2.8.3）
+  static String contentEpisode(int episodeId) => '/content/episodes/$episodeId';
+  /// 播放进度：GET 读取（2.8.5）/ POST 保存（2.8.4），均需 App Token
+  static String contentEpisodeProgress(int episodeId) => '/content/episodes/$episodeId/progress';
+  /// 播放历史（需 App Token，分页 {total, list}，接口 2.8.6）
+  static const String contentPlayHistory = '/content/play-history';
+  /// 剧集解锁状态（需 App Token，{isUnlocked, unlockType}，接口 2.8.7）
+  static String contentEpisodeUnlockStatus(int episodeId) =>
+      '/content/episodes/$episodeId/unlock-status';
+  /// 付费解锁（需 App Token，幂等 {unlockId, message}，接口 2.8.8）
+  static String contentEpisodeUnlock(int episodeId) => '/content/episodes/$episodeId/unlock';
+  /// 广告解锁（需 App Token，幂等 {unlockId, message}，接口 2.8.9）
+  static String contentEpisodeAdUnlock(int episodeId) =>
+      '/content/episodes/$episodeId/ad-unlock';
+  /// 追更订阅：POST 订阅 / DELETE 取消（需 App Token，接口 2.8.13）
+  static String contentWorkSubscribe(int workId) => '/content/works/$workId/subscribe';
+  /// 我的追更列表（需 App Token，分页 {total, list}，接口 2.8.14）
+  static const String contentSubscriptions = '/content/subscriptions';
+  /// 外部视频详情（公开，接口 2.8.15）
+  static String contentExternalDrama(int dramaId) => '/content/external-dramas/$dramaId';
+  /// 找同款剧本（公开，{dramaId, hasRelatedWork, work}，接口 2.8.16）
+  static String contentExternalDramaRelatedWork(int dramaId) =>
+      '/content/external-dramas/$dramaId/related-work';
+  /// 内容举报（需 App Token，接口 2.8.17）
+  static const String contentReports = '/content/reports';
+  /// 剧集评论列表（需 App Token，分页 {total, list}，接口 2.8.10）
+  static String contentEpisodeComments(int episodeId) =>
+      '/content/episodes/$episodeId/comments';
+  /// 发表剧集评论（需 App Token，body {content, parentId}，接口 2.8.11）
+  static String contentEpisodeCommentCreate(int episodeId) =>
+      '/content/episodes/$episodeId/comments';
+  /// 剧集点赞 / 取消点赞（需 App Token，幂等 {liked, likeCount}，接口 2.8.12）
+  static String contentEpisodeLike(int episodeId) =>
+      '/content/episodes/$episodeId/like';
 
   /// App 域头像上传（multipart，字段名 `file`）。
   ///
@@ -148,8 +201,6 @@ class ApiEndpoints {
   static const String playHistory = '/play-history';
   static String episodeUnlockStatus(int id) => '/episodes/$id/unlock-status';
   static String episodeUnlockPay(int id) => '/episodes/$id/unlock';
-  static const String episodeComments = '/comments';
-  static String episodeLike(int id) => '/comments/$id/like';
   static const String subscriptions = '/subscriptions';
   static const String externalDramas = '/external-dramas';
   static const String fileUpload = '/files/upload';

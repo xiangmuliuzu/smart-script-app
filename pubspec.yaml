@@ -47,6 +47,8 @@ dependencies:
   shared_preferences: ^2.2.2
   # A3：平台安全存储（Token/Refresh Token）；经负责人批准引入
   flutter_secure_storage: ^9.2.2
+  # B 模块 2.8：外部视频 / 剧集播放地址为站外链接，需拉起系统浏览器或外部播放器
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

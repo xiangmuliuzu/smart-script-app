@@ -34,10 +34,12 @@ class ContentRepository {
   }
 
   /// 标签列表（后端按使用量降序下发）。
-  Future<List<TagItem>> listTags({String? tagType}) async {
+  ///
+  /// [categoryId] 有值时只返回该分类下已上架作品关联过的标签（接口文档表 2-126）。
+  Future<List<TagItem>> listTags({String? tagType, int? categoryId}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentTags,
-      query: _compact({'tagType': tagType}),
+      query: _compact({'tagType': tagType, 'categoryId': categoryId}),
       parser: _mapParser,
     );
     return _items(data, TagItem.fromJson);

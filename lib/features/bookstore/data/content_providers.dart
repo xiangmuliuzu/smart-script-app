@@ -21,8 +21,11 @@ final categoriesProvider = FutureProvider.autoDispose<List<CategoryItem>>(
 );
 
 /// 标签（作品列表的标签筛选项）。
-final tagsProvider = FutureProvider.autoDispose<List<TagItem>>(
-  (ref) => ref.watch(contentRepositoryProvider).listTags(),
+///
+/// 入参为当前选中的分类ID（无则 null）。传分类时后端只返回该分类下的标签，
+/// 用于「分类 × 标签」联动筛选。
+final tagsProvider = FutureProvider.autoDispose.family<List<TagItem>, int?>(
+  (ref, categoryId) => ref.watch(contentRepositoryProvider).listTags(categoryId: categoryId),
 );
 
 /// 榜单：首页预览与榜单页共用；type 取 view/favorite/sale/rating。

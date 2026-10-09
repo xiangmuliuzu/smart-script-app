@@ -39,6 +39,16 @@ class RoutePath {
   // B 模块我的收藏列表（受登录守卫保护）
   static const String favorites = '/favorites';
 
+  // B 模块创作链路（上传 / 编辑 / 草稿 / 版本 / 审核状态，受登录守卫保护）
+  static const String workUpload = '/create/upload';
+  static const String workEdit = '/create/edit';
+  static const String draftList = '/create/drafts';
+  static const String workVersions = '/create/versions';
+  static const String workVersionDetail = '/create/versions/detail';
+  static const String reviewStatus = '/create/review-status';
+  // B 模块章节管理（接口文档无规格，按模块约定补齐；受登录守卫保护）
+  static const String chapterEdit = '/create/chapter';
+
   // B 模块书城浏览链路（公开页，游客可浏览）
   static const String workList = '/works';
   static const String workDetail = '/work';
@@ -49,6 +59,15 @@ class RoutePath {
   // B 模块试读链路（公开页，游客可试读）
   static const String chapterList = '/chapters';
   static const String chapterRead = '/chapter';
+
+  // B 模块漫剧（外部视频）链路（接口 2.8）
+  // 详情统一用查询参数：与消息/反馈详情同风格，登录回跳只需还原整串。
+  static const String dramaDetail = '/comic/drama'; // 公开：外部视频详情（2.8.15）
+  static const String dramaRelatedWork = '/comic/related-work'; // 公开：找同款剧本（2.8.16）
+  static const String dramaPlay = '/comic/play'; // 受保护：短剧播放（2.8.2/2.8.3/2.8.4/2.8.5）
+  static const String dramaHistory = '/comic/history'; // 受保护：播放历史（2.8.6）
+  static const String dramaSubscriptions = '/comic/subscriptions'; // 受保护：我的追更（2.8.14）
+  static const String dramaReport = '/comic/report'; // 受保护：内容举报（2.8.17）
 
   /// 作品列表 URL；[title] 只用于列表页标题展示，不参与后端筛选。
   static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title}) {
@@ -81,6 +100,81 @@ class RoutePath {
         path: chapterRead,
         queryParameters: <String, String>{
           'id': '$chapterId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 外部视频详情 URL（接口 2.8.15）。
+  static String dramaDetailUrl(int dramaId) => '$dramaDetail?id=$dramaId';
+
+  /// 找同款剧本 URL（接口 2.8.16）。
+  static String dramaRelatedWorkUrl(int dramaId) => '$dramaRelatedWork?id=$dramaId';
+
+  /// 短剧播放 URL（接口 2.8.2~2.8.5）；[episodeId] 指定起始集，为空时默认第一集。
+  static String dramaPlayUrl(int workId, {int? episodeId}) => Uri(
+        path: dramaPlay,
+        queryParameters: <String, String>{
+          'id': '$workId',
+          if (episodeId != null) 'episodeId': '$episodeId',
+        },
+      ).toString();
+
+  /// 内容举报 URL（接口 2.8.17）；举报对象为外部视频。
+  static String dramaReportUrl(int dramaId) => '$dramaReport?id=$dramaId';
+
+  /// 编辑我的作品 URL（接口 2.9.3）。
+  ///
+  /// 后端没有「按 id 取本人作品详情」接口，初值全部随查询参数带入。
+  static String workEditUrl({
+    required int workId,
+    String? title,
+    String? description,
+    double? price,
+    int? genreId,
+  }) =>
+      Uri(
+        path: workEdit,
+        queryParameters: <String, String>{
+          'id': '$workId',
+          if (title != null && title.isNotEmpty) 'title': title,
+          if (description != null && description.isNotEmpty) 'description': description,
+          if (price != null) 'price': '$price',
+          if (genreId != null) 'genreId': '$genreId',
+        },
+      ).toString();
+
+  /// 版本管理 URL（接口 2.9.7 / 2.9.8）；[title] 只用于页面标题展示。
+  static String workVersionsUrl(int workId, {String? title}) => Uri(
+        path: workVersions,
+        queryParameters: <String, String>{
+          'id': '$workId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 版本详情 URL（接口 2.9.9）；[title] 只用于页面标题展示。
+  static String workVersionDetailUrl(int versionId, {String? title}) => Uri(
+        path: workVersionDetail,
+        queryParameters: <String, String>{
+          'id': '$versionId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 作品审核状态 URL（接口 2.9.6）；[title] 只用于页面标题展示。
+  static String reviewStatusUrl(int workId, {String? title}) => Uri(
+        path: reviewStatus,
+        queryParameters: <String, String>{
+          'id': '$workId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 章节管理 URL（接口文档无规格，按模块约定补齐）；[title] 只用于页面标题展示。
+  static String chapterEditUrl(int workId, {String? title}) => Uri(
+        path: chapterEdit,
+        queryParameters: <String, String>{
+          'id': '$workId',
           if (title != null && title.isNotEmpty) 'title': title,
         },
       ).toString();
@@ -124,6 +218,19 @@ class RouteName {
   static const String search = 'search';
   static const String chapterList = 'chapterList';
   static const String chapterRead = 'chapterRead';
+  static const String dramaDetail = 'dramaDetail';
+  static const String dramaRelatedWork = 'dramaRelatedWork';
+  static const String dramaPlay = 'dramaPlay';
+  static const String dramaHistory = 'dramaHistory';
+  static const String dramaSubscriptions = 'dramaSubscriptions';
+  static const String dramaReport = 'dramaReport';
+  static const String workUpload = 'workUpload';
+  static const String workEdit = 'workEdit';
+  static const String draftList = 'draftList';
+  static const String workVersions = 'workVersions';
+  static const String workVersionDetail = 'workVersionDetail';
+  static const String reviewStatus = 'reviewStatus';
+  static const String chapterEdit = 'chapterEdit';
   static const String messages = 'messages';
   static const String messageDetail = 'messageDetail';
   static const String feedback = 'feedback';
@@ -143,6 +250,22 @@ class ProtectedRoutes {
     RoutePath.profile, // 我的及用户中心全部子页面
     RoutePath.bookshelf, // A6 示例（B 模块）受保护入口
     RoutePath.favorites, // B 模块我的收藏列表（需登录）
+    // B 模块创作链路（上传 / 编辑 / 草稿 / 版本 / 审核状态，需登录）；
+    // 注意不含 /create 本身，避免拦截底部导航「创作」tab。
+    RoutePath.workUpload,
+    RoutePath.workEdit,
+    RoutePath.draftList,
+    RoutePath.workVersions,
+    RoutePath.workVersionDetail,
+    RoutePath.reviewStatus,
+    RoutePath.chapterEdit, // B 模块章节管理（需登录）
+    // B 模块漫剧链路（需登录）：播放/历史/追更/举报；
+    // 注意不含 /comic 本身（底部导航「漫剧」tab 为公开信息流），
+    // 也不含 /comic/drama、/comic/related-work（公开详情与找同款）。
+    RoutePath.dramaPlay,
+    RoutePath.dramaHistory,
+    RoutePath.dramaSubscriptions,
+    RoutePath.dramaReport,
   ];
 
   static bool isProtected(String location) {
