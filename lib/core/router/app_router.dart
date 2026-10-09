@@ -418,6 +418,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.messageDetail,
         builder: (context, state) => MessageDetailPage(
           messageId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          source: state.uri.queryParameters['source'] == 'ANNOUNCEMENT'
+              ? 'ANNOUNCEMENT'
+              : 'NOTIFICATION',
         ),
       ),
       GoRoute(
@@ -448,6 +451,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 void _rememberIntent(Ref ref, GoRouterState state) {
   final store = ref.read(routeIntentStoreProvider);
   if (store.pending != null) return;
-  final intent = RouteIntent.fromParam(Uri.encodeComponent(state.uri.toString()));
+  final intent =
+      RouteIntent.fromParam(Uri.encodeComponent(state.uri.toString()));
   if (intent != null) store.save(intent);
 }

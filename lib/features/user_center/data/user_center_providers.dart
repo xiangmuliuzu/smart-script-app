@@ -31,7 +31,9 @@ final realNameStatusProvider = FutureProvider.autoDispose<RealNameStatus>(
 
 /// 未读消息数：我的页与消息中心共用；已读操作后 invalidate。
 final unreadCountProvider = FutureProvider<UnreadCount>(
-  (ref) => ref.watch(messageRepositoryProvider).unreadCount(),
+  (ref) => ref
+      .watch(messageRepositoryProvider)
+      .unreadCount(includeAnnouncements: true),
 );
 
 /// 通知偏好。
