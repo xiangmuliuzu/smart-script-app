@@ -51,9 +51,6 @@ class ApiEndpoints {
   static String contentWorkById(int workId) => '/content/works/$workId';
   /// 作品章节目录（含试读可读标记；游客可读）
   static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
-  /// 作者视角章节管理列表（不过滤 status，隐藏章节也在列；需 App Token，接口文档无 CRUD 规格按模块约定补齐）
-  static String contentWorkChaptersManage(int workId) =>
-      '/content/works/$workId/chapters/manage';
   /// 作品试读包（可读章节 + 试读文件；游客可读）
   static String contentWorkPreview(int workId) => '/content/works/$workId/preview';
   /// 版权合作联系方式（{workId, hasContact, displayScope}；游客可读，不下发明文）
@@ -78,14 +75,29 @@ class ApiEndpoints {
   static String contentFavoriteByWorkId(int workId) => '/content/favorites/$workId';
   /// 内容文件上传（需 App Token，multipart 字段 file；type=cover/script，接口 2.9.1）
   static const String contentUpload = '/content/upload';
-  /// 我的草稿箱列表（需 App Token，分页，接口 2.9.5）
-  static const String contentDrafts = '/content/works/drafts';
-  /// 作品审核状态（需 App Token，接口 2.9.6）
-  static String contentReviewStatus(int workId) => '/content/works/$workId/review-status';
   /// 作品版本列表 / 新建版本（需 App Token，接口 2.9.7 / 2.9.8）
   static String contentWorkVersions(int workId) => '/content/works/$workId/versions';
   /// 作品版本详情（需 App Token，接口 2.9.9）
   static String contentWorkVersionDetail(int versionId) => '/content/works/versions/$versionId';
+
+  // ===== B 模块「我的作品」写作链路（A 套：/users/me/works，需 App Token）=====
+  /// 我的作品列表（列表不分页；status=all/draft/reviewing/revision/rejected/published）
+  static const String authorWorks = '/users/me/works';
+  /// 作品详情（含章节目录与最近审核意见，一次拿全）
+  static String authorWorkById(int workId) => '/users/me/works/$workId';
+  /// 提交审核（draft/revision/rejected/published → reviewing；已发布作品改动后可重新提交）
+  static String authorWorkSubmit(int workId) => '/users/me/works/$workId/submit';
+  /// 作者章节新增（B 套 POST /content/works/{workId}/chapters）
+  /// 注意：与书城目录 [contentWorkChapters] 同路径、不同方法（游客 GET / 作者 POST）。
+  static String contentAuthorChapterCreate(int workId) =>
+      '/content/works/$workId/chapters';
+  /// 作者章节更新 / 删除（B 套 PUT / DELETE /content/chapters/{chapterId}）
+  /// 注意：与书城正文 [contentChapter] 同路径、不同方法（游客 GET / 作者 PUT、DELETE）。
+  static String contentAuthorChapterById(int chapterId) =>
+      '/content/chapters/$chapterId';
+  /// 审核记录（审核历史 + 管理员意见）
+  static String authorWorkReviewRecords(int workId) =>
+      '/users/me/works/$workId/review-records';
 
   // ===== B 模块外部视频/漫剧契约（2.8）=====
   /// 短剧信息流（公开，分页 {total, list}，接口 2.8.1）

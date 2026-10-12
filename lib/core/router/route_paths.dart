@@ -39,15 +39,12 @@ class RoutePath {
   // B 模块我的收藏列表（受登录守卫保护）
   static const String favorites = '/favorites';
 
-  // B 模块创作链路（上传 / 编辑 / 草稿 / 版本 / 审核状态，受登录守卫保护）
+  // B 模块创作链路（新建作品 / 工作台 / 章节写作 / 版本，受登录守卫保护）
   static const String workUpload = '/create/upload';
-  static const String workEdit = '/create/edit';
-  static const String draftList = '/create/drafts';
+  static const String workWorkspace = '/create/workspace';
+  static const String chapterWrite = '/create/chapter/write';
   static const String workVersions = '/create/versions';
   static const String workVersionDetail = '/create/versions/detail';
-  static const String reviewStatus = '/create/review-status';
-  // B 模块章节管理（接口文档无规格，按模块约定补齐；受登录守卫保护）
-  static const String chapterEdit = '/create/chapter';
 
   // B 模块书城浏览链路（公开页，游客可浏览）
   static const String workList = '/works';
@@ -122,24 +119,24 @@ class RoutePath {
   /// 内容举报 URL（接口 2.8.17）；举报对象为外部视频。
   static String dramaReportUrl(int dramaId) => '$dramaReport?id=$dramaId';
 
-  /// 编辑我的作品 URL（接口 2.9.3）。
+  /// 作品工作台 URL（写作范式：章节 / 设置 / 发布 三 Tab）。
   ///
-  /// 后端没有「按 id 取本人作品详情」接口，初值全部随查询参数带入。
-  static String workEditUrl({
-    required int workId,
-    String? title,
-    String? description,
-    double? price,
-    int? genreId,
-  }) =>
-      Uri(
-        path: workEdit,
+  /// 工作台内部以 A 套 `GET /users/me/works/{workId}` 为单一数据源，
+  /// 只需 workId；[title] 仅用于详情加载完成前的 AppBar 占位。
+  static String workWorkspaceUrl({required int workId, String? title}) => Uri(
+        path: workWorkspace,
         queryParameters: <String, String>{
           'id': '$workId',
           if (title != null && title.isNotEmpty) 'title': title,
-          if (description != null && description.isNotEmpty) 'description': description,
-          if (price != null) 'price': '$price',
-          if (genreId != null) 'genreId': '$genreId',
+        },
+      ).toString();
+
+  /// 章节写作编辑器 URL；[chapterId] 为 0 或不传时为新建模式。
+  static String chapterWriteUrl({required int workId, int? chapterId}) => Uri(
+        path: chapterWrite,
+        queryParameters: <String, String>{
+          'workId': '$workId',
+          if (chapterId != null && chapterId > 0) 'chapterId': '$chapterId',
         },
       ).toString();
 
@@ -157,24 +154,6 @@ class RoutePath {
         path: workVersionDetail,
         queryParameters: <String, String>{
           'id': '$versionId',
-          if (title != null && title.isNotEmpty) 'title': title,
-        },
-      ).toString();
-
-  /// 作品审核状态 URL（接口 2.9.6）；[title] 只用于页面标题展示。
-  static String reviewStatusUrl(int workId, {String? title}) => Uri(
-        path: reviewStatus,
-        queryParameters: <String, String>{
-          'id': '$workId',
-          if (title != null && title.isNotEmpty) 'title': title,
-        },
-      ).toString();
-
-  /// 章节管理 URL（接口文档无规格，按模块约定补齐）；[title] 只用于页面标题展示。
-  static String chapterEditUrl(int workId, {String? title}) => Uri(
-        path: chapterEdit,
-        queryParameters: <String, String>{
-          'id': '$workId',
           if (title != null && title.isNotEmpty) 'title': title,
         },
       ).toString();
@@ -225,12 +204,10 @@ class RouteName {
   static const String dramaSubscriptions = 'dramaSubscriptions';
   static const String dramaReport = 'dramaReport';
   static const String workUpload = 'workUpload';
-  static const String workEdit = 'workEdit';
-  static const String draftList = 'draftList';
+  static const String workWorkspace = 'workWorkspace';
+  static const String chapterWrite = 'chapterWrite';
   static const String workVersions = 'workVersions';
   static const String workVersionDetail = 'workVersionDetail';
-  static const String reviewStatus = 'reviewStatus';
-  static const String chapterEdit = 'chapterEdit';
   static const String messages = 'messages';
   static const String messageDetail = 'messageDetail';
   static const String feedback = 'feedback';
@@ -250,15 +227,13 @@ class ProtectedRoutes {
     RoutePath.profile, // 我的及用户中心全部子页面
     RoutePath.bookshelf, // A6 示例（B 模块）受保护入口
     RoutePath.favorites, // B 模块我的收藏列表（需登录）
-    // B 模块创作链路（上传 / 编辑 / 草稿 / 版本 / 审核状态，需登录）；
+    // B 模块创作链路（新建作品 / 工作台 / 版本，需登录）；
     // 注意不含 /create 本身，避免拦截底部导航「创作」tab。
     RoutePath.workUpload,
-    RoutePath.workEdit,
-    RoutePath.draftList,
+    RoutePath.workWorkspace,
+    RoutePath.chapterWrite,
     RoutePath.workVersions,
     RoutePath.workVersionDetail,
-    RoutePath.reviewStatus,
-    RoutePath.chapterEdit, // B 模块章节管理（需登录）
     // B 模块漫剧链路（需登录）：播放/历史/追更/举报；
     // 注意不含 /comic 本身（底部导航「漫剧」tab 为公开信息流），
     // 也不含 /comic/drama、/comic/related-work（公开详情与找同款）。

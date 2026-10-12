@@ -6,14 +6,14 @@ import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
 import '../../shared/widgets/common_views.dart';
 import '../user_center/widgets/paged_list_controller.dart';
-import '../user_center/widgets/user_center_widgets.dart';
 import 'data/drama_models.dart';
 import 'data/drama_providers.dart';
 import 'widgets/drama_widgets.dart';
 
 /// 漫剧（B 模块，接口文档 2.8.1 短剧信息流）。
 ///
-/// 公开页，游客可浏览。信息流按触底追加分页；
+/// 抖音式竖向视频流：一屏一个视频，上下滑动切换，切到哪一页哪一页自动播放。
+/// 公开页，游客可浏览；滑到接近列表尾部时自动追加分页。
 /// 「播放历史」「我的追更」是受保护入口，由 [AuthGuard.pushProtected] 统一拦截。
 class ComicPage extends ConsumerStatefulWidget {
   const ComicPage({super.key});
@@ -26,7 +26,8 @@ class _ComicPageState extends ConsumerState<ComicPage> {
   static const int _pageSize = 10;
 
   late final PagedListController<DramaFeedItem> _controller;
-  final ScrollController _scrollController = ScrollController();
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -39,16 +40,16 @@ class _ComicPageState extends ConsumerState<ComicPage> {
     );
     _controller.addListener(_onControllerChanged);
     _controller.load();
-    _scrollController.addListener(_onScroll);
   }
 
   void _onControllerChanged() {
     if (mounted) setState(() {});
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
+  /// 滑到倒数第二页时预取下一页，保证继续下滑不中断。
+  void _onPageChanged(int index) {
+    setState(() => _currentIndex = index);
+    if (index >= _controller.items.length - 2) {
       _controller.loadMore();
     }
   }
@@ -57,15 +58,18 @@ class _ComicPageState extends ConsumerState<ComicPage> {
   void dispose() {
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
-    _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.black,
       appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: const Text('漫剧'),
         actions: [
           IconButton(
@@ -103,23 +107,21 @@ class _ComicPageState extends ConsumerState<ComicPage> {
     if (_controller.isEmpty) {
       return const EmptyView(message: '暂无漫剧内容', icon: Icons.smart_display_outlined);
     }
-    return RefreshIndicator(
-      onRefresh: () => _controller.load(refresh: true),
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        itemCount: _controller.items.length + (_controller.hasMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index >= _controller.items.length) {
-            return LoadMoreFooter<DramaFeedItem>(controller: _controller);
-          }
-          final item = _controller.items[index];
-          return DramaFeedCard(
-            item: item,
-            onTap: () => context.push(RoutePath.dramaDetailUrl(item.dramaId)),
-          );
-        },
-      ),
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      controller: _pageController,
+      onPageChanged: _onPageChanged,
+      itemCount: _controller.items.length,
+      itemBuilder: (context, index) {
+        final item = _controller.items[index];
+        return DramaVideoPane(
+          key: ValueKey<int>(item.dramaId),
+          item: item,
+          active: index == _currentIndex,
+          onOpenDetail: () => context.push(RoutePath.dramaDetailUrl(item.dramaId)),
+          onOpenRelated: () => context.push(RoutePath.dramaRelatedWorkUrl(item.dramaId)),
+        );
+      },
     );
   }
 }

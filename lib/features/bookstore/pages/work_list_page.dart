@@ -131,8 +131,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
       body: Column(
         children: [
           _buildSortBar(),
-          _buildCategoryBar(categories),
-          _buildTagBar(),
+          _buildFilterBar(categories),
           Expanded(child: _buildList()),
         ],
       ),
@@ -169,52 +168,66 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
     );
   }
 
-  /// 分类筛选项：分类为空（或加载失败）时整行隐藏，不阻塞列表。
-  Widget _buildCategoryBar(List<CategoryItem> categories) {
-    if (categories.isEmpty) return const SizedBox.shrink();
-    return Container(
-      color: AppColors.card,
-      child: FilterChipBar(
-        items: [
-          FilterChipItem(
-            label: '全部分类',
-            selected: _categoryId == null,
-            onTap: () => _applyCategory(null),
-          ),
-          for (final category in categories)
-            FilterChipItem(
-              label: category.categoryName,
-              selected: category.categoryId == _categoryId,
-              onTap: () => _applyCategory(category.categoryId),
+  /// 分类与标签筛选：选项较多时横向滚动难以选全，改用下拉按钮 + 底部弹窗选择。
+  /// 分类或标签为空（或加载失败）时对应下拉隐藏；两者皆空则整行隐藏，不阻塞列表。
+  Widget _buildFilterBar(List<CategoryItem> categories) {
+    final tags = ref.watch(tagsProvider(_categoryId)).valueOrNull ?? const <TagItem>[];
+    final filters = <FilterDropdownFilter>[
+      if (categories.isNotEmpty)
+        FilterDropdownFilter(
+          label: '分类',
+          valueText: _selectedCategoryName(categories) ?? '全部类型',
+          options: [
+            FilterDropdownOption(
+              label: '全部类型',
+              selected: _categoryId == null,
+              onTap: () => _applyCategory(null),
             ),
-        ],
-      ),
-    );
+            for (final category in categories)
+              FilterDropdownOption(
+                label: category.categoryName,
+                selected: category.categoryId == _categoryId,
+                onTap: () => _applyCategory(category.categoryId),
+              ),
+          ],
+        ),
+      if (tags.isNotEmpty)
+        FilterDropdownFilter(
+          label: '标签',
+          valueText: _selectedTagName(tags) ?? '全部标签',
+          options: [
+            FilterDropdownOption(
+              label: '全部标签',
+              selected: _tagId == null,
+              onTap: () => _applyTag(null),
+            ),
+            for (final tag in tags)
+              FilterDropdownOption(
+                label: tag.tagName,
+                selected: tag.tagId == _tagId,
+                onTap: () => _applyTag(tag.tagId),
+              ),
+          ],
+        ),
+    ];
+    if (filters.isEmpty) return const SizedBox.shrink();
+    return Container(color: AppColors.card, child: FilterDropdownBar(filters: filters));
   }
 
-  /// 标签筛选项：随当前分类联动（只显示该分类下的标签）；
-  /// 为空（或加载失败）时整行隐藏，不阻塞列表。
-  Widget _buildTagBar() {
-    final tags = ref.watch(tagsProvider(_categoryId)).valueOrNull ?? const <TagItem>[];
-    if (tags.isEmpty) return const SizedBox.shrink();
-    return Container(
-      color: AppColors.card,
-      child: FilterChipBar(
-        items: [
-          FilterChipItem(
-            label: '全部标签',
-            selected: _tagId == null,
-            onTap: () => _applyTag(null),
-          ),
-          for (final tag in tags)
-            FilterChipItem(
-              label: tag.tagName,
-              selected: tag.tagId == _tagId,
-              onTap: () => _applyTag(tag.tagId),
-            ),
-        ],
-      ),
-    );
+  /// 当前选中分类名；未选或分类尚未加载完成时返回 null，由调用方回落默认文案。
+  String? _selectedCategoryName(List<CategoryItem> categories) {
+    for (final category in categories) {
+      if (category.categoryId == _categoryId) return category.categoryName;
+    }
+    return null;
+  }
+
+  /// 当前选中标签名；未选或标签尚未加载完成时返回 null，由调用方回落默认文案。
+  String? _selectedTagName(List<TagItem> tags) {
+    for (final tag in tags) {
+      if (tag.tagId == _tagId) return tag.tagName;
+    }
+    return null;
   }
 
   Widget _buildList() {

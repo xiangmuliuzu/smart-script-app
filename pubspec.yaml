@@ -49,6 +49,9 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   # B 模块 2.8：外部视频 / 剧集播放地址为站外链接，需拉起系统浏览器或外部播放器
   url_launcher: ^6.2.5
+  video_player: ^2.9.2
+  # B 模块 2.9：上传新作品的封面与剧本文件需从本机选择（拿到本地路径交给 2.9.1 上传）
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:

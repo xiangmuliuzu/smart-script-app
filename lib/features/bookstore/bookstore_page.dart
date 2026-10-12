@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
@@ -175,7 +176,7 @@ class _BannerImage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (banner.imageUrl.isEmpty) return _placeholder();
     return Image.network(
-      banner.imageUrl,
+      AppConfig.resolveAssetUrl(banner.imageUrl),
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => _placeholder(),
     );

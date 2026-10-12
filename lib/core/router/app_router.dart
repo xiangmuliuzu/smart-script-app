@@ -26,12 +26,10 @@ import '../../features/comic/pages/drama_related_work_page.dart';
 import '../../features/comic/pages/drama_report_page.dart';
 import '../../features/comic/pages/drama_subscription_page.dart';
 import '../../features/create/create_page.dart';
-import '../../features/create/pages/chapter_edit_page.dart';
-import '../../features/create/pages/draft_list_page.dart';
-import '../../features/create/pages/review_status_page.dart';
-import '../../features/create/pages/work_edit_page.dart';
+import '../../features/create/pages/chapter_write_page.dart';
 import '../../features/create/pages/work_upload_page.dart';
 import '../../features/create/pages/work_version_detail_page.dart';
+import '../../features/create/pages/work_workspace_page.dart';
 import '../../features/create/pages/work_version_page.dart';
 import '../../features/feedback/pages/feedback_create_page.dart';
 import '../../features/feedback/pages/feedback_detail_page.dart';
@@ -320,23 +318,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const WorkUploadPage(),
       ),
       GoRoute(
-        path: RoutePath.workEdit,
-        name: RouteName.workEdit,
+        path: RoutePath.workWorkspace,
+        name: RouteName.workWorkspace,
         builder: (context, state) {
           final query = state.uri.queryParameters;
-          return WorkEditPage(
+          return WorkWorkspacePage(
             workId: int.tryParse(query['id'] ?? '') ?? 0,
             title: query['title'],
-            description: query['description'],
-            price: double.tryParse(query['price'] ?? ''),
-            genreId: int.tryParse(query['genreId'] ?? ''),
           );
         },
       ),
       GoRoute(
-        path: RoutePath.draftList,
-        name: RouteName.draftList,
-        builder: (_, __) => const DraftListPage(),
+        path: RoutePath.chapterWrite,
+        name: RouteName.chapterWrite,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return ChapterWritePage(
+            workId: int.tryParse(query['workId'] ?? '') ?? 0,
+            chapterId: int.tryParse(query['chapterId'] ?? '') ?? 0,
+          );
+        },
       ),
       // 版本管理（/create/versions）与版本详情（/create/versions/detail）
       // 拆成两条静态路径，用查询参数区分记录，登录回跳只需还原 /path?id=n。
@@ -353,23 +354,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.workVersionDetail,
         builder: (context, state) => WorkVersionDetailPage(
           versionId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
-          title: state.uri.queryParameters['title'],
-        ),
-      ),
-      GoRoute(
-        path: RoutePath.reviewStatus,
-        name: RouteName.reviewStatus,
-        builder: (context, state) => ReviewStatusPage(
-          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
-          title: state.uri.queryParameters['title'],
-        ),
-      ),
-      // 章节管理（接口文档无规格，按模块约定补齐；受登录守卫保护）
-      GoRoute(
-        path: RoutePath.chapterEdit,
-        name: RouteName.chapterEdit,
-        builder: (context, state) => ChapterEditPage(
-          workId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
           title: state.uri.queryParameters['title'],
         ),
       ),

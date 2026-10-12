@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/bookstore_models.dart';
 
 /// 作品封面：无图/加载失败时统一回落占位，避免书城出现破图。
+/// 地址经 [AppConfig.resolveAssetUrl] 归一，兼容相对路径与各开发环境的 host 差异。
 class WorkCover extends StatelessWidget {
   const WorkCover({
     super.key,
@@ -28,7 +30,7 @@ class WorkCover extends StatelessWidget {
         child: url.isEmpty
             ? _placeholder()
             : Image.network(
-                url,
+                AppConfig.resolveAssetUrl(url),
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _placeholder(),
               ),
@@ -417,6 +419,152 @@ class FilterChipBar extends StatelessWidget {
 
 class FilterChipItem {
   const FilterChipItem({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+}
+
+/// 下拉式筛选条（分类 / 标签等选项较多的筛选用）。
+///
+/// 与 [FilterChipBar] 的区别：以「筛选名 + 当前选中项 + 下拉箭头」按钮呈现，
+/// 点击弹出底部弹窗列出全部选项，避免选项过多时必须横向滚动才能选到。
+class FilterDropdownBar extends StatelessWidget {
+  const FilterDropdownBar({super.key, required this.filters});
+
+  final List<FilterDropdownFilter> filters;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          for (var i = 0; i < filters.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: _FilterDropdownButton(filter: filters[i])),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterDropdownButton extends StatelessWidget {
+  const _FilterDropdownButton({required this.filter});
+
+  final FilterDropdownFilter filter;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _open(context),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: AppColors.fill,
+          borderRadius: BorderRadius.circular(AppRadius.rSmall),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Row(
+          children: [
+            Text(filter.label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                filter.valueText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: AppColors.primary),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.text3),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final option = await showModalBottomSheet<FilterDropdownOption>(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.r)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  '选择${filter.label}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text1,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: filter.options.length,
+                  itemBuilder: (context, index) {
+                    final item = filter.options[index];
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: item.selected ? AppColors.primary : AppColors.text1,
+                        ),
+                      ),
+                      trailing: item.selected
+                          ? const Icon(Icons.check, size: 18, color: AppColors.primary)
+                          : null,
+                      onTap: () => Navigator.of(sheetContext).pop(item),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (option != null) option.onTap();
+  }
+}
+
+class FilterDropdownFilter {
+  const FilterDropdownFilter({
+    required this.label,
+    required this.valueText,
+    required this.options,
+  });
+
+  /// 筛选名（如「分类」「标签」）。
+  final String label;
+
+  /// 当前选中项展示文案（如「全部类型」「都市」）。
+  final String valueText;
+
+  final List<FilterDropdownOption> options;
+}
+
+class FilterDropdownOption {
+  const FilterDropdownOption({
     required this.label,
     required this.selected,
     required this.onTap,

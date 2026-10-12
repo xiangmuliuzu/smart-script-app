@@ -1,6 +1,9 @@
-// B 模块「上传与创作」真实联调（App 端）：2.9.2~2.9.9
-// （创建 / 更新 / 删除 / 草稿箱 / 审核状态 / 版本列表 / 新建版本 / 版本详情），
+// B 模块「创作」真实联调（App 端，B 套仍保留的能力）：2.9.2~2.9.4 / 2.9.7~2.9.9
+// （创建 / 更新 / 删除 / 版本列表 / 新建版本 / 版本详情），
 // 以及 2.9.1 文件上传的类型白名单拒绝路径。
+//
+// 说明：草稿箱（2.9.5）与审核状态（2.9.6）已被「我的作品」写作链路
+// （A 套 /users/me/works 列表与详情）取代，其联调见 A 套用例。
 //
 // 这些全是 App 私有接口（需 App Access Token），故与书架/收藏联调一致：
 // 用随机手机号真实注册建号（草稿天然为空），断言只覆盖契约行为，
@@ -134,12 +137,10 @@ void main() {
     addTearDown(() => dir.deleteSync(recursive: true));
     final guestFile = File('${dir.path}${Platform.pathSeparator}live_guest.txt')
       ..writeAsStringSync('guest');
-    await expectLater(guest.pageDrafts(pageNum: 1, pageSize: 10), throwsA(_code(401)));
     await expectLater(
         guest.createWork(title: '联调未登录', categoryId: 1), throwsA(_code(401)));
     await expectLater(guest.updateWork(1, title: '联调未登录'), throwsA(_code(401)));
     await expectLater(guest.deleteWork(1), throwsA(_code(401)));
-    await expectLater(guest.reviewStatus(1), throwsA(_code(401)));
     await expectLater(guest.listVersions(1), throwsA(_code(401)));
     await expectLater(guest.createVersion(1, content: '联调未登录'), throwsA(_code(401)));
     await expectLater(guest.versionDetail(1), throwsA(_code(401)));
@@ -153,7 +154,7 @@ void main() {
     );
   });
 
-  test('创作：必填校验 → 草稿箱可见 → 审核状态 → 更新 → 删除', () async {
+  test('创作：必填校验 → 更新 → 删除（逻辑删除）', () async {
     final s = await _loggedIn();
     final categoryId = await _firstCategoryId(s.content);
 
@@ -178,38 +179,14 @@ void main() {
       }
     });
 
-    // 草稿箱：新账号仅此一条，字段与提交一致（camelCase 出参）。
-    final drafts = await s.create.pageDrafts(pageNum: 1, pageSize: 10);
-    expect(drafts.list.map((e) => e.workId), contains(workId));
-    final item = drafts.list.firstWhere((e) => e.workId == workId);
-    expect(item.status, 'draft');
-    expect(item.title, title);
-    expect(item.summary, '联调简介');
-    expect(item.price, 1.5);
-    expect(item.genreId, categoryId);
-
-    // 审核状态：草稿状态派生为「待审核」，无驳回意见。
-    final status = await s.create.reviewStatus(workId);
-    expect(status.status, 'draft');
-    expect(status.reviewResult, 'pending');
-    expect(status.reviewComment, isNull);
-
-    // 更新：标题与价格可改，回读一致。
-    final newTitle = '$title改';
-    await s.create.updateWork(workId, title: newTitle, price: 2.5);
-    final afterUpdate = await s.create.pageDrafts(pageNum: 1, pageSize: 10);
-    final updated = afterUpdate.list.firstWhere((e) => e.workId == workId);
-    expect(updated.title, newTitle);
-    expect(updated.price, 2.5);
+    // 更新：标题与价格可改。
+    await s.create.updateWork(workId, title: '$title改', price: 2.5);
 
     // 负价格按 400 拒绝。
     await expectLater(s.create.updateWork(workId, price: -1), throwsA(_code(400)));
 
-    // 删除（逻辑删除）：草稿箱不再可见；再查/再删均按 404。
+    // 删除（逻辑删除）：再删按 404。
     await s.create.deleteWork(workId);
-    final afterDelete = await s.create.pageDrafts(pageNum: 1, pageSize: 10);
-    expect(afterDelete.list.map((e) => e.workId), isNot(contains(workId)));
-    await expectLater(s.create.reviewStatus(workId), throwsA(_code(404)));
     await expectLater(s.create.deleteWork(workId), throwsA(_code(404)));
   });
 
@@ -252,14 +229,12 @@ void main() {
     final s = await _loggedIn();
 
     // 他人作品（work_id=1 为既有数据，必不属于刚注册的账号）：不区分「不存在」与「无权」。
-    await expectLater(s.create.reviewStatus(1), throwsA(_code(404)));
     await expectLater(s.create.listVersions(1), throwsA(_code(404)));
     await expectLater(s.create.updateWork(1, title: '越权修改'), throwsA(_code(404)));
     await expectLater(s.create.deleteWork(1), throwsA(_code(404)));
 
     // 不存在的主键：同样 404。
     const ghost = 999999999;
-    await expectLater(s.create.reviewStatus(ghost), throwsA(_code(404)));
     await expectLater(s.create.listVersions(ghost), throwsA(_code(404)));
     await expectLater(s.create.createVersion(ghost, content: '越权建版本'), throwsA(_code(404)));
     await expectLater(s.create.versionDetail(ghost), throwsA(_code(404)));

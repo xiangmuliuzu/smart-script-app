@@ -35,15 +35,27 @@ class AppConfig {
   // ===== 后端静态资源地址 =====
 
   /// 视为「本机后端」的资源主机名。
-  static const Set<String> _localAssetHosts = {'localhost', '127.0.0.1', '0.0.0.0'};
+  static const Set<String> _localAssetHosts = {
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    // Android 模拟器访问宿主机的别名：不同开发环境（模拟器/真机）会存下不同 host，
+    // 归一后才能共用同一份后端数据。
+    '10.0.2.2',
+  };
 
-  /// 把指向本机后端的资源地址归一为 [baseUrl] 的 origin，其余地址原样返回。
+  /// 把后端下发的资源地址解析为当前设备可访问的地址。
   ///
-  /// 后端下发的封面/Banner 地址是开发机地址（`http://localhost:8080/...`）：
-  /// PC 浏览器可直连，但在真机/模拟器上 `localhost` 指向设备自身而取不到图。
-  /// 归一后「后端地址怎么配，图片就怎么取」，PC/App 共用同一份数据、互不影响。
+  /// 覆盖两种形态：
+  ///   - 相对路径（`/profile/upload/...`）：直接补上 [baseUrl] 的 origin；
+  ///   - 指向本机后端的绝对地址（`http://localhost:8080/...`）：把 origin 换成 [baseUrl]。
+  ///
+  /// 其余（CDN / 公网 https）原样返回。这样「后端地址怎么配，图片就怎么取」，
+  /// PC/App 共用同一份数据、互不影响。
   static String resolveAssetUrl(String raw) {
     if (raw.isEmpty) return raw;
+    final origin = Uri.parse(baseUrl).origin;
+    if (raw.startsWith('/')) return '$origin$raw';
     final uri = Uri.tryParse(raw);
     if (uri == null || !uri.hasScheme || !_localAssetHosts.contains(uri.host)) {
       return raw;
