@@ -16,7 +16,8 @@ class NativeImagePicker {
   /// 调起系统选择器。
   ///
   /// 返回所选图片的字节与文件名；用户取消返回 null。
-  static Future<PickedImage?> pickImage() async {
+  static Future<PickedImage?> pickImage(
+      {String filenamePrefix = 'avatar'}) async {
     final String? path;
     try {
       path = await _channel.invokeMethod<String>('pickImage');
@@ -36,7 +37,8 @@ class NativeImagePicker {
       if (size == 0) throw NativeImageException('图片不能为空');
       if (size > maxImageBytes) throw NativeImageException('图片不能超过 5 MB');
       final bytes = await file.readAsBytes();
-      return PickedImage(bytes: bytes, filename: _fileName(file.path));
+      return PickedImage(
+          bytes: bytes, filename: _fileName(file.path, filenamePrefix));
     } finally {
       // 临时文件用完即删，不把用户选择的原图留在应用缓存里
       try {
@@ -48,14 +50,14 @@ class NativeImagePicker {
   }
 
   /// 从缓存路径还原一个对用户可读的文件名（扩展名影响上传的 MIME 判断）。
-  static String _fileName(String path) {
+  static String _fileName(String path, String prefix) {
     final base = path.split(Platform.pathSeparator).last;
     final dot = base.lastIndexOf('.');
     final ext = dot >= 0 ? base.substring(dot).toLowerCase() : '';
     if (!const ['.jpg', '.jpeg', '.png', '.gif', '.bmp'].contains(ext)) {
       throw NativeImageException('请选择 JPG、PNG、GIF 或 BMP 图片');
     }
-    return 'avatar$ext';
+    return '$prefix$ext';
   }
 }
 

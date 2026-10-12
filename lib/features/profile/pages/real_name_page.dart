@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/services/native_image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
@@ -23,9 +27,9 @@ class RealNamePage extends ConsumerWidget {
     final statusAsync = ref.watch(realNameStatusProvider);
 
     return UserCenterScaffold(
-        title: '实名认证',
-        actions: null,
-        body: statusAsync.when(
+      title: '实名认证',
+      actions: null,
+      body: statusAsync.when(
         loading: () => const LoadingView(message: '加载中'),
         error: (error, _) => ErrorView(
           message: error is ApiException ? error.message : '加载失败，请稍后重试',
@@ -49,53 +53,70 @@ class _RealNameBody extends ConsumerStatefulWidget {
 class _RealNameBodyState extends ConsumerState<_RealNameBody> {
   final _nameCtrl = TextEditingController();
   final _idCtrl = TextEditingController();
-  final _materialCtrl = TextEditingController();
+  PickedImage? _materialImage;
+  MemoryImage? _previewImage;
+  String? _materialRef;
+  String? _uploadError;
+  bool _uploading = false;
+  bool _picking = false;
   bool _submitting = false;
+  RealNameStatus? _submittedStatus;
+
+  bool get _busy => _submitting || _uploading || _picking;
 
   /// 与后端校验一致的身份证号形态（15 位旧证 / 18 位新证，末位可为 X）。
   static final RegExp _idPattern = RegExp(r'^\d{15}$|^\d{17}[0-9Xx]$');
 
   @override
   void dispose() {
+    _clearMaterialPreview();
     _nameCtrl.dispose();
     _idCtrl.dispose();
-    _materialCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    if (_busy || !(_submittedStatus ?? widget.status).state.canSubmit) return;
     final realName = _nameCtrl.text.trim();
     final idNumber = _idCtrl.text.trim();
-    final material = _materialCtrl.text.trim();
-    if (realName.length < 2) {
-      _toast('请输入真实姓名');
+    if (realName.length < 2 || realName.length > 32) {
+      _toast('请输入 2–32 个字符的真实姓名');
       return;
     }
     if (!_idPattern.hasMatch(idNumber)) {
       _toast('请输入正确的身份证号');
       return;
     }
-    if (material.isEmpty) {
-      _toast('请填写证件材料引用');
+    final material = _materialRef;
+    if (material == null) {
+      _toast('请先上传证件照片');
       return;
     }
     final resubmit = widget.status.state == RealNameState.rejected;
     setState(() => _submitting = true);
     try {
-      await ref.read(userCenterRepositoryProvider).submitRealName(
-            realName: realName,
-            idNumber: idNumber,
-            materialRefs: [material],
-            resubmit: resubmit,
-          );
-      ref.invalidate(realNameStatusProvider);
-      // 实名状态影响全局身份摘要，同步刷新
-      await ref.read(authControllerProvider.notifier).refreshMe();
+      final result =
+          await ref.read(userCenterRepositoryProvider).submitRealName(
+                realName: realName,
+                idNumber: idNumber,
+                materialRefs: [material],
+                resubmit: resubmit,
+              );
       if (!mounted) return;
+      setState(() {
+        _submittedStatus = result;
+        _clearMaterialPreview();
+        _materialRef = null;
+        _uploadError = null;
+      });
       _toast('提交成功，请等待审核');
       _nameCtrl.clear();
       _idCtrl.clear();
-      _materialCtrl.clear();
+      // 提交已经成功，身份摘要暂时刷新失败不应误报申请失败。
+      try {
+        await ref.read(authControllerProvider.notifier).refreshMe();
+      } catch (_) {}
+      // 页面使用提交响应展示审核中；离开后 autoDispose，重进再查询最新状态。
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {
@@ -105,14 +126,78 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
     }
   }
 
+  Future<void> _pickMaterial() async {
+    if (_busy) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _picking = true);
+    try {
+      final image =
+          await NativeImagePicker.pickImage(filenamePrefix: 'realname');
+      if (image == null || !mounted) return;
+      setState(() {
+        _clearMaterialPreview();
+        _materialImage = image;
+        _previewImage = MemoryImage(Uint8List.fromList(image.bytes));
+        _materialRef = null;
+        _uploadError = null;
+      });
+      await _uploadMaterial();
+    } on NativeImageException catch (e) {
+      _toast(e.message);
+    } catch (_) {
+      _toast('无法选择图片，请重试');
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  Future<void> _uploadMaterial() async {
+    final image = _materialImage;
+    if (image == null || _uploading || _submitting) return;
+    setState(() {
+      _uploading = true;
+      _uploadError = null;
+    });
+    try {
+      final reference =
+          await ref.read(userCenterRepositoryProvider).uploadRealNameMaterial(
+                bytes: image.bytes,
+                filename: image.filename,
+              );
+      if (mounted) setState(() => _materialRef = reference);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _uploadError = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _uploadError = '上传失败，请检查网络后重试');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  void _removeMaterial() {
+    if (_busy) return;
+    setState(() {
+      _clearMaterialPreview();
+      _materialRef = null;
+      _uploadError = null;
+    });
+  }
+
+  void _clearMaterialPreview() {
+    unawaited(_previewImage?.evict());
+    _previewImage = null;
+    _materialImage = null;
+  }
+
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final status = widget.status;
+    final status = _submittedStatus ?? widget.status;
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
@@ -124,7 +209,9 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Text(
-              status.state == RealNameState.pending ? '申请审核中，暂不能重复提交。' : '已通过实名认证，如需变更请联系客服。',
+              status.state == RealNameState.pending
+                  ? '申请审核中，暂不能重复提交。'
+                  : '已通过实名认证，如需变更请联系客服。',
               style: const TextStyle(color: AppColors.text3, fontSize: 13),
             ),
           ),
@@ -158,6 +245,7 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
                 label: '真实姓名',
                 child: TextField(
                   controller: _nameCtrl,
+                  enabled: !_busy,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintText: '与证件一致',
@@ -168,6 +256,7 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
                 label: '身份证号',
                 child: TextField(
                   controller: _idCtrl,
+                  enabled: !_busy,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintText: '15 或 18 位',
@@ -176,13 +265,7 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
               ),
               UserFieldRow(
                 label: '证件材料',
-                child: TextField(
-                  controller: _materialCtrl,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '平台上传服务返回的材料引用',
-                  ),
-                ),
+                child: _buildMaterialPicker(),
               ),
             ],
           ),
@@ -190,23 +273,92 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: ElevatedButton(
-            onPressed: _submitting ? null : _submit,
+            onPressed: _busy ? null : _submit,
             child: _submitting
                 ? const SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(status.state == RealNameState.rejected ? '重新提交' : '提交认证'),
+                : Text(
+                    status.state == RealNameState.rejected ? '重新提交' : '提交认证'),
           ),
         ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            '证件材料需先经平台上传服务上传，此处填写返回的材料引用。',
+            '请上传清晰、完整的证件照片，用于实名认证审核。支持 JPG、PNG、GIF、BMP，每张不超过 5 MB。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildMaterialPicker() {
+    final image = _materialImage;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (image != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image(
+              image: _previewImage!,
+              height: 140,
+              fit: BoxFit.contain,
+              excludeFromSemantics: true,
+              errorBuilder: (_, __, ___) => const SizedBox(
+                height: 100,
+                child: Center(child: Icon(Icons.image_outlined, size: 40)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (_uploading || _picking && image == null)
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 8),
+              Text('正在上传…'),
+            ],
+          )
+        else if (_uploadError != null)
+          Text(_uploadError!, style: const TextStyle(color: AppColors.danger))
+        else if (_materialRef != null)
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline,
+                  color: AppColors.success, size: 18),
+              SizedBox(width: 6),
+              Text('上传成功', style: TextStyle(color: AppColors.success)),
+            ],
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _pickMaterial,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(image == null ? '选择证件照片' : '更换照片'),
+        ),
+        if (image != null)
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              if (_uploadError != null)
+                TextButton(
+                    onPressed: _busy ? null : _uploadMaterial,
+                    child: const Text('重试上传')),
+              TextButton(
+                  onPressed: _busy ? null : _removeMaterial,
+                  child: const Text('移除照片')),
+            ],
+          ),
       ],
     );
   }
@@ -231,7 +383,8 @@ class _StatusCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 status.state.label,
-                style: TextStyle(color: _color, fontWeight: FontWeight.w600, fontSize: 16),
+                style: TextStyle(
+                    color: _color, fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ],
           ),
@@ -240,9 +393,12 @@ class _StatusCard extends StatelessWidget {
             UserInfoLine(label: '姓名', value: status.realNameMasked!),
           if (status.idNumberMasked != null)
             UserInfoLine(label: '证件号', value: status.idNumberMasked!),
-          if (status.submittedAt != null) UserInfoLine(label: '提交时间', value: status.submittedAt!),
-          if (status.reviewedAt != null) UserInfoLine(label: '审核时间', value: status.reviewedAt!),
-          if (status.state == RealNameState.rejected && status.rejectReason != null)
+          if (status.submittedAt != null)
+            UserInfoLine(label: '提交时间', value: status.submittedAt!),
+          if (status.reviewedAt != null)
+            UserInfoLine(label: '审核时间', value: status.reviewedAt!),
+          if (status.state == RealNameState.rejected &&
+              status.rejectReason != null)
             UserInfoLine(label: '驳回原因', value: status.rejectReason!),
         ],
       ),
