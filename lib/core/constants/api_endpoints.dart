@@ -229,4 +229,35 @@ class ApiEndpoints {
   static const String categories = '/categories';
   static String categoryById(int id) => '/categories/$id';
   static const String tags = '/tags';
+
+  // ===== C 交易域（复用 admin 端点，后续 APP 专用接口上线后替换路径） =====
+  // 交易作品
+  static const String adminTradeWorks = '/admin/trade/works';
+  static String adminTradeWorkById(int workId) => '/admin/trade/works/$workId';
+  // 询盘
+  static const String adminTradeInquiryList = '/admin/trade/inquiry/list';
+  static String adminTradeInquiryDetail(int id) => '/admin/trade/inquiry/detail/$id';
+  static const String adminTradeInquiry = '/admin/trade/inquiry';
+  static String adminTradeInquiryAccept(int id) => '/admin/trade/inquiry/$id/accept';
+  static String adminTradeInquiryReject(int id) => '/admin/trade/inquiry/$id/reject';
+  static String adminTradeInquiryClose(int id) => '/admin/trade/inquiry/$id/close';
+  // 报价/议价
+  static const String adminTradeQuoteList = '/admin/trade/quote/list';
+  static const String adminTradeQuote = '/admin/trade/quote';
+  static const String adminTradeQuoteCounterOffer = '/admin/trade/quote/counter-offer';
+  static String adminTradeQuoteById(int id) => '/admin/trade/quote/$id';
+  static String adminTradeQuoteAccept(int id) => '/admin/trade/quote/$id/accept';
+  static String adminTradeQuoteReject(int id) => '/admin/trade/quote/$id/reject';
+  static String adminTradeQuoteSellerAccept(int id) => '/admin/trade/quote/$id/seller-accept';
+  static String adminTradeQuoteSellerReject(int id) => '/admin/trade/quote/$id/seller-reject';
+  // 订单
+  static const String adminTradeOrders = '/admin/trade/orders';
+  static String adminTradeOrderById(int id) => '/admin/trade/orders/$id';
+  // 合作记录
+  static const String adminTradeCooperationList = '/admin/trade/cooperation/list';
+  static const String adminTradeCooperation = '/admin/trade/cooperation';
+  // 商务跟进
+  static const String adminTradeFollowUps = '/admin/trade/partners/follow-ups';
+  // 需求标签
+  static const String adminTradeDemandTags = '/admin/trade/partners/tags';
 }

@@ -45,6 +45,9 @@ import '../../features/profile/pages/profile_edit_page.dart';
 import '../../features/profile/pages/real_name_page.dart';
 import '../../features/profile/profile_page.dart';
 import '../../features/splash/splash_page.dart';
+import '../../features/trade/pages/inquiry_create_page.dart';
+import '../../features/trade/pages/inquiry_detail_page.dart';
+import '../../features/trade/pages/inquiry_list_page.dart';
 import '../providers/auth_providers.dart';
 import 'route_intent.dart';
 import 'route_paths.dart';
@@ -422,6 +425,27 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.feedbackDetail,
         builder: (context, state) => FeedbackDetailPage(
           feedbackId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      // ===== C 交易域 =====
+      GoRoute(
+        path: RoutePath.inquiryCreate,
+        name: RouteName.inquiryCreate,
+        builder: (context, state) => InquiryCreatePage(
+          workId: int.tryParse(state.uri.queryParameters['workId'] ?? ''),
+          workTitle: state.uri.queryParameters['title'],
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.inquiryList,
+        name: RouteName.inquiryList,
+        builder: (_, __) => const InquiryListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.inquiryDetail,
+        name: RouteName.inquiryDetail,
+        builder: (context, state) => InquiryDetailPage(
+          inquiryId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
       ),
     ],

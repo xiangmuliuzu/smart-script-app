@@ -164,6 +164,27 @@ class RoutePath {
   static const String feedback = '/profile/feedback';
   static const String feedbackDetail = '/profile/feedback/detail';
   static const String feedbackCreate = '/profile/feedback/create';
+
+  // ===== C 交易域（受登录守卫保护）=====
+  // 询盘
+  static const String inquiryCreate = '/trade/inquiry/create';
+  static const String inquiryList = '/trade/inquiry/list';
+  static const String inquiryDetail = '/trade/inquiry/detail';
+  // 报价
+  static const String quoteCreate = '/trade/quote/create';
+  static const String quoteList = '/trade/quote/list';
+  static const String counterOffer = '/trade/quote/counter-offer';
+  // 订单
+  static const String orderList = '/trade/order/list';
+  static const String orderDetail = '/trade/order/detail';
+  static const String orderCancel = '/trade/order/cancel';
+  // 合作记录
+  static const String cooperationCreate = '/trade/cooperation/create';
+  static const String followUpList = '/trade/follow-up/list';
+  // 需求
+  static const String demandList = '/trade/demand/list';
+  // 线上沟通（聊天，待接入 A3）
+  static const String tradeChat = '/trade/chat';
 }
 
 class RouteName {
@@ -213,6 +234,21 @@ class RouteName {
   static const String feedback = 'feedback';
   static const String feedbackDetail = 'feedbackDetail';
   static const String feedbackCreate = 'feedbackCreate';
+
+  // ===== C 交易域 =====
+  static const String inquiryCreate = 'inquiryCreate';
+  static const String inquiryList = 'inquiryList';
+  static const String inquiryDetail = 'inquiryDetail';
+  static const String quoteCreate = 'quoteCreate';
+  static const String quoteList = 'quoteList';
+  static const String counterOffer = 'counterOffer';
+  static const String orderList = 'orderList';
+  static const String orderDetail = 'orderDetail';
+  static const String orderCancel = 'orderCancel';
+  static const String cooperationCreate = 'cooperationCreate';
+  static const String followUpList = 'followUpList';
+  static const String demandList = 'demandList';
+  static const String tradeChat = 'tradeChat';
 }
 
 /// 需要登录才能访问的路径前缀（规格 §8.1 守卫清单）。
@@ -241,6 +277,20 @@ class ProtectedRoutes {
     RoutePath.dramaHistory,
     RoutePath.dramaSubscriptions,
     RoutePath.dramaReport,
+    // C 交易域（询盘/报价/订单/合作，需登录）
+    RoutePath.inquiryCreate,
+    RoutePath.inquiryList,
+    RoutePath.inquiryDetail,
+    RoutePath.quoteCreate,
+    RoutePath.quoteList,
+    RoutePath.counterOffer,
+    RoutePath.orderList,
+    RoutePath.orderDetail,
+    RoutePath.orderCancel,
+    RoutePath.cooperationCreate,
+    RoutePath.followUpList,
+    RoutePath.demandList,
+    RoutePath.tradeChat,
   ];
 
   static bool isProtected(String location) {
