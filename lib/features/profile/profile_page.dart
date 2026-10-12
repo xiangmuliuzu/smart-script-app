@@ -154,7 +154,7 @@ class _ProfileDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nickname = (user.nickname == null || user.nickname!.isEmpty) ? '未设置昵称' : user.nickname!;
+    final nickname = (user.nickname == null || user.nickname!.isEmpty) ? '未设置用户名称' : user.nickname!;
     return Drawer(
       backgroundColor: AppColors.card,
       child: SafeArea(
@@ -267,7 +267,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = RealNameState.fromCode(user.realNameStatus);
     final approved = state == RealNameState.approved;
-    final nickname = (user.nickname == null || user.nickname!.isEmpty) ? '未设置昵称' : user.nickname!;
+    final nickname = (user.nickname == null || user.nickname!.isEmpty) ? '未设置用户名称' : user.nickname!;
 
     return _CardBox(
       child: Row(
