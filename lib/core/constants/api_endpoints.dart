@@ -6,11 +6,11 @@ class ApiEndpoints {
   // ===== A3 认证契约 =====
   static const String smsSend = '/auth/sms/send';
   static const String smsLogin = '/auth/sms/login';
-  static const String passwordLogin = '/auth/password/login';
+  static const String passwordLogin = '/auth/login';
+  static const String captchaImage = '/auth/captchaImage';
   static const String register = '/auth/register';
-  static const String tokenRefresh = '/auth/token/refresh';
   static const String logout = '/auth/logout';
-  static const String me = '/auth/me';
+  static const String me = '/auth/getInfo';
   static const String passwordSet = '/auth/password/set';
   static const String passwordChange = '/auth/password/change';
   static const String passwordReset = '/auth/password/reset';

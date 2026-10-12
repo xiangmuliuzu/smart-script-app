@@ -73,15 +73,13 @@ class _GatedTokenStorage extends TokenStorage {
 
   @override
   Future<void> saveSession({
-    required String accessToken,
-    required String refreshToken,
+    required String token,
     Map<String, dynamic>? user,
   }) async {
     final gate = saveGates.isEmpty ? null : saveGates.removeAt(0);
     if (gate != null) await gate.future;
     return super.saveSession(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
+      token: token,
       user: user,
     );
   }
@@ -91,7 +89,7 @@ class _GatedTokenStorage extends TokenStorage {
 class _LoginRepo implements AuthRepository {
   @override
   Future<User> me() async =>
-      const User(userId: 1, userType: UserType.user, nickname: '恢复用户');
+      const User(userId: 601, userType: UserType.user, nickname: '短信用户');
 
   @override
   Future<AuthSession> smsLogin({
@@ -102,11 +100,7 @@ class _LoginRepo implements AuthRepository {
     bool acceptAgreements = true,
   }) async =>
       const AuthSession(
-        accessToken: 'sms-at',
-        refreshToken: 'sms-rt',
-        tokenType: 'Bearer',
-        expiresIn: 3600,
-        refreshExpiresIn: 7200,
+        token: 'sms-at',
         user: User(userId: 601, userType: UserType.user, nickname: '短信用户'),
       );
 
@@ -149,7 +143,12 @@ Future<
   );
 }
 
-Future<({ProviderContainer container, TokenSecureStorage secure, _FakeAuthRepo repo})> _setup() async {
+Future<
+    ({
+      ProviderContainer container,
+      TokenSecureStorage secure,
+      _FakeAuthRepo repo
+    })> _setup() async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
   final secure = InMemoryTokenSecureStorage();
@@ -194,7 +193,8 @@ Future<
   return (container: container, secure: secure, prefs: prefs, repo: repo);
 }
 
-Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 20));
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -203,7 +203,8 @@ void main() {
     final s = await _setup();
     await s.container.read(authControllerProvider.notifier).refreshMe();
     await _settle();
-    expect(s.container.read(authControllerProvider).status, AuthStatus.authenticated);
+    expect(s.container.read(authControllerProvider).status,
+        AuthStatus.authenticated);
     expect(s.container.read(authControllerProvider).user?.userId, 501);
   });
 
@@ -211,7 +212,8 @@ void main() {
     final s = await _setup();
     await s.container.read(authControllerProvider.notifier).refreshMe();
     await _settle();
-    expect(s.container.read(authControllerProvider).status, AuthStatus.authenticated);
+    expect(s.container.read(authControllerProvider).status,
+        AuthStatus.authenticated);
 
     // 网络层在 401/不可恢复业务码时发出该事件
     SessionEvents.instance.sessionExpired();
@@ -235,7 +237,8 @@ void main() {
     await _settle();
 
     expect(s.repo.logoutCalls, 1, reason: '主动退出应通知后端吊销会话');
-    expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated);
+    expect(s.container.read(authControllerProvider).status,
+        AuthStatus.unauthenticated);
     expect(await s.secure.read(AppConstants.kAccessToken), isNull);
     expect(await s.secure.read(AppConstants.kRefreshToken), isNull);
   });
@@ -249,7 +252,8 @@ void main() {
     await _settle();
 
     expect(s.repo.logoutCalls, 0, reason: '强制本地登出不应再发后端请求（凭据已失效）');
-    expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated);
+    expect(s.container.read(authControllerProvider).status,
+        AuthStatus.unauthenticated);
     expect(await s.secure.read(AppConstants.kAccessToken), isNull);
     expect(await s.secure.read(AppConstants.kRefreshToken), isNull);
   });
@@ -258,13 +262,15 @@ void main() {
     final s = await _setup();
     await s.container.read(authControllerProvider.notifier).refreshMe();
     await _settle();
-    expect(s.container.read(authControllerProvider).status, AuthStatus.authenticated);
+    expect(s.container.read(authControllerProvider).status,
+        AuthStatus.authenticated);
 
     SessionEvents.instance.sessionExpired();
     SessionEvents.instance.sessionExpired();
     await _settle();
 
-    expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated);
+    expect(s.container.read(authControllerProvider).status,
+        AuthStatus.unauthenticated);
   });
 
   // ==================================================================
@@ -281,12 +287,14 @@ void main() {
 
       // 构造时已触发 _restore，此刻停在 await me()
       await _settle();
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unknown,
+      expect(
+          s.container.read(authControllerProvider).status, AuthStatus.unknown,
           reason: '恢复进行中应为 unknown');
 
       SessionEvents.instance.sessionExpired();
       await _settle();
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated,
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.unauthenticated,
           reason: '会话失效应立即生效');
       expect(await s.secure.read(AppConstants.kAccessToken), isNull,
           reason: '会话失效应已清除凭据');
@@ -309,13 +317,15 @@ void main() {
       final s = await _setupDelayedRestore();
 
       await _settle();
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unknown,
+      expect(
+          s.container.read(authControllerProvider).status, AuthStatus.unknown,
           reason: '恢复进行中应为 unknown');
 
       await s.container.read(authControllerProvider.notifier).logout();
       await _settle();
       expect(s.repo.logoutCalls, 1);
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated);
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.unauthenticated);
 
       // 退出发生在恢复在途期间：me() 之后返回的结果必须被丢弃
       s.repo.gate.complete(_user);
@@ -342,7 +352,8 @@ void main() {
       s.repo.gate.complete(_user);
       await _settle();
 
-      expect(s.container.read(authControllerProvider).status, AuthStatus.authenticated);
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.authenticated);
       expect(s.repo.meCalls, 1);
     });
   });
@@ -363,7 +374,8 @@ void main() {
       final s = await _setupLoginRace();
       final notifier = s.container.read(authControllerProvider.notifier);
       await _settle();
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated);
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.unauthenticated);
 
       final gate = Completer<void>();
       s.storage.saveGates.add(gate);
@@ -375,7 +387,8 @@ void main() {
 
       SessionEvents.instance.sessionExpired();
       await _settle();
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated);
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.unauthenticated);
       expect(await s.secure.read(AppConstants.kAccessToken), isNull);
 
       // 放行保存：修复前会写回 authenticated 并把凭据重新落盘
@@ -406,9 +419,11 @@ void main() {
       final s = await _setup();
       await s.container.read(authControllerProvider.notifier).refreshMe();
       await _settle();
-      expect(s.container.read(authControllerProvider).status, AuthStatus.authenticated);
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.authenticated);
 
-      SessionEvents.instance.sessionExpired(SessionExpiryReason.accountDisabled);
+      SessionEvents.instance
+          .sessionExpired(SessionExpiryReason.accountDisabled);
       await _settle();
 
       final state = s.container.read(authControllerProvider);
@@ -429,8 +444,7 @@ void main() {
 
       final state = s.container.read(authControllerProvider);
       expect(state.status, AuthStatus.unauthenticated);
-      expect(state.errorMessage, isNull,
-          reason: 'Token 过期已由「踢回登录页」表达，不新增提示');
+      expect(state.errorMessage, isNull, reason: 'Token 过期已由「踢回登录页」表达，不新增提示');
     });
 
     test('禁用文案读取一次后即被消费（不重复弹出）', () async {
@@ -439,7 +453,8 @@ void main() {
       s.container.read(authControllerProvider);
       await _settle();
 
-      SessionEvents.instance.sessionExpired(SessionExpiryReason.accountDisabled);
+      SessionEvents.instance
+          .sessionExpired(SessionExpiryReason.accountDisabled);
       await _settle();
 
       final notifier = s.container.read(authControllerProvider.notifier);
@@ -448,7 +463,8 @@ void main() {
 
       notifier.consumeErrorMessage();
       expect(s.container.read(authControllerProvider).errorMessage, isNull);
-      expect(s.container.read(authControllerProvider).status, AuthStatus.unauthenticated,
+      expect(s.container.read(authControllerProvider).status,
+          AuthStatus.unauthenticated,
           reason: '消费提示不得改变登录态');
     });
   });

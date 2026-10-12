@@ -72,7 +72,9 @@ class AuthController extends StateNotifier<AuthState> {
         return;
       }
       // 启动恢复需验证身份；已验证会话的资料刷新不进入 splash 重定向。
-      if (mounted && !preserveSession) state = const AuthState(AuthStatus.unknown);
+      if (mounted && !preserveSession) {
+        state = const AuthState(AuthStatus.unknown);
+      }
       try {
         final user = await _repository.me();
         // 失效/退出/新登录已发生：不写回登录态，也不写回用户缓存（B3-APP-01）
@@ -128,9 +130,7 @@ class AuthController extends StateNotifier<AuthState> {
     _generation++;
     final generation = _generation;
     await _storage.saveSession(
-      accessToken: session.accessToken,
-      refreshToken: session.refreshToken,
-      user: session.user.toJson(),
+      token: session.token,
     );
     if (generation != _generation) {
       // 保存期间会话已被失效/退出（B3-APP-01 同源竞态）：本次保存整体作废。
@@ -138,14 +138,24 @@ class AuthController extends StateNotifier<AuthState> {
       await _storage.clear();
       return;
     }
-    if (mounted) state = AuthState(AuthStatus.authenticated, user: session.user);
+    // RuoYi login establishes the token; getInfo supplies verified roles/capabilities.
+    final user = await _repository.me();
+    if (generation != _generation) return;
+    await _storage.cacheUser(user.toJson());
+    if (generation != _generation) return;
+    if (mounted) {
+      state = AuthState(AuthStatus.authenticated, user: user);
+    }
   }
 
-  Future<void> loginWithPassword(String phone, String password, {String? deviceId}) async {
+  Future<void> loginWithPassword(String phone, String password,
+      {String? deviceId, String? code, String? uuid}) async {
     final session = await _repository.passwordLogin(
       phone: phone,
       password: password,
       deviceId: deviceId ?? 'flutter-device',
+      code: code,
+      uuid: uuid,
     );
     await _applySession(session);
   }
@@ -209,7 +219,8 @@ class AuthController extends StateNotifier<AuthState> {
   ///
   /// 后端在首次设置后会吊销其它会话，因此设置完成后刷新身份摘要即可，
   /// 当前设备会话保留。
-  Future<void> passwordSet(String password) => _repository.passwordSet(password);
+  Future<void> passwordSet(String password) =>
+      _repository.passwordSet(password);
 
   /// A5 账号安全：修改已有密码。后端会吊销该用户全部 App 会话，
   /// 因此成功返回后本地凭证已经无效，由调用方触发 [forceLocalSignOut]。
@@ -217,7 +228,8 @@ class AuthController extends StateNotifier<AuthState> {
     required String oldPassword,
     required String newPassword,
   }) =>
-      _repository.passwordChange(oldPassword: oldPassword, newPassword: newPassword);
+      _repository.passwordChange(
+          oldPassword: oldPassword, newPassword: newPassword);
 
   /// 服务端已吊销会话时的本地登出（不再调用后端 logout）。
   ///

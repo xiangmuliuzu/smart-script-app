@@ -24,7 +24,7 @@ final tokenStorageProvider = Provider<TokenStorage>(
   ),
 );
 
-/// Breaks the interceptor ↔ repository cycle via a mutable holder.
+/// Shared authentication network dependencies.
 class AuthNetworkGraph {
   AuthNetworkGraph._({
     required this.storage,
@@ -39,17 +39,10 @@ class AuthNetworkGraph {
   final ApiClient apiClient;
 
   factory AuthNetworkGraph.create(TokenStorage storage) {
-    late AuthRepository repository;
-    late AuthInterceptor interceptor;
-    late ApiClient apiClient;
-    interceptor = AuthInterceptor(
-      storage,
-      () => repository,
-      () => interceptor.refreshCountForTest,
-    );
+    final interceptor = AuthInterceptor(storage);
     final dio = ApiClient.buildDio(interceptor);
-    apiClient = ApiClient(dio);
-    repository = AuthRepository(apiClient);
+    final apiClient = ApiClient(dio);
+    final repository = AuthRepository(apiClient);
     return AuthNetworkGraph._(
       storage: storage,
       repository: repository,

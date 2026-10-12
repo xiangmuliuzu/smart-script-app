@@ -104,7 +104,7 @@ class _ScriptedAuthController extends AuthController {
 
   @override
   Future<void> loginWithPassword(String phone, String password,
-      {String? deviceId}) async {
+      {String? deviceId, String? code, String? uuid}) async {
     passwordLoginCalls++;
     final error = passwordLoginError;
     if (error != null) throw error;
@@ -162,6 +162,8 @@ Future<_Harness> _pump(WidgetTester tester, Widget Function() page) async {
 
   final container = ProviderContainer(
     overrides: [
+      loginCaptchaProvider
+          .overrideWith((ref) async => {'captchaEnabled': false}),
       sharedPreferencesProvider.overrideWithValue(prefs),
       secureTokenStorageProvider.overrideWithValue(secure),
       tokenStorageProvider.overrideWithValue(storage),

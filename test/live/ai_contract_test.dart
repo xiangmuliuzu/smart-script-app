@@ -67,7 +67,7 @@ Future<String> _loginToken() async {
     password: 'LiveCheck!2026',
     deviceId: 'live-ai',
   );
-  return session.accessToken;
+  return session.token;
 }
 
 /// 整个测试文件只注册一次并复用 Token：

@@ -41,7 +41,7 @@ void main() {
     final patterns = [
       RegExp(r"print\(.*(token|password|code|refreshToken)"),
       RegExp(r"debugPrint\(.*(token|password|code|refreshToken)"),
-      RegExp(r"developer\.log\(.*(accessToken|refreshToken|password)"),
+      RegExp(r"developer\.log\(.*(accessToken|token|refreshToken|password)"),
     ];
     final offenders = <String>[];
     for (final f in libRoot
@@ -60,16 +60,15 @@ void main() {
     expect(offenders, isEmpty, reason: '日志不得含敏感信息: $offenders');
   });
 
-  test('认证接口路径符合 A3 契约', () {
+  test('认证接口路径符合若依登录契约', () {
     final endpoints = File('lib/core/constants/api_endpoints.dart').readAsStringSync();
     for (final path in [
       '/auth/sms/send',
       '/auth/sms/login',
-      '/auth/password/login',
+      '/auth/login',
       '/auth/register',
-      '/auth/token/refresh',
       '/auth/logout',
-      '/auth/me',
+      '/auth/getInfo',
       '/auth/password/set',
       '/auth/password/change',
       '/auth/password/reset',
@@ -77,7 +76,7 @@ void main() {
     ]) {
       expect(endpoints.contains(path), isTrue, reason: '缺少契约路径 $path');
     }
-    expect(endpoints.contains("'/auth/login'"), isFalse);
+    expect(endpoints.contains("'/auth/token/refresh'"), isFalse);
     expect(endpoints.contains("'/auth/login-sms'"), isFalse);
     expect(endpoints.contains("'/auth/refresh'"), isFalse);
     expect(endpoints.contains("'/auth/sms-code'"), isFalse);

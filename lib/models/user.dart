@@ -77,8 +77,11 @@ class User {
         avatar: json['avatar'] as String?,
         bio: json['bio'] as String?,
         realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
-        roles: (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
-        permissions: (json['permissions'] as List?)?.whereType<String>().toList() ?? const [],
+        roles:
+            (json['roles'] as List?)?.whereType<String>().toList() ?? const [],
+        permissions:
+            (json['permissions'] as List?)?.whereType<String>().toList() ??
+                const [],
         authorCapability: json['authorCapability'] as bool? ?? false,
         hasPassword: json['hasPassword'] as bool? ?? false,
       );
@@ -98,29 +101,15 @@ class User {
       };
 }
 
+/// RuoYi login result: one token and the App user summary.
 class AuthSession {
-  const AuthSession({
-    required this.accessToken,
-    required this.refreshToken,
-    required this.tokenType,
-    required this.expiresIn,
-    required this.refreshExpiresIn,
-    required this.user,
-  });
-
-  final String accessToken;
-  final String refreshToken;
-  final String tokenType;
-  final int expiresIn;
-  final int refreshExpiresIn;
+  const AuthSession({required this.token, required this.user});
+  final String token;
   final User user;
 
   factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
-        accessToken: json['accessToken'] as String? ?? '',
-        refreshToken: json['refreshToken'] as String? ?? '',
-        tokenType: json['tokenType'] as String? ?? 'Bearer',
-        expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 0,
-        refreshExpiresIn: (json['refreshExpiresIn'] as num?)?.toInt() ?? 0,
-        user: User.fromJson(Map<String, dynamic>.from(json['user'] as Map? ?? {})),
+        token: json['token'] as String? ?? '',
+        user: User.fromJson(
+            Map<String, dynamic>.from(json['user'] as Map? ?? {})),
       );
 }

@@ -72,8 +72,9 @@ class ApiClient {
     Map<String, dynamic>? headers,
     T Function(dynamic raw)? parser,
   }) =>
-      _send<T>(_dio.get<dynamic>(path,
-          queryParameters: query, options: Options(headers: headers)),
+      _send<T>(
+          _dio.get<dynamic>(path,
+              queryParameters: query, options: Options(headers: headers)),
           parser);
 
   /// POST 请求（JSON）。
@@ -101,7 +102,8 @@ class ApiClient {
     T Function(dynamic raw)? parser,
   }) =>
       _send<T>(
-          _dio.put<dynamic>(path, data: data, options: Options(headers: headers)),
+          _dio.put<dynamic>(path,
+              data: data, options: Options(headers: headers)),
           parser);
 
   /// DELETE 请求。
@@ -162,12 +164,14 @@ class ApiClient {
       if (!apiResp.isSuccess) {
         // 会话不可恢复：40100/40102/40103 需重新登录，40301 为账号被禁用。
         final code = apiResp.code;
-        if (code == AppAuthErrorCodes.accountDisabled) {
+        if (code == AppAuthErrorCodes.accountDisabled &&
+            resp.requestOptions.extra['skipSessionExpiry'] != true) {
           SessionEvents.instance
               .sessionExpired(SessionExpiryReason.accountDisabled);
-        } else if (code == AppAuthErrorCodes.unauthorized ||
-            code == AppAuthErrorCodes.refreshInvalid ||
-            code == AppAuthErrorCodes.refreshReplay) {
+        } else if (resp.requestOptions.extra['skipSessionExpiry'] != true &&
+            (code == AppAuthErrorCodes.unauthorized ||
+                code == AppAuthErrorCodes.refreshInvalid ||
+                code == AppAuthErrorCodes.refreshReplay)) {
           SessionEvents.instance.sessionExpired();
         }
         throw ApiException(
@@ -178,7 +182,10 @@ class ApiClient {
       }
       return apiResp.data;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 401) SessionEvents.instance.sessionExpired();
+      if (e.response?.statusCode == 401 &&
+          e.requestOptions.extra['skipSessionExpiry'] != true) {
+        SessionEvents.instance.sessionExpired();
+      }
       throw ApiException(_mapDioError(e), code: e.response?.statusCode);
     }
   }

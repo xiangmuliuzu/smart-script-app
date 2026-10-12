@@ -65,7 +65,8 @@ class _RecordingAuthController extends AuthController {
   }
 
   @override
-  Future<void> loginWithPassword(String phone, String password, {String? deviceId}) async {
+  Future<void> loginWithPassword(String phone, String password,
+      {String? deviceId, String? code, String? uuid}) async {
     passwordLoginCalls += 1;
     final error = passwordLoginError;
     if (error != null) throw error;
@@ -88,6 +89,8 @@ Future<_Harness> _pumpApp(WidgetTester tester) async {
   late _RecordingAuthController auth;
   final container = ProviderContainer(
     overrides: [
+      loginCaptchaProvider
+          .overrideWith((ref) async => {'captchaEnabled': false}),
       sharedPreferencesProvider.overrideWithValue(prefs),
       secureTokenStorageProvider.overrideWithValue(_FakeSecureStorage()),
       tokenStorageProvider.overrideWithValue(storage),
@@ -116,7 +119,9 @@ Future<_Harness> _pumpApp(WidgetTester tester) async {
 
 /// 用受保护入口触发守卫，使登录页拿到一个待消费的回跳意图。
 void _seedIntentViaGuard(_Harness harness) {
-  harness.container.read(routerProvider).go('${RoutePath.feedbackDetail}?id=42');
+  harness.container
+      .read(routerProvider)
+      .go('${RoutePath.feedbackDetail}?id=42');
 }
 
 /// 点击协议圆圈：不落在《用户协议》《隐私政策》文字上，避免误触发跳转。
@@ -128,7 +133,10 @@ Future<void> _tapAgreement(WidgetTester tester) async {
 
 /// 匹配「以错误态样式渲染的文案」，与同名的 placeholder 区分开。
 Finder _errorText(String text) => find.byWidgetPredicate(
-      (widget) => widget is Text && widget.data == text && widget.style?.color == AppColors.error,
+      (widget) =>
+          widget is Text &&
+          widget.data == text &&
+          widget.style?.color == AppColors.error,
     );
 
 void main() {
@@ -148,7 +156,8 @@ void main() {
     // 填好手机号与验证码但**不勾选协议**
     await tester.enterText(find.byType(TextField).at(0), '13800001111');
     await tester.enterText(find.byType(TextField).at(1), '123456');
-    await tester.tap(find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
+    await tester.tap(
+        find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -165,7 +174,8 @@ void main() {
 
     await tester.enterText(find.byType(TextField).at(0), '2380000');
     await _tapAgreement(tester);
-    await tester.tap(find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
+    await tester.tap(
+        find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -190,7 +200,8 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), '13800001111');
     await tester.enterText(find.byType(TextField).at(1), '123456');
     await _tapAgreement(tester);
-    await tester.tap(find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
+    await tester.tap(
+        find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -221,7 +232,8 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), '13800001111');
     await tester.enterText(find.byType(TextField).at(1), 'Passw0rd1');
     await tester.tap(
-      find.descendant(of: find.byType(PasswordLoginPage), matching: find.text('登录')),
+      find.descendant(
+          of: find.byType(PasswordLoginPage), matching: find.text('登录')),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -248,7 +260,8 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), '13800001111');
     await tester.enterText(find.byType(TextField).at(1), '123456');
     await _tapAgreement(tester);
-    await tester.tap(find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
+    await tester.tap(
+        find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -277,7 +290,8 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), '13800001111');
     await tester.enterText(find.byType(TextField).at(1), 'Passw0rd1');
     await tester.tap(
-      find.descendant(of: find.byType(PasswordLoginPage), matching: find.text('登录')),
+      find.descendant(
+          of: find.byType(PasswordLoginPage), matching: find.text('登录')),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

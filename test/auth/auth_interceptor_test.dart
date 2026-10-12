@@ -1,239 +1,185 @@
+import 'dart:async';
 import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/core/network/interceptors/auth_interceptor.dart';
+import 'package:script_app/core/network/session_events.dart';
 import 'package:script_app/core/storage/secure_token_storage.dart';
 import 'package:script_app/core/storage/token_storage.dart';
 import 'package:script_app/features/auth/data/auth_repository.dart';
-import 'package:script_app/models/user.dart';
+import 'package:script_app/core/constants/app_constants.dart';
 
-class _ScriptAdapter implements HttpClientAdapter {
-  _ScriptAdapter(this.handler);
+class _GatedSecure extends InMemoryTokenSecureStorage {
+  Completer<void>? writeGate;
+  @override
+  Future<void> write(String key, String value) async {
+    if (key == AppConstants.kAccessToken && writeGate != null) {
+      await writeGate!.future;
+    }
+    await super.write(key, value);
+  }
+}
 
-  final Response<dynamic> Function(RequestOptions options) handler;
-
+class _Adapter implements HttpClientAdapter {
+  _Adapter(this.respond);
+  final FutureOr<ResponseBody> Function(RequestOptions) respond;
   @override
   void close({bool force = false}) {}
-
   @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final resp = handler(options);
-    final bytes = utf8.encode(jsonEncode(resp.data));
-    return ResponseBody.fromBytes(
-      bytes,
-      resp.statusCode ?? 200,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
+  Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? body,
+          Future<void>? cancelFuture) async =>
+      respond(options);
 }
 
-class _CountingRepo implements AuthRepository {
-  _CountingRepo(this.nextSession);
-
-  final AuthSession nextSession;
-  int refreshCalls = 0;
-
-  @override
-  Future<AuthSession> refresh({
-    required String refreshToken,
-    required String deviceId,
-    String? deviceName,
-  }) async {
-    refreshCalls++;
-    return nextSession;
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FailingRefreshRepo implements AuthRepository {
-  @override
-  Future<AuthSession> refresh({
-    required String refreshToken,
-    required String deviceId,
-    String? deviceName,
-  }) async {
-    throw Exception('replay');
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-AuthSession _session() => const AuthSession(
-      accessToken: 'NEW_AT',
-      refreshToken: 'NEW_RT',
-      tokenType: 'Bearer',
-      expiresIn: 1800,
-      refreshExpiresIn: 86400,
-      user: User(userId: 1, userType: UserType.user, nickname: 'u'),
-    );
+ResponseBody _body(Map<String, dynamic> data, [int status = 200]) =>
+    ResponseBody.fromString(jsonEncode(data), status, headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType]
+    });
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  tearDown(() {
-    AuthInterceptor.debugRetryAdapter = null;
+  late TokenStorage storage;
+  late InMemoryTokenSecureStorage secure;
+  late Dio dio;
+  late ApiClient api;
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    secure = InMemoryTokenSecureStorage();
+    storage = TokenStorage(secure, await SharedPreferences.getInstance());
+    await storage.saveSession(token: 'ruoyi-token');
+    dio = ApiClient.buildDio(AuthInterceptor(storage));
+    api = ApiClient(dio);
   });
 
-  test('APP-04 Bearer 仅注入私有 App 请求', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final secure = InMemoryTokenSecureStorage();
-    final storage = TokenStorage(secure, prefs);
-    await storage.saveSession(accessToken: 'AT', refreshToken: 'RT');
-
-    final dio = Dio(BaseOptions(
-      baseUrl: 'http://t/api/v1',
-      validateStatus: (s) => s != null && s < 500 && s != 401,
-    ));
-    AuthRepository? repo;
-    final interceptor = AuthInterceptor(storage, () => repo!);
-    dio.interceptors.add(interceptor);
-    late RequestOptions seenPrivate;
-    late RequestOptions seenPublic;
-    final adapter = _ScriptAdapter((options) {
-      if (options.path.contains('me')) seenPrivate = options;
-      if (options.path.contains('password/login')) seenPublic = options;
-      return Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {'code': 200, 'message': 'ok', 'data': {}},
-      );
-    });
-    dio.httpClientAdapter = adapter;
-    AuthInterceptor.debugRetryAdapter = adapter;
-    repo = _CountingRepo(_session());
-
-    await dio.get('/auth/me');
-    await dio.post('/auth/password/login', data: {'phone': '1', 'password': 'x'});
-
-    expect(seenPrivate.headers['Authorization'], 'Bearer AT');
-    expect(seenPublic.headers.containsKey('Authorization'), isFalse);
-  });
-
-  test('APP-05/06 并发 401 只刷新一次并各重试一次', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final secure = InMemoryTokenSecureStorage();
-    final storage = TokenStorage(secure, prefs);
-    await storage.saveSession(accessToken: 'OLD', refreshToken: 'RT');
-
-    final dio = Dio(BaseOptions(
-      baseUrl: 'http://t/api/v1',
-      validateStatus: (s) => s != null && s < 500 && s != 401,
-    ));
-    late _CountingRepo repo;
-    final interceptor = AuthInterceptor(storage, () => repo);
-    dio.interceptors.add(interceptor);
-    final adapter = _ScriptAdapter((options) {
-      if (options.path == '/auth/token/refresh') {
-        return Response(
-          requestOptions: options,
-          statusCode: 200,
-          data: {
-            'code': 200,
-            'message': 'ok',
-            'data': {
-              'accessToken': 'NEW_AT',
-              'refreshToken': 'NEW_RT',
-              'tokenType': 'Bearer',
-              'expiresIn': 1800,
-              'refreshExpiresIn': 86400,
-              'user': {'userId': 1, 'userType': '01', 'nickname': 'u'},
-            },
-          },
-        );
+  test('RuoYi token is injected into private requests only', () async {
+    dio.httpClientAdapter = _Adapter((request) {
+      if (request.path == '/users/me/profile') {
+        expect(request.headers['Authorization'], 'Bearer ruoyi-token');
+      } else {
+        expect(request.headers.containsKey('Authorization'), isFalse);
       }
-      if (options.headers['Authorization'] == 'Bearer OLD') {
-        return Response(
-          requestOptions: options,
-          statusCode: 401,
-          data: {'code': 40101, 'message': 'access token expired', 'data': null},
-        );
-      }
-      return Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'code': 200,
-          'message': 'ok',
-          'data': {'userId': 1, 'userType': '01', 'nickname': 'u'},
-        },
-      );
+      return _body({'code': 200});
     });
-    dio.httpClientAdapter = adapter;
-    AuthInterceptor.debugRetryAdapter = adapter;
-    repo = _CountingRepo(_session());
-
-    await Future.wait([
-      dio.get('/auth/me'),
-      dio.get('/auth/me'),
-    ]);
-
-    expect(repo.refreshCalls, 1);
-    expect(interceptor.refreshCountForTest, 1);
-    expect(storage.token, 'NEW_AT');
+    await api.get<void>('/users/me/profile');
+    await api.post<void>('/auth/login');
+    await api.get<void>('/auth/captchaImage');
+    expect(await secure.read(AppConstants.kRefreshToken), isNull);
   });
 
-  test('APP-07 刷新失败/重放清凭据', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final secure = InMemoryTokenSecureStorage();
-    final storage = TokenStorage(secure, prefs);
-    await storage.saveSession(accessToken: 'OLD', refreshToken: 'RT');
-
-    final dio = Dio(BaseOptions(baseUrl: 'http://t/api/v1'));
-    final repo = _FailingRefreshRepo();
-    final interceptor = AuthInterceptor(storage, () => repo);
-    dio.interceptors.add(interceptor);
-    dio.httpClientAdapter = _ScriptAdapter((options) {
-      return Response(
-        requestOptions: options,
-        statusCode: 401,
-        data: {'code': 40103, 'message': 'refresh token replay', 'data': null},
-      );
+  test('password login uses LoginBody and top-level token', () async {
+    dio.httpClientAdapter = _Adapter((request) {
+      expect(request.path, '/auth/login');
+      expect(request.data, {
+        'username': '13900000007',
+        'password': 'Passw0rdX',
+        'code': '1234',
+        'uuid': 'captcha-id'
+      });
+      return _body({
+        'code': 200,
+        'msg': '操作成功',
+        'token': 'new-token',
+        'user': {'userId': 8, 'userType': '01', 'nickname': 'user'}
+      });
     });
+    final result = await AuthRepository(api).passwordLogin(
+        phone: '13900000007',
+        password: 'Passw0rdX',
+        deviceId: 'device',
+        code: '1234',
+        uuid: 'captcha-id');
+    expect(result.token, 'new-token');
+    expect(result.user.userId, 8);
+  });
 
+  test('captcha consumes native RuoYi response', () async {
+    dio.httpClientAdapter = _Adapter((request) {
+      expect(request.uri.path, '/api/v1/auth/captchaImage');
+      return _body({'code': 200, 'msg': '操作成功', 'captchaEnabled': false});
+    });
+    expect(await AuthRepository(api).captcha(),
+        containsPair('captchaEnabled', false));
+  });
+
+  test('expired Redis session clears login with no refresh or retry', () async {
+    int requests = 0;
+    dio.httpClientAdapter = _Adapter((request) {
+      requests++;
+      return _body({'code': 40100, 'message': 'unauthorized'}, 401);
+    });
+    await expectLater(api.get<void>('/auth/me'), throwsA(anything));
+    expect(requests, 1);
+    expect(storage.token, isNull);
+  });
+
+  test('permission and transient server errors preserve login', () async {
+    dio.httpClientAdapter =
+        _Adapter((_) => _body({'code': 40300, 'message': 'forbidden'}, 403));
     await expectLater(
-      dio.get('/auth/me'),
-      throwsA(isA<DioException>()),
-    );
-    expect(storage.token, isNull);
-    expect(storage.refreshToken, isNull);
+        api.get<void>('/content/works/drafts'), throwsA(anything));
+    expect(storage.token, 'ruoyi-token');
+    dio.httpClientAdapter =
+        _Adapter((_) => _body({'code': 500, 'msg': 'error'}, 500));
+    await expectLater(api.get<void>('/auth/me'), throwsA(anything));
+    expect(storage.token, 'ruoyi-token');
   });
 
-  test('APP-08 再次 401 不循环刷新', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final secure = InMemoryTokenSecureStorage();
-    final storage = TokenStorage(secure, prefs);
-    await storage.saveSession(accessToken: 'OLD', refreshToken: 'RT');
-
-    final dio = Dio(BaseOptions(baseUrl: 'http://t/api/v1'));
-    late _CountingRepo repo;
-    final interceptor = AuthInterceptor(storage, () => repo);
-    dio.interceptors.add(interceptor);
-    dio.httpClientAdapter = _ScriptAdapter((options) {
-      return Response(
-        requestOptions: options,
-        statusCode: 401,
-        data: {'code': 40101, 'message': 'expired', 'data': null},
-      );
+  test('stale 401 cannot expire a newer login', () async {
+    final pending = Completer<ResponseBody>(), started = Completer<void>();
+    int expired = 0;
+    final sub =
+        SessionEvents.instance.onSessionExpired.listen((_) => expired++);
+    dio.httpClientAdapter = _Adapter((_) {
+      started.complete();
+      return pending.future;
     });
-    repo = _CountingRepo(_session());
+    final failed = expectLater(api.get<void>('/auth/me'), throwsA(anything));
+    await started.future;
+    await storage.saveSession(token: 'new-session');
+    pending.complete(_body({'code': 40100}, 401));
+    await failed;
+    await Future<void>.delayed(Duration.zero);
+    expect(storage.token, 'new-session');
+    expect(expired, 0);
+    await sub.cancel();
+  });
 
-    await expectLater(dio.get('/auth/me'), throwsA(isA<DioException>()));
-    expect(repo.refreshCalls, 1);
-    expect(storage.token, isNull);
+  test('RuoYi msg reaches the form', () async {
+    dio.httpClientAdapter =
+        _Adapter((_) => _body({'code': 40000, 'msg': '验证码错误'}, 400));
+    await expectLater(api.post<void>('/auth/login'),
+        throwsA(predicate((error) => error.toString().contains('验证码错误'))));
+    expect(storage.token, 'ruoyi-token');
+  });
+
+  test('old 401 cannot interrupt a new token still being persisted', () async {
+    final gated = _GatedSecure();
+    final store = TokenStorage(gated, await SharedPreferences.getInstance());
+    await store.saveSession(token: 'old-token');
+    final client = ApiClient.buildDio(AuthInterceptor(store));
+    final pending = Completer<ResponseBody>(), started = Completer<void>();
+    client.httpClientAdapter = _Adapter((_) {
+      started.complete();
+      return pending.future;
+    });
+    int expired = 0;
+    final sub =
+        SessionEvents.instance.onSessionExpired.listen((_) => expired++);
+    final failed = expectLater(
+        ApiClient(client).get<void>('/auth/getInfo'), throwsA(anything));
+    await started.future;
+    gated.writeGate = Completer<void>();
+    final saving = store.saveSession(token: 'new-token');
+    pending.complete(_body({'code': 40100}, 401));
+    await failed;
+    gated.writeGate!.complete();
+    await saving;
+    await Future<void>.delayed(Duration.zero);
+    expect(store.token, 'new-token');
+    expect(await gated.read(AppConstants.kAccessToken), 'new-token');
+    expect(expired, 0);
+    await sub.cancel();
   });
 }

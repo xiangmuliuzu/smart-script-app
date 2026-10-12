@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/auth_validators.dart';
@@ -15,6 +18,10 @@ import '../widgets/auth_header.dart';
 import '../widgets/auth_page_scaffold.dart';
 import '../widgets/phone_input.dart';
 import '../widgets/underlined_input.dart';
+
+final loginCaptchaProvider = FutureProvider<Map<String, dynamic>>(
+  (ref) => ref.watch(authRepositoryProvider).captcha(),
+);
 
 /// 账号密码登录页（登录首页的次入口）。
 ///
@@ -29,6 +36,7 @@ class PasswordLoginPage extends ConsumerStatefulWidget {
 class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _captchaController = TextEditingController();
   final FocusNode _passwordFocusNode = FocusNode();
 
   bool _obscure = true;
@@ -40,11 +48,13 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
+    _captchaController.dispose();
     _passwordFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
+    if (_submitting) return;
     FocusScope.of(context).unfocus();
     final phoneError = AuthValidators.phone(_phoneController.text);
     final passwordError =
@@ -57,11 +67,24 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
       return;
     }
 
+    final captcha = ref.read(loginCaptchaProvider).valueOrNull;
+    if (captcha == null) {
+      showAppToast(context, '请先加载验证码配置');
+      return;
+    }
+    if (captcha['captchaEnabled'] == true &&
+        _captchaController.text.trim().isEmpty) {
+      showAppToast(context, '请输入图形验证码');
+      return;
+    }
+
     setState(() => _submitting = true);
     try {
       await ref.read(authControllerProvider.notifier).loginWithPassword(
             _phoneController.text.trim(),
             _passwordController.text,
+            code: _captchaController.text.trim(),
+            uuid: captcha['uuid'] as String?,
           );
       if (!mounted) {
         return;
@@ -71,6 +94,8 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
     } on ApiException catch (e) {
       if (mounted) {
         showAppToast(context, AuthFeedback.passwordLoginError(e));
+        _captchaController.clear();
+        ref.invalidate(loginCaptchaProvider);
       }
     } catch (_) {
       if (mounted) {
@@ -85,6 +110,7 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final captcha = ref.watch(loginCaptchaProvider);
     return AuthPageScaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -132,6 +158,35 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
               onPressed: () => context.push(RoutePath.forgotPassword),
               child: const Text('忘记密码？', style: TextStyle(fontSize: 13)),
             ),
+          ),
+          captcha.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => TextButton(
+              onPressed: () => ref.invalidate(loginCaptchaProvider),
+              child: const Text('验证码加载失败，点击重试'),
+            ),
+            data: (data) => data['captchaEnabled'] == true
+                ? UnderlinedInput(
+                    controller: _captchaController,
+                    label: '验证码',
+                    hintText: '请输入图形验证码',
+                    onSubmitted: (_) => _handleLogin(),
+                    trailing: InkWell(
+                      onTap: _submitting
+                          ? null
+                          : () {
+                              _captchaController.clear();
+                              ref.invalidate(loginCaptchaProvider);
+                            },
+                      child: Semantics(
+                        label: '点击更换图形验证码',
+                        button: true,
+                        child: Image.memory(base64Decode(data['img'] as String),
+                            width: 100, height: 40, fit: BoxFit.contain),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
           const SizedBox(height: 12),
           PrimaryButton(

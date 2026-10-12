@@ -75,8 +75,8 @@ Future<DramaRepository> _loggedInRepo() async {
     deviceId: 'live-drama',
   );
   await storage.saveSession(
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
+    token: session.token,
+
     user: session.user.toJson(),
   );
   return DramaRepository(graph.apiClient);

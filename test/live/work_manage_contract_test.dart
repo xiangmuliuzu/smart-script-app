@@ -82,8 +82,8 @@ Future<_Session> _loggedIn() async {
     deviceId: 'live-work-manage',
   );
   await storage.saveSession(
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
+    token: session.token,
+
     user: session.user.toJson(),
   );
   return _Session(CreateRepository(graph.apiClient), ContentRepository(graph.apiClient));
