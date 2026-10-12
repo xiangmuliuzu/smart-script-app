@@ -103,7 +103,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final secure = InMemoryTokenSecureStorage();
     final storage = TokenStorage(secure, prefs);
-    await storage.saveSession(accessToken: 'AT', refreshToken: 'RT');
+    await storage.saveSession(token: 'AT');
     expect(await storage.prefsContainCredentials(), isFalse);
     expect(prefs.getString('auth_token'), isNull);
     expect(prefs.getString(AppConstants.kAccessToken), isNull);

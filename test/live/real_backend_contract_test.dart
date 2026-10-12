@@ -86,11 +86,11 @@ Future<LiveAccount> _registerAccount(LiveStack stack) async {
     deviceId: 'live-integration',
   );
   await stack.storage.saveSession(
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
+    token: session.token,
+
     user: session.user.toJson(),
   );
-  return LiveAccount(session.user.userId, phone, session.accessToken);
+  return LiveAccount(session.user.userId, phone, session.token);
 }
 
 Future<LiveAccount> _loginAccount(LiveStack stack, String phone) async {
@@ -102,11 +102,11 @@ Future<LiveAccount> _loginAccount(LiveStack stack, String phone) async {
     deviceId: 'live-integration',
   );
   await stack.storage.saveSession(
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
+    token: session.token,
+
     user: session.user.toJson(),
   );
-  return LiveAccount(session.user.userId, phone, session.accessToken);
+  return LiveAccount(session.user.userId, phone, session.token);
 }
 
 Future<Dio> _adminDio() async {
@@ -235,7 +235,7 @@ void main() {
         .create(category: 'BUG', content: 'B 的反馈，仅用于跨用户拒绝验证。');
 
     // 切回 A 的 Token 访问 B 的资源
-    stackA.storage.saveSession(accessToken: accountA.token, refreshToken: 'x');
+    stackA.storage.saveSession(token: accountA.token);
     await expectLater(
       FeedbackRepository(stackA.apiClient).detail(bId),
       throwsA(isA<ApiException>().having((e) => e.code, 'code', 40400)),

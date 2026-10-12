@@ -61,8 +61,8 @@ Future<ContentRepository> _loggedInRepo() async {
     deviceId: 'live-search-history',
   );
   await storage.saveSession(
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
+    token: session.token,
+
     user: session.user.toJson(),
   );
   return ContentRepository(graph.apiClient);

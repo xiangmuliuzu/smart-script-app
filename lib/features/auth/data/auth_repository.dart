@@ -28,7 +28,8 @@ class AuthRepository {
   }
 
   /// Loads current agreement type/version pairs from the server (not hardcoded).
-  Future<List<Map<String, String>>> currentAgreementAcceptances({bool forceReload = false}) async {
+  Future<List<Map<String, String>>> currentAgreementAcceptances(
+      {bool forceReload = false}) async {
     if (!forceReload && _agreementAcceptances != null) {
       return _agreementAcceptances!;
     }
@@ -75,19 +76,28 @@ class AuthRepository {
     required String password,
     required String deviceId,
     String? deviceName,
+    String? code,
+    String? uuid,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.passwordLogin,
       data: {
-        'phone': phone,
+        'username': phone,
         'password': password,
-        'deviceId': deviceId,
-        if (deviceName != null) 'deviceName': deviceName,
+        if (code != null) 'code': code,
+        if (uuid != null) 'uuid': uuid,
       },
       parser: _mapParser,
     );
     return _requireSession(data);
   }
+
+  Future<Map<String, dynamic>> captcha() async =>
+      await _api.get<Map<String, dynamic>>(
+        ApiEndpoints.captchaImage,
+        parser: _mapParser,
+      ) ??
+      const <String, dynamic>{};
 
   Future<AuthSession> register({
     required String phone,
@@ -104,24 +114,8 @@ class AuthRepository {
         'password': password,
         'deviceId': deviceId,
         if (deviceName != null) 'deviceName': deviceName,
-        'agreementAcceptances': await currentAgreementAcceptances(forceReload: true),
-      },
-      parser: _mapParser,
-    );
-    return _requireSession(data);
-  }
-
-  Future<AuthSession> refresh({
-    required String refreshToken,
-    required String deviceId,
-    String? deviceName,
-  }) async {
-    final data = await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.tokenRefresh,
-      data: {
-        'refreshToken': refreshToken,
-        'deviceId': deviceId,
-        if (deviceName != null) 'deviceName': deviceName,
+        'agreementAcceptances':
+            await currentAgreementAcceptances(forceReload: true),
       },
       parser: _mapParser,
     );
@@ -134,12 +128,13 @@ class AuthRepository {
 
   Future<User> me() async {
     final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.me,
-      parser: _mapParser,
-    ) ??
+          ApiEndpoints.me,
+          parser: _mapParser,
+        ) ??
         const <String, dynamic>{};
     if (data.isEmpty) throw ApiException('获取用户信息失败');
-    return User.fromJson(data);
+    return User.fromJson(
+        Map<String, dynamic>.from(data['user'] as Map? ?? data));
   }
 
   Future<void> passwordSet(String password) async {
@@ -169,13 +164,16 @@ class AuthRepository {
 
   Future<List<Map<String, dynamic>>> agreements() async {
     final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.agreements,
-      parser: _mapParser,
-    ) ??
+          ApiEndpoints.agreements,
+          parser: _mapParser,
+        ) ??
         const <String, dynamic>{};
     final list = data['agreements'];
     if (list is List) {
-      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     }
     return const [];
   }
@@ -187,7 +185,7 @@ class AuthRepository {
 
   static AuthSession _requireSession(Map<String, dynamic>? data) {
     final session = data;
-    final access = session == null ? null : session['accessToken'] as String?;
+    final access = session == null ? null : session['token'] as String?;
     if (access == null || access.isEmpty || session == null) {
       throw ApiException('登录失败：响应缺少会话');
     }
