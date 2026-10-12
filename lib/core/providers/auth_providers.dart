@@ -60,6 +60,7 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> _restore() async {
     if (_restoring) return;
     _restoring = true;
+    final preserveSession = state.isAuthenticated;
     final generation = _generation;
     bool stale() => generation != _generation;
     try {
@@ -70,8 +71,8 @@ class AuthController extends StateNotifier<AuthState> {
         if (mounted) state = const AuthState(AuthStatus.unauthenticated);
         return;
       }
-      // Tokens exist, but identity is unverified until /auth/me succeeds.
-      if (mounted) state = const AuthState(AuthStatus.unknown);
+      // 启动恢复需验证身份；已验证会话的资料刷新不进入 splash 重定向。
+      if (mounted && !preserveSession) state = const AuthState(AuthStatus.unknown);
       try {
         final user = await _repository.me();
         // 失效/退出/新登录已发生：不写回登录态，也不写回用户缓存（B3-APP-01）
@@ -82,6 +83,8 @@ class AuthController extends StateNotifier<AuthState> {
       } catch (_) {
         // 失效/退出已给出终态，不得用「网络异常」覆盖
         if (stale()) return;
+        // 真正失效由网络层的 SessionEvents 处理，临时网络失败保留已验证会话。
+        if (preserveSession) return;
         // Offline / unauthorized: do not fabricate a verified session (APP-03).
         if (mounted) {
           state = const AuthState(

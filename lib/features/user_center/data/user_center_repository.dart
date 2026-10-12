@@ -29,7 +29,8 @@ class UserCenterRepository {
   /// 只提交需要修改的字段；三个字段都不传时后端返回 400，此处提前拦截。
   /// [bio] 传空串表示清空简介（后端契约允许），传 null 表示不修改；
   /// 超过 200 字符（后端上限）在本地直接拒绝，不发请求。
-  Future<UserProfile> updateProfile({String? nickname, String? avatar, String? bio}) async {
+  Future<UserProfile> updateProfile(
+      {String? nickname, String? avatar, String? bio}) async {
     if (nickname == null && avatar == null && bio == null) {
       throw ApiException('没有需要保存的修改');
     }
@@ -64,7 +65,8 @@ class UserCenterRepository {
       'file': MultipartFile.fromBytes(
         bytes,
         filename: filename,
-        contentType: contentType == null ? null : DioMediaType.parse(contentType),
+        contentType:
+            contentType == null ? null : DioMediaType.parse(contentType),
       ),
     });
     try {
@@ -100,6 +102,25 @@ class UserCenterRepository {
   // ------------------------------------------------------------------
   // 实名认证（§1.3）
   // ------------------------------------------------------------------
+
+  /// 上传审核专用材料；返回内部引用，不提供公开图片地址。
+  Future<String> uploadRealNameMaterial({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final data = await _api.upload<Map<String, dynamic>>(
+      ApiEndpoints.myRealNameMaterial,
+      formData: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      }),
+      parser: _mapParser,
+    );
+    final reference = data?['materialRef'];
+    if (reference is! String || reference.trim().isEmpty) {
+      throw ApiException('材料上传失败，请稍后重试');
+    }
+    return reference;
+  }
 
   Future<RealNameStatus> realNameStatus() async {
     final data = await _api.get<Map<String, dynamic>>(
