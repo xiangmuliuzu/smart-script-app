@@ -6,6 +6,7 @@ import '../../core/providers/auth_providers.dart';
 import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/avatar_url.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../models/user.dart';
 import '../bookstore/data/bookstore_models.dart';
@@ -344,7 +345,7 @@ class _Avatar extends StatelessWidget {
         height: 56,
         child: (avatar != null && avatar!.isNotEmpty)
             ? Image.network(
-                avatar!,
+                avatarUrl(avatar),
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _placeholder,
               )

@@ -27,9 +27,41 @@ class PagedListController<T> extends ChangeNotifier {
   bool _end = false;
   int _page = 0;
   int _generation = 0;
+  bool _refreshing = false;
 
   bool get hasMore => !_end;
   bool get isEmpty => items.isEmpty;
+
+  /// 接收新消息时更新首屏，不清空现有内容或打断正在翻页的列表。
+  /// 网络失败保留当前数据；手动刷新和销毁会使在途响应作废。
+  Future<void> refreshSilently() async {
+    if (loading || loadingMore || _refreshing || _page > 1) return;
+    final generation = _generation;
+    _refreshing = true;
+    try {
+      final data = await fetchPage(1, pageSize);
+      if (generation != _generation) return;
+      items
+        ..clear()
+        ..addAll(data.list);
+      total = data.total;
+      _page = 1;
+      _end = data.list.isEmpty || items.length >= total;
+      error = null;
+      notifyListeners();
+    } catch (_) {
+      // 自动接收失败不覆盖已有列表，用户仍可手动刷新或重试。
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    // 切换页面后丢弃在途响应，防止已释放的控制器继续通知监听者。
+    _generation++;
+    super.dispose();
+  }
 
   /// 首屏加载（或筛选变化后重新加载）。
   Future<void> load({bool refresh = false}) async {
@@ -67,7 +99,7 @@ class PagedListController<T> extends ChangeNotifier {
 
   /// 触底追加下一页。
   Future<void> loadMore() async {
-    if (loading || loadingMore || _end) return;
+    if (loading || loadingMore || _refreshing || _end) return;
     if (loadMoreError != null) return; // 失败驻留时不再自动重试，等 [retryLoadMore]
     final generation = _generation;
     loadingMore = true;

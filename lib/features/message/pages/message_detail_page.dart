@@ -13,9 +13,11 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 ///
 /// 进入即标记已读（幂等）；标记失败不回滚展示，用户仍可看到正文。
 class MessageDetailPage extends ConsumerStatefulWidget {
-  const MessageDetailPage({super.key, required this.messageId});
+  const MessageDetailPage(
+      {super.key, required this.messageId, this.source = 'NOTIFICATION'});
 
   final int messageId;
+  final String source;
 
   @override
   ConsumerState<MessageDetailPage> createState() => _MessageDetailPageState();
@@ -46,11 +48,12 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
     });
     try {
       final repo = ref.read(messageRepositoryProvider);
-      final message = await repo.detail(widget.messageId);
+      final message =
+          await repo.detail(widget.messageId, source: widget.source);
       // 详情即已读：失败不阻断阅读
       if (!message.read) {
         try {
-          await repo.markRead(widget.messageId);
+          await repo.markRead(widget.messageId, source: widget.source);
           ref.invalidate(unreadCountProvider);
         } catch (_) {
           // 已读失败仅影响角标，正文照常展示
@@ -79,9 +82,9 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
   @override
   Widget build(BuildContext context) {
     return UserCenterScaffold(
-        title: '消息详情',
-        actions: null,
-        body: _buildBody(),
+      title: '消息详情',
+      actions: null,
+      body: _buildBody(),
     );
   }
 
@@ -117,7 +120,8 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
             const SizedBox(height: 16),
             Text(
               message.content ?? message.summary,
-              style: const TextStyle(fontSize: 15, color: AppColors.text1, height: 1.6),
+              style: const TextStyle(
+                  fontSize: 15, color: AppColors.text1, height: 1.6),
             ),
           ],
         ),

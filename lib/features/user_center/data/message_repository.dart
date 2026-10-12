@@ -15,12 +15,14 @@ class MessageRepository {
     String? type,
     int pageNum = 1,
     int pageSize = 10,
+    bool includeAnnouncements = false,
   }) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.messages,
       query: {
         'pageNum': pageNum,
         'pageSize': pageSize,
+        if (includeAnnouncements) 'includeAnnouncements': true,
         if (type != null && type.isNotEmpty) 'type': type,
       },
       parser: _mapParser,
@@ -29,31 +31,48 @@ class MessageRepository {
     return PagedData.parse(data, MessageItem.fromJson);
   }
 
-  Future<UnreadCount> unreadCount() async {
+  Future<UnreadCount> unreadCount({bool includeAnnouncements = false}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.messagesUnreadCount,
+      query: {if (includeAnnouncements) 'includeAnnouncements': true},
       parser: _mapParser,
     );
     return UnreadCount.fromJson(data ?? const {});
   }
 
-  Future<MessageItem> detail(int messageId) async {
+  Future<MessageItem> detail(int messageId,
+      {String source = 'NOTIFICATION'}) async {
     final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.messageById(messageId),
+      source == 'ANNOUNCEMENT'
+          ? '/announcements/$messageId'
+          : ApiEndpoints.messageById(messageId),
       parser: _mapParser,
     );
     if (data == null || data.isEmpty) throw ApiException('消息不存在或已删除');
+    if (source == 'ANNOUNCEMENT') {
+      return MessageItem(
+          messageId: messageId,
+          source: source,
+          type: 'SYSTEM',
+          title: data['noticeTitle'] as String? ?? '',
+          content: data['noticeContent'] as String?,
+          read: data['isRead'] as bool? ?? false,
+          createdAt: data['createTime'] as String?);
+    }
     return MessageItem.fromJson(data);
   }
 
   /// 标记单条已读（幂等，重复调用不报错）。
-  Future<void> markRead(int messageId) async {
-    await _api.put(ApiEndpoints.messageRead(messageId));
+  Future<void> markRead(int messageId, {String source = 'NOTIFICATION'}) async {
+    await _api.put(source == 'ANNOUNCEMENT'
+        ? '/announcements/$messageId/read'
+        : ApiEndpoints.messageRead(messageId));
   }
 
   /// 全部已读（幂等）。
-  Future<void> markAllRead() async {
-    await _api.put(ApiEndpoints.messagesReadAll);
+  Future<void> markAllRead({bool includeAnnouncements = false}) async {
+    await _api.put(
+        '${ApiEndpoints.messagesReadAll}${includeAnnouncements ? '?includeAnnouncements=true' : ''}');
   }
 
   /// 通知偏好矩阵（渠道 × 类型，未配置的组合由服务端按默认开启展开）。
@@ -66,12 +85,14 @@ class MessageRepository {
     if (raw is! List) return const [];
     return raw
         .whereType<Map>()
-        .map((e) => NotificationPreference.fromJson(Map<String, dynamic>.from(e)))
+        .map((e) =>
+            NotificationPreference.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 
   /// 保存偏好：只提交发生变化的组合。
-  Future<void> updatePreferences(List<NotificationPreference> preferences) async {
+  Future<void> updatePreferences(
+      List<NotificationPreference> preferences) async {
     await _api.put(
       ApiEndpoints.myNotificationPreferences,
       data: {'preferences': preferences.map((e) => e.toJson()).toList()},
@@ -129,7 +150,8 @@ class FeedbackRepository {
       data: {
         'category': category,
         'content': content,
-        if (attachmentRef != null && attachmentRef.isNotEmpty) 'attachmentRef': attachmentRef,
+        if (attachmentRef != null && attachmentRef.isNotEmpty)
+          'attachmentRef': attachmentRef,
       },
       parser: _mapParser,
     );

@@ -49,6 +49,7 @@ class MainActivity : FlutterActivity() {
         val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "image/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/jpeg", "image/png", "image/gif", "image/bmp", "image/x-ms-bmp"))
         }
         try {
             startActivityForResult(Intent.createChooser(intent, "选择图片"), REQUEST_PICK)
@@ -65,51 +66,95 @@ class MainActivity : FlutterActivity() {
             return
         }
         val pending = pendingResult
-        pendingResult = null
         if (pending == null) {
             return
         }
         if (resultCode != Activity.RESULT_OK) {
+            pendingResult = null
             // 用户取消：回 null，Dart 侧按「未选择」处理，不当作错误
             pending.success(null)
             return
         }
         val uri: Uri? = data?.data
         if (uri == null) {
+            pendingResult = null
             pending.success(null)
             return
         }
-        try {
-            val copied = copyToCache(uri)
-            if (copied == null) {
-                pending.error("copy_failed", "selected image could not be read", null)
-            } else {
-                pending.success(copied)
+        // URI 可能来自慢速或云端文件提供方，复制与格式识别均在后台完成。
+        Thread {
+            try {
+                val copied = copyToCache(uri)
+                runOnUiThread {
+                    pendingResult = null
+                    pending.success(copied)
+                }
+            } catch (e: ImagePickException) {
+                runOnUiThread {
+                    pendingResult = null
+                    pending.error(e.code, e.message, null)
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    pendingResult = null
+                    pending.error("copy_failed", "无法读取所选图片，请重试", null)
+                }
             }
-        } catch (e: Exception) {
-            pending.error("copy_failed", "selected image could not be read", null)
+        }.start()
+    }
+
+    /** 限量复制，并根据实际文件头保留格式；任何失败都删除部分缓存。 */
+    private fun copyToCache(uri: Uri): String {
+        val dir = File(cacheDir, "avatar_pick")
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw ImagePickException("copy_failed", "无法读取所选图片，请重试")
+        }
+        val input: InputStream = contentResolver.openInputStream(uri)
+            ?: throw ImagePickException("copy_failed", "无法读取所选图片，请重试")
+        return input.buffered().use { source ->
+            source.mark(12)
+            val header = ByteArray(12)
+            var count = 0
+            while (count < header.size) {
+                val read = source.read(header, count, header.size - count)
+                if (read < 0) break
+                count += read
+            }
+            source.reset()
+            if (count == 0) throw ImagePickException("empty", "图片不能为空")
+            val format = when {
+                count >= 3 && header[0] == 0xff.toByte() && header[1] == 0xd8.toByte() && header[2] == 0xff.toByte() -> "jpg"
+                count >= 8 && header.take(8).toByteArray().contentEquals(byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) -> "png"
+                count >= 6 && String(header, 0, 6, Charsets.US_ASCII) in arrayOf("GIF87a", "GIF89a") -> "gif"
+                count >= 2 && header[0] == 0x42.toByte() && header[1] == 0x4d.toByte() -> "bmp"
+                else -> throw ImagePickException("format", "请选择 JPG、PNG、GIF 或 BMP 图片")
+            }
+            val target = File(dir, UUID.randomUUID().toString() + "." + format)
+            try {
+                FileOutputStream(target).use { output ->
+                    val buffer = ByteArray(8192)
+                    var total = 0L
+                    while (true) {
+                        val read = source.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        if (total > MAX_IMAGE_BYTES) throw ImagePickException("too_large", "图片不能超过 5 MB")
+                        output.write(buffer, 0, read)
+                    }
+                }
+                target.absolutePath
+            } catch (e: Exception) {
+                target.delete()
+                throw e
+            }
         }
     }
 
-    /** 复制到应用缓存目录并返回绝对路径；无法读取时返回 null。 */
-    private fun copyToCache(uri: Uri): String? {
-        val dir = File(cacheDir, "avatar_pick")
-        if (!dir.exists() && !dir.mkdirs()) {
-            return null
-        }
-        // 每次选择新建文件，避免旧文件残留造成脏读
-        val target = File(dir, UUID.randomUUID().toString() + ".img")
-        val input: InputStream = contentResolver.openInputStream(uri) ?: return null
-        input.use { source ->
-            FileOutputStream(target).use { output ->
-                source.copyTo(output)
-            }
-        }
-        return if (target.length() > 0L) target.absolutePath else null
-    }
+    private class ImagePickException(val code: String, message: String) : Exception(message)
 
     companion object {
         private const val CHANNEL = "smartscript/native_image"
         private const val REQUEST_PICK = 4101
+        private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024L
     }
 }

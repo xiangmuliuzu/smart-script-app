@@ -49,13 +49,15 @@ enum RealNameState {
   final String code;
   final String label;
 
-  static RealNameState fromCode(String? code) => RealNameState.values.firstWhere(
+  static RealNameState fromCode(String? code) =>
+      RealNameState.values.firstWhere(
         (e) => e.code == code,
         orElse: () => RealNameState.notSubmitted,
       );
 
   /// 是否允许提交/重新提交材料（与后端状态机一致）。
-  bool get canSubmit => this == RealNameState.notSubmitted || this == RealNameState.rejected;
+  bool get canSubmit =>
+      this == RealNameState.notSubmitted || this == RealNameState.rejected;
 }
 
 /// 实名状态详情（§1.3）。
@@ -116,7 +118,8 @@ enum NotificationChannel {
   final String code;
   final String label;
 
-  static NotificationChannel fromCode(String? code) => NotificationChannel.values.firstWhere(
+  static NotificationChannel fromCode(String? code) =>
+      NotificationChannel.values.firstWhere(
         (e) => e.code == code,
         orElse: () => NotificationChannel.inbox,
       );
@@ -128,6 +131,7 @@ class MessageItem {
     required this.messageId,
     required this.type,
     required this.title,
+    this.source = 'NOTIFICATION',
     this.summary = '',
     this.content,
     this.read = false,
@@ -135,6 +139,7 @@ class MessageItem {
   });
 
   final int messageId;
+  final String source;
   final String type;
   final String title;
   final String summary;
@@ -147,6 +152,7 @@ class MessageItem {
 
   factory MessageItem.fromJson(Map<String, dynamic> json) => MessageItem(
         messageId: (json['messageId'] as num?)?.toInt() ?? 0,
+        source: json['source'] as String? ?? 'NOTIFICATION',
         type: json['type'] as String? ?? 'SYSTEM',
         title: json['title'] as String? ?? '',
         summary: json['summary'] as String? ?? '',
@@ -173,7 +179,8 @@ class UnreadCount {
         if (value is num) byType['$key'] = value.toInt();
       });
     }
-    return UnreadCount(total: (json['total'] as num?)?.toInt() ?? 0, byType: byType);
+    return UnreadCount(
+        total: (json['total'] as num?)?.toInt() ?? 0, byType: byType);
   }
 }
 
@@ -192,7 +199,8 @@ class NotificationPreference {
   String get typeCode => type?.code ?? '';
   String get typeLabel => type?.label ?? typeCode;
 
-  factory NotificationPreference.fromJson(Map<String, dynamic> json) => NotificationPreference(
+  factory NotificationPreference.fromJson(Map<String, dynamic> json) =>
+      NotificationPreference(
         channel: NotificationChannel.fromCode(json['channel'] as String?),
         type: MessageType.fromCode(json['type'] as String?),
         enabled: json['enabled'] as bool? ?? true,
@@ -223,7 +231,8 @@ enum FeedbackStatus {
   final String code;
   final String label;
 
-  static FeedbackStatus fromCode(String? code) => FeedbackStatus.values.firstWhere(
+  static FeedbackStatus fromCode(String? code) =>
+      FeedbackStatus.values.firstWhere(
         (e) => e.code == code,
         orElse: () => FeedbackStatus.submitted,
       );
@@ -242,7 +251,8 @@ enum FeedbackCategory {
   final String code;
   final String label;
 
-  static FeedbackCategory fromCode(String? code) => FeedbackCategory.values.firstWhere(
+  static FeedbackCategory fromCode(String? code) =>
+      FeedbackCategory.values.firstWhere(
         (e) => e.code == code,
         orElse: () => FeedbackCategory.other,
       );
@@ -281,7 +291,9 @@ class FeedbackItem {
       content: json['content'] as String? ?? '',
       status: FeedbackStatus.fromCode(json['status'] as String?),
       reply: json['reply'] as String?,
-      attachments: rawAttachments is List ? rawAttachments.whereType<String>().toList() : const [],
+      attachments: rawAttachments is List
+          ? rawAttachments.whereType<String>().toList()
+          : const [],
       submittedAt: json['submittedAt'] as String?,
       handledAt: json['handledAt'] as String?,
     );

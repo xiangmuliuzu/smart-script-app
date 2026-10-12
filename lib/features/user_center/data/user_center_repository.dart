@@ -73,7 +73,8 @@ class UserCenterRepository {
         formData: formData,
         parser: _mapParser,
       );
-      final url = data?['url'] as String?;
+      // 保存站内路径，展示时由客户端按当前后端地址解析；旧后端兼容 url。
+      final url = (data?['path'] as String?) ?? (data?['url'] as String?);
       if (url == null || url.isEmpty) {
         throw ApiException('头像上传失败，请稍后重试');
       }
