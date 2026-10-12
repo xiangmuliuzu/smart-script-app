@@ -17,6 +17,7 @@ import 'package:script_app/core/constants/app_constants.dart';
 import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/core/providers/app_providers.dart';
+import 'package:script_app/core/providers/auth_providers.dart';
 import 'package:script_app/core/storage/secure_token_storage.dart';
 import 'package:script_app/core/storage/token_storage.dart';
 import 'package:script_app/features/auth/data/auth_repository.dart';
@@ -280,10 +281,11 @@ void main() {
 
   // ================================================================
   group('H-05-H 资料保存后的全局同步（widget）', () {
-    testWidgets('保存成功：提交变更字段、刷新全局 currentUser 并重新拉取资料', (tester) async {
+    testWidgets('用户名称可替换默认手机号名称，保存后刷新全局用户与资料', (tester) async {
       final api = ScriptedApi();
+      var nickname = '138****8000';
       api.handle('/users/me/profile', (req) {
-        final nickname = req.method == 'PUT' ? '新昵称' : '旧昵称';
+        if (req.method == 'PUT') nickname = (req.data as Map)['nickname'] as String;
         return Envelope.ok({
           'userId': 601,
           'userType': '01',
@@ -295,7 +297,10 @@ void main() {
       final repo = await _pumpProfileEdit(tester, api);
 
       expect(find.byType(ProfileEditPage), findsOneWidget);
-      expect(find.text('旧昵称'), findsOneWidget, reason: '进入页面应展示服务端返回的当前资料');
+      expect(find.text('用户名称'), findsOneWidget);
+      final nameField = tester.widget<TextField>(find.byType(TextField).first);
+      expect(nameField.controller!.text, '138****8000', reason: '默认手机号名称应可编辑');
+      expect(nameField.maxLength, 15);
       final getsBefore = api.countOf('/users/me/profile');
       expect(getsBefore, 1, reason: '进入页面拉取一次资料');
 
@@ -318,6 +323,51 @@ void main() {
       // 保存成功会返回上一页
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('home'), findsOneWidget);
+      final container = ProviderScope.containerOf(tester.element(find.text('home')));
+      expect(container.read(authControllerProvider).user?.nickname, '新昵称');
+      GoRouter.of(tester.element(find.text('home'))).push('/profile/edit');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+          '新昵称', reason: '重新进入资料页应展示保存后的用户名称');
+      expect(find.text('138****8000'), findsOneWidget, reason: '名称修改不影响手机号');
+    });
+
+    testWidgets('用户名称为空时提示并保留编辑页，不提交保存', (tester) async {
+      final api = ScriptedApi();
+      api.reply('/users/me/profile', Envelope.ok({
+        'userId': 601, 'userType': '01', 'nickname': '138****8000',
+        'phoneMasked': '138****8000', 'realNameStatus': 'NOT_SUBMITTED',
+      }));
+      final repo = await _pumpProfileEdit(tester, api);
+      repo.meCalls = 0;
+      await tester.enterText(find.byType(TextField).first, '   ');
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+      expect(find.text('用户名称不能为空'), findsWidgets);
+      expect(find.byType(ProfileEditPage), findsOneWidget);
+      expect(api.requests.where((request) => request.method == 'PUT'), isEmpty);
+      expect(repo.meCalls, 0);
+      await tester.enterText(find.byType(TextField).first, '名' * 16);
+      final field = tester.widget<TextField>(find.byType(TextField).first);
+      expect(field.controller!.text, '名' * 15, reason: '用户名称最多允许输入 15 个字');
+    });
+
+    testWidgets('重复用户名称提示服务端错误，保留输入且不刷新用户状态', (tester) async {
+      final api = ScriptedApi();
+      api.handle('/users/me/profile', (request) => request.method == 'PUT'
+          ? const Envelope(409, {'code': 40907, 'message': '用户名称已被使用，请更换名称', 'data': null})
+          : Envelope.ok({'userId': 601, 'userType': '01', 'nickname': '138****8000'}));
+      final repo = await _pumpProfileEdit(tester, api);
+      repo.meCalls = 0;
+      await tester.enterText(find.byType(TextField).first, '重复名称');
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('用户名称已被使用，请更换名称'), findsWidgets);
+      expect(find.byType(ProfileEditPage), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text, '重复名称');
+      expect(repo.meCalls, 0);
     });
 
     testWidgets('无变更时不发请求，也不触发全局刷新', (tester) async {

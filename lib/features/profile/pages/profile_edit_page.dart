@@ -40,8 +40,8 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   /// 进入页面时的简介原文；简介可清空，因此用「是否改过」而不是「是否为空」判断。
   String _initialBio = '';
 
-  /// 与后端昵称/简介上限一致的本地预校验上限（sys_user.nick_name=30、bio=200）。
-  static const int _nicknameMax = 30;
+  /// 与后端用户名称/简介上限一致的本地预校验上限。
+  static const int _nicknameMax = 15;
   static const int _bioMax = 200;
 
   @override
@@ -55,11 +55,11 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     if (_saving || _uploading) return;
     final nickname = _nicknameCtrl.text.trim();
     if (nickname.isEmpty) {
-      _toast('昵称不能为空');
+      _toast('用户名称不能为空');
       return;
     }
-    if (nickname.length > _nicknameMax) {
-      _toast('昵称不能超过 $_nicknameMax 个字符');
+    if (nickname.runes.length > _nicknameMax) {
+      _toast('用户名称不能超过 $_nicknameMax 个字符');
       return;
     }
     final bio = _bioCtrl.text.trim();
@@ -232,14 +232,16 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
           child: Column(
             children: [
               _Field(
-                label: '昵称',
+                label: '用户名称',
                 child: TextField(
                   controller: _nicknameCtrl,
+                  enabled: !_saving,
+                  textInputAction: TextInputAction.next,
                   maxLength: _nicknameMax,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     counterText: '',
-                    hintText: '请输入昵称',
+                    hintText: '请输入用户名称',
                   ),
                 ),
               ),
@@ -277,7 +279,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            '简介可留空或清空，最长 $_bioMax 个字符；手机号与实名状态需在账号安全、实名认证中单独办理，不能在此修改。',
+            '用户名称用于页面展示，不能重复，长度为 1–$_nicknameMax 个字符。简介可留空或清空，最长 $_bioMax 个字符；手机号与实名状态需在账号安全、实名认证中单独办理，不能在此修改。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),
