@@ -420,7 +420,6 @@ class _QuickGrid extends StatelessWidget {
           badge: unread,
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.messages)),
-      _QuickEntry(ref, Icons.history, '浏览历史'),
       _QuickEntry(ref, Icons.edit_outlined, '编辑资料',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.profileEdit)),
