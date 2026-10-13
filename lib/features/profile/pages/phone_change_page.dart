@@ -53,7 +53,8 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _startCooldown({required bool oldPhone}) {
@@ -97,7 +98,8 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
     }
     setState(() => _busy = true);
     try {
-      final stepUp = await ref.read(userCenterRepositoryProvider).verifyOldPhone(code);
+      final stepUp =
+          await ref.read(userCenterRepositoryProvider).verifyOldPhone(code);
       if (!mounted) return;
       setState(() {
         _stepUpToken = stepUp.stepUpToken;
@@ -182,104 +184,112 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
     final phoneMasked = ref.watch(authControllerProvider).user?.phoneMasked;
 
     return UserCenterScaffold(
-        title: '更换手机号',
-        actions: null,
-        body: ListView(
+      title: '更换手机号',
+      actions: null,
+      body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
-          UserStepCard(
-            index: 1,
-            title: '验证当前手机号',
-            subtitle: phoneMasked ?? '当前手机号未获取',
-            active: _step == 1,
-            done: _step > 1,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _oldCodeCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '验证码'),
+          if (_step == 1)
+            UserStepCard(
+              index: 1,
+              title: '验证当前手机号',
+              subtitle: phoneMasked ?? '当前手机号未获取',
+              active: _step == 1,
+              done: _step > 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _oldCodeCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: '验证码'),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: (_oldCooldown > 0 || _busy) ? null : _sendOldCode,
-                      child: Text(_oldCooldown > 0 ? '${_oldCooldown}s' : '获取验证码'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _busy ? null : _verifyOldCode,
-                  child: const Text('下一步'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          UserStepCard(
-            index: 2,
-            title: '填写新手机号',
-            subtitle: '新手机号需未被平台其它账号使用',
-            active: _step == 2,
-            done: _step > 2,
-            child: Column(
-              children: [
-                TextField(
-                  controller: _newPhoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: '新手机号'),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _busy ? null : _sendNewCode,
-                  child: const Text('发送验证码'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          UserStepCard(
-            index: 3,
-            title: '确认换绑',
-            subtitle: '确认后需使用新手机号重新登录',
-            active: _step == 3,
-            done: false,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _newCodeCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '新号验证码'),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed:
+                            (_oldCooldown > 0 || _busy) ? null : _sendOldCode,
+                        child: Text(
+                            _oldCooldown > 0 ? '${_oldCooldown}s' : '获取验证码'),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: (_newCooldown > 0 || _busy) ? null : _sendNewCode,
-                      child: Text(_newCooldown > 0 ? '${_newCooldown}s' : '重新发送'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _busy ? null : _confirm,
-                  child: _busy
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('确认换绑'),
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _busy ? null : _verifyOldCode,
+                    child: const Text('下一步'),
+                  ),
+                ],
+              ),
             ),
-          ),
+          if (_step == 2)
+            UserStepCard(
+              index: 2,
+              title: '填写新手机号',
+              subtitle: '新手机号需未被平台其它账号使用',
+              active: _step == 2,
+              done: _step > 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _newPhoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: '新手机号'),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _busy ? null : _sendNewCode,
+                    child: const Text('下一步'),
+                  ),
+                ],
+              ),
+            ),
+          if (_step == 3)
+            UserStepCard(
+              index: 3,
+              title: '确认换绑',
+              subtitle: '确认后需使用新手机号重新登录',
+              active: _step == 3,
+              done: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _newCodeCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: '新号验证码'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed:
+                            (_newCooldown > 0 || _busy) ? null : _sendNewCode,
+                        child: Text(
+                            _newCooldown > 0 ? '${_newCooldown}s' : '重新发送'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _busy ? null : _confirm,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('确认换绑'),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
