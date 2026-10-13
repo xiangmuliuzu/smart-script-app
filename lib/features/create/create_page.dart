@@ -12,8 +12,8 @@ import 'data/author_work_providers.dart';
 
 /// 创作入口（底部导航「创作」tab）。
 ///
-/// 采用写作 App 书架范式：状态筛选 Tab + **三列网格**作品卡（序号 + 标题 + 分类 + 封面），
-/// 三列排布使同屏作品数大幅提升，避免作品多时频繁上下滑动。
+/// 采用写作 App 书架范式：状态筛选 Tab + **两列网格**作品卡（封面 + 标题 + 状态 + 分类），
+/// 两列给封面留足展示面积，作品多时上下滑动浏览。
 /// 右上角「新建」进入创建表单；点卡片进入作品工作台（章节 / 设置 / 发布）。
 ///
 /// 数据走 A 套 /users/me/works（写作链路），状态由服务端按最新审核记录派生。
@@ -35,8 +35,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     (value: 'published', label: '已发布'),
   ];
 
-  /// 网格列数（复刻图二：固定三列）。
-  static const int _columns = 3;
+  /// 网格列数（两列，封面可展示得更大）。
+  static const int _columns = 2;
 
   String _status = 'all';
 
@@ -81,51 +81,32 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     if (works.isEmpty) {
       return _EmptyWorks(onCreate: () => context.push(RoutePath.workUpload));
     }
-    final cells = _columnMajor(works);
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(myWorksProvider(_status)),
       child: GridView.builder(
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _columns,
-          crossAxisSpacing: 8,
+          crossAxisSpacing: 10,
           mainAxisSpacing: 10,
-          childAspectRatio: 0.8,
+          // 竖向卡片：封面占大头，下方留出标题行 + 「分类 · 状态」行。
+          childAspectRatio: 0.72,
         ),
-        itemCount: cells.length,
+        itemCount: works.length,
         itemBuilder: (context, index) {
-          final cell = cells[index];
+          final work = works[index];
           return _WorkCard(
-            no: cell.no,
-            work: cell.work,
+            work: work,
             onTap: () => context.push(
               RoutePath.workWorkspaceUrl(
-                workId: cell.work.workId,
-                title: cell.work.title,
+                workId: work.workId,
+                title: work.title,
               ),
             ),
           );
         },
       ),
     );
-  }
-
-  /// 按「列优先」重排：先自上而下填满第一列，再填第二列……
-  ///
-  /// GridView 默认「行优先」放置，这里预先按列优先顺序重排，再交给行优先网格渲染，
-  /// 即可得到图二那种 01/02/03 竖排一列的视觉效果，同时保留 GridView 的懒加载。
-  List<({int no, AuthorWorkItem work})> _columnMajor(List<AuthorWorkItem> works) {
-    final rows = (works.length / _columns).ceil();
-    final cells = <({int no, AuthorWorkItem work})>[];
-    for (var row = 0; row < rows; row++) {
-      for (var col = 0; col < _columns; col++) {
-        final origin = col * rows + row;
-        if (origin < works.length) {
-          cells.add((no: origin + 1, work: works[origin]));
-        }
-      }
-    }
-    return cells;
   }
 }
 
@@ -180,16 +161,16 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-/// 网格作品卡（复刻图二）：左列「序号 + 标题 + 分类」，右侧封面缩略图。
+/// 封面下方文字区预留高度（标题行 + 「分类 · 状态」行 + 内边距）。
+const double _kCardTextHeight = 64;
+
+/// 网格作品卡：封面上、标题与状态角标同行，其下为「分类 · 状态」。
 class _WorkCard extends StatelessWidget {
   const _WorkCard({
-    required this.no,
     required this.work,
     required this.onTap,
   });
 
-  /// 作品序号（1 起，按列表原始顺序，与状态筛选无关）。
-  final int no;
   final AuthorWorkItem work;
   final VoidCallback onTap;
 
@@ -201,62 +182,70 @@ class _WorkCard extends StatelessWidget {
         : '未分类';
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.rSmall),
-      child: Container(
-        padding: const EdgeInsets.all(8),
+      borderRadius: BorderRadius.circular(AppRadius.r),
+      child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.card,
-          borderRadius: BorderRadius.circular(AppRadius.rSmall),
+          borderRadius: BorderRadius.circular(AppRadius.r),
+          boxShadow: const [
+            BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+          ],
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.r),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 卡片高度固定，封面吃掉文字区之外的全部高度，不写死尺寸也不溢出。
+              final coverHeight = (constraints.maxHeight - _kCardTextHeight)
+                  .clamp(48.0, constraints.maxHeight);
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        no.toString().padLeft(2, '0'),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.text1,
+                  // 封面铺满卡片宽度，圆角交给外层 ClipRRect，避免出现双层圆角。
+                  WorkCover(
+                    url: work.cover ?? '',
+                    width: constraints.maxWidth,
+                    height: coverHeight,
+                    radius: 0,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.text1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _StatusBadge(status: work.status),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 2,
+                        const SizedBox(height: 5),
+                        Text(
+                          '$genre · ${workStatusLabel(work.status)}',
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            height: 1.25,
-                            color: AppColors.text1,
-                          ),
+                          style: const TextStyle(fontSize: 12, color: AppColors.text3),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    genre,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppColors.text3),
-                  ),
-                  const SizedBox(height: 5),
-                  _StatusBadge(status: work.status),
                 ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            WorkCover(url: work.cover ?? '', width: 30, height: 42),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -281,14 +270,14 @@ class _StatusBadge extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
           color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
           workStatusLabel(status),
-          style: TextStyle(fontSize: 10, color: color),
+          style: TextStyle(fontSize: 11, color: color),
         ),
       ),
     );
