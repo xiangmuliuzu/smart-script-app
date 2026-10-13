@@ -420,12 +420,14 @@ class _QuickGrid extends StatelessWidget {
           badge: unread,
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.messages)),
+      _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理',
+          onTap: (ctx, ref) =>
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.inquiryList)),
       _QuickEntry(ref, Icons.edit_outlined, '编辑资料',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.profileEdit)),
       if (user.isCreator || user.authorCapability) ...[
         _QuickEntry(ref, Icons.description_outlined, '我的剧本'),
-        _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理'),
         _QuickEntry(ref, Icons.account_balance_wallet_outlined, '交易管理'),
         _QuickEntry(ref, Icons.approval, '我的印章'),
         _QuickEntry(ref, Icons.bar_chart, '创作者后台'),

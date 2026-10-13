@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../data/bookstore_models.dart';
 import '../data/content_providers.dart';
@@ -37,7 +38,7 @@ class WorkDetailPage extends ConsumerWidget {
         data: (work) => RefreshIndicator(
           onRefresh: () async => ref.invalidate(workDetailProvider(workId)),
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 80),  // 留出底部栏空间
             children: [
               _Header(work: work),
               _ChapterEntry(work: work),
@@ -53,6 +54,7 @@ class WorkDetailPage extends ConsumerWidget {
           ),
         ),
       ),
+      bottomNavigationBar: _TradeBottomBar(workId: workId),
     );
   }
 }
@@ -310,6 +312,128 @@ class _ChapterEntry extends StatelessWidget {
                 ),
               ),
               const Icon(Icons.chevron_right, size: 20, color: AppColors.text3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// C 交易域底部固定栏（发起询盘 / 我的询盘）。
+///
+/// 固定在页面底部，始终可见。未开启交易的作品点击时给提示。
+class _TradeBottomBar extends ConsumerWidget {
+  const _TradeBottomBar({required this.workId});
+
+  final int workId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final work = ref.watch(workDetailProvider(workId)).valueOrNull;
+    final tradeEnabled = work?.tradeEnabled ?? false;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 12,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
+      ),
+      child: Row(
+        children: [
+          // 发起询盘按钮
+          Expanded(
+            child: _TradeButton(
+              icon: Icons.send_outlined,
+              label: '发起询盘',
+              enabled: tradeEnabled,
+              onTap: () => _onInquiryTap(context, ref, work),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 我的询盘按钮
+          Expanded(
+            child: _TradeButton(
+              icon: Icons.list_alt_outlined,
+              label: '我的询盘',
+              enabled: true,
+              onTap: () => _onListTap(context, ref),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onInquiryTap(BuildContext context, WidgetRef ref, BookItem? work) {
+    if (work == null || !work.tradeEnabled) {
+      showAppToast(context, '该作品尚未开启交易，暂不能发起询盘');
+      return;
+    }
+    if (!AuthGuard.isLoggedIn(ref)) {
+      AuthGuard.pushProtected(
+        context,
+        ref,
+        target: '${RoutePath.inquiryCreate}?workId=${work.workId}&title=${Uri.encodeComponent(work.title)}',
+      );
+      return;
+    }
+    context.push(
+      '${RoutePath.inquiryCreate}?workId=${work.workId}&title=${Uri.encodeComponent(work.title)}',
+    );
+  }
+
+  void _onListTap(BuildContext context, WidgetRef ref) {
+    if (!AuthGuard.isLoggedIn(ref)) {
+      AuthGuard.pushProtected(context, ref, target: RoutePath.inquiryList);
+      return;
+    }
+    context.push(RoutePath.inquiryList);
+  }
+}
+
+/// 交易域操作按钮。
+class _TradeButton extends StatelessWidget {
+  const _TradeButton({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = enabled ? AppColors.primary : Colors.grey.shade300;
+    final textColor = enabled ? Colors.white : Colors.grey.shade600;
+    final suffix = enabled ? '' : '（未开启）';
+
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: textColor),
+              const SizedBox(width: 6),
+              Text(
+                '$label$suffix',
+                style: TextStyle(fontSize: 14, color: textColor),
+              ),
             ],
           ),
         ),

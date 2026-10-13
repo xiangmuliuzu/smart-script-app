@@ -16,6 +16,12 @@ void resolvePostLoginTarget(BuildContext context, WidgetRef ref) {
     context.go(RoutePath.home);
     return;
   }
+  // 目标是底部导航分支根：只能 go 切分支。若走下面的 push，页面会被压进
+  // 书城分支的导航栈 —— 底部导航高亮留在书城，内容却是目标页。
+  if (RoutePath.isShellRoot(target)) {
+    context.go(target);
+    return;
+  }
   // 回跳用 push：目标页需要真实历史栈，按返回键能回到上一页而不是退出应用
   context.go(RoutePath.home);
   context.push(target);
