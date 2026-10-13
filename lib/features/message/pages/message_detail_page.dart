@@ -94,8 +94,7 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
     final message = _message;
     if (message == null) return const EmptyView(message: '消息不存在');
     return SingleChildScrollView(
-      child: Container(
-        color: AppColors.card,
+      child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
