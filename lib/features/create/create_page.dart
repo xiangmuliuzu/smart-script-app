@@ -12,8 +12,8 @@ import 'data/author_work_providers.dart';
 
 /// 创作入口（底部导航「创作」tab）。
 ///
-/// 采用写作 App 书架范式：状态筛选 Tab + **两列网格**作品卡（封面 + 标题 + 状态 + 分类），
-/// 两列给封面留足展示面积，作品多时上下滑动浏览。
+/// 采用写作 App 书架范式：状态筛选 Tab + **三列网格**作品卡（封面 + 标题 + 分类 + 状态），
+/// 三列使同屏作品数更多，封面保持近方形比例，作品多时上下滑动浏览。
 /// 右上角「新建」进入创建表单；点卡片进入作品工作台（章节 / 设置 / 发布）。
 ///
 /// 数据走 A 套 /users/me/works（写作链路），状态由服务端按最新审核记录派生。
@@ -35,8 +35,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     (value: 'published', label: '已发布'),
   ];
 
-  /// 网格列数（两列，封面可展示得更大）。
-  static const int _columns = 2;
+  /// 网格列数（三列，同屏作品数更多）。
+  static const int _columns = 3;
 
   String _status = 'all';
 
@@ -87,10 +87,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _columns,
-          crossAxisSpacing: 10,
+          crossAxisSpacing: 8,
           mainAxisSpacing: 10,
-          // 竖向卡片：封面占大头，下方留出标题行 + 「分类 · 状态」行。
-          childAspectRatio: 0.72,
+          // 竖向卡片：封面占大头，下方留出标题行 + 「分类 + 状态」行。
+          childAspectRatio: 0.65,
         ),
         itemCount: works.length,
         itemBuilder: (context, index) {
@@ -161,10 +161,10 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-/// 封面下方文字区预留高度（标题行 + 「分类 · 状态」行 + 内边距）。
-const double _kCardTextHeight = 64;
+/// 封面下方文字区预留高度（标题行 + 「分类 + 状态」行 + 内边距）。
+const double _kCardTextHeight = 56;
 
-/// 网格作品卡：封面上、标题与状态角标同行，其下为「分类 · 状态」。
+/// 网格作品卡：封面上，标题与「分类 + 状态角标」在下。
 class _WorkCard extends StatelessWidget {
   const _WorkCard({
     required this.work,
@@ -209,35 +209,35 @@ class _WorkCard extends StatelessWidget {
                     radius: 0,
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // 三列卡片宽度有限，状态角标与分类同行，避免标题被挤到只剩两三个字。
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Text(
-                                title,
+                                genre,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.text1,
-                                ),
+                                style: const TextStyle(fontSize: 11, color: AppColors.text3),
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 4),
                             _StatusBadge(status: work.status),
                           ],
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          '$genre · ${workStatusLabel(work.status)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, color: AppColors.text3),
                         ),
                       ],
                     ),
@@ -270,14 +270,14 @@ class _StatusBadge extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
         decoration: BoxDecoration(
           color: color.withOpacity(0.12),
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
           workStatusLabel(status),
-          style: TextStyle(fontSize: 11, color: color),
+          style: TextStyle(fontSize: 10, color: color),
         ),
       ),
     );

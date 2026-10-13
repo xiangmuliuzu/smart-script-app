@@ -66,6 +66,7 @@ class BookItem {
     this.isFree = false,
     this.previewEnabled = false,
     this.previewEpisodes = 0,
+    this.freeChapterCount = 0,
     this.qualityLevel = '',
     this.viewCount = 0,
     this.favoriteCount = 0,
@@ -102,6 +103,11 @@ class BookItem {
   final bool isFree;
   final bool previewEnabled;
   final int previewEpisodes;
+
+  /// 可试读（作者逐章标记的免费）章节数，后端派生字段。
+  /// 平台试读范围（[previewEnabled]/[previewEpisodes]）当前无写入方，
+  /// 故作品级「试读」展示需与本值合并判定。
+  final int freeChapterCount;
   final String qualityLevel;
   final int viewCount;
   final int favoriteCount;
@@ -151,6 +157,7 @@ class BookItem {
         isFree: _flag(json['isFree']),
         previewEnabled: _flag(json['previewEnabled']),
         previewEpisodes: _int(json['previewEpisodes']),
+        freeChapterCount: _int(json['freeChapterCount']),
         qualityLevel: _text(json['qualityLevel']),
         viewCount: _int(json['viewCount']),
         favoriteCount: _int(json['favoriteCount']),
@@ -361,8 +368,8 @@ class ChapterSummary {
   final int wordCount;
   final bool isFree;
 
-  /// 当前身份是否可读本章：由服务端判定（试读范围内 或 已获版权授权），
-  /// 客户端不自行推算。
+  /// 当前身份是否可读本章：由服务端判定
+  /// （试读范围内 或 作者标记的免费章节 或 已获版权授权），客户端不自行推算。
   final bool readable;
 
   factory ChapterSummary.fromJson(Map<String, dynamic> json) => ChapterSummary(

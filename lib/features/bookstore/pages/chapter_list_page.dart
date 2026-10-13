@@ -84,15 +84,25 @@ class _PreviewBanner extends StatelessWidget {
     // 已获授权时全文可读，试读范围不再是限制条件，故优先展示授权态
     final bool unlocked = payload.unlocked;
     final bool opened = payload.previewEnabled && payload.previewEpisodes > 0;
-    final bool highlighted = unlocked || opened;
+    // 试读状态以「实际可读章节」为准：平台试读范围（当前无写入方）未开启时，
+    // 作品级是否算「已开启试读」由作者逐章标记的免费章节决定，
+    // 否则会出现目录里章节标着可读、横幅却说未开启试读的矛盾。
+    final int readableCount =
+        payload.chapters.where((chapter) => chapter.readable).length;
+    final bool hasReadableChapter = !unlocked && !opened && readableCount > 0;
+    final bool highlighted = unlocked || opened || hasReadableChapter;
     final IconData icon = unlocked
         ? Icons.verified_outlined
-        : (opened ? Icons.lock_open_outlined : Icons.lock_outline);
+        : (opened || hasReadableChapter
+            ? Icons.lock_open_outlined
+            : Icons.lock_outline);
     final String message = unlocked
         ? '已获授权：可阅读全部章节'
         : (opened
             ? '已开启试读：前 ${payload.previewEpisodes} 集可免费阅读'
-            : '本作品未开启试读，仅可查看章节目录');
+            : (hasReadableChapter
+                ? '已开启试读：$readableCount 章可免费阅读'
+                : '本作品未开启试读，仅可查看章节目录'));
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

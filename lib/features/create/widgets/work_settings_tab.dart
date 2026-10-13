@@ -13,7 +13,8 @@ import '../data/create_providers.dart';
 
 /// 工作台 Tab2：作品设置。
 ///
-/// 标题 / 分类 / 简介 / 封面走 A 套 `PUT /users/me/works/{workId}`（updateWorkBase）；
+/// 标题 / 分类 / 简介 / 封面 / 标签走 A 套 `PUT /users/me/works/{workId}`（updateWorkBase），
+/// 其中标签为全量覆盖（接口文档 2.3.3，最多 8 个）；
 /// 定价走 B 套 `PUT /content/works/{workId}`（updateWork，2.9.3 仅放行 price）。
 /// 封面从本地选图，先经 2.9.1 上传拿到 url，保存在「保存」时随基本信息提交。
 /// 编辑闸门：仅审核中锁定，其余状态（含已发布）均可保存；已发布改动后需重新提交审核。
@@ -26,12 +27,18 @@ class WorkSettingsTab extends ConsumerStatefulWidget {
   ConsumerState<WorkSettingsTab> createState() => _WorkSettingsTabState();
 }
 
+/// 作品标签数量上限（接口文档 2.3.3：tagIds 最多 8 个，后端同样按 400 拒绝超限）。
+const int _kMaxWorkTags = 8;
+
 class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _summaryCtrl;
   late final TextEditingController _priceCtrl;
   int? _genreId;
   bool _saving = false;
+
+  /// 已选标签ID（全量覆盖提交，仅变化时下发）。
+  late final Set<int> _tagIds;
 
   /// 封面上传中标志。
   bool _uploading = false;
@@ -56,6 +63,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     );
     _genreId = work.genreId;
     _pendingCover = work.cover;
+    _tagIds = widget.detail.tags.map((tag) => tag.tagId).toSet();
   }
 
   @override
@@ -92,16 +100,20 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     final oldPrice = widget.detail.work.price ?? 0.0;
     final priceChanged = (newPrice ?? 0.0) != oldPrice;
     final coverChanged = _pendingCover != widget.detail.work.cover;
+    final oldTagIds = widget.detail.tags.map((tag) => tag.tagId).toSet();
+    final tagsChanged = _tagIds.length != oldTagIds.length ||
+        !_tagIds.every(oldTagIds.contains);
 
     setState(() => _saving = true);
     try {
-      // A 套更新基本信息（含封面，仅变化时下发）
+      // A 套更新基本信息（含封面与标签，仅变化时下发）
       await ref.read(authorWorkRepositoryProvider).updateWorkBase(
             workId,
             title: title,
             summary: _summaryCtrl.text.trim(),
             genreId: _genreId,
             cover: coverChanged ? _pendingCover : null,
+            tagIds: tagsChanged ? _tagIds.toList() : null,
           );
       // B 套更新定价（仅当变化时）
       if (priceChanged) {
@@ -121,6 +133,35 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// 打开标签多选弹窗。
+  ///
+  /// 弹窗内改动的是临时集合，点「确定」才回写；点「取消」/ 下滑关闭视为放弃修改。
+  Future<void> _openTagPicker(List<TagItem> tags) async {
+    if (tags.isEmpty) {
+      _toast('暂无可用标签');
+      return;
+    }
+    final picked = await showModalBottomSheet<Set<int>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.r)),
+      ),
+      builder: (_) => _TagPickerSheet(
+        tags: tags,
+        initial: _tagIds,
+        maxCount: _kMaxWorkTags,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _tagIds
+        ..clear()
+        ..addAll(picked);
+    });
   }
 
   /// 从本地选择封面并上传，成功后暂存 url（点「保存」才落库）。
@@ -162,6 +203,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     final work = widget.detail.work;
     final editable = work.editable;
     final categoriesAsync = ref.watch(categoriesProvider);
+    // 标签库全量启用标签（与分类页同一数据源 GET /content/tags）
+    final tagsAsync = ref.watch(tagsProvider(null));
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
@@ -199,6 +242,21 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                     value: _genreId,
                     enabled: editable,
                     onChanged: (value) => setState(() => _genreId = value),
+                  ),
+                ),
+              ),
+              _Field(
+                label: '标签',
+                child: tagsAsync.when(
+                  loading: () => const Text('加载中…',
+                      style: TextStyle(color: AppColors.text3)),
+                  error: (_, __) => const Text('标签加载失败',
+                      style: TextStyle(color: AppColors.text3)),
+                  data: (tags) => _TagSelector(
+                    tags: tags,
+                    selected: _tagIds,
+                    enabled: editable,
+                    onTap: () => _openTagPicker(tags),
                   ),
                 ),
               ),
@@ -311,6 +369,220 @@ class _CategoryDropdown extends StatelessWidget {
           ),
       ],
       onChanged: enabled ? onChanged : null,
+    );
+  }
+}
+
+/// 标签选择触发行：显示已选标签名称，点击弹出多选弹窗。
+class _TagSelector extends StatelessWidget {
+  const _TagSelector({
+    required this.tags,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final List<TagItem> tags;
+  final Set<int> selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final names = [
+      for (final tag in tags)
+        if (selected.contains(tag.tagId)) tag.tagName,
+    ];
+    final hasSelection = names.isNotEmpty;
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              hasSelection
+                  ? names.join('、')
+                  : (enabled ? '请选择标签（最多 $_kMaxWorkTags 个）' : '审核中不可修改'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                color: hasSelection ? AppColors.text1 : AppColors.text3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.keyboard_arrow_down,
+              size: 20, color: AppColors.text3),
+        ],
+      ),
+    );
+  }
+}
+
+/// 标签多选弹窗：全量标签胶囊可多选，最多 [maxCount] 个。
+///
+/// 内部维护临时集合，点「确定」通过 `Navigator.pop` 返回最终结果。
+class _TagPickerSheet extends StatefulWidget {
+  const _TagPickerSheet({
+    required this.tags,
+    required this.initial,
+    required this.maxCount,
+  });
+
+  final List<TagItem> tags;
+  final Set<int> initial;
+  final int maxCount;
+
+  @override
+  State<_TagPickerSheet> createState() => _TagPickerSheetState();
+}
+
+class _TagPickerSheetState extends State<_TagPickerSheet> {
+  late final Set<int> _selected;
+
+  /// 选满后再次点选时置位，标题栏据此显示上限提醒。
+  bool _overflow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = {...widget.initial};
+  }
+
+  void _toggle(int tagId) {
+    setState(() {
+      if (_selected.contains(tagId)) {
+        _selected.remove(tagId);
+        _overflow = false;
+      } else if (_selected.length >= widget.maxCount) {
+        _overflow = true;
+      } else {
+        _selected.add(tagId);
+        _overflow = false;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              children: [
+                const Text('选择标签',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text1)),
+                const Spacer(),
+                Text(
+                  _overflow
+                      ? '最多选 ${widget.maxCount} 个'
+                      : '已选 ${_selected.length}/${widget.maxCount}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _overflow ? AppColors.warning : AppColors.text3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final tag in widget.tags)
+                    _TagChip(
+                      label: tag.tagName,
+                      selected: _selected.contains(tag.tagId),
+                      onTap: () => _toggle(tag.tagId),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () => setState(() {
+                            _selected.clear();
+                            _overflow = false;
+                          }),
+                  child: const Text('清空'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    child: const Text('确定'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 可选中标签胶囊（样式对齐分类页胶囊，增加选中态）。
+class _TagChip extends StatelessWidget {
+  const _TagChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppColors.primary.withOpacity(0.12)
+          : AppColors.fill,
+      borderRadius: BorderRadius.circular(AppRadius.rSmall),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        onTap: onTap,
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.rSmall),
+            border: Border.all(
+              color: selected ? AppColors.primary : Colors.transparent,
+              width: 0.5,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 12,
+              color: selected ? AppColors.primary : AppColors.text2,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

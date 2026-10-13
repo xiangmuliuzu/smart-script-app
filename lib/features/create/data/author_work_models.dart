@@ -2,7 +2,7 @@
 ///
 /// 字段与后端一一对应，不自行拼装：
 ///   - [AuthorWorkItem]    ← GET /users/me/works 列表元素
-///   - [AuthorWorkDetail]  ← GET /users/me/works/{workId}（work + chapters + latestReview）
+///   - [AuthorWorkDetail]  ← GET /users/me/works/{workId}（work + tags + chapters + latestReview）
 ///   - [AuthorChapterItem] ← 章节元素（含正文 content）
 ///   - [ReviewRecordItem]  ← GET /users/me/works/{workId}/review-records 元素
 ///
@@ -11,6 +11,8 @@
 ///   rejected（已驳回）/ published（approved，已发布）。
 /// 编辑闸门：仅 reviewing（审核中）锁定，其余状态均可编辑；已发布作品改动后需重新提交审核。
 library;
+
+import '../../bookstore/data/bookstore_models.dart';
 
 bool _flag(dynamic value) => value == '1' || value == 1 || value == true;
 
@@ -211,11 +213,17 @@ class ReviewRecordItem {
 class AuthorWorkDetail {
   const AuthorWorkDetail({
     required this.work,
+    this.tags = const [],
     this.chapters = const [],
     this.latestReview,
   });
 
   final AuthorWorkItem work;
+
+  /// 作品标签（A 套详情 tags 字段，复用书城 TagItem）；
+  /// 设置页据此回填已选标签。
+  final List<TagItem> tags;
+
   final List<AuthorChapterItem> chapters;
 
   /// 最近一条审核记录；从未提交过审核时为 null。
@@ -227,12 +235,19 @@ class AuthorWorkDetail {
 
   factory AuthorWorkDetail.fromJson(Map<String, dynamic> json) {
     final rawWork = json['work'];
+    final rawTags = json['tags'];
     final rawChapters = json['chapters'];
     final rawLatest = json['latestReview'];
     return AuthorWorkDetail(
       work: rawWork is Map
           ? AuthorWorkItem.fromJson(Map<String, dynamic>.from(rawWork))
           : const AuthorWorkItem(workId: 0),
+      tags: rawTags is List
+          ? rawTags
+              .whereType<Map>()
+              .map((e) => TagItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
       chapters: rawChapters is List
           ? rawChapters
               .whereType<Map>()

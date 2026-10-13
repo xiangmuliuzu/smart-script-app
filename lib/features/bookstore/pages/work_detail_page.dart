@@ -278,9 +278,12 @@ class _ChapterEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 试读状态合并判定：平台试读范围（当前无写入方，恒为未开）+ 作者逐章标记的免费章节
     final String subtitle = work.previewEnabled && work.previewEpisodes > 0
         ? '可试读前 ${work.previewEpisodes} 集'
-        : '暂未开启试读';
+        : (work.freeChapterCount > 0
+            ? '${work.freeChapterCount} 章可免费阅读'
+            : '暂未开启试读');
     return Container(
       color: AppColors.card,
       margin: const EdgeInsets.only(top: 8),
@@ -334,7 +337,7 @@ class _TradeBottomBar extends ConsumerWidget {
     final tradeEnabled = work?.tradeEnabled ?? false;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.card,
         border: Border(top: BorderSide(color: AppColors.divider)),
       ),
@@ -590,7 +593,11 @@ class _InfoBlock extends StatelessWidget {
           _row('是否开启交易', work.tradeEnabled ? '是' : '否'),
           _row(
             '试读',
-            work.previewEnabled ? '已开启，共 ${work.previewEpisodes} 集' : '未开启',
+            work.previewEnabled
+                ? '已开启，共 ${work.previewEpisodes} 集'
+                : (work.freeChapterCount > 0
+                    ? '已开启，共 ${work.freeChapterCount} 章可免费阅读'
+                    : '未开启'),
           ),
           _row('上架时间', work.createTime ?? '—'),
         ],
