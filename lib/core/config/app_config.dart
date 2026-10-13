@@ -95,5 +95,5 @@ class AppConfig {
   static const String defaultCountryCode = '+86';
 
   /// 协议版本兜底值：服务端 `/auth/agreements` 未返回时展示，不作为提交依据。
-  static const String agreementVersion = '1.0';
+  static const String agreementVersion = '1.0.0';
 }
