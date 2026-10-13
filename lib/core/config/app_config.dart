@@ -44,17 +44,25 @@ class AppConfig {
     '10.0.2.2',
   };
 
+  /// 后端公开静态资源前缀（与后端 ResourcesConfig 的 `/profile/**` 映射一致）。
+  static const String _mediaPathPrefix = '/profile/';
+
   /// 把后端下发的资源地址解析为当前设备可访问的地址。
   ///
-  /// 覆盖两种形态：
-  ///   - 相对路径（`/profile/upload/...`）：直接补上 [baseUrl] 的 origin；
-  ///   - 指向本机后端的绝对地址（`http://localhost:8080/...`）：把 origin 换成 [baseUrl]。
+  /// 覆盖三种形态：
+  ///   - 相对路径（`/profile/upload/...`）：补上 [baseUrl] 的 origin；
+  ///   - 内嵌 `/profile/` 的绝对地址（本机 `http://localhost:8080/profile/...`、
+  ///     服务器 `http://<IP 或域名>/profile/...`）：截取 `/profile/` 之后的部分再拼 origin；
+  ///   - 其余（CDN / 公网 https）原样返回。
   ///
-  /// 其余（CDN / 公网 https）原样返回。这样「后端地址怎么配，图片就怎么取」，
-  /// PC/App 共用同一份数据、互不影响。
+  /// 为什么不能只按 host 白名单判断：在服务器上上传的图片会把服务器地址存进共享库，
+  /// 该 host 不在本机白名单内，原样请求会打到前端站点、拿回 index.html 导致破图。
+  /// 按 `/profile/` 锚点归一后，「后端地址怎么配，图片就怎么取」，各端共用同一份数据。
   static String resolveAssetUrl(String raw) {
     if (raw.isEmpty) return raw;
     final origin = Uri.parse(baseUrl).origin;
+    final mediaIndex = raw.indexOf(_mediaPathPrefix);
+    if (mediaIndex >= 0) return '$origin${raw.substring(mediaIndex)}';
     if (raw.startsWith('/')) return '$origin$raw';
     final uri = Uri.tryParse(raw);
     if (uri == null || !uri.hasScheme || !_localAssetHosts.contains(uri.host)) {
