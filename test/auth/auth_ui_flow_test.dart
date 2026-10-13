@@ -16,6 +16,8 @@ import 'package:script_app/core/theme/app_colors.dart';
 import 'package:script_app/features/auth/pages/login_page.dart';
 import 'package:script_app/features/auth/pages/password_login_page.dart';
 import 'package:script_app/features/auth/widgets/agreement_checkbox.dart';
+import 'package:script_app/features/home/home_shell.dart';
+import 'package:script_app/features/profile/profile_page.dart';
 
 /// A3 认证页 UI 契约：协议门禁、请求时机与登录回跳。
 ///
@@ -303,5 +305,37 @@ void main() {
       '${RoutePath.feedbackDetail}?id=42',
       reason: '密码登录失败不得消费回跳意图',
     );
+  });
+
+  // 回归（2026-10-13 用户报障「登录后书城显示的也是我的页」）：
+  // 回跳目标是底部导航分支根（游客在书城点「我的」被拦到登录页）时，
+  // 必须 go 切换分支；用 push 会把「我的」页压进书城分支的导航栈，
+  // 于是底部导航高亮仍在书城、内容却是我的页。
+  testWidgets('回跳目标是底部导航分支根时切到该 tab，而不是压进书城分支', (tester) async {
+    final harness = await _pumpApp(tester);
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // 游客在书城点「我的」：守卫保存意图并拦到登录页
+    await tester.tap(find.descendant(
+        of: find.byType(HomeShell), matching: find.text('我的')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(harness.container.read(routeIntentStoreProvider).pending?.target,
+        RoutePath.profile);
+
+    await tester.enterText(find.byType(TextField).at(0), '13800001111');
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await _tapAgreement(tester);
+    await tester.tap(
+        find.descendant(of: find.byType(LoginPage), matching: find.text('登录')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(ProfilePage), findsOneWidget);
+    expect(tester.widget<HomeShell>(find.byType(HomeShell)).shell.currentIndex, 4,
+        reason: '回跳到「我的」后底部导航必须切到第 5 格（分支 4），'
+            'currentIndex 仍停在 0 就是书城 tab 里显示我的页');
   });
 }

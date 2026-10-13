@@ -25,6 +25,20 @@ class RoutePath {
   static const String category = '/category';
   static const String profile = '/profile';
 
+  /// 底部导航五个分支的根路径（顺序与 app_router.dart 的 StatefulShellBranch 一致）。
+  /// 登录回跳到这些目标时必须用 go 切分支；用 push 会把页面压进当前分支的导航栈，
+  /// 出现「书城 tab 高亮、内容却是目标页」的错位（见 test/auth/auth_ui_flow_test.dart）。
+  static const List<String> shellRoots = <String>[
+    bookstore,
+    comic,
+    create,
+    category,
+    profile,
+  ];
+
+  static bool isShellRoot(String location) =>
+      shellRoots.contains(Uri.parse(location).path);
+
   // A5 用户中心（Shell 之外的独立页面，受登录守卫保护）
   static const String profileEdit = '/profile/edit';
   static const String realName = '/profile/real-name';
