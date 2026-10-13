@@ -57,6 +57,8 @@ class ProfilePage extends ConsumerWidget {
                 }),
                 _Header(
                   user: user,
+                  onEdit: () =>
+                      AuthGuard.pushProtected(context, ref, target: RoutePath.profileEdit),
                   onAuth: () =>
                       AuthGuard.pushProtected(context, ref, target: RoutePath.realName),
                 ),
@@ -161,35 +163,38 @@ class _ProfileDrawer extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Row(
-                children: [
-                  _Avatar(nickname: nickname, avatar: user.avatar),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          nickname,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.text1,
+            InkWell(
+              onTap: () => _push(context, RoutePath.profileEdit),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Row(
+                  children: [
+                    _Avatar(nickname: nickname, avatar: user.avatar),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            nickname,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.text1,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user.userType.label,
-                          style: const TextStyle(fontSize: 12, color: AppColors.text3),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            user.userType.label,
+                            style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const Divider(height: 1, color: AppColors.divider),
@@ -258,9 +263,10 @@ class _DrawerItem extends StatelessWidget {
 
 /// 头部卡：头像 + 昵称/实名标签/简介 + 「去认证」按钮（原型 `.prof-head`）。
 class _Header extends StatelessWidget {
-  const _Header({required this.user, required this.onAuth});
+  const _Header({required this.user, required this.onEdit, required this.onAuth});
 
   final User user;
+  final VoidCallback onEdit;
   final VoidCallback onAuth;
 
   @override
@@ -273,7 +279,11 @@ class _Header extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _Avatar(nickname: nickname, avatar: user.avatar),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onEdit,
+            child: _Avatar(nickname: nickname, avatar: user.avatar),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -282,14 +292,18 @@ class _Header extends StatelessWidget {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(
-                        nickname,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.text1,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onEdit,
+                        child: Text(
+                          nickname,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text1,
+                          ),
                         ),
                       ),
                     ),
