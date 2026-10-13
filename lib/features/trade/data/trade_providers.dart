@@ -44,6 +44,20 @@ class InquiryListParams {
       pageSize: pageSize ?? this.pageSize,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is InquiryListParams &&
+        other.role == role &&
+        other.status == status &&
+        other.keyword == keyword &&
+        other.pageNum == pageNum &&
+        other.pageSize == pageSize;
+  }
+
+  @override
+  int get hashCode => Object.hash(role, status, keyword, pageNum, pageSize);
 }
 
 /// 询盘分页列表

@@ -11,7 +11,10 @@ class PagedData<T> {
     Map<String, dynamic> json,
     T Function(Map<String, dynamic> item) itemParser,
   ) {
-    final raw = json['list'];
+    // 兼容两种格式：
+    // 1. App 端格式：{total: xxx, list: [...]}
+    // 2. 若依框架格式：{total: xxx, rows: [...]}
+    final raw = json['list'] ?? json['rows'];
     return PagedData<T>(
       total: (json['total'] as num?)?.toInt() ?? 0,
       list: raw is List

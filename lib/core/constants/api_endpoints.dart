@@ -230,17 +230,17 @@ class ApiEndpoints {
   static String categoryById(int id) => '/categories/$id';
   static const String tags = '/tags';
 
-  // ===== C 交易域（复用 admin 端点，后续 APP 专用接口上线后替换路径） =====
+  // ===== C 交易域（APP 专用接口） =====
   // 交易作品
   static const String adminTradeWorks = '/admin/trade/works';
   static String adminTradeWorkById(int workId) => '/admin/trade/works/$workId';
   // 询盘
-  static const String adminTradeInquiryList = '/admin/trade/inquiry/list';
-  static String adminTradeInquiryDetail(int id) => '/admin/trade/inquiry/detail/$id';
-  static const String adminTradeInquiry = '/admin/trade/inquiry';
-  static String adminTradeInquiryAccept(int id) => '/admin/trade/inquiry/$id/accept';
-  static String adminTradeInquiryReject(int id) => '/admin/trade/inquiry/$id/reject';
-  static String adminTradeInquiryClose(int id) => '/admin/trade/inquiry/$id/close';
+  static const String adminTradeInquiryList = '/trade/inquiry/list';
+  static String adminTradeInquiryDetail(int id) => '/trade/inquiry/$id';
+  static const String adminTradeInquiry = '/trade/inquiry';
+  static String adminTradeInquiryAccept(int id) => '/trade/inquiry/$id/accept';
+  static String adminTradeInquiryReject(int id) => '/trade/inquiry/$id/reject';
+  static String adminTradeInquiryClose(int id) => '/trade/inquiry/$id/close';
   // 报价/议价
   static const String adminTradeQuoteList = '/admin/trade/quote/list';
   static const String adminTradeQuote = '/admin/trade/quote';

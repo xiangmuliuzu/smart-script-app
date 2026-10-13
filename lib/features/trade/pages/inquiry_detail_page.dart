@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/providers/auth_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -46,9 +47,19 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
   }
 
   Widget _buildContent(Inquiry inquiry) {
-    // 判断当前用户角色（简化：根据 buyerId 判断）
-    // 实际应从 auth provider 获取当前用户 ID
-    final isBuyer = true; // 默认当前用户是买方，实际需从 auth 获取
+    // 从 auth provider 获取当前用户ID
+    final authState = ref.watch(authControllerProvider);
+    final currentUserId = authState.user?.userId;
+
+    // 根据当前用户ID与询盘中的 buyerId/sellerId 比对判断角色
+    // 一个用户可以同时是买方和卖方，具体在某笔询盘中扮演哪个角色取决于ID比对
+    final isBuyerInThisInquiry = inquiry.buyerId == currentUserId;
+    final isSellerInThisInquiry = inquiry.sellerId == currentUserId;
+
+    // 异常情况：当前用户既不是买方也不是卖方（不应发生，后端会拦截）
+    if (!isBuyerInThisInquiry && !isSellerInThisInquiry) {
+      return const ErrorView(message: '无权查看此询盘');
+    }
 
     return Column(
       children: [
@@ -77,7 +88,7 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
                 // 双方信息
                 _buildSectionTitle('双方信息'),
                 const SizedBox(height: 8),
-                _buildPartyInfo(inquiry, isBuyer),
+                _buildPartyInfo(inquiry),
                 const SizedBox(height: 16),
 
                 // 留言
@@ -92,7 +103,7 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
         ),
 
         // 底部操作栏
-        _buildActionBar(inquiry, isBuyer),
+        _buildActionBar(inquiry, isBuyerInThisInquiry, isSellerInThisInquiry),
       ],
     );
   }
@@ -261,7 +272,7 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     );
   }
 
-  Widget _buildPartyInfo(Inquiry inquiry, bool isBuyer) {
+  Widget _buildPartyInfo(Inquiry inquiry) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -319,7 +330,11 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     );
   }
 
-  Widget _buildActionBar(Inquiry inquiry, bool isBuyer) {
+  Widget _buildActionBar(
+    Inquiry inquiry,
+    bool isBuyerInThisInquiry,
+    bool isSellerInThisInquiry,
+  ) {
     // 只有 pending 状态可以操作
     if (inquiry.status != InquiryStatus.pending) {
       return const SizedBox.shrink();
@@ -334,7 +349,7 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
       child: SafeArea(
         child: Row(
           children: [
-            if (isBuyer) ...[
+            if (isBuyerInThisInquiry) ...[
               // 买方可以关闭
               Expanded(
                 child: OutlinedButton(
@@ -347,8 +362,10 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
                   child: const Text('关闭询盘'),
                 ),
               ),
-            ] else ...[
+            ],
+            if (isSellerInThisInquiry) ...[
               // 卖方可以接受/拒绝
+              if (isBuyerInThisInquiry) const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
                   onPressed: _operating ? null : () => _rejectInquiry(),

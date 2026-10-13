@@ -26,7 +26,7 @@ class AppConfig {
   /// 是否输出网络日志（禁止打印 Token/密码/验证码）。
   static const bool enableNetworkLog = bool.fromEnvironment(
     'ENABLE_NETWORK_LOG',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// 是否 production 构建（禁止演示会话）。
