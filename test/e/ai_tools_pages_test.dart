@@ -24,12 +24,14 @@ class _FakeAiRepository implements AiRepository {
     this.outlineText = '第一幕：跌入谷底\n第二幕：逆袭崛起\n第三幕：登顶巅峰',
     this.polishContent = '【润色】夜色如墨，他立于落地窗前，久久无言。',
     this.shouldFail = false,
+    this.quotaInsufficient = false,
   });
 
   final String writeContent;
   final String outlineText;
   final String polishContent;
   final bool shouldFail;
+  final bool quotaInsufficient;
 
   final List<String> calls = [];
 
@@ -39,6 +41,7 @@ class _FakeAiRepository implements AiRepository {
     String? type,
   }) async {
     calls.add('write:$prompt');
+    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     return AiWriteResult(content: writeContent, recordId: 11);
   }
@@ -49,6 +52,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
   }) async {
     calls.add('polish:$content|$style');
+    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     return AiWriteResult(content: polishContent, recordId: 22);
   }
@@ -60,6 +64,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
+    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     return AiOutlineResult(
       outline: outlineText,
@@ -201,12 +206,12 @@ void main() {
   });
 
   // ================================================================
-  group('E 阶段2-D 服务失败', () {
-    testWidgets('AI 服务不可用时提示且不崩溃', (tester) async {
+  group('E 阶段2-E AI 次数不足引导', () {
+    testWidgets('可用次数为0：生成后弹出引导弹窗（积分兑换/看广告）', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
-      final fake = _FakeAiRepository(shouldFail: true);
+      final fake = _FakeAiRepository(quotaInsufficient: true);
       await tester.pumpWidget(wrap(const AiWritePage(), fake));
       await tester.pumpAndSettle();
 
@@ -214,8 +219,11 @@ void main() {
       await tester.tap(find.text('生成内容'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('AI 服务不可用'), findsOneWidget);
-      expect(find.text('生成内容'), findsOneWidget); // 按钮仍在，可重试
+
+      expect(find.text('AI 次数不足'), findsOneWidget);
+      expect(find.textContaining('当前可用: 0 次'), findsOneWidget);
+      expect(find.text('积分兑换'), findsOneWidget);
+      expect(find.text('看广告获取'), findsOneWidget);
     });
   });
 }

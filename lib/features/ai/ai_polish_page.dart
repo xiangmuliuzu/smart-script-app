@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import 'ai_quota_dialog.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
@@ -55,7 +56,11 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      showAppToast(context, e.message);
+      if (isQuotaInsufficientError(e)) {
+        showAiQuotaInsufficientDialog(context, message: e.message);
+      } else {
+        showAppToast(context, e.message);
+      }
     } catch (e) {
       if (!mounted) return;
       showAppToast(context, '操作失败，请稍后重试');
