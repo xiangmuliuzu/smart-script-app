@@ -568,6 +568,30 @@ class FavoriteState {
       FavoriteState(favorited: _flag(json['favorited']));
 }
 
+/// 作品读者评分（读者评分通道，data 含 `rating` / `ratingCount` / `myScore`）。
+class WorkRating {
+  const WorkRating({
+    required this.rating,
+    required this.ratingCount,
+    this.myScore,
+  });
+
+  /// 作品平均分（保留一位小数；无人评分时为 0）。
+  final double rating;
+
+  /// 评分数（一人一评，等于评分人数）。
+  final int ratingCount;
+
+  /// 我的评分（1~5）；null = 当前身份未评分（游客恒为 null）。
+  final int? myScore;
+
+  factory WorkRating.fromJson(Map<String, dynamic> json) => WorkRating(
+        rating: _decimal(json['rating']),
+        ratingCount: _int(json['ratingCount']),
+        myScore: json['myScore'] == null ? null : _int(json['myScore']),
+      );
+}
+
 /// 书架状态（接口 2.7.12 的书架态查询，data 只有 `onShelf`）。
 class ShelfState {
   const ShelfState({required this.onShelf});

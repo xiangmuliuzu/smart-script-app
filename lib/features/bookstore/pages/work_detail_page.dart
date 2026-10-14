@@ -41,6 +41,7 @@ class WorkDetailPage extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: 80),  // 留出底部栏空间
             children: [
               _Header(work: work),
+              _RatingEntry(workId: work.workId),
               _ChapterEntry(work: work),
               _ContactEntry(workId: work.workId),
               if (work.summary.isNotEmpty)
@@ -55,6 +56,135 @@ class WorkDetailPage extends ConsumerWidget {
         ),
       ),
       bottomNavigationBar: _TradeBottomBar(workId: workId),
+    );
+  }
+}
+
+/// 读者评分入口（读者评分通道）。
+///
+/// 详情页是公开页：游客看到平均分与评分数但不可点，点击星星先经
+/// [AuthGuard.pushProtected] 引导登录并回跳，不为必然 401 的请求往返；
+/// 登录态下回显「我的评分」，再次点击即覆盖更新（一人一评、评分数不增长）。
+class _RatingEntry extends ConsumerStatefulWidget {
+  const _RatingEntry({required this.workId});
+
+  final int workId;
+
+  @override
+  ConsumerState<_RatingEntry> createState() => _RatingEntryState();
+}
+
+class _RatingEntryState extends ConsumerState<_RatingEntry> {
+  /// 星级上限（每星 2 分、满分 10 分，与后端 2~10 口径一致）。
+  static const int _maxScore = 5;
+
+  bool _busy = false;
+
+  Future<void> _rate(BuildContext context, int score) async {
+    if (!AuthGuard.isLoggedIn(ref)) {
+      // 登录成功后回到本作品详情（RouteIntent 会还原整串）。
+      AuthGuard.pushProtected(
+        context,
+        ref,
+        target: RoutePath.workDetailUrl(widget.workId),
+      );
+      return;
+    }
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(contentRepositoryProvider).submitRating(widget.workId, score);
+      // 评分态与作品平均分一并失效：详情页顶部「评分」与书城列表随之刷新
+      ref.invalidate(workRatingProvider(widget.workId));
+      ref.invalidate(workDetailProvider(widget.workId));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('评分成功：$score 分')),
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loggedIn = AuthGuard.isLoggedIn(ref);
+    final rating =
+        loggedIn ? ref.watch(workRatingProvider(widget.workId)).valueOrNull : null;
+    final int myScore = rating?.myScore ?? 0;
+    final int count = rating?.ratingCount ?? 0;
+    final double average = rating?.rating ?? 0;
+    final String aggregate =
+        count > 0 ? '平均 ${average.toStringAsFixed(1)} 分 · $count 人评分' : '暂无评分';
+    final String mine = !loggedIn
+        ? '登录后可评分'
+        : (rating?.myScore == null ? '点击星星评分' : '我的评分 $myScore 分');
+    return Container(
+      color: AppColors.card,
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题行：标题居左、平均分与评分数居右，避免两者挤在同一侧
+            Row(
+              children: [
+                const Icon(Icons.star_outline_rounded, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                const Text(
+                  '读者评分',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text1,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    aggregate,
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 评分行：五星用 GestureDetector 紧凑排布（IconButton 的 Material 最小触控尺寸
+            // 会把星星互相拉开、且撑出多余空白），右侧为我的评分/引导文案
+            Row(
+              children: [
+                for (int star = 1; star <= _maxScore; star++)
+                  GestureDetector(
+                    // 每星 2 分：第 N 颗星提交 N*2 分（2/4/6/8/10）
+                    onTap: _busy ? null : () => _rate(context, star * 2),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(
+                        star * 2 <= myScore ? Icons.star_rounded : Icons.star_border_rounded,
+                        size: 30,
+                        color: star * 2 <= myScore ? AppColors.primary : AppColors.text3,
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                Text(
+                  mine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

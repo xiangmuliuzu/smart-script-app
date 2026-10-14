@@ -96,6 +96,14 @@ final favoriteStatusProvider = FutureProvider.autoDispose.family<FavoriteState, 
   (ref, workId) => ref.watch(contentRepositoryProvider).favoriteStatus(workId),
 );
 
+/// 作品读者评分态（需 App Token）。
+///
+/// 详情页是公开页，游客不 watch（评分星星点击时由 AuthGuard 引导登录），
+/// 避免为必然 401 的请求往返。
+final workRatingProvider = FutureProvider.autoDispose.family<WorkRating, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).workRating(workId),
+);
+
 /// 作品章节目录；payload 含试读配置，每条章节自带 readable 标记。
 final chapterListProvider = FutureProvider.autoDispose.family<ChapterListPayload, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).listChapters(workId),

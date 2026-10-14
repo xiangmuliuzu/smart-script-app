@@ -74,6 +74,8 @@ class ApiEndpoints {
   static const String contentFavorites = '/content/favorites';
   /// 收藏 / 取消收藏 / 收藏态（需 App Token，接口 2.7.10）
   static String contentFavoriteByWorkId(int workId) => '/content/favorites/$workId';
+  /// 作品读者评分：查询评分态 / 提交评分（需 App Token；POST body {score}）
+  static String contentWorkRating(int workId) => '/content/works/$workId/rating';
   /// 内容文件上传（需 App Token，multipart 字段 file；type=cover/script，接口 2.9.1）
   static const String contentUpload = '/content/upload';
   /// 作品版本列表 / 新建版本（需 App Token，接口 2.9.7 / 2.9.8）

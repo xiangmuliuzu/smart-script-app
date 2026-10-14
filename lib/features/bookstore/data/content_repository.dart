@@ -271,6 +271,33 @@ class ContentRepository {
     return FavoriteState.fromJson(data);
   }
 
+  /// 查询作品评分态（需 App Token）。
+  ///
+  /// data 含 {workId, rating, ratingCount, myScore}；myScore 为当前身份的分值，
+  /// 未评分时为 null；作品不存在或未上架时后端按 404 拒绝。
+  Future<WorkRating> workRating(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkRating(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取评分失败');
+    return WorkRating.fromJson(data);
+  }
+
+  /// 提交评分（需 App Token，body {score}，1~5 星）。
+  ///
+  /// 一人一评：同一身份重复提交即覆盖分值，评分数不增长；
+  /// 返回覆盖后回写过的 {rating, ratingCount, myScore}。
+  Future<WorkRating> submitRating(int workId, int score) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkRating(workId),
+      data: {'score': score},
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('提交评分失败');
+    return WorkRating.fromJson(data);
+  }
+
   static Map<String, dynamic> _mapParser(dynamic raw) {
     if (raw is Map) return Map<String, dynamic>.from(raw);
     return <String, dynamic>{};
