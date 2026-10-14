@@ -163,8 +163,13 @@ class ApiEndpoints {
   static String inquiryQuotes(int inquiryId) => '/inquiries/$inquiryId/quotes';
   static String inquiryAccept(int inquiryId) => '/inquiries/$inquiryId/accept';
   static String inquiryReject(int inquiryId) => '/inquiries/$inquiryId/reject';
-  static const String chatSessions = '/chat/sessions';
-  static String chatMessages(int sessionId) => '/chat/sessions/$sessionId/messages';
+  static const String chatSessions = '/users/me/chat/sessions';
+  static String chatMessages(int sessionId) => '/users/me/chat/sessions/$sessionId/messages';
+  static String chatMarkRead(int sessionId) => '/users/me/chat/sessions/$sessionId/read';
+  static const String chatUnreadCount = '/users/me/chat/unread-count';
+  static String chatChangeStatus(int sessionId) => '/users/me/chat/sessions/$sessionId/status';
+  // TRADE 类型会话创建（通过询盘）
+  static const String tradeChatSessions = '/trade/inquiry/chat/sessions';
   static const String orders = '/orders';
   static String orderById(int orderId) => '/orders/$orderId';
   static String orderContract(int orderId) => '/orders/$orderId/contract';

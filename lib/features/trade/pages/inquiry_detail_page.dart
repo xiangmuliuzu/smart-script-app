@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../chat/data/chat_repository.dart';
+import '../../chat/data/chat_providers.dart';
 import '../data/trade_models.dart';
 import '../data/trade_providers.dart';
 
@@ -104,6 +107,9 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
 
         // 底部操作栏
         _buildActionBar(inquiry, isBuyerInThisInquiry, isSellerInThisInquiry),
+
+        // 底部聊天按钮（始终显示）
+        _buildChatBar(),
       ],
     );
   }
@@ -396,6 +402,35 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     );
   }
 
+  /// 底部聊天按钮栏（始终显示）
+  Widget _buildChatBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _operating ? null : _startChat,
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('联系对方'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _acceptInquiry() async {
     setState(() => _operating = true);
     try {
@@ -469,6 +504,21 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     } finally {
       if (mounted) {
         setState(() => _operating = false);
+      }
+    }
+  }
+
+  /// 创建或获取 TRADE 类型聊天会话并跳转到聊天详情页
+  Future<void> _startChat() async {
+    try {
+      final chatRepo = ref.read(chatRepositoryProvider);
+      final session = await chatRepo.createTradeSession(widget.inquiryId);
+      if (mounted) {
+        context.push(RoutePath.chatDetail(session.session.sessionId));
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppToast(context, '创建会话失败: $e');
       }
     }
   }

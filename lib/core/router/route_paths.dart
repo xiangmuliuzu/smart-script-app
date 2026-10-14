@@ -197,8 +197,12 @@ class RoutePath {
   static const String followUpList = '/trade/follow-up/list';
   // 需求
   static const String demandList = '/trade/demand/list';
-  // 线上沟通（聊天，待接入 A3）
+  // 线上沟通（聊天，接入 A3）
   static const String tradeChat = '/trade/chat';
+  // 聊天会话列表
+  static const String chatSessionList = '/chat';
+  // 聊天详情页
+  static String chatDetail(int sessionId) => '/chat/$sessionId';
 }
 
 class RouteName {
@@ -263,6 +267,9 @@ class RouteName {
   static const String followUpList = 'followUpList';
   static const String demandList = 'demandList';
   static const String tradeChat = 'tradeChat';
+  // 聊天
+  static const String chatSessionList = 'chatSessionList';
+  static const String chatDetail = 'chatDetail';
 }
 
 /// 需要登录才能访问的路径前缀（规格 §8.1 守卫清单）。
@@ -305,6 +312,8 @@ class ProtectedRoutes {
     RoutePath.followUpList,
     RoutePath.demandList,
     RoutePath.tradeChat,
+    // 聊天（需登录）
+    RoutePath.chatSessionList,
   ];
 
   static bool isProtected(String location) {

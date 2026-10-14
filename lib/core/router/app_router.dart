@@ -48,6 +48,8 @@ import '../../features/splash/splash_page.dart';
 import '../../features/trade/pages/inquiry_create_page.dart';
 import '../../features/trade/pages/inquiry_detail_page.dart';
 import '../../features/trade/pages/inquiry_list_page.dart';
+import '../../features/chat/pages/chat_session_list_page.dart';
+import '../../features/chat/pages/chat_detail_page.dart';
 import '../providers/auth_providers.dart';
 import 'route_intent.dart';
 import 'route_paths.dart';
@@ -446,6 +448,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.inquiryDetail,
         builder: (context, state) => InquiryDetailPage(
           inquiryId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      // ===== A3 聊天域 =====
+      GoRoute(
+        path: RoutePath.chatSessionList,
+        name: RouteName.chatSessionList,
+        builder: (_, __) => const ChatSessionListPage(),
+      ),
+      GoRoute(
+        path: '/chat/:sessionId',
+        name: RouteName.chatDetail,
+        builder: (context, state) => ChatDetailPage(
+          sessionId: int.tryParse(state.pathParameters['sessionId'] ?? '') ?? 0,
         ),
       ),
     ],
