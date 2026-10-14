@@ -311,6 +311,45 @@ class TradeRepository {
     return Order.fromJson(data);
   }
 
+  /// APP订单列表（分页，按角色）。
+  Future<PagedData<Order>> appPageOrders({
+    required String role,
+    String? status,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appOrderList,
+      query: _compact({
+        'role': role,
+        'status': status,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取订单列表失败');
+    return PagedData.parse<Order>(data, Order.fromJson);
+  }
+
+  /// APP订单详情。
+  Future<Order> appOrderDetail(int orderId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appOrderById(orderId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取订单详情失败');
+    return Order.fromJson(data);
+  }
+
+  /// APP取消订单。
+  Future<void> appCancelOrder(int orderId, String reason) async {
+    await _api.put<void>(
+      ApiEndpoints.appOrderCancel(orderId),
+      data: {'reason': reason},
+    );
+  }
+
   // ==================== 合作记录 ====================
 
   /// 合作记录列表（分页）。

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../trade/data/trade_models.dart';
@@ -170,9 +172,15 @@ class NegotiationStatusBar extends ConsumerWidget {
 
   Future<void> _acceptQuote(BuildContext context, WidgetRef ref, int quoteId) async {
     try {
-      await ref.read(tradeRepositoryProvider).appAcceptQuote(quoteId);
+      final result = await ref.read(tradeRepositoryProvider).appAcceptQuote(quoteId);
       if (context.mounted) {
-        showAppToast(context, '已接受报价，订单生成中...');
+        final orderId = result['orderId'] as int?;
+        if (orderId != null) {
+          showAppToast(context, '已接受报价，正在生成订单...');
+          context.push('${RoutePath.orderDetail}?id=$orderId');
+        } else {
+          showAppToast(context, '已接受报价');
+        }
         ref.invalidate(latestQuoteProvider(inquiryId));
       }
     } catch (e) {

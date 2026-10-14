@@ -1,9 +1,9 @@
-feat(trade,chat): 报价议价融入聊天会话 + 页面顶部统一白色风格
+feat(trade): 订单域APP端全栈实现
 
-- 新增 NegotiationStatusBar（顶部展示当前金额+接受按钮）
-- 新增 QuoteInputCard（底部可编辑金额，¥紧贴数字，无边框）
-- 聊天发送按钮统一触发报价更新，金额无变化时不重复提交
-- TradeQuoteService 兼容 APP 认证上下文（safeGetOperatorName）
-- AppTradeQuoteController 改用 AppIdentityContext 获取用户ID
-- 报价记录页改为纯查看，不提供操作入口
-- 所有页面 AppBar 统一白色背景+黑色文字（会话/询盘/报价/聊天详情等）
+- 新增 order_list_page: 双Tab(买方/作者) + 状态筛选
+- 新增 order_detail_page: 状态卡片 + 信息卡片 + 取消弹窗
+- trade_repository 新增 appPageOrders/appOrderDetail/appCancelOrder
+- trade_providers 新增 appOrderListProvider/appOrderDetailProvider
+- negotiation_status_bar 接受报价后跳转订单详情
+- profile_page 新增"订单管理"入口
+- app_router 注册 orderList/orderDetail 路由

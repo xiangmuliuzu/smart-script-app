@@ -50,6 +50,8 @@ import '../../features/trade/pages/inquiry_detail_page.dart';
 import '../../features/trade/pages/inquiry_list_page.dart';
 import '../../features/trade/pages/quote_create_page.dart';
 import '../../features/trade/pages/quote_records_page.dart';
+import '../../features/trade/pages/order_list_page.dart';
+import '../../features/trade/pages/order_detail_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
 import '../providers/auth_providers.dart';
@@ -467,6 +469,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => QuoteRecordsPage(
           inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
           workTitle: state.uri.queryParameters['workTitle'],
+        ),
+      ),
+      // ===== 订单 =====
+      GoRoute(
+        path: RoutePath.orderList,
+        name: RouteName.orderList,
+        builder: (_, __) => const OrderListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.orderDetail,
+        name: RouteName.orderDetail,
+        builder: (context, state) => OrderDetailPage(
+          orderId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
       ),
       // ===== A3 聊天域 =====

@@ -270,6 +270,9 @@ class ApiEndpoints {
   // 订单
   static const String adminTradeOrders = '/admin/trade/orders';
   static String adminTradeOrderById(int id) => '/admin/trade/orders/$id';
+  static const String appOrderList = '/trade/order/list';
+  static String appOrderById(int orderId) => '/trade/order/$orderId';
+  static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
   // 合作记录
   static const String adminTradeCooperationList = '/admin/trade/cooperation/list';
   static const String adminTradeCooperation = '/admin/trade/cooperation';

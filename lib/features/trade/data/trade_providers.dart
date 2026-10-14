@@ -262,3 +262,48 @@ final tradeWorkListProvider = FutureProvider.autoDispose
 final tradeWorkDetailProvider = FutureProvider.autoDispose.family<TradeWork, int>(
   (ref, workId) => ref.watch(tradeRepositoryProvider).tradeWorkDetail(workId),
 );
+
+// ==================== 订单 Providers ====================
+
+/// APP订单列表查询参数
+class AppOrderListParams {
+  final String role;
+  final String? status;
+  final int pageNum;
+  final int pageSize;
+
+  const AppOrderListParams({
+    required this.role,
+    this.status,
+    this.pageNum = 1,
+    this.pageSize = 10,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppOrderListParams &&
+          role == other.role &&
+          status == other.status &&
+          pageNum == other.pageNum &&
+          pageSize == other.pageSize;
+
+  @override
+  int get hashCode => Object.hash(role, status, pageNum, pageSize);
+}
+
+/// APP订单分页列表
+final appOrderListProvider = FutureProvider.autoDispose
+    .family<PagedData<Order>, AppOrderListParams>(
+  (ref, params) => ref.watch(tradeRepositoryProvider).appPageOrders(
+        role: params.role,
+        status: params.status,
+        pageNum: params.pageNum,
+        pageSize: params.pageSize,
+      ),
+);
+
+/// APP订单详情
+final appOrderDetailProvider = FutureProvider.autoDispose.family<Order, int>(
+  (ref, orderId) => ref.watch(tradeRepositoryProvider).appOrderDetail(orderId),
+);

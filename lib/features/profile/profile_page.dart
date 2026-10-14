@@ -441,6 +441,9 @@ class _QuickGrid extends StatelessWidget {
       _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.inquiryList)),
+      _QuickEntry(ref, Icons.receipt_long_outlined, '订单管理',
+          onTap: (ctx, ref) =>
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.orderList)),
       _QuickEntry(ref, Icons.edit_outlined, '编辑资料',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.profileEdit)),
