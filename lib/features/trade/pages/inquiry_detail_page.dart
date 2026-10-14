@@ -35,8 +35,9 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('询盘详情'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.5,
       ),
       body: detailAsync.when(
         loading: () => const LoadingView(),
@@ -99,7 +100,13 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
                   _buildSectionTitle('留言'),
                   const SizedBox(height: 8),
                   _buildMessageCard(inquiry.message!),
+                  const SizedBox(height: 16),
                 ],
+
+                // 报价与议价
+                _buildSectionTitle('报价与议价'),
+                const SizedBox(height: 8),
+                _buildQuoteSection(inquiry, isBuyerInThisInquiry, isSellerInThisInquiry),
               ],
             ),
           ),
@@ -332,6 +339,94 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
       child: Text(
         message,
         style: const TextStyle(fontSize: 14, color: AppColors.text2),
+      ),
+    );
+  }
+
+  /// 报价与议价区块
+  Widget _buildQuoteSection(
+    Inquiry inquiry,
+    bool isBuyerInThisInquiry,
+    bool isSellerInThisInquiry,
+  ) {
+    // 询盘必须被接受后才能报价
+    final canQuote = inquiry.status == InquiryStatus.accepted ||
+        inquiry.status == InquiryStatus.deal;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          // 查看报价记录（双方都可见）
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                context.push(
+                  '${RoutePath.quoteList}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
+                );
+              },
+              icon: const Icon(Icons.receipt_long, size: 18),
+              label: const Text('查看报价记录'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 卖方可以提交报价
+          if (isSellerInThisInquiry && canQuote)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await context.push<bool>(
+                    '${RoutePath.quoteCreate}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
+                  );
+                  if (result == true) {
+                    ref.invalidate(inquiryDetailProvider(widget.inquiryId));
+                  }
+                },
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('提交报价'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          // 买方可以发起议价
+          if (isBuyerInThisInquiry && canQuote)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  context.push(
+                    '${RoutePath.quoteList}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
+                  );
+                },
+                icon: const Icon(Icons.gavel, size: 18),
+                label: const Text('发起议价'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          if (!canQuote)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('询盘被接受后可进行报价/议价', style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            ),
+        ],
       ),
     );
   }

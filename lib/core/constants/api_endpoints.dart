@@ -166,6 +166,7 @@ class ApiEndpoints {
   static String inquiryAccept(int inquiryId) => '/inquiries/$inquiryId/accept';
   static String inquiryReject(int inquiryId) => '/inquiries/$inquiryId/reject';
   static const String chatSessions = '/users/me/chat/sessions';
+  static String chatSessionDetail(int sessionId) => '/users/me/chat/sessions/$sessionId';
   static String chatMessages(int sessionId) => '/users/me/chat/sessions/$sessionId/messages';
   static String chatMarkRead(int sessionId) => '/users/me/chat/sessions/$sessionId/read';
   static const String chatUnreadCount = '/users/me/chat/unread-count';
@@ -248,7 +249,7 @@ class ApiEndpoints {
   static String adminTradeInquiryAccept(int id) => '/trade/inquiry/$id/accept';
   static String adminTradeInquiryReject(int id) => '/trade/inquiry/$id/reject';
   static String adminTradeInquiryClose(int id) => '/trade/inquiry/$id/close';
-  // 报价/议价
+  // 报价/议价（PC管理端）
   static const String adminTradeQuoteList = '/admin/trade/quote/list';
   static const String adminTradeQuote = '/admin/trade/quote';
   static const String adminTradeQuoteCounterOffer = '/admin/trade/quote/counter-offer';
@@ -257,6 +258,15 @@ class ApiEndpoints {
   static String adminTradeQuoteReject(int id) => '/admin/trade/quote/$id/reject';
   static String adminTradeQuoteSellerAccept(int id) => '/admin/trade/quote/$id/seller-accept';
   static String adminTradeQuoteSellerReject(int id) => '/admin/trade/quote/$id/seller-reject';
+  // 报价/议价（APP端）
+  static const String appQuoteList = '/trade/quote/list';
+  static const String appQuoteCreate = '/trade/quote';
+  static const String appQuoteCounterOffer = '/trade/quote/counter-offer';
+  static String appQuoteById(int id) => '/trade/quote/$id';
+  static String appQuoteModify(int id) => '/trade/quote/$id';
+  static String appQuoteAccept(int id) => '/trade/quote/$id/accept';
+  static String appQuoteReject(int id) => '/trade/quote/$id/reject';
+  static const String appQuoteLatest = '/trade/quote/latest';
   // 订单
   static const String adminTradeOrders = '/admin/trade/orders';
   static String adminTradeOrderById(int id) => '/admin/trade/orders/$id';

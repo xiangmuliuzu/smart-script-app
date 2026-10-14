@@ -204,6 +204,78 @@ class TradeRepository {
     );
   }
 
+  // ==================== 报价/议价（APP端） ====================
+
+  /// 报价列表（按询盘ID查询，APP端）。
+  Future<List<Quote>> listQuotesByInquiry(int inquiryId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appQuoteList,
+      query: {'inquiryId': inquiryId},
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取报价列表失败');
+    final list = data['list'] as List<dynamic>? ?? [];
+    return list.map((e) => Quote.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 创建报价（卖方出价，APP端）。
+  Future<Quote> appCreateQuote(Quote quote) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.appQuoteCreate,
+      data: quote.toJson(),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('创建报价失败');
+    return Quote.fromJson(data);
+  }
+
+  /// 买方议价（APP端）。
+  Future<Quote> appCounterOffer(Quote quote) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.appQuoteCounterOffer,
+      data: quote.toJson(),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('发起议价失败');
+    return Quote.fromJson(data);
+  }
+
+  /// 修改报价（APP端）。
+  Future<void> appModifyQuote(int quoteId, Quote quote) async {
+    await _api.put<void>(
+      ApiEndpoints.appQuoteModify(quoteId),
+      data: quote.toJson(),
+    );
+  }
+
+  /// 接受报价（APP端）。
+  Future<Map<String, dynamic>> appAcceptQuote(int quoteId) async {
+    final data = await _api.put<Map<String, dynamic>>(
+      ApiEndpoints.appQuoteAccept(quoteId),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('接受报价失败');
+    return data;
+  }
+
+  /// 拒绝报价（APP端）。
+  Future<void> appRejectQuote(int quoteId) async {
+    await _api.put<void>(
+      ApiEndpoints.appQuoteReject(quoteId),
+    );
+  }
+
+  /// 查询某询盘下最新报价（用于聊天页议价卡片）。
+  Future<Quote?> getLatestQuote(int inquiryId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appQuoteLatest,
+      query: {'inquiryId': inquiryId},
+      parser: _mapParser,
+    );
+    if (data == null) return null;
+    return Quote.fromJson(data);
+  }
+
   // ==================== 订单 ====================
 
   /// 订单列表（分页）。

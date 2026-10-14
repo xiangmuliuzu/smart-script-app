@@ -108,6 +108,20 @@ final quoteListProvider = FutureProvider.autoDispose
       ),
 );
 
+// ==================== 报价/议价 Providers（APP端） ====================
+
+/// 按询盘ID查询报价列表
+final appQuoteListProvider = FutureProvider.autoDispose
+    .family<List<Quote>, int>(
+  (ref, inquiryId) => ref.watch(tradeRepositoryProvider).listQuotesByInquiry(inquiryId),
+);
+
+/// 按询盘ID查询最新报价（用于聊天页议价卡片）
+final latestQuoteProvider = FutureProvider.autoDispose
+    .family<Quote?, int>(
+  (ref, inquiryId) => ref.watch(tradeRepositoryProvider).getLatestQuote(inquiryId),
+);
+
 // ==================== 订单 Providers ====================
 
 /// 订单列表查询参数

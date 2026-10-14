@@ -1,0 +1,9 @@
+feat(trade,chat): 报价议价融入聊天会话 + 页面顶部统一白色风格
+
+- 新增 NegotiationStatusBar（顶部展示当前金额+接受按钮）
+- 新增 QuoteInputCard（底部可编辑金额，¥紧贴数字，无边框）
+- 聊天发送按钮统一触发报价更新，金额无变化时不重复提交
+- TradeQuoteService 兼容 APP 认证上下文（safeGetOperatorName）
+- AppTradeQuoteController 改用 AppIdentityContext 获取用户ID
+- 报价记录页改为纯查看，不提供操作入口
+- 所有页面 AppBar 统一白色背景+黑色文字（会话/询盘/报价/聊天详情等）

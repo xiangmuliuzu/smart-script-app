@@ -46,8 +46,9 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('发起询盘'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.5,
       ),
       body: _buildBody(),
     );

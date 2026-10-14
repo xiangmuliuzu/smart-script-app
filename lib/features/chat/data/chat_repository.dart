@@ -68,6 +68,16 @@ class ChatRepository {
     return ChatSessionWithPeer.fromVo(data);
   }
 
+  /// 获取单个会话详情（含 sessionType、inquiryId 等）。
+  Future<ChatSessionWithPeer> getSessionDetail(int sessionId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.chatSessionDetail(sessionId),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取会话详情失败');
+    return ChatSessionWithPeer.fromVo(data);
+  }
+
   // ==================== 消息管理 ====================
 
   /// 获取会话内历史消息。

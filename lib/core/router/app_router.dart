@@ -48,6 +48,8 @@ import '../../features/splash/splash_page.dart';
 import '../../features/trade/pages/inquiry_create_page.dart';
 import '../../features/trade/pages/inquiry_detail_page.dart';
 import '../../features/trade/pages/inquiry_list_page.dart';
+import '../../features/trade/pages/quote_create_page.dart';
+import '../../features/trade/pages/quote_records_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
 import '../providers/auth_providers.dart';
@@ -448,6 +450,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.inquiryDetail,
         builder: (context, state) => InquiryDetailPage(
           inquiryId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      // ===== 报价/议价 =====
+      GoRoute(
+        path: RoutePath.quoteCreate,
+        name: RouteName.quoteCreate,
+        builder: (context, state) => QuoteCreatePage(
+          inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
+          workTitle: state.uri.queryParameters['workTitle'],
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.quoteList,
+        name: RouteName.quoteList,
+        builder: (context, state) => QuoteRecordsPage(
+          inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
+          workTitle: state.uri.queryParameters['workTitle'],
         ),
       ),
       // ===== A3 聊天域 =====

@@ -3,11 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../trade/data/trade_models.dart';
+import '../../trade/data/trade_providers.dart';
 import '../../user_center/data/paged_data.dart';
 import '../data/chat_models.dart';
 import '../data/chat_providers.dart';
-import '../data/chat_repository.dart';
+import '../widgets/negotiation_status_bar.dart';
+import '../widgets/quote_input_card.dart';
+import '../widgets/quote_message_bubble.dart';
 
 /// 聊天详情页（分工条目 7）
 ///
@@ -26,8 +31,11 @@ class ChatDetailPage extends ConsumerStatefulWidget {
 
 class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   final _inputController = TextEditingController();
+  final _amountController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
+  int? _lastSentAmount; // 上次发送的报价金额（分），用于判断金额是否变化
+  _TradeContext? _tradeContext; // 交易会话上下文
 
   @override
   void initState() {
@@ -41,6 +49,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   @override
   void dispose() {
     _inputController.dispose();
+    _amountController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -60,10 +69,33 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     final content = _inputController.text.trim();
     if (content.isEmpty || _isSending) return;
 
+    // 检查报价金额是否变化（仅 TRADE 会话）
+    final int? newAmountFen = _parseAmountFen(_amountController.text.trim());
+    final bool amountChanged = newAmountFen != null && newAmountFen != _lastSentAmount;
+
     setState(() => _isSending = true);
     try {
-      final repo = ref.read(chatRepositoryProvider);
-      await repo.sendMessage(widget.sessionId, content);
+      // 金额变化时先发送报价
+      if (amountChanged && _tradeContext != null) {
+        final ctx = _tradeContext!;
+        final repo = ref.read(tradeRepositoryProvider);
+        final quote = Quote(
+          inquiryId: ctx.inquiryId,
+          amount: newAmountFen,
+          licenseType: ctx.licenseType ?? 'non_exclusive',
+          role: ctx.isSeller ? 'seller' : 'buyer',
+        );
+        if (ctx.isSeller) {
+          await repo.appCreateQuote(quote);
+        } else {
+          await repo.appCounterOffer(quote);
+        }
+        _lastSentAmount = newAmountFen;
+        ref.invalidate(latestQuoteProvider(ctx.inquiryId));
+      }
+
+      final chatRepo = ref.read(chatRepositoryProvider);
+      await chatRepo.sendMessage(widget.sessionId, content);
       _inputController.clear();
       // 刷新消息列表
       ref.invalidate(messagesProvider(widget.sessionId));
@@ -71,13 +103,18 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       await _markAsRead();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('发送失败：$e')),
-        );
+        showAppToast(context, '发送失败：$e');
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
+  }
+
+  int? _parseAmountFen(String text) {
+    if (text.isEmpty) return null;
+    final yuan = double.tryParse(text);
+    if (yuan == null || yuan <= 0) return null;
+    return (yuan * 100).round();
   }
 
   Future<void> _reopenSession() async {
@@ -100,17 +137,67 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     final authState = ref.watch(authControllerProvider);
     final currentUserId = authState.user?.userId ?? 0;
     final messagesAsync = ref.watch(messagesProvider(widget.sessionId));
+    final sessionAsync = ref.watch(sessionDetailProvider(widget.sessionId));
+
+    // 提取会话信息
+    final isTrade = sessionAsync.whenOrNull(
+      data: (s) => s.session.sessionType == SessionType.trade,
+    ) ?? false;
+    final inquiryId = sessionAsync.whenOrNull(
+      data: (s) => s.session.inquiryId,
+    );
+
+    // 对 TRADE 会话，加载询盘以确定买卖角色 + 预算/授权类型
+    bool isBuyer = false;
+    bool isSeller = false;
+    int? budget;
+    String? licenseType;
+    if (isTrade && inquiryId != null) {
+      final inquiryAsync = ref.watch(inquiryDetailProvider(inquiryId));
+      inquiryAsync.whenOrNull(
+        data: (inquiry) {
+          isBuyer = inquiry.buyerId == currentUserId;
+          isSeller = inquiry.sellerId == currentUserId;
+          budget = inquiry.budget;
+          licenseType = inquiry.licenseType;
+          // 缓存交易上下文供发送消息时使用
+          _tradeContext = _TradeContext(
+            inquiryId: inquiryId,
+            isBuyer: isBuyer,
+            isSeller: isSeller,
+            licenseType: licenseType,
+          );
+        },
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: _buildTitle(messagesAsync),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        title: _buildTitle(sessionAsync),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.5,
       ),
       body: Column(
         children: [
+          // 顶部议价状态栏（仅 TRADE 会话显示）
+          if (isTrade && inquiryId != null)
+            NegotiationStatusBar(
+              inquiryId: inquiryId,
+              currentUserId: currentUserId,
+              isBuyer: isBuyer,
+              isSeller: isSeller,
+              budget: budget,
+            ),
           // 消息列表
           Expanded(child: _buildMessageList(messagesAsync, currentUserId)),
+          // 底部报价输入卡片（仅 TRADE 会话显示）
+          if (isTrade && inquiryId != null)
+            QuoteInputCard(
+              inquiryId: inquiryId,
+              amountController: _amountController,
+              budget: budget,
+            ),
           // 输入区
           _buildInputArea(messagesAsync),
         ],
@@ -118,10 +205,10 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     );
   }
 
-  Widget _buildTitle(AsyncValue<PagedData<ChatMessage>> messagesAsync) {
-    // 从第一条消息或会话信息获取对方名称
-    // 这里简化处理，实际可以从会话详情获取
-    return const Text('聊天');
+  Widget _buildTitle(AsyncValue<ChatSessionWithPeer> sessionAsync) {
+    // 从会话详情取对方名称
+    final peerName = sessionAsync.whenOrNull(data: (s) => s.peerName);
+    return Text(peerName ?? '聊天');
   }
 
   Widget _buildMessageList(
@@ -144,7 +231,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         ),
       ),
       data: (pagedData) {
-        if (pagedData == null || pagedData.isEmpty) {
+        if (pagedData.isEmpty) {
           return const EmptyView(message: '暂无消息，开始聊天吧');
         }
         return ListView.builder(
@@ -155,6 +242,10 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           itemBuilder: (context, index) {
             // 倒序遍历，让最新消息在最下面
             final message = pagedData.list[pagedData.list.length - 1 - index];
+            // 报价/议价类系统消息渲染为卡片
+            if (QuoteMessageBubble.isQuoteMessage(message)) {
+              return QuoteMessageBubble(message: message);
+            }
             return _MessageBubble(
               message: message,
               isMine: message.isMine(currentUserId),
@@ -326,4 +417,19 @@ class _MessageBubble extends StatelessWidget {
           : null,
     );
   }
+}
+
+/// 交易会话上下文（缓存询盘ID和角色信息，供发送消息时判断是否需要更新报价）
+class _TradeContext {
+  final int inquiryId;
+  final bool isBuyer;
+  final bool isSeller;
+  final String? licenseType;
+
+  const _TradeContext({
+    required this.inquiryId,
+    required this.isBuyer,
+    required this.isSeller,
+    this.licenseType,
+  });
 }

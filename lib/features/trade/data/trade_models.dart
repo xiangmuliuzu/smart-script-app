@@ -223,10 +223,11 @@ class Quote {
   final int? quoteId;
   final int? inquiryId;
   final int? workId;
-  final String? role;         // buyer / seller
-  final int? amount;          // 分
+  final String? role;         // buyer / seller (quoterRole)
+  final int? amount;          // 分 (price)
   final String? licenseType;
-  final String? message;
+  final int? validDays;       // 有效天数
+  final String? message;      // description
   final String? status;
   final DateTime? expireAt;
   final DateTime? createdAt;
@@ -242,6 +243,7 @@ class Quote {
     this.role,
     this.amount,
     this.licenseType,
+    this.validDays,
     this.message,
     this.status,
     this.expireAt,
@@ -256,16 +258,17 @@ class Quote {
       quoteId: json['quoteId'] as int?,
       inquiryId: json['inquiryId'] as int?,
       workId: json['workId'] as int?,
-      role: json['role'] as String?,
-      amount: (json['amount'] as num?)?.toInt(),
+      role: (json['quoterRole'] ?? json['role']) as String?,
+      amount: ((json['price'] ?? json['amount']) as num?)?.toInt(),
       licenseType: json['licenseType'] as String?,
-      message: json['message'] as String?,
+      validDays: json['validDays'] as int?,
+      message: (json['description'] ?? json['message']) as String?,
       status: json['status'] as String?,
       expireAt: _parseDateTime(json['expireAt']),
       createdAt: _parseDateTime(json['createdAt']),
       inquiryNo: json['inquiryNo'] as String?,
       workTitle: json['workTitle'] as String?,
-      operatorName: json['operatorName'] as String?,
+      operatorName: (json['quoterName'] ?? json['operatorName']) as String?,
     );
   }
 
@@ -274,10 +277,11 @@ class Quote {
       if (quoteId != null) 'quoteId': quoteId,
       if (inquiryId != null) 'inquiryId': inquiryId,
       if (workId != null) 'workId': workId,
-      if (role != null) 'role': role,
-      if (amount != null) 'amount': amount,
+      if (role != null) 'quoterRole': role,
+      if (amount != null) 'price': amount,
       if (licenseType != null) 'licenseType': licenseType,
-      if (message != null) 'message': message,
+      if (validDays != null) 'validDays': validDays,
+      if (message != null) 'description': message,
       if (status != null) 'status': status,
     };
   }
