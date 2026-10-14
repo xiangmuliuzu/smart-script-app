@@ -479,7 +479,7 @@ class PreviewFile {
   factory PreviewFile.fromJson(Map<String, dynamic> json) => PreviewFile(
         fileId: _int(json['fileId']),
         fileName: _text(json['fileName']),
-        fileUrl: _text(json['fileUrl']),
+        fileUrl: AppConfig.resolveAssetUrl(_text(json['fileUrl'])),
         fileType: _text(json['fileType']),
         fileSize: _int(json['fileSize']),
       );

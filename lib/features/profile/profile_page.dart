@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
@@ -607,14 +608,18 @@ class _ShelfSection extends StatelessWidget {
   }
 }
 
-/// 竖版书封：3:4 渐变底 + 左侧书脊线 + 书名白字（原型 `.book .cv`）。
+/// 竖版书封：优先展示真实封面图，缺失/加载失败时回退到 3:4 渐变底 + 书名
+/// （对照原型 `.book .cv.g1/g2/g3` 的三套蓝色系书封）。
+///
+/// 修复：原实现固定渲染「渐变底 + 书名白字」，导致书架预览显示名字而非
+/// 作品真实封面，与详情页/书城（WorkCover 封面图）不一致；现改为封面图优先。
 class _ShelfBook extends StatelessWidget {
   const _ShelfBook({required this.work, required this.gradientIndex});
 
   final BookItem work;
   final int gradientIndex;
 
-  // 对照原型 app.css `.book .cv.g1/g2/g3` 的三套蓝色系书封渐变。
+  // 对照原型 app.css `.book .cv.g1/g2/g3` 的三套蓝色系书封渐变（兜底用）。
   static const _gradients = <List<Color>>[
     <Color>[Color(0xFF2F5FA8), Color(0xFF1B3A6B)],
     <Color>[Color(0xFF254E90), Color(0xFF16305C)],
@@ -630,43 +635,15 @@ class _ShelfBook extends StatelessWidget {
         children: [
           Expanded(
             child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _gradients[gradientIndex % _gradients.length],
-                ),
                 borderRadius: BorderRadius.circular(8),
                 boxShadow: const [
                   BoxShadow(color: Color(0x12000000), blurRadius: 6, offset: Offset(0, 2)),
                 ],
               ),
-              child: Stack(
-                children: [
-                  const Positioned(
-                    left: 7,
-                    top: 0,
-                    bottom: 0,
-                    width: 1,
-                    child: ColoredBox(color: Colors.white24),
-                  ),
-                  Center(
-                    child: Text(
-                      work.title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: work.cover.isEmpty ? _fallback() : _coverImage(),
               ),
             ),
           ),
@@ -689,4 +666,52 @@ class _ShelfBook extends StatelessWidget {
       ),
     );
   }
+
+  /// 真实封面图：与详情页/书城同一份 cover 数据、同一套 [AppConfig.resolveAssetUrl] 归一，
+  /// 撑满网格并裁切；加载失败回退到渐变书封。
+  Widget _coverImage() => Image.network(
+        AppConfig.resolveAssetUrl(work.cover),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+
+  /// 封面缺失/加载失败时的兜底书封：蓝色渐变 + 左侧书脊线 + 书名白字。
+  Widget _fallback() => Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _gradients[gradientIndex % _gradients.length],
+          ),
+        ),
+        child: Stack(
+          children: [
+            const Positioned(
+              left: 7,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              child: ColoredBox(color: Colors.white24),
+            ),
+            Center(
+              child: Text(
+                work.title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }

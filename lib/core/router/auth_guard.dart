@@ -61,8 +61,9 @@ class AuthGuard {
   /// 消费回跳意图并给出最终目标，供登录页在登录成功后调用。
   ///
   /// 无意图、意图非法或目标不允许恢复时返回 null，由调用方走安全默认首页。
-  /// 返回的定位串由调用方 push：用户中心子页面需要真实历史栈，
-  /// 这样登录回跳后按返回键能回到上一页而不是退出应用。
+  /// 返回的定位串由调用方按栈情况回跳（见 resolvePostLoginTarget）：
+  /// 用户点击路径替换/弹出登录页保原栈，redirect 路径补首页底栈，
+  /// 保证登录回跳后按返回键能回到上一页而不是退出应用。
   static String? consumeAndResolve(WidgetRef ref) {
     final intent = ref.read(routeIntentStoreProvider).consume();
     if (intent == null) return null;
@@ -75,10 +76,17 @@ class AuthGuard {
     ref.read(routeIntentStoreProvider).clear();
   }
 
+  /// 进入登录页。
+  ///
+  /// 用 `push` 而不是 `go`：本方法只被用户主动触发的 [requireLogin] 调用，
+  /// push 保留下方原浏览栈（首页→列表→详情），登录成功后由
+  /// [resolvePostLoginTarget] 弹出/替换登录页即可回原栈，返回落点正确。
+  /// 路由级 redirect / 深链路径不经过这里（由 GoRouter redirect 以 go 语义
+  /// 直接进入登录页），那条路径栈里只剩登录页，回跳时仍会补首页底栈。
   static void _goLogin(BuildContext context, WidgetRef ref) {
     final intent = ref.read(routeIntentStoreProvider).pending;
     final target = intent?.encoded;
-    context.go(
+    context.push(
       target == null
           ? RoutePath.login
           : '${RoutePath.login}?${RouteIntent.paramName}=$target',

@@ -178,7 +178,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
-  /// AppBar 内嵌搜索框：进入自动聚焦，回车即搜索。
+  /// AppBar 内嵌搜索框：不自动弹键盘，用户点击搜索框后再聚焦；回车即搜索。
   Widget _buildSearchField() {
     return Container(
       height: 36,
@@ -195,7 +195,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             child: TextField(
               controller: _textController,
               focusNode: _focusNode,
-              autofocus: true,
+              autofocus: false,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _submit(),
               style: const TextStyle(fontSize: 14, color: AppColors.text1),
@@ -270,8 +270,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 
   Widget _buildResults() {
-    if (_controller.loading) return const LoadingView(message: '搜索中');
-    if (_controller.error != null) {
+    // 首屏无结果时整屏展示加载/错误；已有结果时保留列表，下拉刷新由 RefreshIndicator 反馈。
+    if (_controller.loading && _controller.isEmpty) {
+      return const LoadingView(message: '搜索中');
+    }
+    if (_controller.error != null && _controller.isEmpty) {
       return ErrorView(
         message: _controller.error!,
         onRetry: () => _controller.load(refresh: true),

@@ -30,6 +30,9 @@ class _FavoriteListPageState extends ConsumerState<FavoriteListPage> {
   late final PagedListController<BookItem> _controller;
   final ScrollController _scrollController = ScrollController();
 
+  /// 取消收藏在途的作品 id 集合：请求期间对应行按钮置灰禁用，防止连点触发重复请求。
+  final Set<int> _cancelingIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -64,19 +67,35 @@ class _FavoriteListPageState extends ConsumerState<FavoriteListPage> {
   }
 
   Future<void> _cancel(BookItem work) async {
+    // 请求在途时直接忽略重复触发，配合按钮置灰防连点。
+    if (_cancelingIds.contains(work.workId)) return;
+    setState(() => _cancelingIds.add(work.workId));
     try {
-      await ref.read(contentRepositoryProvider).removeFavorite(work.workId);
-    } on ApiException catch (e) {
+      try {
+        await ref.read(contentRepositoryProvider).removeFavorite(work.workId);
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      }
+      // 收藏态随列表一并失效，避免详情页回显旧的「已收藏」。
+      ref.invalidate(favoriteStatusProvider(work.workId));
+      // 与书架页一致性修复：取消收藏同样改为本地移除并同步总数，不整页刷新，
+      // 保留当前滚动位置，避免深页操作后跳回第 1 页。
+      _controller.items.removeWhere((item) => item.workId == work.workId);
+      if (_controller.total > 0) _controller.total -= 1;
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      return;
+      if (_controller.items.isEmpty) {
+        await _controller.load(refresh: true);
+      } else {
+        setState(() {});
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已取消收藏')));
+    } finally {
+      if (mounted) setState(() => _cancelingIds.remove(work.workId));
     }
-    // 收藏态随列表一并失效，避免详情页回显旧的「已收藏」。
-    ref.invalidate(favoriteStatusProvider(work.workId));
-    _controller.load(refresh: true);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('已取消收藏')));
   }
 
   @override
@@ -88,8 +107,11 @@ class _FavoriteListPageState extends ConsumerState<FavoriteListPage> {
   }
 
   Widget _buildBody() {
-    if (_controller.loading) return const LoadingView(message: '加载中');
-    if (_controller.error != null) {
+    // 首屏无收藏时整屏展示加载/错误；已有数据时保留列表，下拉刷新由 RefreshIndicator 反馈。
+    if (_controller.loading && _controller.isEmpty) {
+      return const LoadingView(message: '加载中');
+    }
+    if (_controller.error != null && _controller.isEmpty) {
       return ErrorView(
         message: _controller.error!,
         onRetry: () => _controller.load(refresh: true),
@@ -109,12 +131,16 @@ class _FavoriteListPageState extends ConsumerState<FavoriteListPage> {
             return LoadMoreFooter<BookItem>(controller: _controller);
           }
           final work = _controller.items[index];
+          final canceling = _cancelingIds.contains(work.workId);
           return WorkListTile(
             work: work,
             onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
             trailing: IconButton(
-              onPressed: () => _cancel(work),
-              icon: const Icon(Icons.star, size: 20, color: AppColors.warning),
+              // 请求在途时置灰禁用，防连点；批次二本地移除 + total 同步逻辑不变。
+              onPressed: canceling ? null : () => _cancel(work),
+              icon: Icon(canceling ? Icons.hourglass_empty : Icons.star,
+                  size: 20,
+                  color: canceling ? AppColors.text3 : AppColors.warning),
               tooltip: '取消收藏',
             ),
           );

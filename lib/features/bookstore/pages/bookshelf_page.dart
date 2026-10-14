@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -89,7 +90,17 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
     // 书架态与个人中心预览区块一并失效，避免详情页/个人中心回显旧的「已在书架」。
     ref.invalidate(shelfStatusProvider(work.workId));
     ref.invalidate(shelfProvider);
-    _controller.load(refresh: true);
+    // 本地移除该行并同步总数：不清空列表、不重置分页游标，用户停留在原滚动位置，
+    // 不再 load(refresh:true) 整页刷新导致深页操作后跳回第 1 页。
+    _controller.items.removeWhere((item) => item.workId == work.workId);
+    if (_controller.total > 0) _controller.total -= 1;
+    if (!mounted) return;
+    if (_controller.items.isEmpty) {
+      // 移除后已加载列表被清空：补一次首屏刷新，让空态/加载态与服务端一致。
+      await _controller.load(refresh: true);
+    } else {
+      setState(() {});
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('已移出书架')));
@@ -116,16 +127,20 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
   }
 
   Widget _buildBody() {
-    if (_controller.loading) return const LoadingView(message: '加载中');
-    if (_controller.error != null) {
+    // 首屏空书架时整屏展示加载/错误；已有数据时保留列表，下拉刷新由 RefreshIndicator 反馈。
+    if (_controller.loading && _controller.isEmpty) {
+      return const LoadingView(message: '加载中');
+    }
+    if (_controller.error != null && _controller.isEmpty) {
       return ErrorView(
         message: _controller.error!,
         onRetry: () => _controller.load(refresh: true),
       );
     }
     final payload = _payload;
-    // 身份卡片与列表同源；载荷未就绪时不渲染卡片，避免出现空壳。
-    final headerCount = payload == null ? 0 : 1;
+    // 身份卡为跨模块身份联调的调试信息，仅 debug 构建展示（C）；
+    // 非 debug 或载荷未就绪时不渲染卡片，避免出现空壳。
+    final headerCount = (kDebugMode && payload != null) ? 1 : 0;
     final showEmpty = _controller.items.isEmpty;
     final listCount = showEmpty
         ? 1
@@ -150,15 +165,26 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
             work: work,
             onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
             progressText: work.readingProgressLabel,
+            // trailing 为 Row 中的非 flex 子项，先于 Expanded 标题区分配宽度；
+            // 收紧「继续阅读」按钮与移出图标的默认 padding / 最小点击区，
+            // 避免小屏上把标题挤成一两个字（标题 ellipsis 由共享 WorkListTile 保证）。
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextButton(
                   onPressed: () => _continueRead(work),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   child: const Text('继续阅读', style: TextStyle(fontSize: 13)),
                 ),
                 IconButton(
                   onPressed: () => _remove(work),
+                  padding: const EdgeInsets.all(4),
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
                   icon: const Icon(Icons.bookmark_remove_outlined,
                       size: 20, color: AppColors.text3),
                   tooltip: '移出书架',

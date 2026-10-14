@@ -43,11 +43,13 @@ class _WorkVersionPageState extends ConsumerState<WorkVersionPage> {
       isScrollControlled: true,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // 包一层可滚动容器：小屏 + 键盘弹起时多行 TextField 不再触发 RenderFlex overflow。
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 '新建版本',
@@ -77,6 +79,7 @@ class _WorkVersionPageState extends ConsumerState<WorkVersionPage> {
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -198,6 +201,9 @@ class _VersionTile extends StatelessWidget {
                     (item.changeLog == null || item.changeLog!.isEmpty)
                         ? '无变更说明'
                         : item.changeLog!,
+                    // 多行变更说明只占位 2 行，避免撑高卡片；全文走点行进版本详情查看。
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: AppColors.text2),
                   ),
                   const SizedBox(height: 6),

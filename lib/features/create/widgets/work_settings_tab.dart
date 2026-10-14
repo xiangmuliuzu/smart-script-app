@@ -115,15 +115,23 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
             cover: coverChanged ? _pendingCover : null,
             tagIds: tagsChanged ? _tagIds.toList() : null,
           );
-      // B 套更新定价（仅当变化时）
+      // B 套更新定价（仅当变化时）。A、B 是两次独立 PUT，非原子：
+      // A 已落库后若 B 再失败，不能整体报「保存失败」误导用户，需分别提示。
       if (priceChanged) {
-        await ref.read(createRepositoryProvider).updateWork(
-              workId,
-              price: newPrice,
-            );
+        final priceSaved = await _savePriceWithRetry(workId, newPrice ?? 0.0);
+        if (!priceSaved) {
+          // B 两次都失败：基本信息已保存；保留定价表单值供用户重存（PUT 幂等），
+          // 不标记「未保存」，仅刷新已落库的 A 套数据。
+          ref.invalidate(authorWorkDetailProvider(workId));
+          ref.invalidate(myWorksProvider);
+          if (!mounted) return;
+          _toast('基本信息已保存，但定价/交易设置保存失败，请重试');
+          return;
+        }
       }
       ref.invalidate(authorWorkDetailProvider(workId));
-      ref.invalidate(myWorksProvider('all'));
+      // 失效整个 family，覆盖 all/draft/reviewing/revision/rejected/published。
+      ref.invalidate(myWorksProvider);
       if (!mounted) return;
       _toast('保存成功');
     } on ApiException catch (e) {
@@ -133,6 +141,24 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// B 套定价保存，失败自动重试一次（PUT 幂等，重试安全）。
+  ///
+  /// 不抛错：返回是否最终成功，由调用方据 A 套是否已落库给出准确文案。
+  Future<bool> _savePriceWithRetry(int workId, double price) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await ref
+            .read(createRepositoryProvider)
+            .updateWork(workId, price: price);
+        return true;
+      } catch (_) {
+        if (attempt == 0) continue;
+        return false;
+      }
+    }
+    return false;
   }
 
   /// 打开标签多选弹窗。

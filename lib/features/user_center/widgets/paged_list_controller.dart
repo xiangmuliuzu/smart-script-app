@@ -29,6 +29,9 @@ class PagedListController<T> extends ChangeNotifier {
   int _generation = 0;
   bool _refreshing = false;
 
+  /// 在途请求期间收到的 refresh 请求：当前请求收尾后自动补发一次（多次合并为一次）。
+  bool _pendingRefresh = false;
+
   bool get hasMore => !_end;
   bool get isEmpty => items.isEmpty;
 
@@ -65,12 +68,21 @@ class PagedListController<T> extends ChangeNotifier {
 
   /// 首屏加载（或筛选变化后重新加载）。
   Future<void> load({bool refresh = false}) async {
-    if (loading) return;
+    if (loading) {
+      // 在途请求期间收到新的 refresh：记录待刷新标志并直接返回，避免「UI 已更新但数据未变」；
+      // 非 refresh 调用仍按原样丢弃。当前请求收尾后会自动补发一次（多次合并为一次）。
+      if (refresh) _pendingRefresh = true;
+      return;
+    }
     final generation = ++_generation;
+    // 刷新前的分页游标：刷新失败但已有数据时据此恢复，避免 loadMore 从页码 0 重复拉取第 1 页。
+    var previousPage = _page;
+    var previousEnd = _end;
     if (refresh) {
       _page = 0;
       _end = false;
-      items.clear();
+      // 已有数据时不在请求发出前清空，避免下拉刷新整页闪白；成功后由下方整体替换。
+      if (items.isEmpty) items.clear();
     }
     loading = true;
     error = null;
@@ -87,12 +99,22 @@ class PagedListController<T> extends ChangeNotifier {
       _end = data.list.length >= data.total || data.list.isEmpty;
     } catch (e) {
       if (generation != _generation) return;
-      error = e is Exception ? _messageOf(e) : '加载失败，请稍后重试';
-      _end = true;
+      if (refresh && items.isNotEmpty) {
+        // 刷新失败但已有数据：保留旧列表与分页游标，不置 error 覆盖列表。
+        _page = previousPage;
+        _end = previousEnd;
+      } else {
+        error = e is Exception ? _messageOf(e) : '加载失败，请稍后重试';
+        _end = true;
+      }
     } finally {
       if (generation == _generation) {
         loading = false;
+        // 在途期间积累的 refresh 请求：复位标志并自动补发一次。
+        final pendingRefresh = _pendingRefresh;
+        _pendingRefresh = false;
         notifyListeners();
+        if (pendingRefresh) load(refresh: true);
       }
     }
   }

@@ -48,6 +48,9 @@ class AuthorWorkRepository {
   ///
   /// [tagIds] 按接口文档 2.3.3 为**全量覆盖**语义，最多 8 个：
   /// 传 null 表示不改标签，传空列表表示清空标签（因此不能被 [_compact] 过滤掉）。
+  ///
+  /// [summary] 为唯一豁免空串过滤的字段：后端 SQL 为 `summary != null 即更新`，
+  /// 空串用于把简介**清空**；传 null 才表示不更新简介。
   Future<void> updateWorkBase(
     int workId, {
     String? title,
@@ -56,15 +59,19 @@ class AuthorWorkRepository {
     String? cover,
     List<int>? tagIds,
   }) async {
+    final body = _compact({
+      'title': title,
+      'summary': summary,
+      'genreId': genreId,
+      'cover': cover,
+      'tagIds': tagIds,
+    });
+    // 重新写回 summary：_compact 会丢弃空串，但后端支持把 summary 置空，
+    // 故只要调用方显式传了 summary（含空串）就必须下发；其它字段语义不变。
+    if (summary != null) body['summary'] = summary;
     await _api.put<Map<String, dynamic>>(
       ApiEndpoints.authorWorkById(workId),
-      data: _compact({
-        'title': title,
-        'summary': summary,
-        'genreId': genreId,
-        'cover': cover,
-        'tagIds': tagIds,
-      }),
+      data: body,
       parser: _mapParser,
     );
   }

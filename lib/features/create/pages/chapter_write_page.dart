@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/common_views.dart';
 import '../data/author_work_models.dart';
 import '../data/author_work_providers.dart';
 
@@ -47,11 +48,20 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// 是否正在保存中（避免重入）。
   bool _saving = false;
 
+  /// 进行中的保存 Future；返回时复用以避免重复 POST。
+  Future<bool>? _savingFuture;
+
   /// 是否已从 provider 回填数据（仅编辑模式，避免覆盖用户输入）。
   bool _initialized = false;
 
-  /// 从详情中派生的可编辑状态；详情未加载完时乐观置 true。
-  bool _editable = true;
+  /// 从详情中派生的可编辑状态；详情未加载前禁用输入，返回后再决定可写。
+  bool _editable = false;
+
+  /// 返回流程是否已在执行中（防止 PopScope 与返回按钮并发触发）。
+  bool _backing = false;
+
+  /// 上一次静默自动保存是否失败（底部栏展示「保存失败，点击重试」）。
+  bool _saveFailed = false;
 
   /// 是否设为免费试读章节（随保存提交 isFree）。
   bool _isFree = false;
@@ -106,6 +116,8 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// 输入变化：标记 dirty + 重置自动保存定时器。
   void _onChanged() {
     _dirty = true;
+    // 用户重新输入后，旧的「保存失败」态失效。
+    _saveFailed = false;
     _autoSaveTimer?.cancel();
     _autoSaveTimer = Timer(const Duration(seconds: 3), _autoSave);
     setState(() {});
@@ -122,6 +134,9 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// [silent] 为 true 时静默保存（自动保存），false 时显示成功提示。
   Future<bool> _save({bool silent = false}) async {
     if (!_editable) return true;
+    // 已有保存进行中：等待同一请求完成，避免自动保存与返回保存重复 POST。
+    if (_savingFuture != null) return _savingFuture!;
+
     final title = _titleCtrl.text.trim();
     final content = _contentCtrl.text;
 
@@ -131,7 +146,10 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
       return false;
     }
 
-    setState(() => _saving = true);
+    final Completer<bool> completer = Completer<bool>();
+    _savingFuture = completer.future;
+    if (mounted) setState(() => _saving = true);
+    var ok = false;
     try {
       final repo = ref.read(authorWorkRepositoryProvider);
       if (_chapterId == 0) {
@@ -142,6 +160,9 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
           content: content,
           isFree: _isFree,
         );
+        // 新建章首次保存成功即视为已初始化：后续详情回包不得再回填覆盖
+        // 请求飞行窗口内用户继续输入的内容。
+        _initialized = true;
       } else {
         await repo.updateChapter(
           _chapterId,
@@ -151,28 +172,77 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
         );
       }
       _dirty = false;
+      _saveFailed = false;
       if (!silent) _toast('已保存');
       // 刷新工作台数据源
       ref.invalidate(authorWorkDetailProvider(widget.workId));
-      return true;
+      ok = true;
     } on ApiException catch (e) {
-      if (!silent) _toast(e.message);
-      return false;
+      if (!silent) {
+        if (mounted) _toast(e.message);
+      } else {
+        // 静默保存失败：标记失败态，由底部栏提供「点击重试」入口。
+        _saveFailed = true;
+      }
     } catch (_) {
-      if (!silent) _toast('保存失败，请稍后重试');
-      return false;
+      if (!silent) {
+        if (mounted) _toast('保存失败，请稍后重试');
+      } else {
+        _saveFailed = true;
+      }
     } finally {
+      completer.complete(ok);
+      _savingFuture = null;
       if (mounted) setState(() => _saving = false);
     }
+    return ok;
   }
 
   /// 返回前保存未提交内容。
   Future<void> _onBack() async {
+    // 进行中保护：PopScope 与 AppBar 返回按钮并发触发时只执行一次，
+    // 且必须等保存完成后再 pop。
+    if (_backing) return;
+    _backing = true;
     _autoSaveTimer?.cancel();
-    if (_dirty && _editable) {
-      await _save(silent: true);
+    try {
+      // 新建章只写正文、未写标题即返回：服务端无法建章，内容会被静默丢弃，
+      // 先弹确认，不新增持久化层、不改服务端建章规则。
+      final hasContent = _contentCtrl.text.trim().isNotEmpty;
+      final title = _titleCtrl.text.trim();
+      if (_chapterId == 0 && hasContent && title.isEmpty && _editable) {
+        final discard = await _confirmDiscard();
+        if (!discard) return; // 用户取消，留在编辑页
+        // 用户确认放弃：直接返回，不再尝试保存。
+      } else if (_dirty && _editable) {
+        await _save(silent: true);
+      }
+      if (mounted) context.pop();
+    } finally {
+      _backing = false;
     }
-    if (mounted) context.pop();
+  }
+
+  /// 无标题草稿放弃确认对话框。
+  Future<bool> _confirmDiscard() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('内容未保存'),
+        content: const Text('当前章节未填写标题，正文将无法保存，确定放弃吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('继续编辑'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('放弃'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
   }
 
   void _toast(String msg) {
@@ -222,7 +292,11 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
               ),
           ],
         ),
-        body: Column(
+        // detail 未返回前不渲染空白可编辑表单，先给加载占位；
+        // detail 到达后再渲染编辑区。上方 _editable 派生与 _tryInitFromProvider 逻辑不变。
+        body: detail == null
+            ? const LoadingView(message: '加载中')
+            : Column(
           children: [
             // 标题输入
             Container(
@@ -303,11 +377,15 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
               wordCount: _contentCtrl.text.length,
               saving: _saving,
               dirty: _dirty,
+              failed: _saveFailed,
               editable: _editable,
               isFree: _isFree,
+              onRetry: () {
+                _autoSave();
+              },
             ),
           ],
-        ),
+            ),
       ),
     );
   }
@@ -319,32 +397,45 @@ class _BottomBar extends StatelessWidget {
     required this.wordCount,
     required this.saving,
     required this.dirty,
+    required this.failed,
     required this.editable,
     required this.isFree,
+    this.onRetry,
   });
 
   final int wordCount;
   final bool saving;
   final bool dirty;
+  final bool failed;
   final bool editable;
   final bool isFree;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     final String status;
     final Color statusColor;
+    final bool tappable;
     if (!editable) {
       status = '只读';
       statusColor = AppColors.text3;
+      tappable = false;
     } else if (saving) {
       status = '保存中...';
       statusColor = AppColors.warning;
+      tappable = false;
+    } else if (failed) {
+      status = '保存失败，点击重试';
+      statusColor = AppColors.danger;
+      tappable = onRetry != null;
     } else if (dirty) {
       status = '未保存';
       statusColor = AppColors.warning;
+      tappable = false;
     } else {
       status = '已保存';
       statusColor = AppColors.success;
+      tappable = false;
     }
     return Container(
       color: AppColors.card,
@@ -359,7 +450,11 @@ class _BottomBar extends StatelessWidget {
                 style: TextStyle(fontSize: 11, color: AppColors.primary)),
           ],
           const Spacer(),
-          Text(status, style: TextStyle(fontSize: 12, color: statusColor)),
+          GestureDetector(
+            onTap: tappable ? onRetry : null,
+            child: Text(status,
+                style: TextStyle(fontSize: 12, color: statusColor)),
+          ),
         ],
       ),
     );

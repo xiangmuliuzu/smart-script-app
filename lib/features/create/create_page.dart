@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../core/providers/auth_providers.dart';
+import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/common_views.dart';
@@ -42,44 +44,64 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final worksAsync = ref.watch(myWorksProvider(_status));
+    // /create 根被有意排除在路由登录守卫外（避免拦截底部导航创作 tab），但本页数据来自
+    // 需登录的 /users/me/works。此处做页面级兜底：未登录不监听列表 Provider、不发请求，
+    // 页内引导登录；会话恢复中（unknown）按守卫契约视为可能已登录，先加载态等待，
+    // 不误弹「登录已失效」。
+    final authStatus = ref.watch(authControllerProvider).status;
+    final loggedIn = authStatus == AuthStatus.authenticated;
+    // 未登录时不取列表 Provider：不 watch 就不会发出必然 401 的请求。
+    final worksAsync = loggedIn ? ref.watch(myWorksProvider(_status)) : null;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('我的作品'),
         actions: [
-          TextButton.icon(
-            onPressed: () => context.push(RoutePath.workUpload),
-            icon: const Icon(Icons.add, size: 20),
-            label: const Text('新建'),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _FilterBar(
-            filters: _filters,
-            selected: _status,
-            onChanged: (value) => setState(() => _status = value),
-          ),
-          Expanded(
-            child: worksAsync.when(
-              loading: () => const LoadingView(message: '加载中'),
-              error: (error, _) => ErrorView(
-                message: error is ApiException ? error.message : '加载失败，请稍后重试',
-                onRetry: () => ref.invalidate(myWorksProvider(_status)),
-              ),
-              data: _buildGrid,
+          // 新建入口仅登录态出现：游客 body 已提供统一登录引导，避免重复入口。
+          if (loggedIn)
+            TextButton.icon(
+              onPressed: () => context.push(RoutePath.workUpload),
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text('新建'),
             ),
-          ),
         ],
       ),
+      body: switch (authStatus) {
+        // 会话恢复中：不请求、不引导，等 /auth/me 定论。
+        AuthStatus.unknown => const LoadingView(message: '加载中'),
+        // 游客：页内登录引导，不离开创作 tab；登录成功由 RouteIntent 回跳本页。
+        AuthStatus.unauthenticated => _LoginPrompt(
+            onLogin: () =>
+                AuthGuard.requireLogin(context, ref, target: RoutePath.create),
+          ),
+        // 已登录：原列表 / 筛选 / 新建行为不变。
+        AuthStatus.authenticated => Column(
+            children: [
+              _FilterBar(
+                filters: _filters,
+                selected: _status,
+                onChanged: (value) => setState(() => _status = value),
+              ),
+              Expanded(
+                child: worksAsync!.when(
+                  loading: () => const LoadingView(message: '加载中'),
+                  error: (error, _) => ErrorView(
+                    message: error is ApiException ? error.message : '加载失败，请稍后重试',
+                    onRetry: () => ref.invalidate(myWorksProvider(_status)),
+                  ),
+                  data: _buildGrid,
+                ),
+              ),
+            ],
+          ),
+      },
     );
   }
 
   Widget _buildGrid(List<AuthorWorkItem> works) {
     if (works.isEmpty) {
-      return _EmptyWorks(onCreate: () => context.push(RoutePath.workUpload));
+      return const _EmptyWorks();
     }
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(myWorksProvider(_status)),
@@ -285,26 +307,48 @@ class _StatusBadge extends StatelessWidget {
 }
 
 /// 空态：尚无作品时引导新建。
+///
+/// 新建主入口统一保留在 AppBar「新建」（空态 / 有作品态一致，有作品时唯一入口就在
+/// AppBar）；此处不再重复放置右下角 FAB，避免同一页面出现两个新建入口。
 class _EmptyWorks extends StatelessWidget {
-  const _EmptyWorks({required this.onCreate});
-
-  final VoidCallback onCreate;
+  const _EmptyWorks();
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        const EmptyView(message: '还没有作品，点击右下角开始创作', icon: Icons.menu_book_outlined),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton(
-            onPressed: onCreate,
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.add, color: Colors.white),
+    return const EmptyView(
+      message: '还没有作品，点击右上角「新建」开始创作',
+      icon: Icons.menu_book_outlined,
+    );
+  }
+}
+
+/// 游客态页内登录引导。
+///
+/// /create 根被有意排除在路由登录守卫外（见 [ProtectedRoutes] 注释），以保留底部导航
+/// 创作 tab 可进入；但本页数据来自需登录的 /users/me/works，故游客不再直接发请求，
+/// 而是在此引导登录。点击走统一守卫 [AuthGuard.requireLogin]，回跳意图指向本页，
+/// 登录成功后由 resolvePostLoginTarget 以 go 切回创作分支并刷新列表。
+class _LoginPrompt extends StatelessWidget {
+  const _LoginPrompt({required this.onLogin});
+
+  final VoidCallback onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person_outline, size: 56, color: AppColors.text3),
+          const SizedBox(height: 12),
+          const Text('登录后查看我的作品', style: TextStyle(color: AppColors.text3)),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: onLogin,
+            child: const Text('去登录'),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

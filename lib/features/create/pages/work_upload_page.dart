@@ -62,7 +62,9 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
             categoryId: categoryId,
             description: _descCtrl.text.trim(),
           );
-      ref.invalidate(myWorksProvider('all'));
+      // 失效整个 family（all/draft/reviewing/revision/rejected/published），
+      // 避免只刷 'all' 而其它状态 Tab 的列表仍为旧数据。
+      ref.invalidate(myWorksProvider);
       if (!mounted) return;
       context.pushReplacement(
         RoutePath.workWorkspaceUrl(workId: workId, title: title),

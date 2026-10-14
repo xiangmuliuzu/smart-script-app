@@ -81,12 +81,15 @@ class RoutePath {
   static const String dramaReport = '/comic/report'; // 受保护：内容举报（2.8.17）
 
   /// 作品列表 URL；[title] 只用于列表页标题展示，不参与后端筛选。
-  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title}) {
+  /// [sort] 为初始排序（值与后端 normalizeSort 白名单一致，如 view/favorite/...）；
+  /// 不传时列表页默认最新排序，保持既有行为不变。
+  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title, String? sort}) {
     final query = <String, String>{
       if (categoryId != null) 'categoryId': '$categoryId',
       if (tagId != null) 'tagId': '$tagId',
       if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
       if (title != null && title.isNotEmpty) 'title': title,
+      if (sort != null && sort.isNotEmpty) 'sort': sort,
     };
     return Uri(path: workList, queryParameters: query.isEmpty ? null : query).toString();
   }

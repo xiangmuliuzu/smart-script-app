@@ -24,6 +24,10 @@ class RankingPage extends ConsumerStatefulWidget {
 }
 
 class _RankingPageState extends ConsumerState<RankingPage> {
+  /// 与 content_providers.dart 中 rankingProvider 请求的 limit 保持一致；
+  /// 后端榜单接口仅支持 limit、无分页，故前端不做伪分页，仅在页脚提示展示范围。
+  static const int _rankingLimit = 20;
+
   late String _type;
 
   @override
@@ -70,8 +74,18 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                     await ref.read(rankingProvider(_type).future);
                   },
                   child: ListView.builder(
-                    itemCount: items.length,
+                    itemCount: items.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == items.length) {
+                        return const Padding(
+                          padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
+                          child: Text(
+                            '榜单仅展示热度前 $_rankingLimit 名',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: AppColors.text3),
+                          ),
+                        );
+                      }
                       final item = items[index];
                       return RankingRow(
                         item: item,
@@ -89,6 +103,18 @@ class _RankingPageState extends ConsumerState<RankingPage> {
     );
   }
 
-  String _scoreText(RankingItem item) =>
-      _type == 'rating' ? '${item.score.toStringAsFixed(1)} 分' : '${item.score.toInt()}';
+  String _scoreText(RankingItem item) => _type == 'rating'
+      ? '${item.score.toStringAsFixed(1)} 分'
+      : _formatThousands(item.score);
+
+  /// 千分位分隔：1234567 → 1,234,567（项目未引入 intl，手写分隔避免新增依赖）。
+  String _formatThousands(num value) {
+    final digits = value.toInt().toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(digits[i]);
+    }
+    return '$buffer';
+  }
 }

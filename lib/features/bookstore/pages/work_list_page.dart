@@ -48,6 +48,9 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   int? _categoryId;
   int? _tagId;
 
+  /// 首屏引导只做一次：didChangeDependencies 里读完路由 sort 后再发首屏请求。
+  bool _bootstrapped = false;
+
   @override
   void initState() {
     super.initState();
@@ -66,8 +69,23 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
               ),
     );
     _controller.addListener(_onControllerChanged);
-    _controller.load();
     _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_bootstrapped) return;
+    _bootstrapped = true;
+    // 首页「热门作品/最新作品」等入口通过 workListUrl(sort: ...) 带初始排序。
+    // app_router 的 builder 未显式透传 sort，这里直接读本路由 uri 的 query；
+    // 取值须落在后端 normalizeSort 白名单（WorkSortOption.all.value）内，否则忽略。
+    final routeSort = GoRouterState.of(context).uri.queryParameters['sort'];
+    if (routeSort != null &&
+        WorkSortOption.all.any((option) => option.value == routeSort)) {
+      _sort = routeSort;
+    }
+    _controller.load();
   }
 
   void _onControllerChanged() {
@@ -118,6 +136,15 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
         setState(() => _tagId = null);
       }
     }
+    _controller.load(refresh: true);
+  }
+
+  /// 清空分类/标签筛选并重载（仅「带筛选的空态」入口使用；排序与外部关键词不动）。
+  void _resetFilters() {
+    setState(() {
+      _categoryId = null;
+      _tagId = null;
+    });
     _controller.load(refresh: true);
   }
 
@@ -231,15 +258,37 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   }
 
   Widget _buildList() {
-    if (_controller.loading) return const LoadingView(message: '加载中');
-    if (_controller.error != null) {
+    // 首屏无数据时整屏展示加载/错误；已有数据时保留列表，下拉刷新由 RefreshIndicator 反馈。
+    if (_controller.loading && _controller.isEmpty) {
+      return const LoadingView(message: '加载中');
+    }
+    if (_controller.error != null && _controller.isEmpty) {
       return ErrorView(
         message: _controller.error!,
         onRetry: () => _controller.load(refresh: true),
       );
     }
     if (_controller.isEmpty) {
-      return const EmptyView(message: '暂无作品', icon: Icons.menu_book_outlined);
+      // 无筛选条件时保持原空态；带筛选却为空时追加「重置筛选」，引导用户清空条件后重载。
+      final hasFilter = _categoryId != null || _tagId != null;
+      if (!hasFilter) {
+        return const EmptyView(message: '暂无作品', icon: Icons.menu_book_outlined);
+      }
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.menu_book_outlined, size: 56, color: AppColors.text3),
+            const SizedBox(height: 12),
+            const Text('暂无作品', style: TextStyle(color: AppColors.text3)),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: _resetFilters,
+              child: const Text('重置筛选'),
+            ),
+          ],
+        ),
+      );
     }
     return RefreshIndicator(
       onRefresh: () => _controller.load(refresh: true),

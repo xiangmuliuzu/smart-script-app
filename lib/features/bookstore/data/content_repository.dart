@@ -48,11 +48,14 @@ class ContentRepository {
   /// 作品列表（分页 + 筛选 + 排序）。
   ///
   /// [sort] 为空时由后端回落 `latest`；非法值同样回落，客户端不需要做白名单校验。
+  /// [recommendStatus] 传入时后端只回该推荐位下未过期的作品，并按推荐权重降序
+  /// （配合权重同级回落浏览量）；用于书城首页「热门作品」取推荐位。
   Future<PagedData<BookItem>> pageWorks({
     int? categoryId,
     int? tagId,
     String? keyword,
     String? sort,
+    String? recommendStatus,
     required int pageNum,
     required int pageSize,
   }) async {
@@ -63,6 +66,7 @@ class ContentRepository {
         'tagId': tagId,
         'keyword': keyword,
         'sort': sort,
+        'recommendStatus': recommendStatus,
         'page': pageNum,
         'pageSize': pageSize,
       }),

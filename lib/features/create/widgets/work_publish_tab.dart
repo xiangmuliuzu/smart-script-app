@@ -60,7 +60,8 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
           .submitReview(widget.workId);
       ref.invalidate(authorWorkDetailProvider(widget.workId));
       ref.invalidate(authorReviewRecordsProvider(widget.workId));
-      ref.invalidate(myWorksProvider('all'));
+      // 失效整个 family，覆盖 all/draft/reviewing/revision/rejected/published。
+      ref.invalidate(myWorksProvider);
       if (!mounted) return;
       _toast('已提交审核');
     } on ApiException catch (e) {
@@ -174,8 +175,26 @@ class _ReviewHistorySection extends ConsumerWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-            error: (_, __) => const Text('审核记录加载失败',
-                style: TextStyle(color: AppColors.text3, fontSize: 13)),
+            error: (_, __) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Text('审核记录加载失败',
+                      style: TextStyle(color: AppColors.text3, fontSize: 13)),
+                  // 失败态提供重试入口：失效对应 provider 触发重新拉取。
+                  TextButton(
+                    onPressed: () =>
+                        ref.invalidate(authorReviewRecordsProvider(workId)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            ),
             data: (records) {
               if (records.isEmpty) {
                 return const Text('尚未提交审核',

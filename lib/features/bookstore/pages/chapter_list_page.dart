@@ -43,17 +43,19 @@ class ChapterListPage extends ConsumerWidget {
               ref.invalidate(chapterListProvider(workId));
               await ref.read(chapterListProvider(workId).future);
             },
-            child: ListView(
+            child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 24),
-              children: [
-                _PreviewBanner(payload: payload),
-                for (final chapter in payload.chapters)
-                  _ChapterTile(
-                    chapter: chapter,
-                    unlocked: payload.unlocked,
-                    onTap: () => _openChapter(context, chapter),
-                  ),
-              ],
+              itemCount: payload.chapters.length + 1,
+              itemBuilder: (context, index) {
+                // 第 0 项为试读/授权提示条，其后按章节懒加载，避免数百章一次性建 children。
+                if (index == 0) return _PreviewBanner(payload: payload);
+                final chapter = payload.chapters[index - 1];
+                return _ChapterTile(
+                  chapter: chapter,
+                  unlocked: payload.unlocked,
+                  onTap: () => _openChapter(context, chapter),
+                );
+              },
             ),
           );
         },

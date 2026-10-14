@@ -58,7 +58,7 @@ class BookstorePage extends ConsumerWidget {
             const _CategoryEntries(),
             const _RankingPreview(),
             const _BannerCarousel(position: 'home_middle'),
-            _WorkSection(title: '热门作品', provider: hotWorksProvider),
+            _WorkSection(title: '热门作品', provider: hotWorksProvider, sort: 'view'),
             _WorkSection(title: '最新作品', provider: latestWorksProvider),
           ],
         ),
@@ -86,6 +86,10 @@ class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
   int _index = 0;
   int _count = 0;
 
+  /// 上一次渲染用的 Banner 列表实例：用于识别「数据是否刷新出了一份新数据」。
+  /// Riverpod 每次成功取数都会生成新列表实例，未取数的重建保持同一实例。
+  List<BannerItem> _lastBanners = const <BannerItem>[];
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -112,15 +116,34 @@ class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
   @override
   Widget build(BuildContext context) {
     final bannersAsync = ref.watch(bannersProvider(widget.position));
+
+    // 首次加载（无历史数据）时渲染与轮播同高的灰底占位：否则数据到达瞬间 Banner
+    // 才撑开 160，下方分类/榜单板块会整体上移跳动。下拉刷新时 isLoading 仍持有
+    // 旧数据（hasValue=true），继续渲染旧 Banner，布局不跳动。
+    if (bannersAsync.isLoading && !bannersAsync.hasValue) {
+      return const _BannerSkeleton();
+    }
+
     final banners = bannersAsync.valueOrNull ?? const <BannerItem>[];
 
     // 定时器只在数据就绪后启动，且不在 build 过程中直接创建。
+    // 数据变化（数量变化或刷新出一份新数据）时下标归零并跳回首页：
+    // 否则下拉刷新后 Banner 变少，PageView 停在越界旧下标，自动轮播基于旧计数
+    // 还会跳到异常页。定时器本身的启停逻辑保持不变。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncAutoPlay(banners.length);
+      if (!mounted) return;
+      final dataChanged = !identical(banners, _lastBanners);
+      _lastBanners = banners;
+      if (dataChanged && _index != 0 && _controller.hasClients) {
+        setState(() => _index = 0);
+        _controller.jumpToPage(0);
+      }
+      _syncAutoPlay(banners.length);
     });
 
     if (banners.isEmpty) {
-      // Banner 属于装饰性内容：加载中或失败时不占位，页面级下拉刷新可重试。
+      // 已加载但为空列表 / 首次加载失败：Banner 属装饰性内容，不占位，
+      // 页面级下拉刷新可重试。
       return const SizedBox.shrink();
     }
 
@@ -201,6 +224,26 @@ class _BannerImage extends StatelessWidget {
       );
 }
 
+/// Banner 首次加载占位：与轮播同高（160）、同左右留白与圆角，灰底轻量骨架，
+/// 避免数据到达瞬间 Banner 才撑开、下方板块整体上移跳动。
+class _BannerSkeleton extends StatelessWidget {
+  const _BannerSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 160,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.r),
+          child: Container(color: AppColors.primaryTint),
+        ),
+      ),
+    );
+  }
+}
+
 /// 顶级分类入口（parent_id=0）。
 class _CategoryEntries extends ConsumerWidget {
   const _CategoryEntries();
@@ -209,8 +252,20 @@ class _CategoryEntries extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesProvider);
     return categoriesAsync.when(
+      // loading 态暂保持不占位（骨架屏后续批次统一）。
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      // error 态必须可见：否则接口失败时用户以为书城根本没有分类。
+      // 复用本文件 _SectionError，与榜单/作品区块的行内错误风格一致。
+      error: (error, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: '分类'),
+          _SectionError(
+            message: error is ApiException ? error.message : '分类加载失败',
+            onRetry: () => ref.invalidate(categoriesProvider),
+          ),
+        ],
+      ),
       data: (categories) {
         if (categories.isEmpty) return const SizedBox.shrink();
         return Column(
@@ -226,21 +281,26 @@ class _CategoryEntries extends ConsumerWidget {
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final category = categories[index];
-                  return GestureDetector(
-                    onTap: () => context.push(RoutePath.workListUrl(
-                      categoryId: category.categoryId,
-                      title: category.categoryName,
-                    )),
-                    child: Container(
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(17),
-                      ),
-                      child: Text(
-                        category.categoryName,
-                        style: const TextStyle(fontSize: 13, color: AppColors.text2),
+                  // 原胶囊为 GestureDetector + 纯色 Container，点击无任何反馈；
+                  // 改用 Material(承载底色) + InkWell 提供水波纹，圆角/底色/内边距/
+                  // 文字与原胶囊完全一致，横向滑动布局与高度(34)不变。
+                  return Material(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(17),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(17),
+                      onTap: () => context.push(RoutePath.workListUrl(
+                        categoryId: category.categoryId,
+                        title: category.categoryName,
+                      )),
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text(
+                          category.categoryName,
+                          style: const TextStyle(fontSize: 13, color: AppColors.text2),
+                        ),
                       ),
                     ),
                   );
@@ -320,10 +380,14 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
 
 /// 首页作品区块（热门 / 最新共用）：按 provider 取前若干部，完整列表进作品列表页。
 class _WorkSection extends ConsumerWidget {
-  const _WorkSection({required this.title, required this.provider});
+  const _WorkSection({required this.title, required this.provider, this.sort});
 
   final String title;
   final AutoDisposeFutureProvider<List<BookItem>> provider;
+
+  /// 点「更多」带的初始排序值（与后端 normalizeSort 白名单一致，如 'view'）；
+  /// 不传则列表页默认最新排序。热门区块传 'view'，最新区块不传。
+  final String? sort;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -333,7 +397,7 @@ class _WorkSection extends ConsumerWidget {
       children: [
         SectionHeader(
           title: title,
-          onMore: () => context.push(RoutePath.workListUrl()),
+          onMore: () => context.push(RoutePath.workListUrl(sort: sort)),
         ),
         worksAsync.when(
           loading: () => const _SectionLoading(),
