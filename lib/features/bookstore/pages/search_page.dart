@@ -212,8 +212,17 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
-  /// 未提交关键词时的初始态：仅登录用户展示搜索历史，游客不展示、不请求。
+  /// 未提交关键词时的初始态：顶部展示推荐区，其下仅登录用户展示搜索历史，游客不展示、不请求。
   Widget _buildHistory() {
+    return Column(
+      children: [
+        const _SearchRecommendSection(),
+        Expanded(child: _historyBody()),
+      ],
+    );
+  }
+
+  Widget _historyBody() {
     if (!AuthGuard.isLoggedIn(ref)) {
       return const EmptyView(message: '输入关键词开始搜索', icon: Icons.search);
     }
@@ -300,6 +309,34 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           );
         },
       ),
+    );
+  }
+}
+
+/// 搜索页顶部推荐区：按「搜索」展示位取推荐作品（为空不显示）。
+class _SearchRecommendSection extends ConsumerWidget {
+  const _SearchRecommendSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recoAsync = ref.watch(searchRecommendProvider);
+    return recoAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (works) {
+        if (works.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionHeader(title: '为你推荐'),
+            for (final work in works)
+              WorkListTile(
+                work: work,
+                onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
+              ),
+          ],
+        );
+      },
     );
   }
 }

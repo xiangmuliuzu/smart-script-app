@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/common_views.dart';
 import '../bookstore/data/bookstore_models.dart';
 import '../bookstore/data/content_providers.dart';
+import '../bookstore/widgets/bookstore_widgets.dart';
 
 /// 分类（B 模块，接口文档 2.10：分类列表 / 标签列表）。
 ///
@@ -262,6 +263,7 @@ class _CategoryBrowserState extends State<_CategoryBrowser> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(bottom: 24),
                 children: [
+                  const _CategoryRecommendSection(),
                   for (var i = 0; i < groups.length; i++) _buildGroup(i, groups[i]),
                 ],
               ),
@@ -469,6 +471,34 @@ class _ChipBox extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 分类页顶部推荐区：按「分类页」展示位取推荐作品（为空不显示）。
+class _CategoryRecommendSection extends ConsumerWidget {
+  const _CategoryRecommendSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recoAsync = ref.watch(categoryRecommendProvider);
+    return recoAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (works) {
+        if (works.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionHeader(title: '分类推荐'),
+            for (final work in works)
+              WorkListTile(
+                work: work,
+                onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
+              ),
+          ],
+        );
+      },
     );
   }
 }

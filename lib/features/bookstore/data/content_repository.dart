@@ -56,6 +56,7 @@ class ContentRepository {
     String? keyword,
     String? sort,
     String? recommendStatus,
+    String? showScope,
     required int pageNum,
     required int pageSize,
   }) async {
@@ -67,6 +68,7 @@ class ContentRepository {
         'keyword': keyword,
         'sort': sort,
         'recommendStatus': recommendStatus,
+        'showScope': showScope,
         'page': pageNum,
         'pageSize': pageSize,
       }),

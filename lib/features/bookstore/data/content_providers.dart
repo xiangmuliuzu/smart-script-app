@@ -34,14 +34,14 @@ final rankingProvider = FutureProvider.autoDispose.family<List<RankingItem>, Str
   (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
 );
 
-/// 首页热门作品：优先取「首页热门」推荐位（未过期，按推荐权重降序，由后端过滤+排序），
+/// 首页热门作品：优先取「书城首页」展示位推荐（未过期，按推荐权重降序，由后端过滤+排序），
 /// 不足 6 部时用按浏览量取数兜底补足（去重），保证区块始终有内容可展示。
 final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final repo = ref.watch(contentRepositoryProvider);
-    // 1) 首页热门推荐位（recommendStatus=home_hot，未过期，权重降序）
+    // 1) 书城首页展示位推荐（showScope=bookstore，未过期，权重降序）
     final recommended =
-        await repo.pageWorks(pageNum: 1, pageSize: 6, recommendStatus: 'home_hot');
+        await repo.pageWorks(pageNum: 1, pageSize: 6, showScope: 'bookstore');
     final result = List<BookItem>.from(recommended.list);
     // 2) 不足 6 部时按浏览量兜底补足
     if (result.length < 6) {
@@ -53,6 +53,26 @@ final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
       }
     }
     return result.take(6).toList();
+  },
+);
+
+/// 分类页推荐：按「分类页」展示位取未过期的推荐作品（showScope=category_page，权重降序）。
+final categoryRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
+  (ref) async {
+    final page = await ref
+        .watch(contentRepositoryProvider)
+        .pageWorks(pageNum: 1, pageSize: 6, showScope: 'category_page');
+    return page.list;
+  },
+);
+
+/// 搜索页推荐：按「搜索」展示位取未过期的推荐作品（showScope=search，权重降序）。
+final searchRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
+  (ref) async {
+    final page = await ref
+        .watch(contentRepositoryProvider)
+        .pageWorks(pageNum: 1, pageSize: 6, showScope: 'search');
+    return page.list;
   },
 );
 
