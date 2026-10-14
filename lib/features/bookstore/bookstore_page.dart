@@ -15,8 +15,8 @@ import 'widgets/bookstore_widgets.dart';
 
 /// 书城首页（B 模块：内容与作品）。
 ///
-/// 浏览链路全部为公开接口，游客可读；只有「我的书架」是受保护入口，
-/// 由 [AuthGuard.pushProtected] 统一拦截（未登录先登录，登录后回到书架）。
+/// 浏览链路全部为公开接口，游客可读；顶部「消息」是受保护入口，
+/// 由 [AuthGuard.pushProtected] 统一拦截（未登录先登录，登录后回到消息页）。
 class BookstorePage extends ConsumerWidget {
   const BookstorePage({super.key});
 
@@ -25,21 +25,42 @@ class BookstorePage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('书城'),
-        actions: [
-          IconButton(
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        titleSpacing: 16,
+        title: SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
             onPressed: () => context.push(RoutePath.search),
-            icon: const Icon(Icons.search),
-            tooltip: '搜索',
-          ),
-          TextButton.icon(
-            onPressed: () => AuthGuard.pushProtected(
-              context,
-              ref,
-              target: RoutePath.bookshelf,
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.fill,
+              foregroundColor: AppColors.text3,
+              alignment: Alignment.centerLeft,
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              shape: const StadiumBorder(),
+              textStyle: const TextStyle(fontSize: 14),
             ),
-            icon: const Icon(Icons.menu_book_outlined, size: 18),
-            label: const Text('我的书架'),
+            icon: const Icon(Icons.search, size: 18),
+            label: const Text(
+              '搜索作品名称、作者、标签',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () => AuthGuard.pushProtected(
+                context,
+                ref,
+                target: RoutePath.messages,
+              ),
+              icon: const Icon(Icons.notifications_none),
+              tooltip: '消息',
+            ),
           ),
         ],
       ),

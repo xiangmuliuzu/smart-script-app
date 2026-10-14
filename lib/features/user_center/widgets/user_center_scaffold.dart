@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
 
 /// 用户中心子页面外壳：统一 AppBar 与页面底色。
 ///
-/// 返回键的处理不在这里：实测子页面内的 PopScope 收不到系统返回事件
-/// （Android 上按返回键仍会退出应用）。返回键统一在 App 根级拦截，
-/// 见 `lib/app.dart` 的 `_AppBackHandler`，避免每个页面各写一遍且无效。
+/// 子页面明确显示返回入口：优先返回来源页，没有历史栈时回到书城首页。
+/// 正常 push 进入时，系统返回键仍由 Navigator 处理。
 class UserCenterScaffold extends StatelessWidget {
   const UserCenterScaffold({
     super.key,
@@ -25,7 +25,19 @@ class UserCenterScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: Text(title), actions: actions),
+      appBar: AppBar(
+        leading: BackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(RoutePath.home);
+            }
+          },
+        ),
+        title: Text(title),
+        actions: actions,
+      ),
       body: body,
       bottomNavigationBar: bottomNavigationBar,
     );
