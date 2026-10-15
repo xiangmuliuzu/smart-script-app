@@ -12,7 +12,7 @@ import '../../trade/data/trade_providers.dart';
 ///
 /// 展示当前报价金额（初始为询盘预算，有报价后为最新报价），
 /// 对方发的待确认报价可点击"接受"。
-class NegotiationStatusBar extends ConsumerWidget {
+class NegotiationStatusBar extends ConsumerStatefulWidget {
   const NegotiationStatusBar({
     super.key,
     required this.inquiryId,
@@ -29,17 +29,29 @@ class NegotiationStatusBar extends ConsumerWidget {
   final int? budget; // 分
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NegotiationStatusBar> createState() => _NegotiationStatusBarState();
+}
+
+class _NegotiationStatusBarState extends ConsumerState<NegotiationStatusBar> {
+  bool _isAccepting = false;
+
+  int get inquiryId => widget.inquiryId;
+  int get currentUserId => widget.currentUserId;
+  bool get isBuyer => widget.isBuyer;
+  bool get isSeller => widget.isSeller;
+  int? get budget => widget.budget;
+  @override
+  Widget build(BuildContext context) {
     final quoteAsync = ref.watch(latestQuoteProvider(inquiryId));
 
     return quoteAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
-      data: (quote) => _buildContent(context, ref, quote),
+      data: (quote) => _buildContent(context, quote),
     );
   }
 
-  Widget _buildContent(BuildContext context, WidgetRef ref, Quote? quote) {
+  Widget _buildContent(BuildContext context, Quote? quote) {
     // 确定展示金额：有报价用报价，否则用询盘预算
     final int? amountFen = quote?.amount ?? budget;
     if (amountFen == null) return const SizedBox.shrink();
@@ -101,14 +113,16 @@ class NegotiationStatusBar extends ConsumerWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => _acceptQuote(context, ref, quote!.quoteId!),
+                onPressed: _isAccepting ? null : () => _acceptQuote(context, quote!.quoteId!),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('接受', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                child: _isAccepting
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('接受', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ),
           ] else if (quote != null && _isMyPending(quote)) ...[
@@ -170,21 +184,27 @@ class NegotiationStatusBar extends ConsumerWidget {
     return false;
   }
 
-  Future<void> _acceptQuote(BuildContext context, WidgetRef ref, int quoteId) async {
+  Future<void> _acceptQuote(BuildContext context, int quoteId) async {
+    if (_isAccepting) return;
+    setState(() { _isAccepting = true; });
     try {
       final result = await ref.read(tradeRepositoryProvider).appAcceptQuote(quoteId);
       if (context.mounted) {
         final orderId = result['orderId'] as int?;
         if (orderId != null) {
           showAppToast(context, '已接受报价，正在生成订单...');
-          context.push('${RoutePath.orderDetail}?id=$orderId');
+          // 跳转订单详情，返回时刷新状态
+          await context.push('${RoutePath.orderDetail}?id=$orderId');
         } else {
           showAppToast(context, '已接受报价');
         }
+        // 返回后刷新议价状态
         ref.invalidate(latestQuoteProvider(inquiryId));
       }
     } catch (e) {
       if (context.mounted) showAppToast(context, '操作失败：$e');
+    } finally {
+      if (mounted) setState(() { _isAccepting = false; });
     }
   }
 }

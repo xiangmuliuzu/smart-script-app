@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../chat/data/chat_providers.dart';
 import '../data/trade_models.dart';
 import '../data/trade_providers.dart';
 
@@ -62,26 +65,32 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 状态卡片
+  /// 状态卡片 + 进度步骤条
   Widget _buildStatusCard(Order order) {
     final Color color;
     final String desc;
+    final int currentStep;
     switch (order.status) {
       case OrderStatus.confirmed:
         color = AppColors.primary;
         desc = '订单已确认，等待后续流程';
+        currentStep = 0;
       case OrderStatus.delivering:
         color = AppColors.warning;
         desc = '订单交割中，请配合完成相关手续';
+        currentStep = 1;
       case OrderStatus.completed:
         color = AppColors.success;
         desc = '订单已完成';
+        currentStep = 2;
       case OrderStatus.cancelled:
         color = AppColors.text3;
         desc = '订单已取消';
+        currentStep = -1; // 取消不显示步骤
       default:
         color = AppColors.text2;
         desc = OrderStatus.label(order.status);
+        currentStep = -1;
     }
 
     return Container(
@@ -100,8 +109,61 @@ class OrderDetailPage extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(desc, style: TextStyle(fontSize: 13, color: color.withOpacity(0.8))),
+          // 进度步骤条（取消状态不显示）
+          if (currentStep >= 0) ...[
+            const SizedBox(height: 16),
+            _buildProgressSteps(currentStep, color),
+          ],
         ],
       ),
+    );
+  }
+
+  /// 横向进度步骤条
+  Widget _buildProgressSteps(int currentStep, Color activeColor) {
+    const steps = ['已确认', '交割中', '已完成'];
+    return Row(
+      children: List.generate(steps.length * 2 - 1, (i) {
+        if (i.isOdd) {
+          // 连接线
+          final lineIdx = i ~/ 2;
+          final completed = lineIdx < currentStep;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: completed ? activeColor : Colors.grey.shade300,
+            ),
+          );
+        } else {
+          // 步骤圆点
+          final stepIdx = i ~/ 2;
+          final isActive = stepIdx <= currentStep;
+          final isCurrent = stepIdx == currentStep;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: isCurrent ? 14 : 10,
+                height: isCurrent ? 14 : 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive ? activeColor : Colors.grey.shade300,
+                  border: isCurrent ? Border.all(color: activeColor.withOpacity(0.3), width: 4) : null,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                steps[stepIdx],
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isActive ? activeColor : AppColors.text3,
+                  fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          );
+        }
+      }),
     );
   }
 
@@ -118,7 +180,6 @@ class OrderDetailPage extends ConsumerWidget {
     return _buildCard('报价信息', [
       _infoRow('成交金额', order.amountYuan,
           valueStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
-      _infoRow('报价ID', order.quoteId?.toString() ?? '-'),
     ]);
   }
 
@@ -179,7 +240,7 @@ class OrderDetailPage extends ConsumerWidget {
 
   /// 底部操作栏
   Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer) {
-    // 已确认 + 买方 → 显示取消按钮
+    // 已确认 + 买方 → 取消按钮
     if (order.status == OrderStatus.confirmed && isBuyer) {
       return Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
@@ -205,23 +266,116 @@ class OrderDetailPage extends ConsumerWidget {
       );
     }
 
-    // 其他状态：占位说明
+    // 已确认 + 卖方 → 联系买方
     if (order.status == OrderStatus.confirmed && !isBuyer) {
+      return _buildContactBar(context, ref, order, isBuyer, '等待买方操作，可联系买方沟通');
+    }
+
+    // 交割中 → 联系对方
+    if (order.status == OrderStatus.delivering) {
+      return _buildContactBar(context, ref, order, isBuyer, '订单交割中，如有问题请联系对方沟通');
+    }
+
+    // 已完成
+    if (order.status == OrderStatus.completed) {
       return Container(
         padding: const EdgeInsets.all(16),
-        child: const Text('等待买方操作', style: TextStyle(fontSize: 13, color: AppColors.text3)),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.divider)),
+        ),
+        child: SafeArea(
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppColors.success, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('交易已完成，如有问题请联系管理员', style: TextStyle(fontSize: 13, color: AppColors.text2)),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
-    // D 模块功能占位
-    if (order.status == OrderStatus.delivering || order.status == OrderStatus.completed) {
+    // 已取消
+    if (order.status == OrderStatus.cancelled) {
       return Container(
         padding: const EdgeInsets.all(16),
-        child: const Text('合同/托管/结算功能开发中', style: TextStyle(fontSize: 13, color: AppColors.text3)),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.divider)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (order.cancelReason != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: AppColors.text3, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text('取消原因：${order.cancelReason}', style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+                      ),
+                    ],
+                  ),
+                ),
+              const Text('订单已取消，可重新发起交易', style: TextStyle(fontSize: 13, color: AppColors.text2)),
+            ],
+          ),
+        ),
       );
     }
 
     return const SizedBox.shrink();
+  }
+
+  /// 联系对方底部栏
+  Widget _buildContactBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, String hint) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(hint, style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  try {
+                    // 用询盘ID创建或获取 TRADE 类型会话
+                    final chatRepo = ref.read(chatRepositoryProvider);
+                    final session = await chatRepo.createTradeSession(order.inquiryId!);
+                    if (context.mounted) {
+                      context.push(RoutePath.chatDetail(session.session.sessionId));
+                    }
+                  } catch (e) {
+                    if (context.mounted) showAppToast(context, '创建会话失败: $e');
+                  }
+                },
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: Text('联系${isBuyer ? '卖方' : '买方'}'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 取消订单底部弹窗
@@ -304,12 +458,27 @@ class OrderDetailPage extends ConsumerWidget {
                           showAppToast(context, '请选择或输入取消原因');
                           return;
                         }
+                        // 二次确认
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (dlgCtx) => AlertDialog(
+                            title: const Text('确认取消'),
+                            content: const Text('确定取消此订单？取消后不可恢复。'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
+                              TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确定取消', style: TextStyle(color: Colors.red))),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true) return;
                         try {
                           await ref.read(tradeRepositoryProvider).appCancelOrder(order.orderId!, reason);
                           if (context.mounted) {
                             Navigator.pop(ctx);
                             showAppToast(context, '订单已取消');
                             ref.invalidate(appOrderDetailProvider(order.orderId!));
+                            // 返回列表页
+                            context.pop();
                           }
                         } catch (e) {
                           if (context.mounted) showAppToast(context, '取消失败：$e');

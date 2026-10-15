@@ -23,6 +23,7 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
   /// 每个 Tab 当前选中的状态筛选（null = 全部）
   String? _buyerStatus;
   String? _sellerStatus;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -50,7 +51,11 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
     } else {
       _sellerStatus = status;
     }
-    setState(() {});
+    setState(() { _isLoading = true; });
+    // 延迟恢复 loading，让用户看到反馈
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() { _isLoading = false; });
+    });
   }
 
   @override
@@ -81,6 +86,8 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
       body: Column(
         children: [
           _buildStatusFilter(),
+          if (_isLoading)
+            const LinearProgressIndicator(minHeight: 2),
           Expanded(child: _buildList(listAsync)),
         ],
       ),
@@ -133,10 +140,37 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
   Widget _buildList(AsyncValue<PagedData<Order>> listAsync) {
     return listAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('加载失败: $e')),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 40, color: AppColors.text3),
+            const SizedBox(height: 8),
+            Text('加载失败: $e', style: const TextStyle(color: AppColors.text3)),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => ref.invalidate(appOrderListProvider(AppOrderListParams(
+                role: _currentRole, status: _currentStatus,
+              ))),
+              child: const Text('点击重试'),
+            ),
+          ],
+        ),
+      ),
       data: (paged) {
         if (paged.list.isEmpty) {
-          return const Center(child: Text('暂无订单', style: TextStyle(color: AppColors.text3)));
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade300),
+                const SizedBox(height: 12),
+                const Text('暂无订单', style: TextStyle(fontSize: 14, color: AppColors.text3)),
+                const SizedBox(height: 6),
+                const Text('去聊天中接受报价即可生成订单', style: TextStyle(fontSize: 12, color: AppColors.text3)),
+              ],
+            ),
+          );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(appOrderListProvider(AppOrderListParams(
@@ -155,6 +189,11 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
   }
 
   Widget _buildOrderItem(Order order) {
+    // 根据角色显示对方名称
+    final String counterparty = _currentRole == 'buyer'
+        ? (order.sellerName ?? '用户${order.sellerId}')
+        : (order.buyerName ?? '用户${order.buyerId}');
+    final String counterpartyLabel = _currentRole == 'buyer' ? '卖方' : '买方';
     return GestureDetector(
       onTap: () => context.push(
         '${RoutePath.orderDetail}?id=${order.orderId}',
@@ -203,14 +242,22 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
               ],
             ),
             const SizedBox(height: 4),
-            // 第三行：授权类型 + 时间
+            // 第三行：授权类型 + 对方 + 时间
             Row(
               children: [
                 Text(
                   LicenseType.label(order.licenseType),
                   style: const TextStyle(fontSize: 12, color: AppColors.text2),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$counterpartyLabel：$counterparty',
+                    style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Text(
                   _formatDate(order.createdAt),
                   style: const TextStyle(fontSize: 11, color: AppColors.text3),
