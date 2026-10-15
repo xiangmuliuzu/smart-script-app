@@ -16,6 +16,8 @@ import 'package:script_app/features/ai/ai_write_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
+import 'package:script_app/features/welfare/data/welfare_models.dart';
+import 'package:script_app/features/welfare/data/welfare_providers.dart';
 
 /// 可控的假仓库：只对创作三方法返回预设结果，其余方法用不到。
 class _FakeAiRepository implements AiRepository {
@@ -202,6 +204,45 @@ void main() {
           findsOneWidget);
       expect(find.text('复制润色结果'), findsOneWidget);
       expect(fake.calls.first, 'polish:他很生气地走了。|文学优美');
+    });
+  });
+
+  // ================================================================
+  group('E 阶段2-D AI 调用后资产实时刷新', () {
+    testWidgets('写作生成成功后 invalidate 资产provider，余额下次读取重新获取', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository();
+      var assetCalls = 0;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          aiRepositoryProvider.overrideWithValue(fake),
+          welfareAssetProvider.overrideWith((ref) async {
+            assetCalls++;
+            return (points: const PointsBalance(balance: 5000), aiAvailable: 5);
+          }),
+        ],
+        child: const MaterialApp(home: AiWritePage()),
+      ));
+      await tester.pumpAndSettle();
+
+      // 首次读取资产（模拟 AI 创作页已经 watch 过一次）
+      final container =
+          ProviderScope.containerOf(tester.element(find.byType(AiWritePage)),
+              listen: false);
+      await container.read(welfareAssetProvider.future);
+      expect(assetCalls, 1);
+
+      // 生成一次
+      await tester.enterText(find.byType(TextField).first, 'test');
+      await tester.tap(find.text('生成内容'));
+      await tester.pumpAndSettle();
+      expect(fake.calls.first, 'write:test');
+
+      // 生成成功后页面已 invalidate → 再次读取触发重新获取
+      await container.read(welfareAssetProvider.future);
+      expect(assetCalls, 2, reason: '生成成功后应刷新资产缓存（实时扣减显示）');
     });
   });
 

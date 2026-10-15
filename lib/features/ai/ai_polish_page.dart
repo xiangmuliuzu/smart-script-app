@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../welfare/data/welfare_providers.dart';
 import 'ai_quota_dialog.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
@@ -45,10 +46,15 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
       _result = null;
     });
     try {
+      final container = ProviderScope.containerOf(context, listen: false);
       final result = await ref.read(aiRepositoryProvider).polish(
             content: _content.text.trim(),
             style: _selectedStyle,
           );
+      // 扣减已发生。用全局 container 失效缓存：即使用户在 AI 返回前已返回上一页
+      // （页面已 dispose），AI 创作页/福利中心仍在监听，返回后即显示最新次数。
+      container.invalidate(aiBalanceProvider);
+      container.invalidate(welfareAssetProvider);
       if (!mounted) return;
       setState(() => _result = result);
       if (result.content.isEmpty) {
