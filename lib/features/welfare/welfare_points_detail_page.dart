@@ -63,7 +63,7 @@ class _RecordTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positive = record.points >= 0;
+    final positive = !record.isSpend && record.points >= 0;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

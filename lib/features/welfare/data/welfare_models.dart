@@ -128,7 +128,12 @@ class PointsRecord {
   final String remark;
   final String? createTime;
 
-  String get signedPoints => points >= 0 ? '+$points' : '$points';
+  /// SPEND/consume 为支出（显示负数红色），EARN 为收入。
+  bool get isSpend =>
+      changeType == 'SPEND' || changeType == 'consume';
+
+  String get signedPoints =>
+      isSpend ? '-$points' : (points >= 0 ? '+$points' : '$points');
 
   factory PointsRecord.fromJson(Map<String, dynamic> json) => PointsRecord(
         recordId: _int(json['recordId']),

@@ -14,6 +14,7 @@ import 'package:script_app/features/ai/ai_outline_page.dart';
 import 'package:script_app/features/ai/ai_polish_page.dart';
 import 'package:script_app/features/ai/ai_write_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
+import 'package:script_app/features/welfare/data/welfare_models.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
 import 'package:script_app/features/welfare/data/welfare_models.dart';
@@ -297,6 +298,26 @@ void main() {
       expect(text, isNot(contains('name：')));
       expect(text, isNot(contains('role：')));
       expect(text, isNot(contains('beats')));
+    });
+  });
+
+  group('E 阶段2-G 积分明细符号', () {
+    test('SPEND 支出显示负数，EARN 收入显示正数', () {
+      final spend = PointsRecord.fromJson({
+        'changeType': 'SPEND',
+        'points': 20,
+        'balanceAfter': 4980,
+      });
+      final earn = PointsRecord.fromJson({
+        'changeType': 'EARN',
+        'points': 10,
+        'balanceAfter': 4990,
+      });
+      expect(spend.isSpend, isTrue);
+      expect(spend.signedPoints, '-20');
+      expect(spend.balanceAfter, 4980);
+      expect(earn.isSpend, isFalse);
+      expect(earn.signedPoints, '+10');
     });
   });
 }
