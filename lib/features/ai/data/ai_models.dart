@@ -167,12 +167,14 @@ class AiOutlineResult {
   /// 大纲是否有内容。
   bool get hasOutline => outline != null && '$outline'.trim().isNotEmpty;
 
-  /// 把大纲转为可读文本（对象时按 JSON 缩进展示）。
+  /// 把大纲转为可读中文文本（英文键 name/role/beats 等翻译为中文标签）。
   String get outlineText {
     if (outline == null) return '';
     if (outline is String) return outline as String;
     try {
-      return _prettyJson(outline);
+      final sb = StringBuffer();
+      _appendOutline(sb, outline, 0, null);
+      return sb.toString().trim();
     } catch (_) {
       return outline.toString();
     }
@@ -265,4 +267,81 @@ class AiPageResult<T> {
 String _prettyJson(dynamic value) {
   // 轻量 JSON 缩进（避免引入额外依赖时的格式问题）
   return const JsonEncoder.withIndent('  ').convert(value);
+}
+
+/// 递归把大纲对象渲染成「字段：值」的多行中文文本（与后端 outlineToText 对齐）。
+void _appendOutline(StringBuffer sb, dynamic node, int depth, String? parentKey) {
+  if (node == null) return;
+  if (node is Map) {
+    node.forEach((k, value) {
+      final key = '$k';
+      final label = _outlineLabel(key, parentKey);
+      if (value is List) {
+        _appendLine(sb, label, depth);
+        if (value.isEmpty) return;
+        final scalar = value.every((x) => x is! Map && x is! List);
+        if (scalar && _isStorySequence(key)) {
+          for (final item in value) {
+            _appendLine(sb, '  $item', depth);
+          }
+        } else if (scalar) {
+          sb.write(value.join('、'));
+        } else {
+          _appendOutline(sb, value, depth + 1, key);
+        }
+      } else if (value is Map) {
+        _appendLine(sb, label, depth);
+        _appendOutline(sb, value, depth + 1, key);
+      } else {
+        _appendLine(sb, '$label：$value', depth);
+      }
+    });
+  } else if (node is List) {
+    for (final item in node) {
+      _appendOutline(sb, item, depth + 1, parentKey);
+    }
+  } else {
+    _appendLine(sb, '$node', depth);
+  }
+}
+
+bool _isStorySequence(String key) =>
+    key == 'acts' || key == 'plot' || key == 'chapters' || key == 'scenes' ||
+    key == 'steps' || key == 'outline' || key == 'development';
+
+/// 常见大纲字段 → 中文标签（name 按父上下文区分含义）。
+String _outlineLabel(String key, String? parentKey) {
+  switch (key) {
+    case 'title': return '书名';
+    case 'logline': return '一句话简介';
+    case 'summary': return '简介';
+    case 'characters': return '角色';
+    case 'roles': return '角色';
+    case 'acts': return '剧情';
+    case 'plot': return '剧情';
+    case 'chapters': return '章节';
+    case 'setting': return '背景设定';
+    case 'worldview': return '世界观';
+    case 'ending': return '结局';
+    case 'theme': return '主题';
+    case 'role': return '身份';
+    case 'beats': return '关键情节';
+    case 'intro': return '简介';
+    case 'content': return '内容';
+    case 'genre': return '题材';
+    case 'style': return '风格';
+    case 'name':
+      if (parentKey == 'characters') return '角色名';
+      if (parentKey == 'acts') return '幕名';
+      return '名称';
+    default: return key;
+  }
+}
+
+void _appendLine(StringBuffer sb, String text, int depth) {
+  if (sb.isNotEmpty) sb.write('\n');
+  for (var i = 0; i < depth; i++) {
+    sb.write('  ');
+  }
+  sb.write(text);
 }

@@ -267,4 +267,36 @@ void main() {
       expect(find.text('看广告获取'), findsOneWidget);
     });
   });
+
+  // ================================================================
+  group('E 阶段2-F 大纲结果中文渲染', () {
+    test('英文键 name/role/beats 渲染为中文标签', () {
+      final result = AiOutlineResult.fromJson({
+        'outline': {
+          'title': '测试纪元：第七次重启',
+          'logline': '一句话简介',
+          'characters': [
+            {'name': '林砚', 'role': '主角'},
+            {'name': '苏黎', 'role': '女主角'},
+          ],
+          'acts': [
+            {
+              'name': '第一幕：用例',
+              'summary': '本幕概述',
+              'beats': ['关键情节1', '关键情节2'],
+            },
+          ],
+        },
+      });
+      final text = result.outlineText;
+      expect(text, contains('书名：测试纪元：第七次重启'));
+      expect(text, contains('角色名：林砚'));
+      expect(text, contains('身份：主角'));
+      expect(text, contains('幕名：第一幕：用例'));
+      expect(text, contains('关键情节'));
+      expect(text, isNot(contains('name：')));
+      expect(text, isNot(contains('role：')));
+      expect(text, isNot(contains('beats')));
+    });
+  });
 }
