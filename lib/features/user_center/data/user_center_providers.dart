@@ -29,6 +29,11 @@ final realNameStatusProvider = FutureProvider.autoDispose<RealNameStatus>(
   (ref) => ref.watch(userCenterRepositoryProvider).realNameStatus(),
 );
 
+/// 创作者申请状态：提交后 invalidate 以重新拉取。
+final creatorApplyStatusProvider = FutureProvider.autoDispose<CreatorApplyStatus>(
+  (ref) => ref.watch(userCenterRepositoryProvider).creatorApplyStatus(),
+);
+
 /// 未读消息数：我的页与消息中心共用；已读操作后 invalidate。
 final unreadCountProvider = FutureProvider<UnreadCount>(
   (ref) => ref

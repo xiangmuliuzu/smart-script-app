@@ -42,6 +42,7 @@ class RoutePath {
   // A5 用户中心（Shell 之外的独立页面，受登录守卫保护）
   static const String profileEdit = '/profile/edit';
   static const String realName = '/profile/real-name';
+  static const String creatorApply = '/profile/creator-apply';
   static const String accountSecurity = '/profile/security';
   static const String phoneChange = '/profile/security/phone';
   static const String passwordEdit = '/profile/security/password';
@@ -239,6 +240,7 @@ class RouteName {
 
   static const String profileEdit = 'profileEdit';
   static const String realName = 'realName';
+  static const String creatorApply = 'creatorApply';
   static const String accountSecurity = 'accountSecurity';
   static const String phoneChange = 'phoneChange';
   static const String passwordEdit = 'passwordEdit';

@@ -53,6 +53,7 @@ import '../../features/profile/pages/password_edit_page.dart';
 import '../../features/profile/pages/phone_change_page.dart';
 import '../../features/profile/pages/profile_edit_page.dart';
 import '../../features/profile/pages/real_name_page.dart';
+import '../../features/profile/pages/creator_apply_page.dart';
 import '../../features/profile/profile_page.dart';
 import '../../features/splash/splash_page.dart';
 import '../../features/trade/pages/inquiry_create_page.dart';
@@ -388,6 +389,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.realName,
         name: RouteName.realName,
         builder: (_, __) => const RealNamePage(),
+      ),
+      GoRoute(
+        path: RoutePath.creatorApply,
+        name: RouteName.creatorApply,
+        builder: (_, __) => const CreatorApplyPage(),
       ),
       GoRoute(
         path: RoutePath.accountSecurity,

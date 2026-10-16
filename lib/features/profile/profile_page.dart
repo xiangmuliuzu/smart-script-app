@@ -245,6 +245,13 @@ class _ProfileDrawer extends StatelessWidget {
               label: '意见反馈',
               onTap: () => _push(context, RoutePath.feedback),
             ),
+            // 仅未开通作者能力的用户显示申请入口；已是创作者/已开通则隐藏。
+            if (!user.isCreator && !user.authorCapability)
+              _DrawerItem(
+                icon: Icons.workspace_premium_outlined,
+                label: '成为创作者',
+                onTap: () => _push(context, RoutePath.creatorApply),
+              ),
             const Divider(height: 1, color: AppColors.divider),
             _DrawerItem(
               icon: Icons.logout,

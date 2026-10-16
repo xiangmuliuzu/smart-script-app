@@ -88,6 +88,68 @@ class RealNameStatus {
       );
 }
 
+/// 创作者申请状态（§1.6）。
+///
+/// 状态机：NOT_SUBMITTED -> PENDING -> APPROVED；PENDING -> REJECTED -> PENDING（驳回后重提）。
+enum CreatorApplyState {
+  notSubmitted('NOT_SUBMITTED', '未申请'),
+  pending('PENDING', '审核中'),
+  approved('APPROVED', '已通过'),
+  rejected('REJECTED', '已驳回');
+
+  const CreatorApplyState(this.code, this.label);
+
+  final String code;
+  final String label;
+
+  static CreatorApplyState fromCode(String? code) =>
+      CreatorApplyState.values.firstWhere(
+        (e) => e.code == code,
+        orElse: () => CreatorApplyState.notSubmitted,
+      );
+
+  /// 是否允许提交/重新提交（与后端状态机一致）。
+  bool get canSubmit =>
+      this == CreatorApplyState.notSubmitted || this == CreatorApplyState.rejected;
+}
+
+/// 创作者申请状态详情（§1.6）。
+class CreatorApplyStatus {
+  const CreatorApplyStatus({
+    required this.state,
+    this.penName,
+    this.direction,
+    this.portfolio,
+    this.intro,
+    this.contact,
+    this.rejectReason,
+    this.submittedAt,
+    this.reviewedAt,
+  });
+
+  final CreatorApplyState state;
+  final String? penName;
+  final String? direction;
+  final String? portfolio;
+  final String? intro;
+  final String? contact;
+  final String? rejectReason;
+  final String? submittedAt;
+  final String? reviewedAt;
+
+  factory CreatorApplyStatus.fromJson(Map<String, dynamic> json) => CreatorApplyStatus(
+        state: CreatorApplyState.fromCode(json['status'] as String?),
+        penName: json['penName'] as String?,
+        direction: json['direction'] as String?,
+        portfolio: json['portfolio'] as String?,
+        intro: json['intro'] as String?,
+        contact: json['contact'] as String?,
+        rejectReason: json['rejectReason'] as String?,
+        submittedAt: json['submittedAt'] as String?,
+        reviewedAt: json['reviewedAt'] as String?,
+      );
+}
+
 /// 消息类型（与后端 AppAdminConstants 同集合）。
 enum MessageType {
   system('SYSTEM', '系统'),

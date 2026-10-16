@@ -22,6 +22,8 @@ class ApiEndpoints {
   static const String myRealName = '/users/me/real-name';
   static const String myRealNameMaterial = '/users/me/real-name/material';
   static const String myRealNameResubmit = '/users/me/real-name/resubmit';
+  /// 创作者申请（GET 查状态，POST 提交）。
+  static const String myCreatorApply = '/users/me/creator-application';
   static const String phoneChangeOldSend = '/users/me/phone/change/old/send';
   static const String phoneChangeOldVerify = '/users/me/phone/change/old/verify';
   static const String phoneChangeNewSend = '/users/me/phone/change/new/send';

@@ -150,6 +150,40 @@ class UserCenterRepository {
   }
 
   // ------------------------------------------------------------------
+  // 创作者申请（§1.6）
+  // ------------------------------------------------------------------
+
+  Future<CreatorApplyStatus> creatorApplyStatus() async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.myCreatorApply,
+      parser: _mapParser,
+    );
+    return CreatorApplyStatus.fromJson(data ?? const {});
+  }
+
+  /// 提交创作者申请。驳回后重提复用同一端点（服务端按状态机准入，无需区分路径）。
+  Future<CreatorApplyStatus> submitCreatorApply({
+    required String penName,
+    required String direction,
+    String? portfolio,
+    required String intro,
+    required String contact,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.myCreatorApply,
+      data: {
+        'penName': penName,
+        'direction': direction,
+        if (portfolio != null && portfolio.isNotEmpty) 'portfolio': portfolio,
+        'intro': intro,
+        'contact': contact,
+      },
+      parser: _mapParser,
+    );
+    return CreatorApplyStatus.fromJson(data ?? const {});
+  }
+
+  // ------------------------------------------------------------------
   // 账号安全：换绑手机号（§1.4）
   // ------------------------------------------------------------------
 
