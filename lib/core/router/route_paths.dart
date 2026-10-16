@@ -41,6 +41,13 @@ class RoutePath {
 
   // A5 用户中心（Shell 之外的独立页面，受登录守卫保护）
   static const String profileEdit = '/profile/edit';
+  /// 个人主页（自己或他人）；userId 缺省/0 表示自己。
+  static const String userProfile = '/profile/home';
+  /// 关注 / 粉丝列表；following=true 关注列表，false 粉丝列表。
+  static const String userFollowList = '/profile/follow-list';
+  static String userProfileUrl(int userId) => '$userProfile?userId=$userId';
+  static String userFollowListUrl(int userId, {required bool following}) =>
+      '$userFollowList?userId=$userId&following=${following ? 1 : 0}';
   static const String realName = '/profile/real-name';
   static const String creatorApply = '/profile/creator-apply';
   static const String accountSecurity = '/profile/security';
@@ -245,6 +252,8 @@ class RouteName {
   static const String profile = 'profile';
 
   static const String profileEdit = 'profileEdit';
+  static const String userProfile = 'userProfile';
+  static const String userFollowList = 'userFollowList';
   static const String realName = 'realName';
   static const String creatorApply = 'creatorApply';
   static const String accountSecurity = 'accountSecurity';

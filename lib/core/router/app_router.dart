@@ -54,6 +54,8 @@ import '../../features/profile/pages/phone_change_page.dart';
 import '../../features/profile/pages/profile_edit_page.dart';
 import '../../features/profile/pages/real_name_page.dart';
 import '../../features/profile/pages/creator_apply_page.dart';
+import '../../features/profile/pages/user_profile_page.dart';
+import '../../features/profile/pages/user_follow_list_page.dart';
 import '../../features/profile/profile_page.dart';
 import '../../features/splash/splash_page.dart';
 import '../../features/trade/pages/inquiry_create_page.dart';
@@ -398,6 +400,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.creatorApply,
         name: RouteName.creatorApply,
         builder: (_, __) => const CreatorApplyPage(),
+      ),
+      GoRoute(
+        path: RoutePath.userProfile,
+        name: RouteName.userProfile,
+        builder: (context, state) => UserProfilePage(
+          userId: int.tryParse(state.uri.queryParameters['userId'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.userFollowList,
+        name: RouteName.userFollowList,
+        builder: (context, state) => UserFollowListPage(
+          userId: int.tryParse(state.uri.queryParameters['userId'] ?? '') ?? 0,
+          showFollowing: state.uri.queryParameters['following'] == '1',
+        ),
       ),
       GoRoute(
         path: RoutePath.accountSecurity,

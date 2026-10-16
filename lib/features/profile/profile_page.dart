@@ -89,8 +89,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                 }),
                 _Header(
                   user: user,
+                  // 点击头像/昵称进入个人主页（0 = 自己）；编辑资料移到个人主页「···」菜单。
                   onEdit: () =>
-                      AuthGuard.pushProtected(context, ref, target: RoutePath.profileEdit),
+                      AuthGuard.pushProtected(context, ref, target: RoutePath.userProfileUrl(0)),
                   onAuth: () =>
                       AuthGuard.pushProtected(context, ref, target: RoutePath.realName),
                 ),
@@ -196,7 +197,8 @@ class _ProfileDrawer extends StatelessWidget {
           padding: EdgeInsets.zero,
           children: [
             InkWell(
-              onTap: () => _push(context, RoutePath.profileEdit),
+              // 抽屉头部（头像+昵称）：进入个人主页（0 = 自己）。
+              onTap: () => _push(context, RoutePath.userProfileUrl(0)),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                 child: Row(
@@ -476,9 +478,9 @@ class _QuickGrid extends StatelessWidget {
       _QuickEntry(ref, Icons.forum_outlined, '会话',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.chatSessionList)),
-      _QuickEntry(ref, Icons.edit_outlined, '编辑资料',
+      _QuickEntry(ref, Icons.person_outline, '个人主页',
           onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.profileEdit)),
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.userProfileUrl(0))),
       if (user.isCreator || user.authorCapability) ...[
         _QuickEntry(ref, Icons.auto_awesome, 'AI 创作',
             onTap: (ctx, ref) =>

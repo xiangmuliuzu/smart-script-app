@@ -4,11 +4,34 @@ import '../../../core/providers/app_providers.dart';
 import '../data/message_repository.dart';
 import '../data/user_center_models.dart';
 import '../data/user_center_repository.dart';
+import '../data/user_social_models.dart';
+import '../data/user_social_repository.dart';
 
 /// A5 用户中心依赖注入（与框架层 [apiClientProvider] 同源，不新建网络栈）。
 
 final userCenterRepositoryProvider = Provider<UserCenterRepository>(
   (ref) => UserCenterRepository(ref.watch(apiClientProvider)),
+);
+
+final userSocialRepositoryProvider = Provider<UserSocialRepository>(
+  (ref) => UserSocialRepository(ref.watch(apiClientProvider)),
+);
+
+/// 指定用户的公开资料（个人主页头部）。family 按 userId 缓存。
+final userProfileViewProvider =
+    FutureProvider.autoDispose.family<UserProfileView, int>(
+  (ref, userId) => ref.watch(userSocialRepositoryProvider).publicProfile(userId),
+);
+
+/// 关注列表 / 粉丝列表。
+final userFollowingProvider =
+    FutureProvider.autoDispose.family<List<UserSummary>, int>(
+  (ref, userId) => ref.watch(userSocialRepositoryProvider).following(userId),
+);
+
+final userFollowersProvider =
+    FutureProvider.autoDispose.family<List<UserSummary>, int>(
+  (ref, userId) => ref.watch(userSocialRepositoryProvider).followers(userId),
 );
 
 final messageRepositoryProvider = Provider<MessageRepository>(

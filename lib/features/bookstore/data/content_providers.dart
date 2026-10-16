@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../user_center/data/paged_data.dart';
 import 'bookstore_models.dart';
 import 'content_repository.dart';
 
@@ -146,3 +147,13 @@ final chapterDetailProvider = FutureProvider.autoDispose.family<ChapterDetail, i
   (ref, chapterId) => ref.watch(contentRepositoryProvider).chapterDetail(chapterId),
 );
 
+
+/// 指定作者的上架作品（个人主页「TA 的作品」）。
+final authorWorksProvider =
+    FutureProvider.autoDispose.family<PagedData<BookItem>, int>(
+  (ref, authorId) => ref.watch(contentRepositoryProvider).pageWorks(
+        authorId: authorId,
+        pageNum: 1,
+        pageSize: 30,
+      ),
+);

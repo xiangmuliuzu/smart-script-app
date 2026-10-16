@@ -30,6 +30,17 @@ class ApiEndpoints {
   static const String phoneChangeConfirm = '/users/me/phone/change/confirm';
   static const String myNotificationPreferences = '/users/me/notification-preferences';
 
+  // ===== A5 个人主页与关注（§1.7）=====
+  /// 指定用户公开资料（GET）。
+  static String userPublicProfile(int userId) => '/users/$userId/public-profile';
+  /// 关注列表 / 粉丝列表（GET）。
+  static String userFollowing(int userId) => '/users/$userId/following';
+  static String userFollowers(int userId) => '/users/$userId/followers';
+  /// 关注 / 取消关注（POST / DELETE，幂等）。
+  static String userFollow(int userId) => '/users/$userId/follow';
+  /// 作者获赞统计（内容域）；作品列表复用书城 /content/works?authorId=。
+  static String userProfileStats(int userId) => '/content/users/$userId/stats';
+
   // ===== A5 用户中心契约：消息中心 =====
   static const String messages = '/messages';
   static const String messagesUnreadCount = '/messages/unread-count';

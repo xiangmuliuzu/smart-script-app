@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,6 +27,9 @@ class NotificationPoller {
 
   void start() {
     if (_timer != null) return;
+    // 测试环境（flutter test 注入 FLUTTER_TEST=true）不启动周期性轮询，
+    // 否则挂起的 Timer 会让 widget 测试报 "A Timer is still pending" 失败。
+    if (Platform.environment['FLUTTER_TEST'] == 'true') return;
     _seen.clear();
     // 登录后申请一次通知权限（Android 13+）；已授权或低版本为无副作用调用。
     LocalNotifier.ensurePermission();
