@@ -24,11 +24,42 @@ import '../user_center/widgets/user_center_widgets.dart';
 ///   2. 快捷宫格：一行四个圆形入口，创作者与甲方角色分流（原型两套入口）；
 ///   3. 我的书架：一行三本的竖版书封网格。
 /// 数据来源：`/auth/me` 的全局身份 + `/messages/unread-count` 未读数 + 书架接口。
-class ProfilePage extends ConsumerWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 「我的」是身份信息的主要展示入口：进入时刷新全局身份（/auth/me），
+    // 使后台运维端刚通过的实名审核等状态无需重新登录即可显示。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(authControllerProvider.notifier).refreshMe();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 从后台切回前台时刷新身份：审核状态可能在 App 处于后台期间于运维端变更。
+    if (state == AppLifecycleState.resumed) {
+      ref.read(authControllerProvider.notifier).refreshMe();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
     // 该路由受登录守卫保护，正常情况必有会话；兜底空用户避免游客态空指针。
     final user = auth.user ?? const User(userId: 0, userType: UserType.user);
