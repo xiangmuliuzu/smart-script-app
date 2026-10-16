@@ -12,6 +12,9 @@ class AiRepository {
 
   static const _prefix = '/ai/quota';
 
+  /// AI 生成（大纲/写作/润色）耗时可超过全局 30s 接收超时，单独放长到 120s。
+  static const _aiReceiveTimeout = Duration(seconds: 120);
+
   /// 查询 AI 机会余额与最近流水。
   Future<AiQuotaBalance> balance(int userId) async {
     final data = await _api.get<Map<String, dynamic>>(
@@ -101,6 +104,7 @@ class AiRepository {
         'prompt': prompt,
         if (type != null && type.isNotEmpty) 'type': type,
       },
+      receiveTimeout: _aiReceiveTimeout,
       parser: _map,
     );
     if (data == null) throw ApiException('AI 写作失败');
@@ -118,6 +122,7 @@ class AiRepository {
         'content': content,
         if (style != null && style.isNotEmpty) 'style': style,
       },
+      receiveTimeout: _aiReceiveTimeout,
       parser: _map,
     );
     if (data == null) throw ApiException('AI 润色失败');
@@ -138,6 +143,7 @@ class AiRepository {
         if (genre != null && genre.isNotEmpty) 'genre': genre,
         if (style != null && style.isNotEmpty) 'style': style,
       },
+      receiveTimeout: _aiReceiveTimeout,
       parser: _map,
     );
     if (data == null) throw ApiException('AI 大纲生成失败');

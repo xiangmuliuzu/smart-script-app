@@ -80,18 +80,20 @@ class ApiClient {
   /// POST 请求（JSON）。
   ///
   /// 需要幂等的接口（如发票 2.3.16）请在 [headers] 传 `{'Idempotency-Key': '...'}`。
+  /// AI 生成等长耗时接口可传 [receiveTimeout] 覆盖全局 30s 接收超时，避免生成中途被中断。
   Future<T?> post<T>(
     String path, {
     dynamic data,
     Map<String, dynamic>? query,
     Map<String, dynamic>? headers,
+    Duration? receiveTimeout,
     T Function(dynamic raw)? parser,
   }) =>
       _send<T>(
           _dio.post<dynamic>(path,
               data: data,
               queryParameters: query,
-              options: Options(headers: headers)),
+              options: Options(headers: headers, receiveTimeout: receiveTimeout)),
           parser);
 
   /// PUT 请求（JSON）。
