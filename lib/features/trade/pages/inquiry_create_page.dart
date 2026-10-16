@@ -218,7 +218,7 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
     final types = [
       (LicenseType.nonExclusive, '非独家授权'),
       (LicenseType.exclusive, '独家授权'),
-      (LicenseType.transfer, '转让'),
+      (LicenseType.adaptation, '改编授权'),
     ];
 
     return Column(

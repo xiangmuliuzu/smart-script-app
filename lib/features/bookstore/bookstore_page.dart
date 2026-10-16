@@ -74,13 +74,10 @@ class BookstorePage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 16),
           children: [
-            const SizedBox(height: 12),
             const _BannerCarousel(position: 'home_top'),
             const _CategoryEntries(),
             const _RankingPreview(),
-            const SizedBox(height: 36),
             const _BannerCarousel(position: 'home_middle'),
-            const SizedBox(height: 20),
             _WorkSection(title: '热门精选', provider: hotWorksProvider, showScope: 'bookstore'),
           ],
         ),
@@ -169,44 +166,48 @@ class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
       return const SizedBox.shrink();
     }
 
-    return SizedBox(
-      height: 160,
-      child: Stack(
-        children: [
-          PageView.builder(
-            controller: _controller,
-            itemCount: banners.length,
-            onPageChanged: (value) => setState(() => _index = value),
-            itemBuilder: (context, index) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.r),
-                child: _BannerImage(banner: banners[index]),
+    return Padding(
+      // 上边距 20 与下方区块标题自带的 16 顶部留白相加约为 20，使轮播上下留白均匀。
+      padding: const EdgeInsets.only(top: 20, bottom: 4),
+      child: SizedBox(
+        height: 160,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: banners.length,
+              onPageChanged: (value) => setState(() => _index = value),
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.r),
+                  child: _BannerImage(banner: banners[index]),
+                ),
               ),
             ),
-          ),
-          if (banners.length > 1)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 10,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < banners.length; i++)
-                    Container(
-                      width: i == _index ? 14 : 6,
-                      height: 6,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: i == _index ? AppColors.card : AppColors.card.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(3),
+            if (banners.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 10,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var i = 0; i < banners.length; i++)
+                      Container(
+                        width: i == _index ? 14 : 6,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          color: i == _index ? AppColors.card : AppColors.card.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -253,13 +254,16 @@ class _BannerSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 160,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.r),
-          child: Container(color: AppColors.primaryTint),
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 4),
+      child: SizedBox(
+        height: 160,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.r),
+            child: Container(color: AppColors.primaryTint),
+          ),
         ),
       ),
     );

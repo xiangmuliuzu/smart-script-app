@@ -72,13 +72,13 @@ class OrderStatus {
 class LicenseType {
   static const String exclusive = 'exclusive';           // 独家授权
   static const String nonExclusive = 'non_exclusive';    // 非独家授权
-  static const String transfer = 'transfer';             // 转让
+  static const String adaptation = 'adaptation';         // 改编授权
 
   static String label(String? type) {
     switch (type) {
       case exclusive: return '独家授权';
       case nonExclusive: return '非独家授权';
-      case transfer: return '转让';
+      case adaptation: return '改编授权';
       default: return type ?? '未知';
     }
   }

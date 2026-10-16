@@ -210,7 +210,7 @@ class _EmptyShelf extends StatelessWidget {
         children: [
           Icon(Icons.menu_book_outlined, size: 40, color: AppColors.text3),
           SizedBox(height: 10),
-          Text('书架暂无作品，去书城添加吧',
+          Text('书架暂无作品，去首页添加吧',
               style: TextStyle(fontSize: 13, color: AppColors.text3)),
         ],
       ),

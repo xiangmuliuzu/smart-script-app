@@ -685,7 +685,7 @@ class _ShelfSection extends StatelessWidget {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: Text('书架暂无作品，去书城添加吧',
+                  child: Text('书架暂无作品，去首页添加吧',
                       style: TextStyle(fontSize: 12, color: AppColors.text3)),
                 ),
               );
