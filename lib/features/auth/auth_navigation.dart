@@ -55,6 +55,16 @@ void resolvePostLoginTarget(BuildContext context, WidgetRef ref) {
   }
 }
 
+/// 底部导航五个分支的首页路径：作为登录回跳目标时直接切换分支，
+/// 不能用「回首页再 push」的方式打开，否则会污染其他分支的导航栈。
+const Set<String> _shellRootTargets = <String>{
+  RoutePath.bookstore,
+  RoutePath.comic,
+  RoutePath.create,
+  RoutePath.category,
+  RoutePath.profile,
+};
+
 /// 子认证页（注册、账号密码登录）返回：
 /// 历史栈内有上一页就回退，否则回登录首页。
 void backToLogin(BuildContext context) {

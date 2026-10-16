@@ -55,6 +55,12 @@ final messagesProvider = FutureProvider.autoDispose.family<PagedData<ChatMessage
   (ref, sessionId) => ref.watch(chatRepositoryProvider).listMessages(sessionId),
 );
 
+/// 会话详情（按会话ID）
+final sessionDetailProvider = FutureProvider.autoDispose
+    .family<ChatSessionWithPeer, int>(
+  (ref, sessionId) => ref.watch(chatRepositoryProvider).getSessionDetail(sessionId),
+);
+
 /// 未读消息总数
 final chatUnreadCountProvider = FutureProvider<int>((ref) async {
   final repo = ref.watch(chatRepositoryProvider);

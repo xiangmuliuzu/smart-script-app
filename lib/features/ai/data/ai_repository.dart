@@ -1,0 +1,166 @@
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
+import 'ai_models.dart';
+
+/// AI 创作业务仓库（App 端 E 模块）。
+///
+/// 所有写操作带幂等键（后端幂等防重复扣减/补偿/兑换）。
+class AiRepository {
+  AiRepository(this._api);
+
+  final ApiClient _api;
+
+  static const _prefix = '/ai/quota';
+
+  /// 查询 AI 机会余额与最近流水。
+  Future<AiQuotaBalance> balance(int userId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '$_prefix/balance',
+      query: {'userId': userId},
+      parser: _map,
+    );
+    if (data == null) throw ApiException('机会余额加载失败');
+    return AiQuotaBalance.fromJson(data);
+  }
+
+  /// AI 调用消耗机会（预扣；返回最新可用次数）。
+  Future<int> consume({
+    required int userId,
+    required String capability,
+    int quotaCost = 1,
+    int? workId,
+    required String idempotencyKey,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_prefix/consume',
+      data: <String, dynamic>{
+        'userId': userId,
+        'capability': capability,
+        'quotaCost': quotaCost,
+        if (workId != null) 'workId': workId,
+        'idempotencyKey': idempotencyKey,
+      },
+      parser: _map,
+    );
+    return (data?['balance'] as num?)?.toInt() ?? 0;
+  }
+
+  /// AI 调用失败补偿机会（幂等；返回最新可用次数）。
+  Future<int> refund({
+    required int userId,
+    int amount = 1,
+    int? workId,
+    required String idempotencyKey,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_prefix/refund',
+      data: <String, dynamic>{
+        'userId': userId,
+        'amount': amount,
+        if (workId != null) 'workId': workId,
+        'idempotencyKey': idempotencyKey,
+      },
+      parser: _map,
+    );
+    return (data?['balance'] as num?)?.toInt() ?? 0;
+  }
+
+  /// 积分兑换 AI 机会（只能积分换次数；返回最新可用次数）。
+  Future<int> exchange({
+    required int userId,
+    required int points,
+    required String idempotencyKey,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_prefix/exchange',
+      data: <String, dynamic>{
+        'userId': userId,
+        'points': points,
+        'idempotencyKey': idempotencyKey,
+      },
+      parser: _map,
+    );
+    return (data?['balance'] as num?)?.toInt() ?? 0;
+  }
+
+
+  // ================================================================
+  // AI 创作（大纲/写作/润色），对接 /api/v1/content/ai/*
+  // ================================================================
+
+  static const _contentPrefix = '/content/ai';
+
+  /// AI 写作：{prompt, type} → {content, recordId}。
+  Future<AiWriteResult> write({
+    required String prompt,
+    String? type,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_contentPrefix/write',
+      data: <String, dynamic>{
+        'prompt': prompt,
+        if (type != null && type.isNotEmpty) 'type': type,
+      },
+      parser: _map,
+    );
+    if (data == null) throw ApiException('AI 写作失败');
+    return AiWriteResult.fromJson(data);
+  }
+
+  /// AI 润色：{content, style} → {content, recordId}。
+  Future<AiWriteResult> polish({
+    required String content,
+    String? style,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_contentPrefix/polish',
+      data: <String, dynamic>{
+        'content': content,
+        if (style != null && style.isNotEmpty) 'style': style,
+      },
+      parser: _map,
+    );
+    if (data == null) throw ApiException('AI 润色失败');
+    return AiWriteResult.fromJson(data);
+  }
+
+  /// AI 大纲：{inspiration, genre, style} → {outline, requestNo, quotaUsed}。
+  Future<AiOutlineResult> outline({
+    String? inspiration,
+    String? genre,
+    String? style,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_contentPrefix/outline',
+      data: <String, dynamic>{
+        if (inspiration != null && inspiration.isNotEmpty)
+          'inspiration': inspiration,
+        if (genre != null && genre.isNotEmpty) 'genre': genre,
+        if (style != null && style.isNotEmpty) 'style': style,
+      },
+      parser: _map,
+    );
+    if (data == null) throw ApiException('AI 大纲生成失败');
+    return AiOutlineResult.fromJson(data);
+  }
+
+  /// AI 写作记录（分页）。
+  Future<AiPageResult<AiWriteRecord>> writeRecords({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '$_contentPrefix/write-records',
+      query: {'page': page, 'pageSize': pageSize},
+      parser: _map,
+    );
+    if (data == null) throw ApiException('AI 写作记录加载失败');
+    return AiPageResult.fromJson(data, AiWriteRecord.fromJson);
+  }
+
+  static Map<String, dynamic> _map(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((key, value) => MapEntry('$key', value));
+    throw ApiException('AI 数据响应无效');
+  }
+}

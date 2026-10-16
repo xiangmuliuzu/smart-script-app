@@ -108,6 +108,20 @@ final quoteListProvider = FutureProvider.autoDispose
       ),
 );
 
+// ==================== 报价/议价 Providers（APP端） ====================
+
+/// 按询盘ID查询报价列表
+final appQuoteListProvider = FutureProvider.autoDispose
+    .family<List<Quote>, int>(
+  (ref, inquiryId) => ref.watch(tradeRepositoryProvider).listQuotesByInquiry(inquiryId),
+);
+
+/// 按询盘ID查询最新报价（用于聊天页议价卡片）
+final latestQuoteProvider = FutureProvider.autoDispose
+    .family<Quote?, int>(
+  (ref, inquiryId) => ref.watch(tradeRepositoryProvider).getLatestQuote(inquiryId),
+);
+
 // ==================== 订单 Providers ====================
 
 /// 订单列表查询参数
@@ -247,4 +261,49 @@ final tradeWorkListProvider = FutureProvider.autoDispose
 /// 交易作品详情
 final tradeWorkDetailProvider = FutureProvider.autoDispose.family<TradeWork, int>(
   (ref, workId) => ref.watch(tradeRepositoryProvider).tradeWorkDetail(workId),
+);
+
+// ==================== 订单 Providers ====================
+
+/// APP订单列表查询参数
+class AppOrderListParams {
+  final String role;
+  final String? status;
+  final int pageNum;
+  final int pageSize;
+
+  const AppOrderListParams({
+    required this.role,
+    this.status,
+    this.pageNum = 1,
+    this.pageSize = 10,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppOrderListParams &&
+          role == other.role &&
+          status == other.status &&
+          pageNum == other.pageNum &&
+          pageSize == other.pageSize;
+
+  @override
+  int get hashCode => Object.hash(role, status, pageNum, pageSize);
+}
+
+/// APP订单分页列表
+final appOrderListProvider = FutureProvider.autoDispose
+    .family<PagedData<Order>, AppOrderListParams>(
+  (ref, params) => ref.watch(tradeRepositoryProvider).appPageOrders(
+        role: params.role,
+        status: params.status,
+        pageNum: params.pageNum,
+        pageSize: params.pageSize,
+      ),
+);
+
+/// APP订单详情
+final appOrderDetailProvider = FutureProvider.autoDispose.family<Order, int>(
+  (ref, orderId) => ref.watch(tradeRepositoryProvider).appOrderDetail(orderId),
 );

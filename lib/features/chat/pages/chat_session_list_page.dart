@@ -68,13 +68,14 @@ class _ChatSessionListPageState extends ConsumerState<ChatSessionListPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('线上会话'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.5,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
+          indicatorColor: AppColors.primary,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(text: '全部'),
             Tab(text: '交易会话'),

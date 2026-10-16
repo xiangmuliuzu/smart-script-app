@@ -34,6 +34,16 @@ import '../../features/create/pages/work_version_page.dart';
 import '../../features/feedback/pages/feedback_create_page.dart';
 import '../../features/feedback/pages/feedback_detail_page.dart';
 import '../../features/feedback/pages/feedback_list_page.dart';
+import '../../features/ai_creation/ai_creation_page.dart';
+import '../../features/ai/ai_outline_page.dart';
+import '../../features/ai/ai_write_page.dart';
+import '../../features/ai/ai_polish_page.dart';
+import '../../features/ai/ai_record_page.dart';
+import '../../features/ai/ai_chance_page.dart';
+import '../../features/welfare/welfare_center_page.dart';
+import '../../features/welfare/welfare_exchange_page.dart';
+import '../../features/welfare/welfare_exchange_records_page.dart';
+import '../../features/welfare/welfare_points_detail_page.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/message/pages/message_detail_page.dart';
 import '../../features/message/pages/message_list_page.dart';
@@ -48,6 +58,10 @@ import '../../features/splash/splash_page.dart';
 import '../../features/trade/pages/inquiry_create_page.dart';
 import '../../features/trade/pages/inquiry_detail_page.dart';
 import '../../features/trade/pages/inquiry_list_page.dart';
+import '../../features/trade/pages/quote_create_page.dart';
+import '../../features/trade/pages/quote_records_page.dart';
+import '../../features/trade/pages/order_list_page.dart';
+import '../../features/trade/pages/order_detail_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
 import '../providers/auth_providers.dart';
@@ -429,6 +443,60 @@ final routerProvider = Provider<GoRouter>((ref) {
           feedbackId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
       ),
+      // ===== E 模块：AI 创作中心（受登录守卫保护）=====
+      GoRoute(
+        path: RoutePath.aiCenter,
+        name: RouteName.aiCenter,
+        builder: (_, __) => const AiCreationPage(),
+      ),
+
+      // ===== E 模块：AI 大纲 / 写作 / 润色（受登录守卫保护）=====
+      GoRoute(
+        path: RoutePath.aiOutline,
+        name: RouteName.aiOutline,
+        builder: (_, __) => const AiOutlinePage(),
+      ),
+      GoRoute(
+        path: RoutePath.aiWrite,
+        name: RouteName.aiWrite,
+        builder: (_, __) => const AiWritePage(),
+      ),
+      GoRoute(
+        path: RoutePath.aiPolish,
+        name: RouteName.aiPolish,
+        builder: (_, __) => const AiPolishPage(),
+      ),
+      GoRoute(
+        path: RoutePath.aiRecords,
+        name: RouteName.aiRecords,
+        builder: (_, __) => const AiRecordPage(),
+      ),
+      GoRoute(
+        path: RoutePath.aiOpportunity,
+        name: RouteName.aiOpportunity,
+        builder: (_, __) => const AiChancePage(),
+      ),
+      // ===== E 模块：福利中心（受登录守卫保护）=====
+      GoRoute(
+        path: RoutePath.welfareCenter,
+        name: RouteName.welfareCenter,
+        builder: (_, __) => const WelfareCenterPage(),
+      ),
+      GoRoute(
+        path: RoutePath.welfareExchange,
+        name: RouteName.welfareExchange,
+        builder: (_, __) => const WelfareExchangePage(),
+      ),
+      GoRoute(
+        path: RoutePath.welfarePointsDetail,
+        name: RouteName.welfarePointsDetail,
+        builder: (_, __) => const WelfarePointsDetailPage(),
+      ),
+      GoRoute(
+        path: RoutePath.welfareExchangeRecords,
+        name: RouteName.welfareExchangeRecords,
+        builder: (_, __) => const WelfareExchangeRecordsPage(),
+      ),
       // ===== C 交易域 =====
       GoRoute(
         path: RoutePath.inquiryCreate,
@@ -448,6 +516,36 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.inquiryDetail,
         builder: (context, state) => InquiryDetailPage(
           inquiryId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      // ===== 报价/议价 =====
+      GoRoute(
+        path: RoutePath.quoteCreate,
+        name: RouteName.quoteCreate,
+        builder: (context, state) => QuoteCreatePage(
+          inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
+          workTitle: state.uri.queryParameters['workTitle'],
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.quoteList,
+        name: RouteName.quoteList,
+        builder: (context, state) => QuoteRecordsPage(
+          inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
+          workTitle: state.uri.queryParameters['workTitle'],
+        ),
+      ),
+      // ===== 订单 =====
+      GoRoute(
+        path: RoutePath.orderList,
+        name: RouteName.orderList,
+        builder: (_, __) => const OrderListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.orderDetail,
+        name: RouteName.orderDetail,
+        builder: (context, state) => OrderDetailPage(
+          orderId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
       ),
       // ===== A3 聊天域 =====

@@ -206,6 +206,18 @@ class RoutePath {
   static const String chatSessionList = '/chat';
   // 聊天详情页
   static String chatDetail(int sessionId) => '/chat/$sessionId';
+
+  /// App 端 E 模块：福利中心与 AI 创作。
+  static const String welfareCenter = '/welfare';
+  static const String welfareExchange = '/welfare/exchange';
+  static const String welfarePointsDetail = '/welfare/points-detail';
+  static const String welfareExchangeRecords = '/welfare/exchange-records';
+  static const String aiCenter = '/ai';
+  static const String aiOutline = '/ai/outline';
+  static const String aiWrite = '/ai/write';
+  static const String aiPolish = '/ai/polish';
+  static const String aiRecords = '/ai/records';
+  static const String aiOpportunity = '/ai/opportunity';
 }
 
 class RouteName {
@@ -273,6 +285,18 @@ class RouteName {
   // 聊天
   static const String chatSessionList = 'chatSessionList';
   static const String chatDetail = 'chatDetail';
+
+  // ===== E 模块：福利中心与 AI 创作 =====
+  static const String welfareCenter = 'welfareCenter';
+  static const String welfareExchange = 'welfareExchange';
+  static const String welfarePointsDetail = 'welfarePointsDetail';
+  static const String welfareExchangeRecords = 'welfareExchangeRecords';
+  static const String aiCenter = 'aiCenter';
+  static const String aiOutline = 'aiOutline';
+  static const String aiWrite = 'aiWrite';
+  static const String aiPolish = 'aiPolish';
+  static const String aiRecords = 'aiRecords';
+  static const String aiOpportunity = 'aiOpportunity';
 }
 
 /// 需要登录才能访问的路径前缀（规格 §8.1 守卫清单）。
@@ -317,6 +341,9 @@ class ProtectedRoutes {
     RoutePath.tradeChat,
     // 聊天（需登录）
     RoutePath.chatSessionList,
+    // E 模块：福利中心与 AI 创作（需登录）
+    RoutePath.welfareCenter,
+    RoutePath.aiCenter,
   ];
 
   static bool isProtected(String location) {

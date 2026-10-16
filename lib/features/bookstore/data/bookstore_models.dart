@@ -495,6 +495,9 @@ class WorkContact {
     required this.workId,
     this.hasContact = false,
     this.displayScope = '',
+    this.phone = '',
+    this.email = '',
+    this.wechat = '',
   });
 
   final int workId;
@@ -504,6 +507,15 @@ class WorkContact {
 
   /// 展示范围：public / certified_partner / platform_forward / hidden。
   final String displayScope;
+
+  /// 手机号（明文，开发阶段直接下发）
+  final String phone;
+
+  /// 邮箱（明文，开发阶段直接下发）
+  final String email;
+
+  /// 微信号（明文，开发阶段直接下发）
+  final String wechat;
 
   /// 展示范围文案；未知取值回落为范围原值，避免后端新增范围时前端丢失信息。
   String get displayScopeLabel {
@@ -525,6 +537,9 @@ class WorkContact {
         workId: _int(json['workId']),
         hasContact: _flag(json['hasContact']),
         displayScope: _text(json['displayScope']),
+        phone: _text(json['phone']),
+        email: _text(json['email']),
+        wechat: _text(json['wechat']),
       );
 }
 

@@ -441,11 +441,17 @@ class _QuickGrid extends StatelessWidget {
       _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.inquiryList)),
+      _QuickEntry(ref, Icons.receipt_long_outlined, '订单管理',
+          onTap: (ctx, ref) =>
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.orderList)),
       _QuickEntry(ref, Icons.edit_outlined, '编辑资料',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.profileEdit)),
       if (user.isCreator || user.authorCapability) ...[
-        _QuickEntry(ref, Icons.description_outlined, '我的剧本'),
+        _QuickEntry(ref, Icons.auto_awesome, 'AI 创作',
+            onTap: (ctx, ref) =>
+                AuthGuard.pushProtected(ctx, ref, target: RoutePath.aiCenter)),
+        _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理'),
         _QuickEntry(ref, Icons.account_balance_wallet_outlined, '交易管理'),
         _QuickEntry(ref, Icons.approval, '我的印章'),
         _QuickEntry(ref, Icons.bar_chart, '创作者后台'),
@@ -457,7 +463,9 @@ class _QuickGrid extends StatelessWidget {
         _QuickEntry(ref, Icons.movie_outlined, '短剧管理'),
         _QuickEntry(ref, Icons.approval, '我的印章'),
       ],
-      _QuickEntry(ref, Icons.card_giftcard, '福利'),
+      _QuickEntry(ref, Icons.card_giftcard, '福利',
+          onTap: (ctx, ref) =>
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.welfareCenter)),
     ];
 
     return LayoutBuilder(
