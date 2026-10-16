@@ -14,7 +14,9 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 个人资料（规格 §8.3，契约 §1.2）。
 ///
-/// 允许修改头像、昵称与简介；手机号、角色、实名状态为只读展示。
+/// 头像选定后立即上传并保存，无需再点底部「保存」；
+/// 昵称与简介仍由底部「保存」按钮统一提交。
+/// 手机号、角色、实名状态为只读展示。
 /// 保存成功后刷新全局 currentUser，使其它页面立即显示新资料。
 class ProfileEditPage extends ConsumerStatefulWidget {
   const ProfileEditPage({super.key});
@@ -105,25 +107,45 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     }
   }
 
-  Future<void> _pickAvatar() async {
+  /// 选择头像后立即上传并保存，不依赖底部「保存」按钮。
+  ///
+  /// 上传得到站内路径后直接落库并刷新全局 currentUser，各页面即时生效；
+  /// 只改头像，不影响昵称/简介未保存的编辑内容。
+  Future<void> _changeAvatar() async {
     if (_uploading || _saving) return;
     setState(() => _uploading = true);
     try {
       final picked = await NativeImagePicker.pickImage();
-      if (picked == null || !mounted) return;
+      if (picked == null || !mounted) return; // 用户取消选择
       final url = await ref.read(userCenterRepositoryProvider).uploadAvatar(
             bytes: picked.bytes,
             filename: picked.filename,
           );
       if (!mounted) return;
-      setState(() => _pendingAvatar = url);
-      _toast('头像已上传，保存后生效');
+      if (url == _loadedAvatar) {
+        // 与当前头像一致，无需落库
+        setState(() => _pendingAvatar = url);
+        _toast('头像未变化');
+        return;
+      }
+      final profile = await ref.read(userCenterRepositoryProvider).updateProfile(
+            avatar: url,
+          );
+      // 刷新全局 currentUser，所有页面立即显示新头像（规格 §8.3）
+      await ref.read(authControllerProvider.notifier).refreshMe();
+      ref.invalidate(userProfileProvider);
+      if (!mounted) return;
+      setState(() {
+        _loadedAvatar = profile.avatar;
+        _pendingAvatar = profile.avatar;
+      });
+      _toast('头像已更新');
     } on NativeImageException catch (e) {
       _toast(e.message);
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {
-      _toast('头像上传失败，请稍后重试');
+      _toast('头像更新失败，请稍后重试');
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -189,7 +211,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _saving || _uploading ? null : _pickAvatar,
+                  onTap: _saving || _uploading ? null : _changeAvatar,
                   child: Stack(
                     alignment: Alignment.bottomRight,
                     children: [
