@@ -476,12 +476,6 @@ class _QuickGrid extends StatelessWidget {
       _QuickEntry(ref, Icons.forum_outlined, '会话',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.chatSessionList)),
-      _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.inquiryList)),
-      _QuickEntry(ref, Icons.receipt_long_outlined, '订单管理',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.orderList)),
       _QuickEntry(ref, Icons.edit_outlined, '编辑资料',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.profileEdit)),
@@ -489,18 +483,18 @@ class _QuickGrid extends StatelessWidget {
         _QuickEntry(ref, Icons.auto_awesome, 'AI 创作',
             onTap: (ctx, ref) =>
                 AuthGuard.pushProtected(ctx, ref, target: RoutePath.aiCenter)),
-        _QuickEntry(ref, Icons.headset_mic_outlined, '询盘管理'),
-        _QuickEntry(ref, Icons.account_balance_wallet_outlined, '交易管理'),
         _QuickEntry(ref, Icons.approval, '我的印章'),
         _QuickEntry(ref, Icons.bar_chart, '创作者后台'),
       ],
       if (user.isClient) ...[
         _QuickEntry(ref, Icons.fact_check_outlined, '我的选品'),
         _QuickEntry(ref, Icons.campaign_outlined, '需求发布'),
-        _QuickEntry(ref, Icons.account_balance_wallet_outlined, '交易管理'),
         _QuickEntry(ref, Icons.movie_outlined, '短剧管理'),
         _QuickEntry(ref, Icons.approval, '我的印章'),
       ],
+      _QuickEntry(ref, Icons.account_balance_wallet_outlined, '交易管理',
+          onTap: (ctx, ref) =>
+              AuthGuard.pushProtected(ctx, ref, target: RoutePath.tradeManagement)),
       _QuickEntry(ref, Icons.card_giftcard, '福利',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.welfareCenter)),

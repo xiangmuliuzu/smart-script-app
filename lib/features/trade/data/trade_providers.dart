@@ -307,3 +307,116 @@ final appOrderListProvider = FutureProvider.autoDispose
 final appOrderDetailProvider = FutureProvider.autoDispose.family<Order, int>(
   (ref, orderId) => ref.watch(tradeRepositoryProvider).appOrderDetail(orderId),
 );
+
+// ==================== 财务域 Providers ====================
+
+/// 收益总览
+final incomeOverviewProvider = FutureProvider.autoDispose<Map<String, dynamic>>(
+  (ref) => ref.watch(tradeRepositoryProvider).incomeOverview(),
+);
+
+/// 收益明细查询参数
+class BillRecordListParams {
+  final String? billType;
+  final int pageNum;
+  final int pageSize;
+  const BillRecordListParams({this.billType, this.pageNum = 1, this.pageSize = 20});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BillRecordListParams &&
+          billType == other.billType &&
+          pageNum == other.pageNum &&
+          pageSize == other.pageSize;
+
+  @override
+  int get hashCode => Object.hash(billType, pageNum, pageSize);
+}
+
+/// 收益明细列表
+final billRecordListProvider = FutureProvider.autoDispose
+    .family<PagedData<BillRecord>, BillRecordListParams>(
+  (ref, params) => ref.watch(tradeRepositoryProvider).pageBillRecords(
+        billType: params.billType,
+        pageNum: params.pageNum,
+        pageSize: params.pageSize,
+      ),
+);
+
+/// 托管列表查询参数
+class EscrowListParams {
+  final String role;
+  final String? status;
+  final int pageNum;
+  final int pageSize;
+  const EscrowListParams({required this.role, this.status, this.pageNum = 1, this.pageSize = 20});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EscrowListParams &&
+          role == other.role &&
+          status == other.status &&
+          pageNum == other.pageNum &&
+          pageSize == other.pageSize;
+
+  @override
+  int get hashCode => Object.hash(role, status, pageNum, pageSize);
+}
+
+/// 资金托管列表
+final escrowListProvider = FutureProvider.autoDispose
+    .family<PagedData<Escrow>, EscrowListParams>(
+  (ref, params) => ref.watch(tradeRepositoryProvider).pageEscrows(
+        role: params.role,
+        status: params.status,
+        pageNum: params.pageNum,
+        pageSize: params.pageSize,
+      ),
+);
+
+/// 资金托管列表 + 汇总
+final escrowSummaryProvider = FutureProvider.autoDispose
+    .family<EscrowSummary, EscrowListParams>(
+  (ref, params) async {
+    final repo = ref.watch(tradeRepositoryProvider);
+    // 直接调用底层 API 获取完整响应（含汇总字段）
+    final data = await repo.fetchEscrowSummary(
+      role: params.role,
+      status: params.status,
+      pageNum: params.pageNum,
+      pageSize: params.pageSize,
+    );
+    return data;
+  },
+);
+
+/// 发票列表查询参数
+class InvoiceListParams {
+  final String? status;
+  final int pageNum;
+  final int pageSize;
+  const InvoiceListParams({this.status, this.pageNum = 1, this.pageSize = 20});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InvoiceListParams &&
+          status == other.status &&
+          pageNum == other.pageNum &&
+          pageSize == other.pageSize;
+
+  @override
+  int get hashCode => Object.hash(status, pageNum, pageSize);
+}
+
+/// 发票列表
+final invoiceListProvider = FutureProvider.autoDispose
+    .family<PagedData<Invoice>, InvoiceListParams>(
+  (ref, params) => ref.watch(tradeRepositoryProvider).pageInvoices(
+        status: params.status,
+        pageNum: params.pageNum,
+        pageSize: params.pageSize,
+      ),
+);

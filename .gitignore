@@ -41,3 +41,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 本地运行配置与临时产物（与后端仓约定一致）
+.local/

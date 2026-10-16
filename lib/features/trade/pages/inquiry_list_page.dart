@@ -98,9 +98,9 @@ class _InquiryListPageState extends ConsumerState<InquiryListPage>
                 children: [
                   _buildFilterChip(null, '全部'),
                   _buildFilterChip(InquiryStatus.pending, '待处理'),
-                  _buildFilterChip(InquiryStatus.accepted, '已接受'),
+                  _buildFilterChip(InquiryStatus.quoted, '议价中'),
                   _buildFilterChip(InquiryStatus.rejected, '已拒绝'),
-                  _buildFilterChip(InquiryStatus.deal, '已成交'),
+                  _buildFilterChip(InquiryStatus.deal, '已达成'),
                   _buildFilterChip(InquiryStatus.closed, '已关闭'),
                 ],
               ),
@@ -263,9 +263,9 @@ class _InquiryListPageState extends ConsumerState<InquiryListPage>
       case InquiryStatus.pending:
         bgColor = AppColors.warning.withOpacity(0.1);
         textColor = AppColors.warning;
-      case InquiryStatus.accepted:
-        bgColor = AppColors.success.withOpacity(0.1);
-        textColor = AppColors.success;
+      case InquiryStatus.quoted:
+        bgColor = AppColors.warning.withOpacity(0.1);
+        textColor = AppColors.warning;
       case InquiryStatus.rejected:
         bgColor = AppColors.danger.withOpacity(0.1);
         textColor = AppColors.danger;

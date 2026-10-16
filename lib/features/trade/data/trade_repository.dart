@@ -350,6 +350,24 @@ class TradeRepository {
     );
   }
 
+  /// APP买方付款至托管（confirmed → escrow_pending）。
+  Future<void> appPayOrder(int orderId, {String? payChannel}) async {
+    await _api.post<void>(
+      ApiEndpoints.appOrderPay(orderId),
+      data: {'payChannel': payChannel ?? 'balance'},
+    );
+  }
+
+  /// APP卖方开始交割（escrow_pending → delivering）。
+  Future<void> appDeliverOrder(int orderId) async {
+    await _api.post<void>(ApiEndpoints.appOrderDeliver(orderId));
+  }
+
+  /// APP买方确认收货（delivering → completed，托管释放+收益入账）。
+  Future<void> appCompleteOrder(int orderId) async {
+    await _api.post<void>(ApiEndpoints.appOrderComplete(orderId));
+  }
+
   // ==================== 合作记录 ====================
 
   /// 合作记录列表（分页）。
@@ -435,6 +453,135 @@ class TradeRepository {
     );
     if (data == null) throw ApiException('获取需求标签列表失败');
     return PagedData.parse<DemandTag>(data, DemandTag.fromJson);
+  }
+
+  // ==================== 财务域（收益 / 托管 / 发票） ====================
+
+  /// 收益总览。
+  Future<Map<String, dynamic>> incomeOverview() async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appFinanceIncomeOverview,
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取收益总览失败');
+    return data;
+  }
+
+  /// 收益明细列表（账单流水）。
+  Future<PagedData<BillRecord>> pageBillRecords({
+    String? billType,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appFinanceIncomeDetail,
+      query: _compact({
+        'billType': billType,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取收益明细失败');
+    return PagedData.parse<BillRecord>(data, BillRecord.fromJson);
+  }
+
+  /// 资金托管列表。
+  Future<PagedData<Escrow>> pageEscrows({
+    required String role,
+    String? status,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appFinanceEscrowList,
+      query: _compact({
+        'role': role,
+        'status': status,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取托管列表失败');
+    return PagedData.parse<Escrow>(data, Escrow.fromJson);
+  }
+
+  /// 资金托管列表 + 汇总（含 totalAmount/pendingAmount）。
+  Future<EscrowSummary> fetchEscrowSummary({
+    required String role,
+    String? status,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appFinanceEscrowList,
+      query: _compact({
+        'role': role,
+        'status': status,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取托管列表失败');
+    final rows = (data['rows'] as List<dynamic>?)
+            ?.map((e) => Escrow.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return EscrowSummary(
+      list: rows,
+      totalAmount: (data['totalAmount'] as num?)?.toInt() ?? 0,
+      pendingAmount: (data['pendingAmount'] as num?)?.toInt() ?? 0,
+      total: (data['total'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// 托管详情。
+  Future<Escrow> escrowDetail(int escrowId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appFinanceEscrowById(escrowId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取托管详情失败');
+    return Escrow.fromJson(data);
+  }
+
+  /// 发票列表。
+  Future<PagedData<Invoice>> pageInvoices({
+    String? status,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appFinanceInvoiceList,
+      query: _compact({
+        'status': status,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取发票列表失败');
+    return PagedData.parse<Invoice>(data, Invoice.fromJson);
+  }
+
+  /// 申请发票。
+  Future<void> applyInvoice(Map<String, dynamic> body) async {
+    await _api.post<void>(
+      ApiEndpoints.appFinanceInvoiceApply,
+      data: body,
+    );
+  }
+
+  /// 可开票订单列表。
+  Future<List<Map<String, dynamic>>> invoiceableOrders() async {
+    final data = await _api.get<List<dynamic>>(
+      ApiEndpoints.appFinanceInvoiceOrders,
+      parser: (raw) => raw is List ? raw : [],
+    );
+    if (data == null) return [];
+    return data.cast<Map<String, dynamic>>();
   }
 
   // ==================== 工具方法 ====================

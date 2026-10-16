@@ -73,16 +73,24 @@ class OrderDetailPage extends ConsumerWidget {
     switch (order.status) {
       case OrderStatus.confirmed:
         color = AppColors.primary;
-        desc = '订单已确认，等待后续流程';
+        desc = '订单已确认，等待买方付款至托管';
         currentStep = 0;
+      case OrderStatus.escrowPending:
+        color = AppColors.warning;
+        desc = '资金已托管，等待卖方交割';
+        currentStep = 1;
       case OrderStatus.delivering:
         color = AppColors.warning;
         desc = '订单交割中，请配合完成相关手续';
-        currentStep = 1;
+        currentStep = 2;
       case OrderStatus.completed:
         color = AppColors.success;
-        desc = '订单已完成';
-        currentStep = 2;
+        desc = '订单已完成，托管资金已释放给卖方';
+        currentStep = 3;
+      case OrderStatus.refunded:
+        color = AppColors.text2;
+        desc = '订单已退款';
+        currentStep = -1;
       case OrderStatus.cancelled:
         color = AppColors.text3;
         desc = '订单已取消';
@@ -121,7 +129,7 @@ class OrderDetailPage extends ConsumerWidget {
 
   /// 横向进度步骤条
   Widget _buildProgressSteps(int currentStep, Color activeColor) {
-    const steps = ['已确认', '交割中', '已完成'];
+    const steps = ['已确认', '已托管', '交割中', '已完成'];
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
         if (i.isOdd) {
@@ -238,46 +246,29 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 底部操作栏
+  /// 底部操作栏：按状态与角色分化（confirmed→买方付款/取消；escrow_pending→卖方交割；delivering→买方确认收货）
   Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer) {
-    // 已确认 + 买方 → 取消按钮
-    if (order.status == OrderStatus.confirmed && isBuyer) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.divider)),
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => _showCancelDialog(context, ref, order),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('取消订单', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ),
-      );
+    final status = order.status;
+
+    // 已确认：买方付款至托管/取消，卖方等待并联系
+    if (status == OrderStatus.confirmed) {
+      if (isBuyer) return _buildPayBar(context, ref, order);
+      return _buildContactBar(context, ref, order, isBuyer, '等待买方付款至托管，可联系买方沟通');
     }
 
-    // 已确认 + 卖方 → 联系买方
-    if (order.status == OrderStatus.confirmed && !isBuyer) {
-      return _buildContactBar(context, ref, order, isBuyer, '等待买方操作，可联系买方沟通');
+    // 已托管：卖方开始交割，买方等待
+    if (status == OrderStatus.escrowPending) {
+      if (!isBuyer) return _buildDeliverBar(context, ref, order);
+      return _buildContactBar(context, ref, order, isBuyer, '资金已托管，等待卖方交割');
     }
 
-    // 交割中 → 联系对方
-    if (order.status == OrderStatus.delivering) {
-      return _buildContactBar(context, ref, order, isBuyer, '订单交割中，如有问题请联系对方沟通');
+    // 交割中：买方确认收货，卖方等待
+    if (status == OrderStatus.delivering) {
+      if (isBuyer) return _buildCompleteBar(context, ref, order);
+      return _buildContactBar(context, ref, order, isBuyer, '交割已开始，等待买方确认收货');
     }
-
     // 已完成
-    if (order.status == OrderStatus.completed) {
+    if (status == OrderStatus.completed) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: const BoxDecoration(
@@ -299,7 +290,7 @@ class OrderDetailPage extends ConsumerWidget {
     }
 
     // 已取消
-    if (order.status == OrderStatus.cancelled) {
+    if (status == OrderStatus.cancelled) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: const BoxDecoration(
@@ -333,6 +324,126 @@ class OrderDetailPage extends ConsumerWidget {
     return const SizedBox.shrink();
   }
 
+  /// 买方付款栏：付款至托管 + 取消订单
+  Widget _buildPayBar(BuildContext context, WidgetRef ref, Order order) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('付款后资金由平台托管，确认收货后才会释放给卖方',
+                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _showCancelDialog(context, ref, order),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.text2,
+                      side: const BorderSide(color: AppColors.divider),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('取消订单'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: () => _payToEscrow(context, ref, order),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('付款至托管 ${order.amountYuan}',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 卖方交割栏：开始交割
+  Widget _buildDeliverBar(BuildContext context, WidgetRef ref, Order order) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('买方资金已托管，请放心开始交割',
+                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _deliverOrder(context, ref, order),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('开始交割', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 买方确认收货栏
+  Widget _buildCompleteBar(BuildContext context, WidgetRef ref, Order order) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('确认收货后订单完成，托管资金将释放给卖方',
+                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _completeOrder(context, ref, order),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('确认收货', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 联系对方底部栏
   Widget _buildContactBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, String hint) {
     return Container(
@@ -351,10 +462,15 @@ class OrderDetailPage extends ConsumerWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
+                  final inquiryId = order.inquiryId;
+                  if (inquiryId == null) {
+                    showAppToast(context, '该订单未关联询盘会话');
+                    return;
+                  }
                   try {
                     // 用询盘ID创建或获取 TRADE 类型会话
                     final chatRepo = ref.read(chatRepositoryProvider);
-                    final session = await chatRepo.createTradeSession(order.inquiryId!);
+                    final session = await chatRepo.createTradeSession(inquiryId);
                     if (context.mounted) {
                       context.push(RoutePath.chatDetail(session.session.sessionId));
                     }
@@ -376,6 +492,69 @@ class OrderDetailPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// 买方付款至托管（confirmed → escrow_pending）
+  Future<void> _payToEscrow(BuildContext context, WidgetRef ref, Order order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Text('确认付款'),
+        content: Text('付款 ${order.amountYuan} 至平台托管？资金将在您确认收货后释放给卖方。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确认付款')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(tradeRepositoryProvider).appPayOrder(order.orderId!);
+      if (context.mounted) {
+        showAppToast(context, '付款成功，资金已托管');
+        ref.invalidate(appOrderDetailProvider(order.orderId!));
+      }
+    } catch (e) {
+      if (context.mounted) showAppToast(context, '付款失败：$e');
+    }
+  }
+
+  /// 卖方开始交割（escrow_pending → delivering）
+  Future<void> _deliverOrder(BuildContext context, WidgetRef ref, Order order) async {
+    try {
+      await ref.read(tradeRepositoryProvider).appDeliverOrder(order.orderId!);
+      if (context.mounted) {
+        showAppToast(context, '已开始交割');
+        ref.invalidate(appOrderDetailProvider(order.orderId!));
+      }
+    } catch (e) {
+      if (context.mounted) showAppToast(context, '操作失败：$e');
+    }
+  }
+
+  /// 买方确认收货（delivering → completed，托管释放+收益入账）
+  Future<void> _completeOrder(BuildContext context, WidgetRef ref, Order order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Text('确认收货'),
+        content: const Text('确认收货后订单完成，托管资金将释放给卖方，此操作不可撤销。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确认收货', style: TextStyle(color: AppColors.success))),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(tradeRepositoryProvider).appCompleteOrder(order.orderId!);
+      if (context.mounted) {
+        showAppToast(context, '订单已完成，托管资金已释放给卖方');
+        ref.invalidate(appOrderDetailProvider(order.orderId!));
+      }
+    } catch (e) {
+      if (context.mounted) showAppToast(context, '操作失败：$e');
+    }
   }
 
   /// 取消订单底部弹窗

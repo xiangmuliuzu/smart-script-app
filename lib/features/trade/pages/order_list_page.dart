@@ -99,6 +99,7 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
     const statuses = [
       (null, '全部'),
       (OrderStatus.confirmed, '已确认'),
+      (OrderStatus.escrowPending, '已托管'),
       (OrderStatus.delivering, '交割中'),
       (OrderStatus.completed, '已完成'),
       (OrderStatus.cancelled, '已取消'),
@@ -275,6 +276,8 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
     switch (status) {
       case OrderStatus.confirmed:
         color = AppColors.primary;
+      case OrderStatus.escrowPending:
+        color = AppColors.warning;
       case OrderStatus.delivering:
         color = AppColors.warning;
       case OrderStatus.completed:

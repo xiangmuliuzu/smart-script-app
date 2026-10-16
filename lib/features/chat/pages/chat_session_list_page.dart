@@ -10,6 +10,8 @@ import '../../../shared/widgets/common_views.dart';
 import '../../bookstore/data/content_repository.dart';
 import '../../bookstore/data/bookstore_models.dart';
 import '../../bookstore/data/content_providers.dart';
+import '../../create/data/author_work_repository.dart';
+import '../../create/data/author_work_providers.dart';
 import '../../trade/data/trade_repository.dart';
 import '../../trade/data/trade_providers.dart';
 import '../data/chat_models.dart';
@@ -629,6 +631,7 @@ class _ConsultFormContentState extends ConsumerState<_ConsultFormContent> {
     _BizTypeOption(value: 'GENERAL', label: '通用咨询', icon: Icons.help_outline, direct: true),
     _BizTypeOption(value: 'WORK', label: '作品相关', icon: Icons.menu_book_outlined, direct: false),
     _BizTypeOption(value: 'INQUIRY', label: '询盘相关', icon: Icons.receipt_long_outlined, direct: false),
+    _BizTypeOption(value: 'ORDER', label: '订单相关', icon: Icons.shopping_bag_outlined, direct: false),
     _BizTypeOption(value: 'ACCOUNT', label: '账号问题', icon: Icons.person_outline, direct: true),
   ];
 
@@ -740,6 +743,19 @@ class _ConsultFormContentState extends ConsumerState<_ConsultFormContent> {
               ],
             ),
           ),
+          // 业务对象选择器（作品/询盘/订单）——下拉框展开时隐藏
+          if (!_isDropdownOpen && (_businessType == 'WORK' || _businessType == 'INQUIRY' || _businessType == 'ORDER'))
+            _BusinessObjectSelector(
+              businessType: _businessType!,
+              selectedId: _businessId,
+              selectedName: _businessName,
+              onSelected: (id, name) {
+                setState(() {
+                  _businessId = id;
+                  _businessName = name;
+                });
+              },
+            ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
@@ -780,4 +796,232 @@ class _ConsultFormContentState extends ConsumerState<_ConsultFormContent> {
       }
     }
   }
+}
+
+/// 业务对象选择器（作品/询盘/订单）
+class _BusinessObjectSelector extends ConsumerWidget {
+  final String businessType;
+  final int? selectedId;
+  final String? selectedName;
+  final void Function(int id, String name) onSelected;
+
+  const _BusinessObjectSelector({
+    required this.businessType,
+    required this.selectedId,
+    required this.selectedName,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _getSelectorTitle(),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          _buildSelectorContent(context, ref),
+        ],
+      ),
+    );
+  }
+
+  String _getSelectorTitle() {
+    switch (businessType) {
+      case 'WORK':
+        return '选择作品';
+      case 'INQUIRY':
+        return '选择询盘';
+      case 'ORDER':
+        return '选择订单';
+      default:
+        return '选择';
+    }
+  }
+
+  Widget _buildSelectorContent(BuildContext context, WidgetRef ref) {
+    switch (businessType) {
+      case 'WORK':
+        return _buildWorkSelector(context, ref);
+      case 'INQUIRY':
+        return _buildInquirySelector(context, ref);
+      case 'ORDER':
+        return _buildOrderSelector(context, ref);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildWorkSelector(BuildContext context, WidgetRef ref) {
+    final worksAsync = ref.watch(myWorksProvider('all'));
+    return worksAsync.when(
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(16),
+        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+      )),
+      error: (e, _) => Center(child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('加载失败：$e', style: const TextStyle(color: Colors.red, fontSize: 13)),
+      )),
+      data: (works) {
+        if (works.isEmpty) {
+          return Center(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('暂无作品', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+          ));
+        }
+        return _buildItemList(
+          items: works.map((w) => _SelectorItem(id: w.workId, title: w.title, subtitle: w.status)).toList(),
+          selectedId: selectedId,
+          onSelected: onSelected,
+        );
+      },
+    );
+  }
+
+  Widget _buildInquirySelector(BuildContext context, WidgetRef ref) {
+    final inquiryAsync = ref.watch(inquiryListProvider(const InquiryListParams(
+      role: 'buyer', pageNum: 1, pageSize: 50,
+    )));
+    return inquiryAsync.when(
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(16),
+        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+      )),
+      error: (e, _) => Center(child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('加载失败：$e', style: const TextStyle(color: Colors.red, fontSize: 13)),
+      )),
+      data: (pagedData) {
+        final inquiries = pagedData.list;
+        if (inquiries.isEmpty) {
+          return Center(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('暂无询盘', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+          ));
+        }
+        return _buildItemList(
+          items: inquiries.where((i) => i.inquiryId != null).map((i) => _SelectorItem(
+            id: i.inquiryId!,
+            title: i.workTitle ?? '询盘#${i.inquiryId}',
+            subtitle: i.status,
+          )).toList(),
+          selectedId: selectedId,
+          onSelected: onSelected,
+        );
+      },
+    );
+  }
+
+  Widget _buildOrderSelector(BuildContext context, WidgetRef ref) {
+    final orderAsync = ref.watch(appOrderListProvider(const AppOrderListParams(
+      role: 'buyer', pageNum: 1, pageSize: 50,
+    )));
+    return orderAsync.when(
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(16),
+        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+      )),
+      error: (e, _) => Center(child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('加载失败：$e', style: const TextStyle(color: Colors.red, fontSize: 13)),
+      )),
+      data: (pagedData) {
+        final orders = pagedData.list;
+        if (orders.isEmpty) {
+          return Center(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('暂无订单', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+          ));
+        }
+        return _buildItemList(
+          items: orders.where((o) => o.orderId != null).map((o) => _SelectorItem(
+            id: o.orderId!,
+            title: o.workTitle ?? '订单#${o.orderId}',
+            subtitle: o.status,
+          )).toList(),
+          selectedId: selectedId,
+          onSelected: onSelected,
+        );
+      },
+    );
+  }
+
+  Widget _buildItemList({
+    required List<_SelectorItem> items,
+    required int? selectedId,
+    required void Function(int id, String name) onSelected,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 180),
+      child: ListView.builder(
+        shrinkWrap: true,
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final isSelected = item.id == selectedId;
+          return InkWell(
+            onTap: () => onSelected(item.id, item.title),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withOpacity(0.25) : Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: isSelected ? Border.all(color: Colors.white.withOpacity(0.5), width: 1.5) : null,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.subtitle ?? '',
+                          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SelectorItem {
+  final int id;
+  final String title;
+  final String? subtitle;
+
+  const _SelectorItem({required this.id, required this.title, this.subtitle});
 }

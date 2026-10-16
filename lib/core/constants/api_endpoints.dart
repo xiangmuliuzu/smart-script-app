@@ -275,6 +275,18 @@ class ApiEndpoints {
   static const String appOrderList = '/trade/order/list';
   static String appOrderById(int orderId) => '/trade/order/$orderId';
   static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
+  static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
+  static String appOrderDeliver(int orderId) => '/trade/order/$orderId/deliver';
+  static String appOrderComplete(int orderId) => '/trade/order/$orderId/complete';
+  // 财务（资金托管 / 发票 / 收益）
+  static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
+  static const String appFinanceIncomeDetail = '/trade/finance/income/detail';
+  static const String appFinanceEscrowList = '/trade/finance/escrow/list';
+  static String appFinanceEscrowById(int escrowId) => '/trade/finance/escrow/$escrowId';
+  static const String appFinanceInvoiceList = '/trade/finance/invoice/list';
+  static String appFinanceInvoiceById(int invoiceId) => '/trade/finance/invoice/$invoiceId';
+  static const String appFinanceInvoiceApply = '/trade/finance/invoice/apply';
+  static const String appFinanceInvoiceOrders = '/trade/finance/invoice/orders';
   // 合作记录
   static const String adminTradeCooperationList = '/admin/trade/cooperation/list';
   static const String adminTradeCooperation = '/admin/trade/cooperation';

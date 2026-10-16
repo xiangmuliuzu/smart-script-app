@@ -7,7 +7,6 @@ import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
-import '../../chat/data/chat_repository.dart';
 import '../../chat/data/chat_providers.dart';
 import '../data/trade_models.dart';
 import '../data/trade_providers.dart';
@@ -15,7 +14,8 @@ import '../data/trade_providers.dart';
 /// 询盘详情页（分工条目 5/6）
 ///
 /// 展示询盘内容、作品信息、双方信息、当前状态；
-/// 卖方视角可执行接受/拒绝操作，买方视角可关闭询盘。
+/// 卖方视角可执行接受/拒绝操作，买方视角可关闭询盘；
+/// 报价/议价统一在交易会话内完成，联系对方按钮在询盘被接受后解锁。
 class InquiryDetailPage extends ConsumerStatefulWidget {
   const InquiryDetailPage({super.key, required this.inquiryId});
 
@@ -103,10 +103,10 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
                   const SizedBox(height: 16),
                 ],
 
-                // 报价与议价
-                _buildSectionTitle('报价与议价'),
+                // 报价记录（报价/议价在交易会话内完成，此处仅提供只读入口）
+                _buildSectionTitle('报价记录'),
                 const SizedBox(height: 8),
-                _buildQuoteSection(inquiry, isBuyerInThisInquiry, isSellerInThisInquiry),
+                _buildQuoteSection(inquiry),
               ],
             ),
           ),
@@ -115,8 +115,8 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
         // 底部操作栏
         _buildActionBar(inquiry, isBuyerInThisInquiry, isSellerInThisInquiry),
 
-        // 底部聊天按钮（始终显示）
-        _buildChatBar(),
+        // 底部聊天按钮（询盘被接受后解锁）
+        _buildChatBar(inquiry, isBuyerInThisInquiry),
       ],
     );
   }
@@ -131,10 +131,10 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
         bgColor = AppColors.warning.withOpacity(0.1);
         textColor = AppColors.warning;
         icon = Icons.pending;
-      case InquiryStatus.accepted:
-        bgColor = AppColors.success.withOpacity(0.1);
-        textColor = AppColors.success;
-        icon = Icons.check_circle;
+      case InquiryStatus.quoted:
+        bgColor = AppColors.warning.withOpacity(0.1);
+        textColor = AppColors.warning;
+        icon = Icons.swap_horiz;
       case InquiryStatus.rejected:
         bgColor = AppColors.danger.withOpacity(0.1);
         textColor = AppColors.danger;
@@ -260,10 +260,6 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
           _buildInfoRow('预算金额', inquiry.budgetYuan),
           const Divider(height: 24),
           _buildInfoRow('创建时间', formatDateTime(inquiry.createdAt)),
-          if (inquiry.expireAt != null) ...[
-            const Divider(height: 24),
-            _buildInfoRow('有效期至', formatDateTime(inquiry.expireAt)),
-          ],
         ],
       ),
     );
@@ -343,16 +339,8 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     );
   }
 
-  /// 报价与议价区块
-  Widget _buildQuoteSection(
-    Inquiry inquiry,
-    bool isBuyerInThisInquiry,
-    bool isSellerInThisInquiry,
-  ) {
-    // 询盘必须被接受后才能报价
-    final canQuote = inquiry.status == InquiryStatus.accepted ||
-        inquiry.status == InquiryStatus.deal;
-
+  /// 报价记录区块（只读入口）
+  Widget _buildQuoteSection(Inquiry inquiry) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -360,73 +348,21 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Column(
-        children: [
-          // 查看报价记录（双方都可见）
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                context.push(
-                  '${RoutePath.quoteList}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
-                );
-              },
-              icon: const Icon(Icons.receipt_long, size: 18),
-              label: const Text('查看报价记录'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () {
+            context.push(
+              '${RoutePath.quoteList}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
+            );
+          },
+          icon: const Icon(Icons.receipt_long, size: 18),
+          label: const Text('查看报价记录'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 12),
           ),
-          const SizedBox(height: 8),
-          // 卖方可以提交报价
-          if (isSellerInThisInquiry && canQuote)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final result = await context.push<bool>(
-                    '${RoutePath.quoteCreate}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
-                  );
-                  if (result == true) {
-                    ref.invalidate(inquiryDetailProvider(widget.inquiryId));
-                  }
-                },
-                icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: const Text('提交报价'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          // 买方可以发起议价
-          if (isBuyerInThisInquiry && canQuote)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  context.push(
-                    '${RoutePath.quoteList}?inquiryId=${widget.inquiryId}&workTitle=${Uri.encodeComponent(inquiry.workTitle ?? '')}',
-                  );
-                },
-                icon: const Icon(Icons.gavel, size: 18),
-                label: const Text('发起议价'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warning,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          if (!canQuote)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('询盘被接受后可进行报价/议价', style: TextStyle(fontSize: 12, color: AppColors.text3)),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -436,8 +372,11 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     bool isBuyerInThisInquiry,
     bool isSellerInThisInquiry,
   ) {
-    // 只有 pending 状态可以操作
-    if (inquiry.status != InquiryStatus.pending) {
+    // 待处理/议价中/已拒绝可关闭（对齐后端 closeInquiry 前置状态）
+    final canClose = inquiry.status == InquiryStatus.pending ||
+        inquiry.status == InquiryStatus.quoted ||
+        inquiry.status == InquiryStatus.rejected;
+    if (!canClose) {
       return const SizedBox.shrink();
     }
 
@@ -464,8 +403,8 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
                 ),
               ),
             ],
-            if (isSellerInThisInquiry) ...[
-              // 卖方可以接受/拒绝
+            if (isSellerInThisInquiry && inquiry.status == InquiryStatus.pending) ...[
+              // 卖方可以接受/拒绝（仅待处理时，接受即进入议价中）
               if (isBuyerInThisInquiry) const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
@@ -497,8 +436,18 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     );
   }
 
-  /// 底部聊天按钮栏（始终显示）
-  Widget _buildChatBar() {
+  /// 底部聊天按钮栏：询盘被接受（议价中/已达成）后双方才可联系；
+  /// 待处理时发起方等待对方接受、收到方须先接受，已拒绝/已关闭不可再联系
+  Widget _buildChatBar(Inquiry inquiry, bool isBuyerInThisInquiry) {
+    final status = inquiry.status;
+    final canChat =
+        status == InquiryStatus.quoted || status == InquiryStatus.deal;
+    final label = canChat
+        ? '联系对方'
+        : status == InquiryStatus.pending
+            ? (isBuyerInThisInquiry ? '等待对方接受询盘' : '接受询盘后可联系对方')
+            : '询盘已结束，无法联系对方';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
@@ -509,12 +458,14 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _operating ? null : _startChat,
+            onPressed: canChat ? (_operating ? null : _startChat) : null,
             icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('联系对方'),
+            label: Text(label),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.fill,
+              disabledForegroundColor: AppColors.text3,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

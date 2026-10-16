@@ -184,12 +184,18 @@ class RoutePath {
   static const String feedbackCreate = '/profile/feedback/create';
 
   // ===== C 交易域（受登录守卫保护）=====
+  // 交易管理
+  static const String tradeManagement = '/trade/management';
+  static const String tradeSessionList = '/trade/session/list';
+  // 财务
+  static const String incomeOverview = '/trade/finance/income';
+  static const String escrowList = '/trade/finance/escrow';
+  static const String invoiceManage = '/trade/finance/invoice';
   // 询盘
   static const String inquiryCreate = '/trade/inquiry/create';
   static const String inquiryList = '/trade/inquiry/list';
   static const String inquiryDetail = '/trade/inquiry/detail';
   // 报价
-  static const String quoteCreate = '/trade/quote/create';
   static const String quoteList = '/trade/quote/list';
   static const String counterOffer = '/trade/quote/counter-offer';
   // 订单
@@ -271,10 +277,14 @@ class RouteName {
   static const String feedbackCreate = 'feedbackCreate';
 
   // ===== C 交易域 =====
+  static const String tradeManagement = 'tradeManagement';
+  static const String tradeSessionList = 'tradeSessionList';
+  static const String incomeOverview = 'incomeOverview';
+  static const String escrowList = 'escrowList';
+  static const String invoiceManage = 'invoiceManage';
   static const String inquiryCreate = 'inquiryCreate';
   static const String inquiryList = 'inquiryList';
   static const String inquiryDetail = 'inquiryDetail';
-  static const String quoteCreate = 'quoteCreate';
   static const String quoteList = 'quoteList';
   static const String counterOffer = 'counterOffer';
   static const String orderList = 'orderList';
@@ -331,7 +341,6 @@ class ProtectedRoutes {
     RoutePath.inquiryCreate,
     RoutePath.inquiryList,
     RoutePath.inquiryDetail,
-    RoutePath.quoteCreate,
     RoutePath.quoteList,
     RoutePath.counterOffer,
     RoutePath.orderList,
@@ -343,6 +352,10 @@ class ProtectedRoutes {
     RoutePath.tradeChat,
     // 聊天（需登录）
     RoutePath.chatSessionList,
+    // 财务（需登录）
+    RoutePath.incomeOverview,
+    RoutePath.escrowList,
+    RoutePath.invoiceManage,
     // E 模块：福利中心与 AI 创作（需登录）
     RoutePath.welfareCenter,
     RoutePath.aiCenter,
