@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
+import 'core/services/notification_poller.dart';
 import 'core/theme/app_page_background.dart';
 import 'core/theme/app_theme.dart';
 
@@ -27,6 +28,9 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
 
   @override
   Widget build(BuildContext context) {
+    // 会话期消息通知轮询：随登录启动、退出停止（本地通知，非离线推送）。
+    ref.watch(notificationPollerProvider);
+
     ref.listen(authControllerProvider, (previous, next) {
       final message = next.errorMessage;
       if (message == null || message == previous?.errorMessage) return;

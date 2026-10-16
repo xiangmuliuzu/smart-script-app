@@ -1,8 +1,15 @@
 package com.example.script_app
 
+import android.Manifest
 import android.app.Activity
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -12,31 +19,136 @@ import java.io.InputStream
 import java.util.UUID
 
 /**
- * A5 头像图片选择：通过系统选择器取图，不引入第三方插件。
+ * A5 原生能力网关（不引入第三方插件，只用平台 API）。
  *
- * 为什么用 MethodChannel 而不是新增 picker 插件：
- *   1. `rules.md` 与开发规格要求不得私自新增依赖，本能力用平台原生 API 即可完成；
- *   2. 选择结果只需「文件路径」，最小实现就是系统选择器 + 复制到应用缓存目录。
- *
- * 实现要点（注意：本注释内不得出现斜杠星号组合，否则会提前结束注释）：
- *   1. 用 ACTION_GET_CONTENT 配合图片 MIME 类型选择器（无需运行时权限），
- *      它返回带临时授权的 content URI，因此必须复制到应用私有目录后才能稳定读取；
- *   2. 复制到 cacheDir/avatar_pick/，不把外部 URI 权限带进上传流程；
- *   3. 只把路径交回 Dart，不记录文件内容或选择结果到日志。
+ * 1. 头像图片选择（pickImage）：用 ACTION_GET_CONTENT 取图，复制到应用私有缓存后回传路径。
+ * 2. 本地通知（showNotification / ensureNotificationPermission）：App 运行时轮询到新消息后，
+ *    通过系统通知横幅提示（Android 8+ 通知渠道；Android 13+ 需先申请 POST_NOTIFICATIONS 运行时权限）。
+ *    注意：这是 App 进程存活时的本地通知，不是离线推送；App 被系统杀掉后收不到。
  */
 class MainActivity : FlutterActivity() {
 
     private var pendingResult: MethodChannel.Result? = null
+    private var pendingPermissionResult: MethodChannel.Result? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        ensureNotificationChannel()
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        MethodChannel(messenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "pickImage" -> pickImage(result)
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(messenger, CHANNEL_NOTIFY)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "showNotification" -> showNotification(call, result)
+                    "ensureNotificationPermission" -> ensureNotificationPermission(result)
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    /** 创建通知渠道（Android 8+，幂等）。 */
+    private fun ensureNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) != null) return
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            "消息通知",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "平台消息与审核结果提醒"
+            enableVibration(true)
+        }
+        manager.createNotificationChannel(channel)
+    }
+
+    /**
+     * 弹出系统通知。入参：id(Int)、title(String)、body(String)。
+     * 点击通知回到本 App（单实例，singleTop）。
+     */
+    private fun showNotification(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
+        try {
+            val id = call.argument<Int>("id") ?: (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+            val title = call.argument<String>("title") ?: "新消息"
+            val body = call.argument<String>("body") ?: ""
+            val manager = getSystemService(NotificationManager::class.java)
+            if (manager == null) {
+                result.success(false)
+                return
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // 无通知权限：不弹窗，由 Dart 侧决定是否引导申请
+                result.success(false)
+                return
+            }
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this, id, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+            val notification = builder
+                .setSmallIcon(applicationInfo.icon)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(Notification.BigTextStyle().bigText(body))
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+            manager.notify(id, notification)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("notify_failed", "通知发送失败", null)
+        }
+    }
+
+    /**
+     * 申请通知运行时权限（Android 13+ POST_NOTIFICATIONS），其余版本直接视为已授予。
+     * 权限对话框结果在 onRequestPermissionsResult 中回传。
+     */
+    private fun ensureNotificationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            result.success(true)
+            return
+        }
+        if (pendingPermissionResult != null) {
+            result.success(false)
+            return
+        }
+        pendingPermissionResult = result
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATION_PERMISSION)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode != REQUEST_NOTIFICATION_PERMISSION) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            return
+        }
+        val pending = pendingPermissionResult
+        pendingPermissionResult = null
+        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        pending?.success(granted)
     }
 
     private fun pickImage(result: MethodChannel.Result) {
@@ -156,5 +268,8 @@ class MainActivity : FlutterActivity() {
         private const val CHANNEL = "smartscript/native_image"
         private const val REQUEST_PICK = 4101
         private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024L
+        private const val CHANNEL_NOTIFY = "smartscript/native_notify"
+        private const val REQUEST_NOTIFICATION_PERMISSION = 4102
+        private const val NOTIFICATION_CHANNEL_ID = "smartscript_messages"
     }
 }
