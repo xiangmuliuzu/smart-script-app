@@ -16,17 +16,13 @@ import '../bookstore/widgets/bookstore_widgets.dart';
 /// 与 GET /content/tags，二者均已存在，故本页不新增后端接口。
 ///
 /// 版式：左侧分组导航 + 右侧连续滚动的分组胶囊列表，两侧分组完全一致。
-/// 左栏自上而下（剧本分类置顶）：
+/// 左栏自上而下：
 ///   1. 剧本分类：顶级分类（sys_category.parent_id=0），点击 → 作品列表（?categoryId=）
-///   2. 热门标签：全部标签（sys_tag，按 use_count 降序）
-///   3. 题材 / 受众：按 sys_tag.tag_type 分组，点击 → 作品列表（?tagId=）
+///   2. 热门标签：全部情节标签（sys_tag，按 use_count 降序），点击 → 作品列表（?tagId=）
 ///
 /// 右栏一次渲染全部分组（分组标题 + 3 列胶囊网格），可连续下滑浏览；
 /// 左栏既是目录也是滚动指示器：点击定位到对应分组，手动下滑时高亮跟随。
 /// 分组条目超过 3 行时支持展开 / 收起。
-///
-/// 分组口径全部来自既有字段，不新增表结构；后端新增 tag_type 时按原值兜底展示，
-/// 不丢数据。
 class CategoryPage extends ConsumerWidget {
   const CategoryPage({super.key});
 
@@ -73,12 +69,6 @@ class CategoryPage extends ConsumerWidget {
     ]);
   }
 }
-
-/// 标签类型展示名（sys_tag.tag_type）；后端新增类型时按原值兜底展示。
-const Map<String, String> _tagTypeLabels = <String, String>{
-  'theme': '题材',
-  'audience': '受众',
-};
 
 /// 分组默认展示的胶囊数（3 列 × 3 行），超出部分折叠，点击「展开」查看全部。
 const int _kCollapsedCount = 9;
@@ -181,7 +171,7 @@ class _CategoryBrowserState extends State<_CategoryBrowser> {
     _syncSelection();
   }
 
-  /// 分组列表：剧本分类置顶，其后是标签域分组。
+  /// 分组列表：剧本分类 + 热门标签（标签已统一为情节标签，不再按类型拆分）。
   List<_Group> _groups() {
     return <_Group>[
       if (widget.categories.isNotEmpty)
@@ -201,29 +191,7 @@ class _CategoryBrowserState extends State<_CategoryBrowser> {
             for (final tag in widget.tags) _Chip(label: tag.tagName, tagId: tag.tagId),
           ],
         ),
-      ..._tagGroups(),
     ];
-  }
-
-  /// 按 tag_type 分组：已知类型按约定顺序输出，未知类型追加在后。
-  Iterable<_Group> _tagGroups() sync* {
-    final grouped = <String, List<TagItem>>{};
-    for (final tag in widget.tags) {
-      grouped.putIfAbsent(tag.tagType, () => <TagItem>[]).add(tag);
-    }
-    final orderedTypes = <String>[
-      ..._tagTypeLabels.keys.where(grouped.containsKey),
-      ...grouped.keys.where((type) => !_tagTypeLabels.containsKey(type)),
-    ];
-    for (final type in orderedTypes) {
-      yield _Group(
-        label: _tagTypeLabels[type] ?? (type.isEmpty ? '其他' : type),
-        chips: [
-          for (final tag in grouped[type]!)
-            _Chip(label: tag.tagName, tagId: tag.tagId),
-        ],
-      );
-    }
   }
 
   bool _isExpanded(int index, _Group group) =>
