@@ -107,7 +107,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     final following = _following ?? profile.isFollowing;
     final followerCount = _followerCount ?? profile.followerCount;
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.zero,
       children: [
         _Header(
           profile: profile,
@@ -115,12 +115,21 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
           onFollow: () => _toggleFollow(profile),
           following: following,
           busy: _busy,
-          onEdit: _openEdit,
           onTapFollowing: () => _openFollowList(profile.userId, following: true),
           onTapFollowers: () => _openFollowList(profile.userId, following: false),
         ),
-        const SizedBox(height: 8),
-        _WorksSection(authorId: profile.userId),
+        // 作品区：白色卡片，顶部圆角上移覆盖在头部背景之上（原型 `.content-sheet`）。
+        Transform.translate(
+          offset: const Offset(0, -16),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+            ),
+            padding: const EdgeInsets.only(bottom: 24),
+            child: _WorksSection(authorId: profile.userId),
+          ),
+        ),
       ],
     );
   }
@@ -138,7 +147,6 @@ class _Header extends StatelessWidget {
     required this.following,
     required this.busy,
     required this.onFollow,
-    required this.onEdit,
     required this.onTapFollowing,
     required this.onTapFollowers,
   });
@@ -148,7 +156,6 @@ class _Header extends StatelessWidget {
   final bool following;
   final bool busy;
   final VoidCallback onFollow;
-  final VoidCallback onEdit;
   final VoidCallback onTapFollowing;
   final VoidCallback onTapFollowers;
 
@@ -156,14 +163,15 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final nickname = profile.nickname.isEmpty ? '未设置用户名称' : profile.nickname;
     return Container(
+      // 顶部背景沿用 App 主题色系的浅蓝渐变（与页面背景同调，不用参考图的米色）。
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF8FB4D6), Color(0xFFB9CDD9), Color(0xFFD8CBB6)],
+          colors: [AppColors.primaryTint, Color(0xFFDCE7F3), Color(0xFFE7EDF5)],
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -184,15 +192,15 @@ class _Header extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 20,
+                              fontSize: 19,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: AppColors.text1,
                             ),
                           ),
                         ),
                         if (profile.isCreator) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.edit_note, size: 16, color: Colors.white70),
+                          const Icon(Icons.edit_note, size: 16, color: AppColors.primary),
                         ],
                       ],
                     ),
@@ -201,34 +209,25 @@ class _Header extends StatelessWidget {
                       profile.bio?.isNotEmpty == true ? profile.bio! : '这个人很懒，什么都没写~',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
+                      style: const TextStyle(fontSize: 13, color: AppColors.text2),
                     ),
                     if (profile.registeredAt != null) ...[
                       const SizedBox(height: 6),
                       Text(
                         '加入时间 ${_formatDate(profile.registeredAt!)}',
-                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        style: const TextStyle(fontSize: 12, color: AppColors.text3),
                       ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              if (profile.isSelf)
-                OutlinedButton(
-                  onPressed: onEdit,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white70),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  ),
-                  child: const Text('编辑资料'),
-                )
-              else
+              // 自己的主页不显示任何按钮：编辑资料在右上角「···」菜单里。
+              if (!profile.isSelf)
                 _FollowButton(following: following, busy: busy, onTap: onFollow),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           Row(
             children: [
               _StatItem(label: '关注', value: profile.followingCount, onTap: onTapFollowing),
@@ -263,8 +262,8 @@ class _FollowButton extends StatelessWidget {
           ? OutlinedButton(
               onPressed: busy ? null : onTap,
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white),
+                foregroundColor: AppColors.text2,
+                side: const BorderSide(color: AppColors.divider),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
@@ -273,8 +272,8 @@ class _FollowButton extends StatelessWidget {
           : ElevatedButton(
               onPressed: busy ? null : onTap,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.primary,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 elevation: 0,
@@ -302,10 +301,10 @@ class _StatItem extends StatelessWidget {
           children: [
             Text(
               '$value',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text1),
             ),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.white)),
+            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text3)),
           ],
         ),
       ),
@@ -417,7 +416,7 @@ class _Avatar extends StatelessWidget {
       child: Container(
         width: 64,
         height: 64,
-        color: Colors.white,
+        color: AppColors.primaryTint,
         child: url.isEmpty
             ? _fallback
             : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback),
