@@ -458,7 +458,7 @@ class _AuthButton extends StatelessWidget {
 ///
 /// 入口按账号类型分流（原型 profile.html 创作者 / profile_client.html 甲方）；
 /// 未接入真实页面的入口点击仅提示「建设中」。
-class _QuickGrid extends StatelessWidget {
+class _QuickGrid extends StatefulWidget {
   const _QuickGrid({required this.ref, required this.user, required this.unread});
 
   final WidgetRef ref;
@@ -466,13 +466,33 @@ class _QuickGrid extends StatelessWidget {
   final int unread;
 
   @override
-  Widget build(BuildContext context) {
-    final entries = <_QuickEntry>[
+  State<_QuickGrid> createState() => _QuickGridState();
+}
+
+class _QuickGridState extends State<_QuickGrid> {
+  static const int _columns = 4;
+  static const int _rows = 2;
+  static const double _cellHeight = 84;
+  static const int _perPage = _columns * _rows;
+
+  final PageController _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<_QuickEntry> _entries() {
+    final ref = widget.ref;
+    final user = widget.user;
+    return <_QuickEntry>[
       _QuickEntry(ref, Icons.star_outline, '收藏',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.favorites)),
       _QuickEntry(ref, Icons.chat_bubble_outline, '消息',
-          badge: unread,
+          badge: widget.unread,
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.messages)),
       _QuickEntry(ref, Icons.forum_outlined, '会话',
@@ -501,19 +521,59 @@ class _QuickGrid extends StatelessWidget {
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.welfareCenter)),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = _entries();
+    // 每页 2 行 × 4 列；多余按钮进入后续页，横向滑动切换。
+    final pages = <List<_QuickEntry>>[];
+    for (var i = 0; i < entries.length; i += _perPage) {
+      pages.add(entries.sublist(i, (i + _perPage).clamp(0, entries.length)));
+    }
+    if (pages.isEmpty) pages.add(const []);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const columns = 4;
-        final cellWidth = constraints.maxWidth / columns;
-        return Wrap(
+        final cellWidth = constraints.maxWidth / _columns;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            for (final entry in entries)
-              SizedBox(
-                width: cellWidth,
-                height: 84,
-                child: entry,
+            SizedBox(
+              height: _cellHeight * _rows,
+              child: PageView.builder(
+                controller: _controller,
+                itemCount: pages.length,
+                onPageChanged: (index) => setState(() => _page = index),
+                itemBuilder: (context, pageIndex) {
+                  return Wrap(
+                    children: [
+                      for (final entry in pages[pageIndex])
+                        SizedBox(width: cellWidth, height: _cellHeight, child: entry),
+                    ],
+                  );
+                },
               ),
+            ),
+            if (pages.length > 1) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < pages.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: i == _page ? 16 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: i == _page ? AppColors.primary : AppColors.divider,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         );
       },
