@@ -23,6 +23,7 @@ class WorkListPage extends ConsumerStatefulWidget {
     this.categoryId,
     this.tagId,
     this.keyword,
+    this.showScope,
   });
 
   /// 页面标题（分类名等），仅展示用。
@@ -30,6 +31,9 @@ class WorkListPage extends ConsumerStatefulWidget {
   final int? categoryId;
   final int? tagId;
   final String? keyword;
+
+  /// 推荐展示位过滤（如 bookstore=书城推荐）；传入则变为推荐列表页
+  final String? showScope;
 
   @override
   ConsumerState<WorkListPage> createState() => _WorkListPageState();
@@ -43,6 +47,9 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
 
   /// null 表示不传 sort，由后端回落 `latest`。
   String? _sort;
+
+  /// 推荐展示位过滤（如 bookstore=书城推荐）；null 表示不过滤。
+  String? _showScope;
 
   /// 分类/标签筛选：进入时由路由参数给初值，页内可随时叠加切换。
   int? _categoryId;
@@ -64,6 +71,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
                 tagId: _tagId,
                 keyword: widget.keyword,
                 sort: _sort,
+                showScope: _showScope,
                 pageNum: pageNum,
                 pageSize: pageSize,
               ),
@@ -84,6 +92,10 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
     if (routeSort != null &&
         WorkSortOption.all.any((option) => option.value == routeSort)) {
       _sort = routeSort;
+    }
+    // 直接用 widget 传入的 showScope，不依赖路由读取
+    if (widget.showScope != null && widget.showScope!.isNotEmpty) {
+      _showScope = widget.showScope;
     }
     _controller.load();
   }
@@ -290,11 +302,17 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
         ),
       );
     }
+    // 推荐列表页最多显示 30 本，不显示加载更多
+    final isRecommendList = _showScope != null;
+    final maxItems = isRecommendList ? 30 : _controller.items.length;
+    final itemCount = isRecommendList
+        ? maxItems.clamp(0, _controller.items.length)
+        : _controller.items.length + (_controller.hasMore ? 1 : 0);
     return RefreshIndicator(
       onRefresh: () => _controller.load(refresh: true),
       child: ListView.separated(
         controller: _scrollController,
-        itemCount: _controller.items.length + (_controller.hasMore ? 1 : 0),
+        itemCount: itemCount,
         separatorBuilder: (_, __) => const Divider(height: 0.5, color: AppColors.divider),
         itemBuilder: (context, index) {
           if (index >= _controller.items.length) {

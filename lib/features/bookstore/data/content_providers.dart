@@ -35,29 +35,19 @@ final rankingProvider = FutureProvider.autoDispose.family<List<RankingItem>, Str
   (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
 );
 
-/// 首页热门作品：优先取「书城首页」展示位推荐（未过期，按推荐权重降序，由后端过滤+排序），
-/// 不足 6 部时用按浏览量取数兜底补足（去重），保证区块始终有内容可展示。
+/// 首页热门精选：取「书城首页」展示位推荐（未过期，按位次升序，由后端过滤+排序）。
+/// 推荐多少就显示多少，不做浏览量兜底；点"更多"进入完整推荐列表页。
 final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final repo = ref.watch(contentRepositoryProvider);
-    // 1) 书城首页展示位推荐（showScope=bookstore，未过期，权重降序）
-    final recommended =
-        await repo.pageWorks(pageNum: 1, pageSize: 6, showScope: 'bookstore');
-    final result = List<BookItem>.from(recommended.list);
-    // 2) 不足 6 部时按浏览量兜底补足
-    if (result.length < 6) {
-      final byView = await repo.pageWorks(pageNum: 1, pageSize: 6, sort: 'view');
-      final seen = result.map((w) => w.workId).toSet();
-      for (final w in byView.list) {
-        if (result.length >= 6) break;
-        if (seen.add(w.workId)) result.add(w);
-      }
-    }
-    return result.take(6).toList();
+    // 拿 20 本回来，足够判断总共有多少推荐作品；首页只渲染前 6 本
+    final page =
+        await repo.pageWorks(pageNum: 1, pageSize: 20, showScope: 'bookstore');
+    return page.list;
   },
 );
 
-/// 分类页推荐：按「分类页」展示位取未过期的推荐作品（showScope=category_page，权重降序）。
+/// 分类页推荐：按「分类页」展示位取未过期的推荐作品（showScope=category_page，按位次升序）。
 final categoryRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final page = await ref
@@ -67,7 +57,7 @@ final categoryRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
   },
 );
 
-/// 搜索页推荐：按「搜索」展示位取未过期的推荐作品（showScope=search，权重降序）。
+/// 搜索页推荐：按「搜索」展示位取未过期的推荐作品（showScope=search，按位次升序）。
 final searchRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final page = await ref

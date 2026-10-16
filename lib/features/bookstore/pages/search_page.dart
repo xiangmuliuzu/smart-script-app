@@ -212,30 +212,35 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
-  /// 未提交关键词时的初始态：顶部展示推荐区，其下仅登录用户展示搜索历史，游客不展示、不请求。
+  /// 未提交关键词时的初始态：从上到下依次为搜索历史（仅登录用户）、为你推荐，
+  /// 两者用同一个可滚动 ListView 排布，推荐紧贴搜索历史下方，不占满留白。
   Widget _buildHistory() {
-    return Column(
+    return ListView(
+      padding: EdgeInsets.zero,
       children: [
+        _buildHistorySection(),
+        const SizedBox(height: 8),
         const _SearchRecommendSection(),
-        Expanded(child: _historyBody()),
       ],
     );
   }
 
-  Widget _historyBody() {
+  /// 搜索历史区：高度自适应，不单独滚动；未登录或无历史时不占位，推荐直接置顶。
+  Widget _buildHistorySection() {
     if (!AuthGuard.isLoggedIn(ref)) {
-      return const EmptyView(message: '输入关键词开始搜索', icon: Icons.search);
+      return const SizedBox.shrink();
     }
     return ref.watch(searchHistoryProvider).when(
-          // 历史加载态不占位：字段出现即说明本次已登录，避免闪烁。
+          // 历史加载态不占位，避免闪烁。
           loading: () => const SizedBox.shrink(),
           // 历史拉取失败不阻塞搜索主流程，静默降级为无历史。
-          error: (_, __) => const EmptyView(message: '输入关键词开始搜索', icon: Icons.search),
+          error: (_, __) => const SizedBox.shrink(),
           data: (items) {
             if (items.isEmpty) {
-              return const EmptyView(message: '暂无搜索历史', icon: Icons.history);
+              return const SizedBox.shrink();
             }
-            return ListView(
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),

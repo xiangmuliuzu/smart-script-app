@@ -17,6 +17,7 @@ import '../../features/bookstore/pages/ranking_page.dart';
 import '../../features/bookstore/pages/search_page.dart';
 import '../../features/bookstore/pages/work_detail_page.dart';
 import '../../features/bookstore/pages/work_list_page.dart';
+import '../../features/bookstore/pages/recommend_list_page.dart';
 import '../../features/category/category_page.dart';
 import '../../features/comic/comic_page.dart';
 import '../../features/comic/pages/drama_detail_page.dart';
@@ -248,8 +249,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             categoryId: int.tryParse(query['categoryId'] ?? ''),
             tagId: int.tryParse(query['tagId'] ?? ''),
             keyword: query['keyword'],
+            showScope: query['showScope'],
           );
         },
+      ),
+      GoRoute(
+        path: RoutePath.recommendList,
+        name: 'recommendList',
+        builder: (context, state) => const RecommendListPage(),
       ),
       GoRoute(
         path: RoutePath.workDetail,

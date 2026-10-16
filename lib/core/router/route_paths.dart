@@ -70,6 +70,7 @@ class RoutePath {
 
   // B 模块书城浏览链路（公开页，游客可浏览）
   static const String workList = '/works';
+  static const String recommendList = '/recommend-list';
   static const String workDetail = '/work';
   static const String ranking = '/ranking';
   // 搜索页（公开可搜索；搜索历史区块仅登录可见）
@@ -91,13 +92,14 @@ class RoutePath {
   /// 作品列表 URL；[title] 只用于列表页标题展示，不参与后端筛选。
   /// [sort] 为初始排序（值与后端 normalizeSort 白名单一致，如 view/favorite/...）；
   /// 不传时列表页默认最新排序，保持既有行为不变。
-  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title, String? sort}) {
+  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title, String? sort, String? showScope}) {
     final query = <String, String>{
       if (categoryId != null) 'categoryId': '$categoryId',
       if (tagId != null) 'tagId': '$tagId',
       if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
       if (title != null && title.isNotEmpty) 'title': title,
       if (sort != null && sort.isNotEmpty) 'sort': sort,
+      if (showScope != null && showScope.isNotEmpty) 'showScope': showScope,
     };
     return Uri(path: workList, queryParameters: query.isEmpty ? null : query).toString();
   }

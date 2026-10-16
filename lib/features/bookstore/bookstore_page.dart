@@ -78,9 +78,10 @@ class BookstorePage extends ConsumerWidget {
             const _BannerCarousel(position: 'home_top'),
             const _CategoryEntries(),
             const _RankingPreview(),
+            const SizedBox(height: 36),
             const _BannerCarousel(position: 'home_middle'),
-            _WorkSection(title: '热门作品', provider: hotWorksProvider, sort: 'view'),
-            _WorkSection(title: '最新作品', provider: latestWorksProvider),
+            const SizedBox(height: 20),
+            _WorkSection(title: '热门精选', provider: hotWorksProvider, showScope: 'bookstore'),
           ],
         ),
       ),
@@ -401,7 +402,7 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
 
 /// 首页作品区块（热门 / 最新共用）：按 provider 取前若干部，完整列表进作品列表页。
 class _WorkSection extends ConsumerWidget {
-  const _WorkSection({required this.title, required this.provider, this.sort});
+  const _WorkSection({required this.title, required this.provider, this.sort, this.showScope});
 
   final String title;
   final AutoDisposeFutureProvider<List<BookItem>> provider;
@@ -409,6 +410,9 @@ class _WorkSection extends ConsumerWidget {
   /// 点「更多」带的初始排序值（与后端 normalizeSort 白名单一致，如 'view'）；
   /// 不传则列表页默认最新排序。热门区块传 'view'，最新区块不传。
   final String? sort;
+
+  /// 点「更多」带的推荐展示位过滤（如 'bookstore'）；不传则列表页不过滤。
+  final String? showScope;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -418,7 +422,9 @@ class _WorkSection extends ConsumerWidget {
       children: [
         SectionHeader(
           title: title,
-          onMore: () => context.push(RoutePath.workListUrl(sort: sort)),
+          onMore: worksAsync.valueOrNull != null && worksAsync.value!.length > 6
+              ? () => context.push(RoutePath.recommendList)
+              : null,
         ),
         worksAsync.when(
           loading: () => const _SectionLoading(),
@@ -428,9 +434,11 @@ class _WorkSection extends ConsumerWidget {
           ),
           data: (works) {
             if (works.isEmpty) return const _SectionEmpty(message: '暂无作品');
+            // 首页区块只显示前 6 本，剩余的通过"更多"按钮进列表页看
+            final displayWorks = works.take(6).toList();
             return Column(
               children: [
-                for (final work in works)
+                for (final work in displayWorks)
                   WorkListTile(
                     work: work,
                     onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
