@@ -192,18 +192,16 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   }
 
   Widget _buildSortBar() {
-    return Container(
-      color: AppColors.card,
-      child: FilterChipBar(
-        items: [
-          for (final option in WorkSortOption.all)
-            FilterChipItem(
-              label: option.label,
-              selected: option.value == _sort,
-              onTap: () => _applySort(option.value),
-            ),
-        ],
-      ),
+    // 顶栏透明后不再铺白色通栏，胶囊直接浮在页面渐变背景上。
+    return FilterChipBar(
+      items: [
+        for (final option in WorkSortOption.all)
+          FilterChipItem(
+            label: option.label,
+            selected: option.value == _sort,
+            onTap: () => _applySort(option.value),
+          ),
+      ],
     );
   }
 
@@ -250,7 +248,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
         ),
     ];
     if (filters.isEmpty) return const SizedBox.shrink();
-    return Container(color: AppColors.card, child: FilterDropdownBar(filters: filters));
+    return FilterDropdownBar(filters: filters);
   }
 
   /// 当前选中分类名；未选或分类尚未加载完成时返回 null，由调用方回落默认文案。

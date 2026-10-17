@@ -51,7 +51,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
   Widget build(BuildContext context) {
     final detailAsync = ref.watch(authorWorkDetailProvider(widget.workId));
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(detailAsync.valueOrNull?.work.title.isNotEmpty == true
             ? detailAsync.value!.work.title

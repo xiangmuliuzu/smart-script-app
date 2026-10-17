@@ -17,10 +17,14 @@ class AppTheme {
       colorScheme: colorScheme,
       // 页面背景由 AppPageBackground 的渐变提供，Scaffold 须透明透出。
       scaffoldBackgroundColor: Colors.transparent,
+      // 顶栏同样透明，让顶部冰蓝渐变从状态栏一直延伸到内容区，
+      // 避免白色 AppBar 与渐变背景之间出现割裂的色块。
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.card,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.text1,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
           fontSize: 16,

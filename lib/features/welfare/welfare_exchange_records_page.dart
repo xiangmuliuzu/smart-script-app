@@ -13,7 +13,7 @@ class WelfareExchangeRecordsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final records = ref.watch(exchangeRecordsProvider);
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('兑换记录'),
         backgroundColor: Colors.white,
@@ -53,6 +53,7 @@ class _RecordTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [

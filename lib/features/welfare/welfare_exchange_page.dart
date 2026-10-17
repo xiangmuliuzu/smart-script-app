@@ -85,7 +85,7 @@ class _WelfareExchangePageState extends ConsumerState<WelfareExchangePage> {
     final records = ref.watch(exchangeRecordsProvider);
     final rate = ref.watch(aiBalanceProvider).valueOrNull?.rate ?? 10;
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('AI次数兑换'),
         backgroundColor: Colors.white,
@@ -169,6 +169,7 @@ class _WelfareExchangePageState extends ConsumerState<WelfareExchangePage> {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,6 +230,7 @@ class _WelfareExchangePageState extends ConsumerState<WelfareExchangePage> {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
       ),
       child: asset.when(
         loading: () => const Text('资产加载中…',
@@ -276,6 +278,7 @@ class _RecordTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [

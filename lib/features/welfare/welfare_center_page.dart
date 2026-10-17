@@ -21,7 +21,7 @@ class WelfareCenterPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('福利中心'),
         backgroundColor: Colors.white,
@@ -227,6 +227,7 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [
@@ -374,6 +375,7 @@ class _AdCardState extends ConsumerState<_AdCard> {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [
@@ -438,6 +440,7 @@ class _LoadingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: const Center(
         child: SizedBox(
@@ -462,6 +465,7 @@ class _EmptyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Center(
         child: Text(text,
@@ -483,6 +487,7 @@ class _ErrorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Center(
         child: Text(text,

@@ -18,7 +18,7 @@ class AiCreationPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('AI 创作'),
         backgroundColor: Colors.white,
@@ -115,6 +115,7 @@ class _FeatureCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {

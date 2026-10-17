@@ -147,7 +147,6 @@ class _FilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.card,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -209,9 +208,7 @@ class _WorkCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(AppRadius.r),
-          boxShadow: const [
-            BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
-          ],
+          boxShadow: AppColors.cardShadow,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.r),

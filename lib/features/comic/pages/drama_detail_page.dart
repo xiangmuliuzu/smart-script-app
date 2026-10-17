@@ -54,6 +54,7 @@ class DramaDetailPage extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: AppColors.card,
                 borderRadius: BorderRadius.circular(AppRadius.r),
+                boxShadow: AppColors.cardShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,6 +106,7 @@ class DramaDetailPage extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: AppColors.card,
                 borderRadius: BorderRadius.circular(AppRadius.r),
+                boxShadow: AppColors.cardShadow,
               ),
               child: Column(
                 children: [

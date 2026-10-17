@@ -138,6 +138,7 @@ class WorkListTile extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.progressText,
+    this.showDivider = false,
   });
 
   final BookItem work;
@@ -149,13 +150,21 @@ class WorkListTile extends StatelessWidget {
   /// 额外的阅读进度行（仅书架列表传入，如「读到第 3 章 · 时间」）；为空则不占位。
   final String? progressText;
 
+  /// 是否绘制底部分隔线；首页卡片内连续排列时传 true。
+  final bool showDivider;
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: AppColors.card,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          border: showDivider
+              ? const Border(bottom: BorderSide(color: AppColors.divider, width: 0.5))
+              : null,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -237,21 +246,29 @@ class RankingRow extends StatelessWidget {
     required this.item,
     required this.scoreText,
     this.onTap,
+    this.showDivider = true,
   });
 
   final RankingItem item;
   final String scoreText;
   final VoidCallback? onTap;
 
+  /// 是否为该行绘制底部分隔线；卡片内最后一行传 false。
+  final bool showDivider;
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        decoration: BoxDecoration(
+          // 首页卡片内与卡片同色；独立榜单页同样使用本行，保持白底。
           color: AppColors.card,
-          border: Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
+          // 卡片内最后一行的分隔线交给调用方决定，这里只画行间线。
+          border: showDivider
+              ? const Border(bottom: BorderSide(color: AppColors.divider, width: 0.5))
+              : null,
         ),
         child: Row(
           children: [
@@ -333,6 +350,34 @@ class _RankBadge extends StatelessWidget {
 }
 
 /// 区块标题（首页与榜单页共用：左标题 + 右「更多」）。
+/// 白色圆角卡片容器：统一白底、12 圆角与轻阴影（首页各区块复用）。
+///
+/// 与贴边的通栏列表不同，卡片左右留 14，在页面冰蓝渐变背景上形成浮层，
+/// 和「我的」页等卡片式页面保持一致。
+class AppCard extends StatelessWidget {
+  const AppCard({
+    super.key,
+    required this.child,
+    this.margin = const EdgeInsets.fromLTRB(14, 12, 14, 0),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry margin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: margin,
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.all(Radius.circular(AppRadius.r)),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: child,
+    );
+  }
+}
+
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, this.onMore});
 

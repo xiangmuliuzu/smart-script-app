@@ -270,7 +270,7 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
         if (!didPop) _onBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.pageBackground,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),

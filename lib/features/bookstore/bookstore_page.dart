@@ -72,13 +72,32 @@ class BookstorePage extends ConsumerWidget {
           ref.invalidate(latestWorksProvider);
         },
         child: ListView(
+          // 顶部不再留白：搜索栏已在透明 AppBar 内，渐变直接落到 Banner。
           padding: const EdgeInsets.only(bottom: 16),
           children: [
+            const SizedBox(height: 16),
             const _BannerCarousel(position: 'home_top'),
-            const _CategoryEntries(),
-            const _RankingPreview(),
+            const AppCard(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _CategoryEntries(),
+              ),
+            ),
+            const AppCard(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _RankingPreview(),
+              ),
+            ),
             const _BannerCarousel(position: 'home_middle'),
-            _WorkSection(title: '热门精选', provider: hotWorksProvider, showScope: 'bookstore'),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _WorkSection(title: '热门精选', provider: hotWorksProvider, showScope: 'bookstore'),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -167,8 +186,8 @@ class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
     }
 
     return Padding(
-      // 上边距 20 与下方区块标题自带的 16 顶部留白相加约为 20，使轮播上下留白均匀。
-      padding: const EdgeInsets.only(top: 20, bottom: 4),
+      // Banner 在首页区块里，由外层卡片提供左右留白；卡片内再加水平内边距会双重缩进。
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
       child: SizedBox(
         height: 160,
         child: Stack(
@@ -255,7 +274,7 @@ class _BannerSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 4),
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
       child: SizedBox(
         height: 160,
         child: Padding(
@@ -302,7 +321,8 @@ class _CategoryEntries extends ConsumerWidget {
               height: 34,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                // 已在 AppCard 内，水平留白由卡片承担；两侧各留 2 使胶囊阴影不被裁剪。
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 itemCount: categories.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
@@ -311,7 +331,8 @@ class _CategoryEntries extends ConsumerWidget {
                   // 改用 Material(承载底色) + InkWell 提供水波纹，圆角/底色/内边距/
                   // 文字与原胶囊完全一致，横向滑动布局与高度(34)不变。
                   return Material(
-                    color: AppColors.card,
+                    // 胶囊位于白色卡片内，用浅灰底区分，避免白底白字不可见。
+                    color: AppColors.fill,
                     borderRadius: BorderRadius.circular(17),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
@@ -381,15 +402,18 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
           ),
           data: (items) {
             if (items.isEmpty) return const _SectionEmpty(message: '榜单暂无数据');
-            return Container(
-              color: AppColors.card,
+            final preview = items.take(_previewSize).toList();
+            return Padding(
+              // 行内留白由卡片承担，只在卡片内补水平内边距。
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Column(
                 children: [
-                  for (final item in items.take(_previewSize))
+                  for (var i = 0; i < preview.length; i++)
                     RankingRow(
-                      item: item,
-                      scoreText: _scoreText(item),
-                      onTap: () => context.push(RoutePath.workDetailUrl(item.workId)),
+                      item: preview[i],
+                      scoreText: _scoreText(preview[i]),
+                      showDivider: i != preview.length - 1,
+                      onTap: () => context.push(RoutePath.workDetailUrl(preview[i].workId)),
                     ),
                 ],
               ),
@@ -442,10 +466,11 @@ class _WorkSection extends ConsumerWidget {
             final displayWorks = works.take(6).toList();
             return Column(
               children: [
-                for (final work in displayWorks)
+                for (var i = 0; i < displayWorks.length; i++)
                   WorkListTile(
-                    work: work,
-                    onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
+                    work: displayWorks[i],
+                    showDivider: i != displayWorks.length - 1,
+                    onTap: () => context.push(RoutePath.workDetailUrl(displayWorks[i].workId)),
                   ),
               ],
             );

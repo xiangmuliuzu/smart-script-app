@@ -44,18 +44,17 @@ class _RankingPageState extends ConsumerState<RankingPage> {
       appBar: AppBar(title: const Text('作品榜单')),
       body: Column(
         children: [
-          Container(
-            color: AppColors.card,
-            child: FilterChipBar(
-              items: [
-                for (final type in RankingType.all)
-                  FilterChipItem(
-                    label: type.label,
-                    selected: type.code == _type,
-                    onTap: () => setState(() => _type = type.code),
-                  ),
-              ],
-            ),
+          // 筛选条不再铺白色通栏：顶栏透明后，白色色块会在渐变上形成割裂感，
+          // 直接让胶囊浮在页面背景上（与首页榜单卡片内的胶囊视觉一致）。
+          FilterChipBar(
+            items: [
+              for (final type in RankingType.all)
+                FilterChipItem(
+                  label: type.label,
+                  selected: type.code == _type,
+                  onTap: () => setState(() => _type = type.code),
+                ),
+            ],
           ),
           Expanded(
             child: rankingAsync.when(

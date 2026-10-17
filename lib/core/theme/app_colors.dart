@@ -17,12 +17,27 @@ class AppColors {
 
   /// 卡片 / 背景。
   static const Color card = Color(0xFFFFFFFF);
-  static const Color pageBackground = Color(0xFFE9EBEF);
+  static const Color pageBackground = Color(0xFFF6F8FA);
+
+  /// 顶部沉浸式渐变的起点色（浅冰蓝），向下过渡到 [pageBackground]。
+  static const Color topGradient = Color(0xFFDCE9FA);
+
+  /// 内容卡片统一阴影：0 4px 16px rgba(24, 58, 110, 0.04)。
+  static const List<BoxShadow> cardShadow = <BoxShadow>[
+    BoxShadow(
+      color: Color(0x0A183A6E),
+      offset: Offset(0, 4),
+      blurRadius: 16,
+    ),
+  ];
 
   /// 文本。
   static const Color text1 = Color(0xFF1F2329); // 标题
   static const Color text2 = Color(0xFF4E5969); // 正文
   static const Color text3 = Color(0xFF86909C); // 辅助小字
+
+  /// 输入框占位提示：比正文标签更浅，避免提示词抢过标签的视觉层级。
+  static const Color placeholder = Color(0xFFC0C4CC);
 
   /// 分割线 / 填充。
   static const Color divider = Color(0xFFE5E6EB);

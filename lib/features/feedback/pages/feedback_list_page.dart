@@ -70,7 +70,6 @@ class _FeedbackListPageState extends ConsumerState<FeedbackListPage> {
       body: Column(
         children: [
           Container(
-            color: AppColors.card,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
