@@ -82,11 +82,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             child: ListView(
               padding: const EdgeInsets.only(bottom: 24),
               children: [
-                _TopBar(onDrawer: () => Scaffold.of(context).openDrawer(), onSwitch: () async {
-                  // 切换账号：与退出登录同一动作，回登录页后可换身份登录。
-                  AuthGuard.clearOnLogout(ref);
-                  await ref.read(authControllerProvider.notifier).logout();
-                }),
+                _TopBar(onDrawer: () => Scaffold.of(context).openDrawer()),
                 _Header(
                   user: user,
                   // 点击头像/昵称进入个人主页（0 = 自己）；编辑资料移到个人主页「···」菜单。
@@ -141,12 +137,11 @@ class _CardBox extends StatelessWidget {
   }
 }
 
-/// 顶栏：左上抽屉按钮 + 居中标题 + 右侧「切换账号」（对照原型 `.appbar`）。
+/// 顶栏：左上抽屉按钮 + 居中标题（切换账号/退出登录已统一收进抽屉）。
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onDrawer, required this.onSwitch});
+  const _TopBar({required this.onDrawer});
 
   final VoidCallback onDrawer;
-  final VoidCallback onSwitch;
 
   @override
   Widget build(BuildContext context) {
@@ -165,13 +160,6 @@ class _TopBar extends StatelessWidget {
               onPressed: onDrawer,
               icon: const Icon(Icons.menu, size: 22, color: AppColors.text2),
               tooltip: '工具与设置',
-            ),
-          ),
-          Positioned(
-            right: 12,
-            child: TextButton(
-              onPressed: onSwitch,
-              child: const Text('切换账号', style: TextStyle(fontSize: 13)),
             ),
           ),
         ],
@@ -260,6 +248,24 @@ class _ProfileDrawer extends StatelessWidget {
               label: '退出登录',
               danger: true,
               onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('确认退出'),
+                    content: const Text('确定要退出当前账号吗？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: const Text('取消'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: const Text('退出', style: TextStyle(color: AppColors.danger)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !context.mounted) return;
                 Navigator.pop(context);
                 // 主动退出：清空回跳意图（规格 §8.1）
                 AuthGuard.clearOnLogout(ref);
