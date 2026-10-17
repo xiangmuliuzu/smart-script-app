@@ -118,15 +118,11 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
           onTapFollowing: () => _openFollowList(profile.userId, following: true),
           onTapFollowers: () => _openFollowList(profile.userId, following: false),
         ),
-        // 作品区：白色卡片，顶部圆角上移覆盖在头部背景之上（原型 `.content-sheet`）。
-        Transform.translate(
-          offset: const Offset(0, -16),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-            ),
-            padding: const EdgeInsets.only(bottom: 24),
+        // 作品区与全 App 一致：圆角白卡片浮在页面渐变背景上（不再用通栏白底）。
+        AppCard(
+          margin: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
             child: _WorksSection(authorId: profile.userId),
           ),
         ),
@@ -163,15 +159,8 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final nickname = profile.nickname.isEmpty ? '未设置用户名称' : profile.nickname;
     return Container(
-      // 顶部背景沿用 App 主题色系的浅蓝渐变（与页面背景同调，不用参考图的米色）。
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primaryTint, Color(0xFFDCE7F3), Color(0xFFE7EDF5)],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      // 不再自带渐变：顶部直接透出 AppPageBackground 的冰蓝渐变，与首页保持同一背景。
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -370,14 +359,15 @@ class _WorksGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 10,
         mainAxisSpacing: 14,
-        childAspectRatio: 0.62,
+        // 封面按 3:4 完整竖版展示，下方留出两行标题的高度。
+        childAspectRatio: 0.56,
       ),
       itemCount: works.length,
       itemBuilder: (context, index) {
@@ -387,7 +377,20 @@ class _WorksGrid extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              WorkCover(url: work.cover, width: double.infinity, height: 128, radius: 6),
+              // 封面按列宽等比撑满：3:4 的竖版封面完整显示，不再被固定高度裁切。
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Align(
+                    alignment: Alignment.topCenter,
+                    child: WorkCover(
+                      url: work.cover,
+                      width: constraints.maxWidth,
+                      height: constraints.maxWidth * 4 / 3,
+                      radius: AppRadius.rSmall,
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
                 work.title,

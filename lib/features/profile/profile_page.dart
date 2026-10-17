@@ -124,13 +124,7 @@ class _CardBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.r),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+        boxShadow: AppColors.cardShadow,
       ),
       child: child,
     );
@@ -370,8 +364,12 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          _AuthButton(approved: approved, onTap: approved ? null : onAuth),
+          // 昵称旁已有「已认证」标签，通过后不再重复展示按钮；
+          // 未通过时保留「去认证」入口（待审核/被驳回同样可进入查看状态）。
+          if (!approved) ...[
+            const SizedBox(width: 8),
+            _AuthButton(onTap: onAuth),
+          ],
         ],
       ),
     );
@@ -429,29 +427,28 @@ class _Avatar extends StatelessWidget {
       );
 }
 
-/// 「去认证」按钮：已通过实名将变为主色实底并置灰（原型 `.auth-btn`）。
+/// 「去认证」按钮：仅在实名未通过时展示（通过后由昵称旁的标签表达状态）。
 class _AuthButton extends StatelessWidget {
-  const _AuthButton({required this.approved, required this.onTap});
+  const _AuthButton({required this.onTap});
 
-  final bool approved;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: approved ? AppColors.primary : AppColors.primaryTint,
+      color: AppColors.primaryTint,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Text(
-            approved ? '已认证' : '去认证',
+            '去认证',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: approved ? Colors.white : AppColors.primary,
+              color: AppColors.primary,
             ),
           ),
         ),
@@ -745,9 +742,7 @@ class _ShelfBook extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x12000000), blurRadius: 6, offset: Offset(0, 2)),
-                ],
+                boxShadow: AppColors.cardShadow,
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
