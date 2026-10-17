@@ -14,6 +14,7 @@ class UserCenterScaffold extends StatelessWidget {
     required this.body,
     this.actions,
     this.bottomNavigationBar,
+    this.leading,
   });
 
   final String title;
@@ -21,20 +22,24 @@ class UserCenterScaffold extends StatelessWidget {
   final List<Widget>? actions;
   final Widget? bottomNavigationBar;
 
+  /// 自定义返回入口；为空时使用默认返回按钮。
+  final Widget? leading;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        leading: BackButton(
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(RoutePath.home);
-            }
-          },
-        ),
+        leading: leading ??
+            BackButton(
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go(RoutePath.home);
+                }
+              },
+            ),
         title: Text(title),
         actions: actions,
       ),

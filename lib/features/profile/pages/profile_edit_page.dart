@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/services/native_image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/avatar_url.dart';
@@ -98,14 +99,17 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
         _initialBio = _bioCtrl.text;
       });
       _toast('保存成功');
-      if (mounted) context.pop();
     } on ApiException catch (e) {
       _toast(e.message);
+      return;
     } catch (_) {
       _toast('保存失败，请稍后重试');
+      return;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+    // 保存成功：退出编辑页。放在 try/catch 之外，避免导航异常被当成保存失败吞掉。
+    if (mounted) _pop();
   }
 
   /// 选择头像后立即上传并保存，不依赖底部「保存」按钮。
@@ -157,12 +161,76 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// 是否还有未保存的改动。
+  ///
+  /// 保存成功后会先把本地基线同步到服务端返回值，因此这里能立即反映「已无改动」，
+  /// 用于无改动返回时静默退出而不是弹「是否放弃」。
+  bool get _hasUnsavedChanges {
+    final avatarChanged = _pendingAvatar != null && _pendingAvatar != _loadedAvatar;
+    return avatarChanged ||
+        _nicknameCtrl.text.trim() != _initialNickname ||
+        _bioCtrl.text.trim() != _initialBio.trim();
+  }
+
+  /// 返回上一页（AppBar 返回键与系统返回键共用）。
+  ///
+  /// 有未保存改动时二次确认，避免误触丢失编辑内容。
+  Future<void> _onBack() async {
+    if (!_hasUnsavedChanges) {
+      _pop();
+      return;
+    }
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('放弃修改'),
+        content: const Text('当前修改尚未保存，确定要离开吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续编辑'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('放弃', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (leave == true && mounted) _pop();
+  }
+
+  /// 关闭本页。
+  ///
+  /// 关闭动作放在 `finally` 之外执行，确保它抛出的任何导航异常都不会被
+  /// 「保存失败」的兜底 catch 静默吞掉，导致页面看起来像没退出。
+  void _pop() {
+    if (!mounted) return;
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
+    } else {
+      // 写入根定位（而不是相对子路径），确保能从任何深度的导航栈回到「我的」。
+      router.go(RoutePath.profile);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
 
-    return UserCenterScaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) _onBack();
+      },
+      child: UserCenterScaffold(
         title: '个人资料',
+        // 返回键走统一出口：有未保存改动先确认。
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _onBack,
+        ),
         actions: null,
         body: profileAsync.when(
         loading: () => const LoadingView(message: '加载中'),
@@ -191,6 +259,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
             busy: _saving,
           ),
         ),
+      ),
       ),
     );
   }

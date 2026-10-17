@@ -15,6 +15,7 @@ import '../bookstore/data/content_providers.dart';
 import '../bookstore/data/content_repository.dart';
 import '../user_center/data/user_center_models.dart';
 import '../user_center/data/user_center_providers.dart';
+import '../user_center/data/user_social_models.dart';
 import '../user_center/widgets/user_center_widgets.dart';
 
 /// 我的（对照 H5 原型 `profile.html` / `profile_client.html`）。
@@ -65,6 +66,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     final user = auth.user ?? const User(userId: 0, userType: UserType.user);
     final unread = ref.watch(unreadCountProvider);
     final shelf = ref.watch(shelfProvider);
+    // 粉丝/关注/获赞统计来自公开资料接口；加载中或失败时头部显示占位。
+    final profileView = ref.watch(userProfileViewProvider(user.userId));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -77,6 +80,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             onRefresh: () async {
               ref.invalidate(unreadCountProvider);
               ref.invalidate(shelfProvider);
+              ref.invalidate(userProfileViewProvider(user.userId));
               await ref.read(authControllerProvider.notifier).refreshMe();
             },
             child: ListView(
@@ -85,6 +89,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                 _TopBar(onDrawer: () => Scaffold.of(context).openDrawer()),
                 _Header(
                   user: user,
+                  profileView: profileView,
                   // 点击头像/昵称进入个人主页（0 = 自己）；编辑资料移到个人主页「···」菜单。
                   onEdit: () =>
                       AuthGuard.pushProtected(context, ref, target: RoutePath.userProfileUrl(0)),
@@ -304,9 +309,17 @@ class _DrawerItem extends StatelessWidget {
 
 /// 头部卡：头像 + 昵称/实名标签/简介 + 「去认证」按钮（原型 `.prof-head`）。
 class _Header extends StatelessWidget {
-  const _Header({required this.user, required this.onEdit, required this.onAuth});
+  const _Header({
+    required this.user,
+    required this.profileView,
+    required this.onEdit,
+    required this.onAuth,
+  });
 
   final User user;
+
+  /// 公开资料统计（粉丝/关注/获赞），加载中或失败时为空。
+  final AsyncValue<UserProfileView> profileView;
   final VoidCallback onEdit;
   final VoidCallback onAuth;
 
@@ -352,15 +365,9 @@ class _Header extends StatelessWidget {
                     UserStatusChip(text: state.label, color: _tagColor(state)),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  (user.bio != null && user.bio!.isNotEmpty)
-                      ? user.bio!
-                      : '${user.userType.label} · 简介待完善',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
-                ),
+                const SizedBox(height: 6),
+                // 昵称下方改为展示关注/粉丝/获赞等社交数据。
+                _StatsLine(view: profileView),
               ],
             ),
           ),
@@ -386,6 +393,62 @@ class _Header extends StatelessWidget {
       case RealNameState.notSubmitted:
         return AppColors.text3;
     }
+  }
+}
+
+/// 昵称下方的社交数据行：关注 / 粉丝 / 获赞。
+///
+/// 数据来自公开资料接口，加载中或失败时以「-」占位，避免数字跳变。
+class _StatsLine extends StatelessWidget {
+  const _StatsLine({required this.view});
+
+  final AsyncValue<UserProfileView> view;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = view.valueOrNull;
+    return Row(
+      children: [
+        _StatValue(label: '关注', value: profile?.followingCount),
+        const SizedBox(width: 16),
+        _StatValue(label: '粉丝', value: profile?.followerCount),
+        const SizedBox(width: 16),
+        _StatValue(label: '获赞', value: profile?.likeCount),
+      ],
+    );
+  }
+}
+
+class _StatValue extends StatelessWidget {
+  const _StatValue({required this.label, required this.value});
+
+  final String label;
+  final int? value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value == null ? '-' : _compact(value!),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.text1,
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+      ],
+    );
+  }
+
+  /// 大数字压缩为「1.2万」，与列表页计数展示保持一致。
+  static String _compact(int value) {
+    if (value < 10000) return '$value';
+    final wan = value / 10000;
+    return '${wan.toStringAsFixed(wan >= 100 ? 0 : 1)}万';
   }
 }
 

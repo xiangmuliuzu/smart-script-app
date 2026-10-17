@@ -68,8 +68,13 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _openEdit() {
-    AuthGuard.pushProtected(context, ref, target: RoutePath.profileEdit);
+  Future<void> _openEdit() async {
+    // 编辑资料保存成功后返回本页，需要刷新头部与作品，避免仍显示旧数据。
+    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.profileEdit)) return;
+    await context.push(RoutePath.profileEdit);
+    if (!mounted) return;
+    ref.invalidate(userProfileViewProvider(_targetUserId));
+    ref.read(authControllerProvider.notifier).refreshMe();
   }
 
   @override
