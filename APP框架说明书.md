@@ -2,7 +2,7 @@
 
 > 适用工程：`app/`（Flutter 工程根）
 > 对应团队仓库：根目录三目录 `pc/`（Vue 管理后台）、`app/`（本工程，Flutter）、`backend/`（Spring Boot 2.7.18 共享后端）中的 `app/`。
-> 当前状态：**底部导航已完成、内容页全部占位**（对应排期"完成APP端框架搭建"），登录注册等业务由后续分任务补齐。
+> 当前状态：**底部导航、登录/注册/找回密码链路已完成**；书城/漫剧/创作/分类四个内容页仍为占位（后续分任务补齐）。
 > 一句话定位：本说明书讲清楚"工程里每个目录/文件是干嘛的、谁该改哪里、怎么跑起来"。
 
 ---
@@ -78,8 +78,14 @@ lib/
 │
 └── features/             # 【业务层·各负责人只改自己的子目录】
     ├── splash/splash_page.dart       # 启动页（会话恢复中）
-    ├── auth/pages/login_page.dart    # 登录参考实现（真实调 /auth/login）；登录按钮下含“测试进入”免登录入口，直达书城
-    ├── auth/pages/register_page.dart # 注册占位（待分任务）
+    ├── auth/
+    │   ├── pages/login_page.dart          # 登录入口：短信验证码登录，底部含密码登录、注册、忘记密码
+    │   ├── pages/password_login_page.dart # 账号密码登录（验证码按服务端开关显示），下方"忘记密码？"入口
+    │   ├── pages/register_page.dart       # 注册：手机号 → 验证码 → 密码 → 确认密码 → 勾选协议，成功即登录
+    │   ├── pages/forgot_password_page.dart# 找回密码：手机号 + 短信验证码 + 新密码，成功后回登录页
+    │   ├── pages/agreement_page.dart      # 用户协议与隐私政策（注册前可查看，提交时带当前版本）
+    │   ├── data/auth_repository.dart      # 认证请求：sms/send、login、sms/login、register、password/reset、agreements
+    │   └── widgets/                       # 手机号、验证码、"获取验证码"倒计时、协议勾选等表单组件
     ├── home/home_shell.dart          # ★ 底部五格导航容器（书城/漫剧/＋/分类/我的）
     ├── bookstore/bookstore_page.dart # 占位
     ├── comic/comic_page.dart         # 占位
@@ -94,7 +100,9 @@ lib/
 
 已完成（"APP端框架搭建"范围内）：底部五格导航（可切换、各 tab 保留导航栈、中间圆形凸起＋）；登录参考页跑通登录→存 token→进导航；401 自动登出；会话重启恢复；统一网络/异常/分页/主题/存储地基；自定义图标与桌面名；`flutter analyze` 无问题、`flutter test` 通过。
 
-占位未做（后续分任务）：书城/漫剧/创作/分类四个内容页（纯占位）；"我的"为示例页而非真实业务页；注册/验证码登录/找回密码；创作者与甲方角色分流。
+已完成（认证业务）：注册个人账号（手机号 + 短信验证码 + 密码强度校验 + 协议勾选，成功直接登录）；短信验证码登录；账号密码登录；忘记密码（重置后回到登录页）；协议版本从 `GET /auth/agreements` 实时读取，避免版本漂移导致注册 409。
+
+占位未做（后续分任务）：书城/漫剧/创作/分类四个内容页（纯占位）；"我的"为示例页而非真实业务页；创作者与甲方角色分流。
 
 ---
 
