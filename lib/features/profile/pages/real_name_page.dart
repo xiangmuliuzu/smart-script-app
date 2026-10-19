@@ -105,18 +105,26 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
       if (!mounted) return;
       setState(() {
         _submittedStatus = result;
-        _clearMaterialPreview();
-        _materialRef = null;
-        _uploadError = null;
+        if (result.state != RealNameState.rejected) {
+          _clearMaterialPreview();
+          _materialRef = null;
+          _uploadError = null;
+        }
       });
-      _toast('提交成功，请等待审核');
-      _nameCtrl.clear();
-      _idCtrl.clear();
+      _toast(switch (result.state) {
+        RealNameState.approved => '实名认证通过',
+        RealNameState.rejected => '实名认证未通过，请核对后重新提交',
+        _ => '提交成功，请等待审核',
+      });
+      if (result.state != RealNameState.rejected) {
+        _nameCtrl.clear();
+        _idCtrl.clear();
+      }
       // 提交已经成功，身份摘要暂时刷新失败不应误报申请失败。
       try {
         await ref.read(authControllerProvider.notifier).refreshMe();
       } catch (_) {}
-      // 页面使用提交响应展示审核中；离开后 autoDispose，重进再查询最新状态。
+      // 页面使用提交响应展示核验结果；离开后 autoDispose，重进再查询最新状态。
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {

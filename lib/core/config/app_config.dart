@@ -10,11 +10,11 @@ class AppConfig {
 
   /// 接口基础地址。
   ///
-  /// A3 后端为 RuoYi Spring Boot，默认端口 8080，契约前缀 `/api/v1`。
-  /// Android 模拟器访问宿主机使用 `10.0.2.2`。
+  /// 默认连接服务器统一 HTTPS 入口，契约前缀为 `/api/v1`。
+  /// 本地联调可通过 `--dart-define=BASE_URL=...` 覆盖。
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080/api/v1',
+    defaultValue: 'https://www.eyhereal.site/api/v1',
   );
 
   /// 连接超时。
