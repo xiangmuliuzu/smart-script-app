@@ -405,7 +405,6 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
             ],
             if (isSellerInThisInquiry && inquiry.status == InquiryStatus.pending) ...[
               // 卖方可以接受/拒绝（仅待处理时，接受即进入议价中）
-              if (isBuyerInThisInquiry) const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
                   onPressed: _operating ? null : () => _rejectInquiry(),
