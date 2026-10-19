@@ -47,7 +47,7 @@ lib/
 ├── app.dart              # 根组件：MaterialApp.router + 全局主题
 │
 ├── core/                 # 【框架层·公共地基，改动需对齐】
-│   ├── config/app_config.dart        # 后端地址(默认 http://10.0.2.2:3000/api/v1)、超时、日志开关
+│   ├── config/app_config.dart        # 后端地址(默认 https://www.eyhereal.site/api/v1)、超时、日志开关
 │   ├── constants/
 │   │   ├── api_endpoints.dart        # 接口路径唯一出处（2.1~2.10 全登记），页面禁止手写 URL
 │   │   └── app_constants.dart        # 存储 key、成功码 200、分页默认值
@@ -114,7 +114,7 @@ lib/
    - 正常流程（进登录页）：`flutter run`
    - **演示导航（免后端直接进底部导航）**：`flutter run --dart-define=DEMO_SESSION=true`
      该开关在 `auth_providers.dart`，仅调试用；不带参数时行为不变。给负责人看导航效果用带参数的方式。
-4. 后端地址：模拟器必须用 `10.0.2.2`（已默认），真机/远程改局域网 IP 或 `--dart-define=BASE_URL=...`。
+4. 后端地址：默认统一使用 `https://www.eyhereal.site/api/v1`，模拟器和真机均无需本机后端。本地联调时可用 `--dart-define=BASE_URL=http://10.0.2.2:8080/api/v1` 覆盖，真机改用电脑的局域网 IP。
 5. 校验：`flutter analyze`、`flutter test`。
 6. 换图标/改桌面名后需**重新构建安装**才生效：`flutter build apk --debug` 后 `adb install -r`。
 
@@ -144,7 +144,7 @@ lib/
 
 ## 8. 常见问题（FAQ）
 
-- **一点登录就"网络连接失败"**：后端未启动或地址不对；模拟器必须 `10.0.2.2`。只想看导航请用 `DEMO_SESSION=true`。
+- **一点登录就"网络连接失败"**：检查设备网络及服务器统一接口是否可访问；如使用 `BASE_URL` 覆盖，确认目标后端已启动且地址正确。只想看导航请用 `DEMO_SESSION=true`。
 - **登录后白屏/报 no routes for location: /**：`RoutePath.home` 被改成了未注册路由，改回 `/bookstore`。
 - **图标还是 Flutter 默认**：改图标后没重新构建安装；执行第 5 节第 6 条。
 - **桌面找不到 App**：Pixel 系 launcher 新装 App 进应用抽屉（桌面上滑），长按可拖到首屏。

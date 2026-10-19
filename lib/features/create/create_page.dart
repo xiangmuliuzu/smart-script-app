@@ -48,18 +48,20 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     // 需登录的 /users/me/works。此处做页面级兜底：未登录不监听列表 Provider、不发请求，
     // 页内引导登录；会话恢复中（unknown）按守卫契约视为可能已登录，先加载态等待，
     // 不误弹「登录已失效」。
-    final authStatus = ref.watch(authControllerProvider).status;
+    final auth = ref.watch(authControllerProvider);
+    final authStatus = auth.status;
+    final canCreate = auth.user?.authorCapability == true;
     final loggedIn = authStatus == AuthStatus.authenticated;
-    // 未登录时不取列表 Provider：不 watch 就不会发出必然 401 的请求。
-    final worksAsync = loggedIn ? ref.watch(myWorksProvider(_status)) : null;
+    // 未登录或未开通能力时不请求作者作品列表。
+    final worksAsync = loggedIn && canCreate ? ref.watch(myWorksProvider(_status)) : null;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('我的作品'),
         actions: [
-          // 新建入口仅登录态出现：游客 body 已提供统一登录引导，避免重复入口。
-          if (loggedIn)
+          // 新建入口仅对已开通创作能力的用户展示。
+          if (loggedIn && canCreate)
             TextButton.icon(
               onPressed: () => context.push(RoutePath.workUpload),
               icon: const Icon(Icons.add, size: 20),
@@ -75,7 +77,20 @@ class _CreatePageState extends ConsumerState<CreatePage> {
             onLogin: () =>
                 AuthGuard.requireLogin(context, ref, target: RoutePath.create),
           ),
-        // 已登录：原列表 / 筛选 / 新建行为不变。
+        // 未开通或被关闭能力：阻断创作并引导申请。
+        AuthStatus.authenticated when !canCreate => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('请先申请开通创作者能力'),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => context.push(RoutePath.creatorApply),
+                  child: const Text('去申请'),
+                ),
+              ],
+            ),
+          ),
         AuthStatus.authenticated => Column(
             children: [
               _FilterBar(

@@ -8,21 +8,28 @@
 
 ```powershell
 flutter pub get
-flutter run --dart-define=BASE_URL=http://10.0.2.2:8080/api/v1
+flutter run
 ```
 
-Android 模拟器访问宿主机使用 `10.0.2.2`；真机使用后端实际地址。构建 Android 时按 `rules.md` 使用 JDK 17。
+App 默认连接服务器统一入口 `https://www.eyhereal.site/api/v1`，模拟器和真机均无需在本机启动后端。构建 Android 时按 `rules.md` 使用 JDK 17。
 
-## 连接公网测试服务器
+## 构建测试安装包
 
-测试人员的电脑未运行后端时，使用公网接口地址；`10.0.2.2` 只会访问模拟器所在电脑。
+直接构建即可使用服务器统一入口：
 
 ```powershell
-flutter run --dart-define=BASE_URL=https://www.eyhereal.site/api/v1
-flutter build apk --debug --dart-define=BASE_URL=https://www.eyhereal.site/api/v1
+flutter build apk --debug
 ```
 
 测试安装包输出到 `build/app/outputs/flutter-apk/app-debug.apk`。切换接口地址后需重新运行或安装新构建的 APK。
+
+## 本地后端联调
+
+需要连接本机后端时，显式覆盖地址；`10.0.2.2` 只会访问 Android 模拟器所在电脑，真机需改用电脑的局域网 IP。
+
+```powershell
+flutter run --dart-define=BASE_URL=http://10.0.2.2:8080/api/v1
+```
 
 ## 校验
 

@@ -234,8 +234,8 @@ class _ProfileDrawer extends StatelessWidget {
               label: '意见反馈',
               onTap: () => _push(context, RoutePath.feedback),
             ),
-            // 仅未开通作者能力的用户显示申请入口；已是创作者/已开通则隐藏。
-            if (!user.isCreator && !user.authorCapability)
+            // 申请入口只取决于当前能力，关闭后即使账号类型仍是创作者也可重新申请。
+            if (!user.authorCapability)
               _DrawerItem(
                 icon: Icons.workspace_premium_outlined,
                 label: '成为创作者',
@@ -567,7 +567,7 @@ class _QuickGridState extends State<_QuickGrid> {
       _QuickEntry(ref, Icons.person_outline, '个人主页',
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.userProfileUrl(0))),
-      if (user.isCreator || user.authorCapability) ...[
+      if (user.authorCapability) ...[
         _QuickEntry(ref, Icons.auto_awesome, 'AI 创作',
             onTap: (ctx, ref) =>
                 AuthGuard.pushProtected(ctx, ref, target: RoutePath.aiCenter)),

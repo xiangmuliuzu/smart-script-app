@@ -138,6 +138,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           _rememberIntent(ref, state);
           return RoutePath.login;
         case AuthStatus.authenticated:
+          // 创作子页面（含深链）统一按能力准入，账号类型不赋予创作权限。
+          if (loc.startsWith('${RoutePath.create}/') &&
+              auth.user?.authorCapability != true) {
+            return RoutePath.creatorApply;
+          }
           return (isAuthPage || isSplash) ? RoutePath.home : null;
       }
     },
