@@ -39,7 +39,7 @@ class RoutePath {
   static bool isShellRoot(String location) =>
       shellRoots.contains(Uri.parse(location).path);
 
-  // A5 用户中心（Shell 之外的独立页面，受登录守卫保护）
+  // A5 用户中心（Shell 之外的独立页面,受登录守卫保护）
   static const String profileEdit = '/profile/edit';
   /// 个人主页（自己或他人）；userId 缺省/0 表示自己。
   static const String userProfile = '/profile/home';
@@ -57,6 +57,23 @@ class RoutePath {
 
   // A6 示例业务入口（B 模块：内容/书城），受登录与实名守卫保护
   static const String bookshelf = '/bookshelf';
+
+  // 印章管理（用户印章上传、审核、停用）
+  static const String mySeal = '/seal/my';
+  static const String sealDetail = '/seal/detail';
+  static const String sealUpload = '/seal/upload';
+  static const String sealEdit = '/seal/edit';
+  static const String sealResubmit = '/seal/resubmit';
+  static const String materialPreview = '/seal/material';
+
+  /// 印章详情 URL。
+  static String sealDetailUrl(int sealId) => '$sealDetail?id=$sealId';
+
+  /// 印章编辑 URL。
+  static String sealEditUrl(int sealId) => '$sealEdit?id=$sealId';
+
+  /// 材料预览 URL。
+  static String materialPreviewUrl(int materialId) => '$materialPreview?id=$materialId';
 
   // B 模块我的收藏列表（受登录守卫保护）
   static const String favorites = '/favorites';
@@ -92,14 +109,13 @@ class RoutePath {
   /// 作品列表 URL；[title] 只用于列表页标题展示，不参与后端筛选。
   /// [sort] 为初始排序（值与后端 normalizeSort 白名单一致，如 view/favorite/...）；
   /// 不传时列表页默认最新排序，保持既有行为不变。
-  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title, String? sort, String? showScope}) {
+  static String workListUrl({int? categoryId, int? tagId, String? keyword, String? title, String? sort}) {
     final query = <String, String>{
       if (categoryId != null) 'categoryId': '$categoryId',
       if (tagId != null) 'tagId': '$tagId',
       if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
       if (title != null && title.isNotEmpty) 'title': title,
       if (sort != null && sort.isNotEmpty) 'sort': sort,
-      if (showScope != null && showScope.isNotEmpty) 'showScope': showScope,
     };
     return Uri(path: workList, queryParameters: query.isEmpty ? null : query).toString();
   }
@@ -197,14 +213,18 @@ class RoutePath {
   static const String tradeManagement = '/trade/management';
   static const String tradeSessionList = '/trade/session/list';
   // 财务
+  static const String finance = '/trade/finance';
   static const String incomeOverview = '/trade/finance/income';
   static const String escrowList = '/trade/finance/escrow';
   static const String invoiceManage = '/trade/finance/invoice';
+  static const String financeOrders = '/trade/finance/orders';
+  static const String financeContracts = '/trade/finance/contracts';
   // 询盘
   static const String inquiryCreate = '/trade/inquiry/create';
   static const String inquiryList = '/trade/inquiry/list';
   static const String inquiryDetail = '/trade/inquiry/detail';
   // 报价
+  static const String quoteCreate = '/trade/quote/create';
   static const String quoteList = '/trade/quote/list';
   static const String counterOffer = '/trade/quote/counter-offer';
   // 订单
@@ -264,7 +284,14 @@ class RouteName {
   static const String notificationPreferences = 'notificationPreferences';
   static const String bookshelf = 'bookshelf';
   static const String favorites = 'favorites';
+  static const String mySeal = 'mySeal';
+  static const String sealDetail = 'sealDetail';
+  static const String sealUpload = 'sealUpload';
+  static const String sealEdit = 'sealEdit';
+  static const String sealResubmit = 'sealResubmit';
+  static const String materialPreview = 'materialPreview';
   static const String workList = 'workList';
+  static const String recommendList = 'recommendList';
   static const String workDetail = 'workDetail';
   static const String ranking = 'ranking';
   static const String search = 'search';
@@ -290,12 +317,16 @@ class RouteName {
   // ===== C 交易域 =====
   static const String tradeManagement = 'tradeManagement';
   static const String tradeSessionList = 'tradeSessionList';
+  static const String finance = 'finance';
   static const String incomeOverview = 'incomeOverview';
   static const String escrowList = 'escrowList';
   static const String invoiceManage = 'invoiceManage';
+  static const String financeOrders = 'financeOrders';
+  static const String financeContracts = 'financeContracts';
   static const String inquiryCreate = 'inquiryCreate';
   static const String inquiryList = 'inquiryList';
   static const String inquiryDetail = 'inquiryDetail';
+  static const String quoteCreate = 'quoteCreate';
   static const String quoteList = 'quoteList';
   static const String counterOffer = 'counterOffer';
   static const String orderList = 'orderList';
@@ -370,6 +401,8 @@ class ProtectedRoutes {
     // E 模块：福利中心与 AI 创作（需登录）
     RoutePath.welfareCenter,
     RoutePath.aiCenter,
+    // 印章管理（需登录）
+    RoutePath.mySeal,
   ];
 
   static bool isProtected(String location) {

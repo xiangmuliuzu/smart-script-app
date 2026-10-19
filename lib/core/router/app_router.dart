@@ -45,6 +45,10 @@ import '../../features/welfare/welfare_center_page.dart';
 import '../../features/welfare/welfare_exchange_page.dart';
 import '../../features/welfare/welfare_exchange_records_page.dart';
 import '../../features/welfare/welfare_points_detail_page.dart';
+import '../../features/seal/my_seal_page.dart';
+import '../../features/seal/seal_detail_page.dart';
+import '../../features/seal/seal_edit_page.dart';
+import '../../features/seal/seal_upload_page.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/message/pages/message_detail_page.dart';
 import '../../features/message/pages/message_list_page.dart';
@@ -531,6 +535,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.welfareExchangeRecords,
         builder: (_, __) => const WelfareExchangeRecordsPage(),
       ),
+      // ===== 印章管理（受登录守卫保护）=====
+      GoRoute(
+        path: RoutePath.mySeal,
+        name: RouteName.mySeal,
+        builder: (_, __) => const MySealPage(),
+      ),
+      GoRoute(
+        path: '${RoutePath.sealDetail}/:sealId',
+        name: RouteName.sealDetail,
+        builder: (context, state) {
+          final sealId = int.tryParse(state.pathParameters['sealId'] ?? '') ?? 0;
+          return SealDetailPage(sealId: sealId);
+        },
+      ),
+      GoRoute(
+        path: RoutePath.sealUpload,
+        name: RouteName.sealUpload,
+        builder: (_, __) => const SealUploadPage(),
+      ),
+      GoRoute(
+        path: '${RoutePath.sealEdit}/:sealId',
+        name: RouteName.sealEdit,
+        builder: (context, state) {
+          final sealId = int.tryParse(state.pathParameters['sealId'] ?? '') ?? 0;
+          return SealEditPage(sealId: sealId);
+        },
+      ),
       // ===== C 交易域 =====
       GoRoute(
         path: RoutePath.tradeManagement,
@@ -578,6 +609,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       // ===== 报价/议价 =====
+      GoRoute(
+        path: RoutePath.quoteCreate,
+        name: RouteName.quoteCreate,
+        builder: (context, state) => QuoteCreatePage(
+          inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
+          workTitle: state.uri.queryParameters['workTitle'],
+        ),
+      ),
       GoRoute(
         path: RoutePath.quoteList,
         name: RouteName.quoteList,

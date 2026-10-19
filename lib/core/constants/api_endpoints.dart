@@ -251,6 +251,13 @@ class ApiEndpoints {
   static String categoryById(int id) => '/categories/$id';
   static const String tags = '/tags';
 
+  // ===== 印章管理 =====
+  static const String copyrightSeals = '/content/copyright-seals';
+  static String copyrightSealById(int sealId) => '/content/copyright-seals/$sealId';
+  static String copyrightSealMaterials(int sealId) => '/content/copyright-seals/$sealId/materials';
+  static String copyrightSealResubmit(int sealId) => '/content/copyright-seals/$sealId/resubmit';
+  static String copyrightSealDisable(int sealId) => '/content/copyright-seals/$sealId/disable';
+
   // ===== C 交易域（APP 专用接口） =====
   // 交易作品
   static const String adminTradeWorks = '/admin/trade/works';
