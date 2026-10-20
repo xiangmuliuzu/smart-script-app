@@ -71,7 +71,7 @@ Future<_Session> _loggedIn() async {
   final prefs = await SharedPreferences.getInstance();
   final storage = TokenStorage(InMemoryTokenSecureStorage(), prefs);
   final graph = AuthNetworkGraph.create(storage);
-  graph.apiClient.dioForTest.options.baseUrl = kBase;
+  graph.apiClient.dio.options.baseUrl = kBase;
 
   final phone = _randPhone();
   await graph.repository.sendSms(phone: phone, scene: 'REGISTER');

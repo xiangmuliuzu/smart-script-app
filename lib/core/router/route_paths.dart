@@ -231,6 +231,8 @@ class RoutePath {
   static const String orderList = '/trade/order/list';
   static const String orderDetail = '/trade/order/detail';
   static const String orderCancel = '/trade/order/cancel';
+  // 合同签署
+  static const String contractSign = '/trade/contract/sign';
   // 合作记录
   static const String cooperationCreate = '/trade/cooperation/create';
   static const String followUpList = '/trade/follow-up/list';
@@ -332,6 +334,7 @@ class RouteName {
   static const String orderList = 'orderList';
   static const String orderDetail = 'orderDetail';
   static const String orderCancel = 'orderCancel';
+  static const String contractSign = 'contractSign';
   static const String cooperationCreate = 'cooperationCreate';
   static const String followUpList = 'followUpList';
   static const String demandList = 'demandList';
@@ -388,6 +391,8 @@ class ProtectedRoutes {
     RoutePath.orderList,
     RoutePath.orderDetail,
     RoutePath.orderCancel,
+    // 合同签署（需登录）
+    RoutePath.contractSign,
     RoutePath.cooperationCreate,
     RoutePath.followUpList,
     RoutePath.demandList,

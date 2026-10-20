@@ -46,9 +46,9 @@ class QuoteStatus {
   }
 }
 
-/// 订单状态（对齐后端状态机：confirmed → escrow_pending → delivering → completed）
+/// 订单状态（对齐后端状态机：confirmed → contract signing → escrow_pending → delivering → completed）
 class OrderStatus {
-  static const String confirmed = 'confirmed';            // 已确认（待买方付款）
+  static const String confirmed = 'confirmed';            // 已确认（待双方签署合同）
   static const String escrowPending = 'escrow_pending';   // 已托管（资金入托管，待卖方交割）
   static const String delivering = 'delivering';          // 交割中
   static const String completed = 'completed';            // 已完成（托管释放，收益入账）
@@ -63,6 +63,24 @@ class OrderStatus {
       case completed: return '已完成';
       case cancelled: return '已取消';
       case refunded: return '已退款';
+      default: return status ?? '未知';
+    }
+  }
+}
+
+/// 合同签署状态
+class ContractStatus {
+  static const String pending = 'pending';                  // 待签署
+  static const String partialSigned = 'partial_signed';    // 部分签署（一方已签）
+  static const String completed = 'completed';              // 双方已签署
+  static const String cancelled = 'cancelled';              // 已取消
+
+  static String label(String? status) {
+    switch (status) {
+      case pending: return '待签署';
+      case partialSigned: return '部分签署';
+      case completed: return '双方已签';
+      case cancelled: return '已取消';
       default: return status ?? '未知';
     }
   }
@@ -303,6 +321,7 @@ class Order {
   final String? licenseType;
   final String? status;
   final String? cancelReason;
+  final int? contractId;      // 关联合同 ID
   final DateTime? createdAt;
   final DateTime? updatedAt;
   // Transient
@@ -322,6 +341,7 @@ class Order {
     this.licenseType,
     this.status,
     this.cancelReason,
+    this.contractId,
     this.createdAt,
     this.updatedAt,
     this.workTitle,
@@ -342,6 +362,7 @@ class Order {
       licenseType: json['licenseType'] as String?,
       status: json['status'] as String?,
       cancelReason: json['cancelReason'] as String?,
+      contractId: (json['contractId'] as num?)?.toInt(),
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
       workTitle: json['workTitle'] as String?,
@@ -771,6 +792,107 @@ class EscrowSummary {
   final int total;
   EscrowSummary({required this.list, required this.totalAmount,
     required this.pendingAmount, required this.total});
+}
+
+// ==================== 合同域模型 ====================
+
+/// 合同详情（含 HTML 内容、双方签署状态、签名/印章图片）
+class ContractDetail {
+  final int contractId;
+  final String? contractNo;
+  final String? contractType;
+  final int? amount;          // 元
+  final int? orderId;
+  final String? orderNo;
+  final int? buyerId;
+  final String? buyerName;
+  final int? sellerId;
+  final String? sellerName;
+  final int? buyerSignStatus; // 0=未签, 1=已签
+  final int? sellerSignStatus;
+  final String? buyerSignTime;
+  final String? sellerSignTime;
+  final String? buyerSignatureImage;
+  final String? buyerSealImage;
+  final String? sellerSignatureImage;
+  final String? sellerSealImage;
+  final String? signedPdfUrl;
+  final String? status;       // pending / partial_signed / completed
+  final String? content;      // HTML 合同内容
+  final String? workTitle;
+  final String? licenseType;
+  final String? createdAt;
+
+  const ContractDetail({
+    required this.contractId,
+    this.contractNo,
+    this.contractType,
+    this.amount,
+    this.orderId,
+    this.orderNo,
+    this.buyerId,
+    this.buyerName,
+    this.sellerId,
+    this.sellerName,
+    this.buyerSignStatus,
+    this.sellerSignStatus,
+    this.buyerSignTime,
+    this.sellerSignTime,
+    this.buyerSignatureImage,
+    this.buyerSealImage,
+    this.sellerSignatureImage,
+    this.sellerSealImage,
+    this.signedPdfUrl,
+    this.status,
+    this.content,
+    this.workTitle,
+    this.licenseType,
+    this.createdAt,
+  });
+
+  factory ContractDetail.fromJson(Map<String, dynamic> json) {
+    return ContractDetail(
+      contractId: (json['contractId'] as num?)?.toInt() ?? 0,
+      contractNo: json['contractNo'] as String?,
+      contractType: json['contractType'] as String?,
+      amount: (json['amount'] as num?)?.toInt(),
+      orderId: (json['orderId'] as num?)?.toInt(),
+      orderNo: json['orderNo'] as String?,
+      buyerId: (json['buyerId'] as num?)?.toInt(),
+      buyerName: json['buyerName'] as String?,
+      sellerId: (json['sellerId'] as num?)?.toInt(),
+      sellerName: json['sellerName'] as String?,
+      buyerSignStatus: (json['buyerSignStatus'] as num?)?.toInt(),
+      sellerSignStatus: (json['sellerSignStatus'] as num?)?.toInt(),
+      buyerSignTime: json['buyerSignTime'] as String?,
+      sellerSignTime: json['sellerSignTime'] as String?,
+      buyerSignatureImage: json['buyerSignatureImage'] as String?,
+      buyerSealImage: json['buyerSealImage'] as String?,
+      sellerSignatureImage: json['sellerSignatureImage'] as String?,
+      sellerSealImage: json['sellerSealImage'] as String?,
+      signedPdfUrl: json['signedPdfUrl'] as String?,
+      status: json['status'] as String?,
+      content: json['content'] as String?,
+      workTitle: json['workTitle'] as String?,
+      licenseType: json['licenseType'] as String?,
+      createdAt: json['createdAt'] as String?,
+    );
+  }
+
+  /// 买方是否已签署
+  bool get isBuyerSigned => buyerSignStatus == 1;
+
+  /// 卖方是否已签署
+  bool get isSellerSigned => sellerSignStatus == 1;
+
+  /// 合同是否已完成（双方均已签署）
+  bool get isCompleted => status == ContractStatus.completed;
+
+  /// 合同状态标签
+  String get statusLabel => ContractStatus.label(status);
+
+  /// 金额展示（合同金额后端存元）
+  String get amountYuan => amount != null ? '¥$amount' : '-';
 }
 
 // ==================== 工具函数 ====================

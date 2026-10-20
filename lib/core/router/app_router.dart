@@ -69,6 +69,7 @@ import '../../features/trade/pages/inquiry_list_page.dart';
 import '../../features/trade/pages/quote_records_page.dart';
 import '../../features/trade/pages/order_list_page.dart';
 import '../../features/trade/pages/order_detail_page.dart';
+import '../../features/trade/pages/contract_sign_page.dart';
 import '../../features/trade/pages/trade_management_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
 import '../../features/trade/pages/escrow_list_page.dart';
@@ -642,6 +643,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.orderDetail,
         builder: (context, state) => OrderDetailPage(
           orderId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.contractSign,
+        name: RouteName.contractSign,
+        builder: (context, state) => ContractSignPage(
+          orderId: int.tryParse(state.uri.queryParameters['orderId'] ?? '') ?? 0,
         ),
       ),
       // ===== A3 聊天域 =====

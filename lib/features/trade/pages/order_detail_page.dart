@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../chat/data/chat_providers.dart';
+import '../data/contract_providers.dart';
 import '../data/trade_models.dart';
 import '../data/trade_providers.dart';
 
 /// 订单详情页。
 ///
-/// 从上到下：状态卡片 → 作品信息 → 报价信息 → 双方信息 → 订单信息 → 底部操作栏。
+/// 从上到下：状态卡片 → 作品信息 → 报价信息 → 合同信息 → 双方信息 → 订单信息 → 底部操作栏。
 class OrderDetailPage extends ConsumerWidget {
   const OrderDetailPage({super.key, required this.orderId});
 
@@ -22,6 +25,7 @@ class OrderDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orderAsync = ref.watch(appOrderDetailProvider(orderId));
+    final contractAsync = ref.watch(contractByOrderProvider(orderId));
 
     return Scaffold(
       appBar: AppBar(
@@ -37,6 +41,7 @@ class OrderDetailPage extends ConsumerWidget {
           final authState = ref.watch(authControllerProvider);
           final currentUserId = authState.user?.userId ?? 0;
           final isBuyer = order.buyerId == currentUserId;
+          final contract = contractAsync.valueOrNull;
           return Column(
             children: [
               Expanded(
@@ -44,11 +49,15 @@ class OrderDetailPage extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      _buildStatusCard(order),
+                      _buildStatusCard(order, contract),
                       const SizedBox(height: 10),
                       _buildWorkCard(order),
                       const SizedBox(height: 10),
                       _buildQuoteCard(order),
+                      if (contract != null) ...[
+                        const SizedBox(height: 10),
+                        _buildContractCard(context, order, contract),
+                      ],
                       const SizedBox(height: 10),
                       _buildPartyCard(order),
                       const SizedBox(height: 10),
@@ -57,7 +66,7 @@ class OrderDetailPage extends ConsumerWidget {
                   ),
                 ),
               ),
-              _buildBottomBar(context, ref, order, isBuyer),
+              _buildBottomBar(context, ref, order, isBuyer, contract),
             ],
           );
         },
@@ -66,27 +75,30 @@ class OrderDetailPage extends ConsumerWidget {
   }
 
   /// 状态卡片 + 进度步骤条
-  Widget _buildStatusCard(Order order) {
+  Widget _buildStatusCard(Order order, ContractDetail? contract) {
     final Color color;
     final String desc;
     final int currentStep;
+    final contractCompleted = contract?.isCompleted ?? false;
     switch (order.status) {
       case OrderStatus.confirmed:
         color = AppColors.primary;
-        desc = '订单已确认，等待买方付款至托管';
-        currentStep = 0;
+        desc = contractCompleted
+            ? '合同已签署完成，请买方付款至托管'
+            : '订单已确认，请双方签署合同';
+        currentStep = contractCompleted ? 1 : 0;
       case OrderStatus.escrowPending:
         color = AppColors.warning;
         desc = '资金已托管，等待卖方交割';
-        currentStep = 1;
+        currentStep = 2;
       case OrderStatus.delivering:
         color = AppColors.warning;
         desc = '订单交割中，请配合完成相关手续';
-        currentStep = 2;
+        currentStep = 3;
       case OrderStatus.completed:
         color = AppColors.success;
         desc = '订单已完成，托管资金已释放给卖方';
-        currentStep = 3;
+        currentStep = 4;
       case OrderStatus.refunded:
         color = AppColors.text2;
         desc = '订单已退款';
@@ -94,7 +106,7 @@ class OrderDetailPage extends ConsumerWidget {
       case OrderStatus.cancelled:
         color = AppColors.text3;
         desc = '订单已取消';
-        currentStep = -1; // 取消不显示步骤
+        currentStep = -1;
       default:
         color = AppColors.text2;
         desc = OrderStatus.label(order.status);
@@ -129,7 +141,7 @@ class OrderDetailPage extends ConsumerWidget {
 
   /// 横向进度步骤条
   Widget _buildProgressSteps(int currentStep, Color activeColor) {
-    const steps = ['已确认', '已托管', '交割中', '已完成'];
+    const steps = ['已确认', '已签约', '已托管', '交割中', '已完成'];
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
         if (i.isOdd) {
@@ -191,6 +203,51 @@ class OrderDetailPage extends ConsumerWidget {
     ]);
   }
 
+  /// 合同信息卡片
+  Widget _buildContractCard(BuildContext context, Order order, ContractDetail contract) {
+    final pdfUrl = contract.signedPdfUrl;
+    return _buildCard('合同信息', [
+      _infoRow('合同编号', contract.contractNo ?? '-'),
+      _infoRow('签署状态', contract.statusLabel),
+      _infoRow('买方签署', contract.isBuyerSigned ? '已签署' : '未签署'),
+      if (contract.buyerSignTime != null) _infoRow('买方签署时间', contract.buyerSignTime!),
+      _infoRow('卖方签署', contract.isSellerSigned ? '已签署' : '未签署'),
+      if (contract.sellerSignTime != null) _infoRow('卖方签署时间', contract.sellerSignTime!),
+      if (contract.isCompleted && pdfUrl != null && pdfUrl.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _openSignedPdf(context, pdfUrl),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('查看签署完成 PDF', style: TextStyle(fontSize: 14)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+      ],
+    ]);
+  }
+
+  /// 打开签署完成 PDF：/profile 为 root-relative，拼站点 origin；公开静态资源无需鉴权。
+  /// 本页为 ConsumerWidget 无 State.mounted，用 context.mounted 判定。
+  Future<void> _openSignedPdf(BuildContext context, String pdfUrl) async {
+    String full;
+    try {
+      full = '${Uri.parse(AppConfig.baseUrl).origin}$pdfUrl';
+    } catch (_) {
+      full = '${AppConfig.baseUrl}$pdfUrl';
+    }
+    final launched = await launchUrl(Uri.parse(full), mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      showAppToast(context, '无法打开 PDF，请稍后重试');
+    }
+  }
+
   /// 双方信息卡片
   Widget _buildPartyCard(Order order) {
     return _buildCard('双方信息', [
@@ -246,14 +303,20 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 底部操作栏：按状态与角色分化（confirmed→买方付款/取消；escrow_pending→卖方交割；delivering→买方确认收货）
-  Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer) {
+  /// 底部操作栏：按状态与角色分化
+  Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, ContractDetail? contract) {
     final status = order.status;
 
-    // 已确认：买方付款至托管/取消，卖方等待并联系
+    // 已确认：先检查合同签署状态
     if (status == OrderStatus.confirmed) {
+      final contractCompleted = contract?.isCompleted ?? false;
+      if (!contractCompleted) {
+        // 合同未完成签署 → 显示签署入口
+        return _buildContractSignBar(context, ref, order);
+      }
+      // 合同已完成 → 买方付款/取消，卖方等待
       if (isBuyer) return _buildPayBar(context, ref, order);
-      return _buildContactBar(context, ref, order, isBuyer, '等待买方付款至托管，可联系买方沟通');
+      return _buildContactBar(context, ref, order, isBuyer, '合同已签署完成，等待买方付款至托管');
     }
 
     // 已托管：卖方开始交割，买方等待
@@ -322,6 +385,43 @@ class OrderDetailPage extends ConsumerWidget {
     }
 
     return const SizedBox.shrink();
+  }
+
+  /// 合同签署栏：查看并签署合同
+  Widget _buildContractSignBar(BuildContext context, WidgetRef ref, Order order) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('合同尚未完成签署，请双方各自完成签署后再进行付款',
+                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  context.push('${RoutePath.contractSign}?orderId=${order.orderId}');
+                },
+                icon: const Icon(Icons.description_outlined, size: 18),
+                label: const Text('查看并签署合同', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 买方付款栏：付款至托管 + 取消订单

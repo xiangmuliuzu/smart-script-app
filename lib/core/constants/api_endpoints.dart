@@ -299,6 +299,9 @@ class ApiEndpoints {
   static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
   static String appOrderDeliver(int orderId) => '/trade/order/$orderId/deliver';
   static String appOrderComplete(int orderId) => '/trade/order/$orderId/complete';
+  // 合同
+  static String appContractByOrder(int orderId) => '/trade/contracts/$orderId';
+  static String appContractSign(int contractId) => '/trade/contracts/$contractId/sign';
   // 财务（资金托管 / 发票 / 收益）
   static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
   static const String appFinanceIncomeDetail = '/trade/finance/income/detail';
