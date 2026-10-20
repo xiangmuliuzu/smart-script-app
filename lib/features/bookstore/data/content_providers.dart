@@ -42,7 +42,7 @@ final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
     final repo = ref.watch(contentRepositoryProvider);
     // 拿 20 本回来，足够判断总共有多少推荐作品；首页只渲染前 6 本
     final page =
-        await repo.pageWorks(pageNum: 1, pageSize: 20, showScope: 'bookstore');
+        await repo.pageWorks(pageNum: 1, pageSize: 30, showScope: 'bookstore');
     return page.list;
   },
 );

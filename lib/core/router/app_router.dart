@@ -614,14 +614,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       // ===== 报价/议价 =====
-      GoRoute(
-        path: RoutePath.quoteCreate,
-        name: RouteName.quoteCreate,
-        builder: (context, state) => QuoteCreatePage(
-          inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
-          workTitle: state.uri.queryParameters['workTitle'],
-        ),
-      ),
+      // TODO: QuoteCreatePage 页面未创建，暂时注释
+      // GoRoute(
+      //   path: RoutePath.quoteCreate,
+      //   name: RouteName.quoteCreate,
+      //   builder: (context, state) => QuoteCreatePage(
+      //     inquiryId: int.tryParse(state.uri.queryParameters['inquiryId'] ?? '') ?? 0,
+      //     workTitle: state.uri.queryParameters['workTitle'],
+      //   ),
+      // ),
       GoRoute(
         path: RoutePath.quoteList,
         name: RouteName.quoteList,
