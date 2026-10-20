@@ -13,7 +13,7 @@ import '../data/author_work_providers.dart';
 ///
 /// 数据源为工作台详情的章节列表（随 A 套作品详情一次下发，含正文与 isFree/status）；
 /// 点击章节进入全屏写作编辑器；可编辑状态下支持滑动删除（删除走 B 套章节接口）。
-/// 章节行展示「试读」「已隐藏」徽标，便于作者核对免费试读与目录可见性。
+/// 章节行展示「试读」「草稿」徽标，便于作者核对免费试读与章节发布状态。
 class WorkChapterTab extends ConsumerWidget {
   const WorkChapterTab({
     super.key,
@@ -212,7 +212,7 @@ class _ChapterTile extends StatelessWidget {
                 const _ChapterBadge(text: '试读', color: AppColors.primary),
               if (chapter.isFree && chapter.isHidden) const SizedBox(width: 6),
               if (chapter.isHidden)
-                const _ChapterBadge(text: '已隐藏', color: AppColors.text3),
+                const _ChapterBadge(text: '草稿', color: AppColors.text3),
               const SizedBox(width: 4),
               const Icon(Icons.chevron_right, color: AppColors.text3),
             ],
@@ -223,7 +223,7 @@ class _ChapterTile extends StatelessWidget {
   }
 }
 
-/// 章节状态徽标（试读 / 已隐藏）。
+/// 章节状态徽标（试读 / 草稿）。
 class _ChapterBadge extends StatelessWidget {
   const _ChapterBadge({required this.text, required this.color});
 

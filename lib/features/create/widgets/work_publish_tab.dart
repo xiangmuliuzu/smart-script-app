@@ -114,15 +114,23 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ElevatedButton(
-              onPressed: _submitting ? null : _submitReview,
-              child: _submitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(isPublished ? '提交更新审核' : '提交审核'),
+            child: Column(
+              children: [
+                // 提交审核按钮
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _submitting ? null : _submitReview,
+                    child: _submitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(isPublished ? '提交更新审核' : '提交审核'),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -344,3 +352,5 @@ class _Notice extends StatelessWidget {
     );
   }
 }
+
+

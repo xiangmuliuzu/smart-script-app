@@ -17,6 +17,8 @@ import '../data/author_work_providers.dart';
 ///   不通过路由参数传长文本（URL 长度有限）。
 /// - 保存策略：输入停顿 3 秒自动保存（debounce）；返回 / 点「完成」时立即保存。
 /// - 支持「设为试读章节」开关，随保存一并提交 isFree（走 B 套章节接口）。
+/// - 支持「发布章节」开关（章节两态）：已发布 status="0" / 草稿 status="1"；
+///   新建章节后端默认落草稿，选择发布时保存后补一次更新置为已发布。
 /// - 作品处于审核中时 TextField 禁用，只读浏览。
 class ChapterWritePage extends ConsumerStatefulWidget {
   const ChapterWritePage({
@@ -66,6 +68,11 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// 是否设为免费试读章节（随保存提交 isFree）。
   bool _isFree = false;
 
+  /// 章节发布状态：true=已发布（读者可见），false=草稿（仅作者可见）。
+  ///
+  /// 新建章节默认草稿；已有章节按详情中的 status 回填（"1" 为草稿）。
+  bool _published = false;
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +107,8 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
     _titleCtrl.text = chapter.chapterTitle;
     _contentCtrl.text = chapter.content;
     _isFree = chapter.isFree;
+    // 已有章节按详情回填发布态：status "1" 为草稿，其余（"0"）为已发布。
+    _published = chapter.status != '1';
     _initialized = true;
   }
 
@@ -153,22 +162,29 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
     try {
       final repo = ref.read(authorWorkRepositoryProvider);
       if (_chapterId == 0) {
-        _chapterId = await repo.addChapter(
+        final newId = await repo.addChapter(
           widget.workId,
           chapterNo: _nextChapterNo(),
           chapterTitle: title,
           content: content,
           isFree: _isFree,
         );
+        _chapterId = newId;
+        // 新建章节后端默认落草稿（status="1"）；作者选择发布时补一次更新置为 "0"。
+        if (_published) {
+          await repo.updateChapter(newId, status: '0');
+        }
         // 新建章首次保存成功即视为已初始化：后续详情回包不得再回填覆盖
         // 请求飞行窗口内用户继续输入的内容。
         _initialized = true;
       } else {
+        // 已有章节显式带上 status，保证草稿 ↔ 发布可来回切换。
         await repo.updateChapter(
           _chapterId,
           chapterTitle: title,
           content: content,
           isFree: _isFree,
+          status: _published ? '0' : '1',
         );
       }
       _dirty = false;
@@ -340,6 +356,44 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       onChanged: (value) {
                         _isFree = value;
+                        _onChanged();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0.5, color: AppColors.divider),
+              // 发布状态开关（章节两态：已发布 / 草稿）
+              Container(
+                color: AppColors.card,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.public_outlined,
+                        size: 16, color: AppColors.text3),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '发布章节',
+                            style:
+                                TextStyle(fontSize: 13, color: AppColors.text2),
+                          ),
+                          Text(
+                            _published ? '发布后读者可见' : '草稿仅自己可见',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.text3),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _published,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (value) {
+                        _published = value;
                         _onChanged();
                       },
                     ),

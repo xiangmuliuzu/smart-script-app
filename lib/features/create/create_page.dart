@@ -238,6 +238,7 @@ class _WorkCard extends StatelessWidget {
                   // 封面铺满卡片宽度，圆角交给外层 ClipRRect，避免出现双层圆角。
                   WorkCover(
                     url: work.cover ?? '',
+                    title: title,
                     width: constraints.maxWidth,
                     height: coverHeight,
                     radius: 0,

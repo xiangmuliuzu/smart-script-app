@@ -55,12 +55,21 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
       _toast('请选择作品分类');
       return;
     }
+    final description = _descCtrl.text.trim();
+    if (description.isEmpty) {
+      _toast('请输入作品简介');
+      return;
+    }
+    if (description.length < 10) {
+      _toast('简介至少10个字，让读者了解你的故事');
+      return;
+    }
     setState(() => _submitting = true);
     try {
       final workId = await ref.read(createRepositoryProvider).createWork(
             title: title,
             categoryId: categoryId,
-            description: _descCtrl.text.trim(),
+            description: description,
           );
       // 失效整个 family（all/draft/reviewing/revision/rejected/published），
       // 避免只刷 'all' 而其它状态 Tab 的列表仍为旧数据。
@@ -139,13 +148,13 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
                 ),
               ),
               _Labeled(
-                label: '简介',
+                label: '简介 *',
                 child: TextField(
                   controller: _descCtrl,
                   maxLines: 3,
                   minLines: 1,
                   decoration: const InputDecoration(
-                    hintText: '一句话介绍你的故事（可留空）',
+                    hintText: '一句话介绍你的故事（至少10字）',
                     border: InputBorder.none,
                   ),
                 ),
@@ -169,7 +178,7 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '提示：书名与分类为必填；创建后可在作品工作台补充封面、定价等资料。',
+            '提示：书名、分类与简介为必填；创建后可在作品工作台补充封面、定价等资料。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),

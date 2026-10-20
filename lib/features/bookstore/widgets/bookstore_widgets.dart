@@ -10,15 +10,29 @@ class WorkCover extends StatelessWidget {
   const WorkCover({
     super.key,
     required this.url,
+    this.title = '',
     this.width = 56,
     this.height = 76,
     this.radius = AppRadius.rSmall,
   });
 
   final String url;
+  final String title;
   final double width;
   final double height;
   final double radius;
+
+  /// 默认封面渐变色板：按书名 hash 取色，同一本书颜色稳定。
+  static const List<List<Color>> _palettes = [
+    [Color(0xFF667EEA), Color(0xFF764BA2)], // 紫蓝
+    [Color(0xFF2193B0), Color(0xFF4A00E0)], // 蓝紫
+    [Color(0xFFF2994A), Color(0xFFD35C5C)], // 橙红
+    [Color(0xFF11998E), Color(0xFF38EF7D)], // 青绿
+    [Color(0xFFEE9CA7), Color(0xFFFFDDE1)], // 粉红
+    [Color(0xFF355C7D), Color(0xFF6C5B7B)], // 深蓝紫
+    [Color(0xFFE53935), Color(0xFFB71C3C)], // 红
+    [Color(0xFF1A2980), Color(0xFF26D0CE)], // 深海蓝
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +52,41 @@ class WorkCover extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Container(
-        color: AppColors.primaryTint,
+  Widget _placeholder() {
+    // 有书名：渐变底 + 书名居中，像正式封面
+    if (title.trim().isNotEmpty) {
+      final palette = _palettes[title.hashCode.abs() % _palettes.length];
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: palette,
+          ),
+        ),
+        padding: const EdgeInsets.all(10),
         alignment: Alignment.center,
-        child: const Icon(Icons.menu_book_outlined, color: AppColors.primary, size: 20),
+        child: Text(
+          title.trim(),
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            height: 1.3,
+          ),
+        ),
       );
+    }
+    // 无书名：原图标占位
+    return Container(
+      color: AppColors.primaryTint,
+      alignment: Alignment.center,
+      child: const Icon(Icons.menu_book_outlined, color: AppColors.primary, size: 20),
+    );
+  }
 }
 
 /// 分类 + 标签胶囊组（作品卡片、详情页共用）。
@@ -258,6 +302,13 @@ class RankingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTop3 = item.rankNo <= 3;
+    final Color rankColor = switch (item.rankNo) {
+      1 => const Color(0xFFFFB300),
+      2 => const Color(0xFF9E9E9E),
+      3 => const Color(0xFFCD7F32),
+      _ => AppColors.text3,
+    };
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -272,9 +323,22 @@ class RankingRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _RankBadge(rankNo: item.rankNo),
+            // 排名数字：前三名用金银铜色，其余灰色
+            SizedBox(
+              width: 28,
+              child: Text(
+                '${item.rankNo}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isTop3 ? 22 : 18,
+                  fontWeight: FontWeight.w800,
+                  color: rankColor,
+                  fontStyle: isTop3 ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
             const SizedBox(width: 12),
-            WorkCover(url: item.cover, width: 44, height: 60),
+            WorkCover(url: item.cover, width: 46, height: 62),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -306,44 +370,14 @@ class RankingRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               scoreText,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+                color: isTop3 ? AppColors.primary : AppColors.text2,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 名次徽标：前三名用语义色区分，其余走辅助色。
-class _RankBadge extends StatelessWidget {
-  const _RankBadge({required this.rankNo});
-
-  final int rankNo;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color = switch (rankNo) {
-      1 => AppColors.warning,
-      2 => AppColors.text2,
-      3 => AppColors.success,
-      _ => AppColors.text3,
-    };
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        '$rankNo',
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
       ),
     );
   }

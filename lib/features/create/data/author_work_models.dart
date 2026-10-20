@@ -1,4 +1,4 @@
-/// 「我的作品」写作链路页面模型（A 套接口 /api/v1/users/me/works）。
+﻿/// 「我的作品」写作链路页面模型（A 套接口 /api/v1/users/me/works）。
 ///
 /// 字段与后端一一对应，不自行拼装：
 ///   - [AuthorWorkItem]    ← GET /users/me/works 列表元素
@@ -155,9 +155,10 @@ class AuthorChapterItem {
   final int wordCount;
   final bool isFree;
 
-  /// 章节状态："0"=正常（目录可见），"1"=隐藏。
+  /// 章节状态："0"=已发布（读者可见），"1"=草稿（仅作者可见）。
   final String status;
 
+  /// 是否为草稿（未发布）。保留历史命名 isHidden 以减少连带改动。
   bool get isHidden => status == '1';
 
   factory AuthorChapterItem.fromJson(Map<String, dynamic> json) => AuthorChapterItem(
@@ -216,9 +217,13 @@ class AuthorWorkDetail {
     this.tags = const [],
     this.chapters = const [],
     this.latestReview,
+    this.shelfStatus,
   });
 
   final AuthorWorkItem work;
+
+  /// 上架状态（on_shelf / off_shelf），供上下架按钮使用；null 表示未知。
+  final String? shelfStatus;
 
   /// 作品标签（A 套详情 tags 字段，复用书城 TagItem）；
   /// 设置页据此回填已选标签。
@@ -238,6 +243,7 @@ class AuthorWorkDetail {
     final rawTags = json['tags'];
     final rawChapters = json['chapters'];
     final rawLatest = json['latestReview'];
+    final rawShelfStatus = json['shelfStatus'];
     return AuthorWorkDetail(
       work: rawWork is Map
           ? AuthorWorkItem.fromJson(Map<String, dynamic>.from(rawWork))
@@ -257,6 +263,8 @@ class AuthorWorkDetail {
       latestReview: rawLatest is Map
           ? ReviewRecordItem.fromJson(Map<String, dynamic>.from(rawLatest))
           : null,
+      shelfStatus: rawShelfStatus?.toString(),
     );
   }
 }
+

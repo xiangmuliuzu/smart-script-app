@@ -86,6 +86,16 @@ class AuthorWorkRepository {
     );
   }
 
+  /// 上架/下架作品（作者自主控制）。
+  ///
+  /// [status] 取 on_shelf / off_shelf；仅已通过审核的作品可操作，否则后端按 400 拒绝。
+  Future<void> changeShelfStatus(int workId, String status) async {
+    await _api.put<Map<String, dynamic>>(
+      ApiEndpoints.authorWorkShelf(workId, status),
+      parser: _mapParser,
+    );
+  }
+
   /// 新增章节（B 套 POST /content/works/{workId}/chapters）。
   ///
   /// [chapterNo] 为作品内唯一正整数，由调用方按当前最大序号 +1 计算；

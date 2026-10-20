@@ -103,6 +103,9 @@ class ApiEndpoints {
   static String authorWorkById(int workId) => '/users/me/works/$workId';
   /// 提交审核（draft/revision/rejected/published → reviewing；已发布作品改动后可重新提交）
   static String authorWorkSubmit(int workId) => '/users/me/works/$workId/submit';
+  /// 作者上下架（query: status=on_shelf/off_shelf；仅已通过审核的作品可操作）
+  static String authorWorkShelf(int workId, String status) =>
+      '/users/me/works/$workId/shelf?status=$status';
   /// 作者章节新增（B 套 POST /content/works/{workId}/chapters）
   /// 注意：与书城目录 [contentWorkChapters] 同路径、不同方法（游客 GET / 作者 POST）。
   static String contentAuthorChapterCreate(int workId) =>
