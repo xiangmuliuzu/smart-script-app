@@ -1,12 +1,12 @@
-/// 版权申请详情页（App 端）。
+/// 版权申请详情页（App 端）�?
 /// 
-/// 支持展示申请详情和交割详情两种类型。
+/// 支持展示申请详情和交割详情两种类型�?
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/widgets/common_views.dart';
+import '../../../shared/widgets/common_views.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/copyright_models.dart';
@@ -15,13 +15,13 @@ import '../widgets/material_upload_section.dart';
 import '../widgets/image_viewer.dart';
 import 'copyright_form_page.dart';
 
-/// 详情页类型
+/// 详情页类�?
 enum DetailPageType {
   application, // 申请详情
   delivery,    // 交割详情
 }
 
-/// 版权申请/交割详情页
+/// 版权申请/交割详情�?
 class CopyrightApplicationDetailPage extends ConsumerStatefulWidget {
   final int id;
   final DetailPageType type;
@@ -32,7 +32,7 @@ class CopyrightApplicationDetailPage extends ConsumerStatefulWidget {
     this.type = DetailPageType.application,
   });
 
-  // 便捷构造函数
+  // 便捷构造函�?
   const CopyrightApplicationDetailPage.application({
     super.key,
     required int applyId,
@@ -119,7 +119,7 @@ class _CopyrightApplicationDetailPageState
         ),
         body: CommonViews.emptyView(
           icon: Icons.assignment_outlined,
-          message: '申请记录不存在',
+          message: '申请记录不存�?,
         ),
       );
     }
@@ -136,7 +136,7 @@ class _CopyrightApplicationDetailPageState
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // 状态卡片
+            // 状态卡�?
             _buildStatusCard(application),
             const SizedBox(height: 16),
             // 作品信息
@@ -244,7 +244,7 @@ class _CopyrightApplicationDetailPageState
             ],
             if (application.workIntro != null && application.workIntro!.isNotEmpty) ...[ 
               _buildDivider(),
-              _buildDetailRow('作品简介', application.workIntro!, maxLines: 5),
+              _buildDetailRow('作品简�?, application.workIntro!, maxLines: 5),
             ],
             if (application.workCompletionDate != null) ...[ 
               _buildDivider(),
@@ -291,7 +291,7 @@ class _CopyrightApplicationDetailPageState
   }
 
   bool _hasMaterials(CopyrightApplication application) {
-    // 优先检查新的分类材料字段
+    // 优先检查新的分类材料字�?
     if ((application.originalityProof != null && application.originalityProof!.isNotEmpty) ||
         (application.authorIdentityDoc != null && application.authorIdentityDoc!.isNotEmpty) ||
         (application.creationProcess != null && application.creationProcess!.isNotEmpty) ||
@@ -299,7 +299,7 @@ class _CopyrightApplicationDetailPageState
       return true;
     }
     
-    // 兼容旧字段
+    // 兼容旧字�?
     return (application.workFileUrl != null && application.workFileUrl!.isNotEmpty) ||
            (application.identityProofUrl != null && application.identityProofUrl!.isNotEmpty) ||
            (application.creationProofUrl != null && application.creationProofUrl!.isNotEmpty) ||
@@ -325,7 +325,7 @@ class _CopyrightApplicationDetailPageState
             ),
             const SizedBox(height: 16),
             
-            // 合并显示所有申请材料（不再分类显示）
+            // 合并显示所有申请材料（不再分类显示�?
             ..._buildAllMaterialsSection(application),
             
             // 兼容旧字段显示（如果没有新字段数据）
@@ -351,11 +351,11 @@ class _CopyrightApplicationDetailPageState
     );
   }
 
-  // 合并显示所有申请材料
+  // 合并显示所有申请材�?
   List<Widget> _buildAllMaterialsSection(CopyrightApplication application) {
     final allMaterials = <MaterialFile>[];
     
-    // 合并所有分类材料
+    // 合并所有分类材�?
     if (application.originalityProof != null && application.originalityProof!.isNotEmpty) {
       allMaterials.addAll(materialFilesFromJson(application.originalityProof));
     }
@@ -570,14 +570,14 @@ class _CopyrightApplicationDetailPageState
             _buildDetailRow('申请编号', application.applyNo),
             if (application.externalApplyNo != null) ...[
               _buildDivider(),
-              _buildDetailRow('第三方编号', application.externalApplyNo!),
+              _buildDetailRow('第三方编�?, application.externalApplyNo!),
             ],
             if (application.centerName.isNotEmpty) ...[
               _buildDivider(),
               _buildDetailRow('版权中心', application.centerName),
             ],
             _buildDivider(),
-            _buildDetailRow('申请人', application.userName),
+            _buildDetailRow('申请�?, application.userName),
             _buildDivider(),
             _buildDetailRow('申请时间', application.createTime ?? '-'),
             if (application.certTime != null) ...[
@@ -683,13 +683,13 @@ class _CopyrightApplicationDetailPageState
     );
   }
 
-  /// 显示删除确认对话框
+  /// 显示删除确认对话�?
   void _showDeleteConfirmDialog(CopyrightApplication app) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除「${app.workName}」的版权申请吗？\n\n此操作不可恢复。'),
+        content: Text('确定要删除�?{app.workName}」的版权申请吗？\n\n此操作不可恢复�?),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -721,14 +721,14 @@ class _CopyrightApplicationDetailPageState
             backgroundColor: Colors.green,
           ),
         );
-        // 返回列表页
+        // 返回列表�?
         context.pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('删除失败：$e'),
+            content: Text('删除失败�?e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -736,7 +736,7 @@ class _CopyrightApplicationDetailPageState
     }
   }
 
-  /// 跳转到编辑页面
+  /// 跳转到编辑页�?
 
 
   Widget _buildDetailRow(
@@ -844,7 +844,7 @@ class _CopyrightApplicationDetailPageState
           foregroundColor: Colors.black,
           elevation: 0.5,
         ),
-        body: CommonViews.emptyView(message: '交割记录不存在'),
+        body: CommonViews.emptyView(message: '交割记录不存�?),
       );
     }
 
@@ -941,7 +941,7 @@ class _CopyrightApplicationDetailPageState
           _buildDetailRow('买方', delivery.buyerName),
           _buildDetailRow('卖方', delivery.sellerName),
           if (delivery.certNo != null)
-            _buildDetailRow('版权证书号', delivery.certNo!),
+            _buildDetailRow('版权证书�?, delivery.certNo!),
         ],
       ),
     );
@@ -1038,7 +1038,7 @@ class _CopyrightApplicationDetailPageState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${file.fileType.fileTypeName} • ${_formatDeliveryFileSize(file.fileSize)}',
+                  '${file.fileType.fileTypeName} �?${_formatDeliveryFileSize(file.fileSize)}',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.text3,
@@ -1256,13 +1256,13 @@ class _CopyrightApplicationDetailPageState
 
   void _showDeliveryContractTip() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('合同模块开发中，功能即将开放')),
+      const SnackBar(content: Text('合同模块开发中，功能即将开�?)),
     );
   }
 
   void _showDeliveryDownloadTip(String fileName) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('文件下载功能开发中：$fileName')),
+      SnackBar(content: Text('文件下载功能开发中�?fileName')),
     );
   }
 }

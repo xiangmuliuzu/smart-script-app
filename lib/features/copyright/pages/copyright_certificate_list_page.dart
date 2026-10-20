@@ -1,16 +1,16 @@
-/// 版权证书列表页（App 端）。
+/// 版权证书列表页（App 端）�?
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/widgets/common_views.dart';
+import '../../../shared/widgets/common_views.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
 
-/// 版权证书列表页
+/// 版权证书列表�?
 class CopyrightCertificateListPage extends ConsumerStatefulWidget {
   const CopyrightCertificateListPage({super.key});
 
@@ -63,7 +63,7 @@ class _CopyrightCertificateListPageState
       ),
       body: Column(
         children: [
-          // 搜索栏
+          // 搜索�?
           _buildSearchBar(),
           // 列表
           Expanded(
@@ -129,7 +129,7 @@ class _CopyrightCertificateListPageState
       return CommonViews.emptyView(
         icon: Icons.workspace_premium_outlined,
         message: '暂无证书记录',
-        actionText: '去申请',
+        actionText: '去申�?,
         onAction: () => context.push(RoutePath.copyrightApply),
       );
     }
@@ -166,7 +166,7 @@ class _CopyrightCertificateListPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 标题行
+              // 标题�?
               Row(
                 children: [
                   Container(
@@ -198,7 +198,7 @@ class _CopyrightCertificateListPageState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '证书编号：${item.certNo}',
+                          '证书编号�?{item.certNo}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.text2,
@@ -211,10 +211,10 @@ class _CopyrightCertificateListPageState
                 ],
               ),
               const SizedBox(height: 16),
-              // 信息行
+              // 信息�?
               _buildInfoRow(Icons.person_outline, '权利人：${item.userName}'),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.event_available, '签发时间：${item.certTime ?? '-'}'),
+              _buildInfoRow(Icons.event_available, '签发时间�?{item.certTime ?? '-'}'),
               if (item.blockchainHash != null && item.blockchainHash!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 _buildInfoRow(
@@ -253,15 +253,15 @@ class _CopyrightCertificateListPageState
     switch (status) {
       case CopyrightCertStatus.pending:
         color = const Color(0xFFFFA940);
-        label = '申请中';
+        label = '申请�?;
         break;
       case CopyrightCertStatus.issued:
         color = const Color(0xFF52C41A);
-        label = '已签发';
+        label = '已签�?;
         break;
       case CopyrightCertStatus.expired:
         color = const Color(0xFF8C8C8C);
-        label = '已失效';
+        label = '已失�?;
         break;
       default:
         color = AppColors.text2;

@@ -1,15 +1,15 @@
-/// 版权证书详情页（App 端）。
+/// 版权证书详情页（App 端）�?
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/widgets/common_views.dart';
+import '../../../shared/widgets/common_views.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
 
-/// 版权证书详情页
+/// 版权证书详情�?
 class CopyrightCertificateDetailPage extends ConsumerStatefulWidget {
   final int certId;
 
@@ -51,14 +51,14 @@ class _CopyrightCertificateDetailPageState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('证书下载链接：$url')),
+          SnackBar(content: Text('证书下载链接�?url')),
         );
-        // 这里可以集成下载管理器或打开浏览器
+        // 这里可以集成下载管理器或打开浏览�?
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败：$e')),
+          SnackBar(content: Text('下载失败�?e')),
         );
       }
     } finally {
@@ -73,7 +73,7 @@ class _CopyrightCertificateDetailPageState
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label已复制')),
+      SnackBar(content: Text('$label已复�?)),
     );
   }
 
@@ -119,7 +119,7 @@ class _CopyrightCertificateDetailPageState
         ),
         body: CommonViews.emptyView(
           icon: Icons.workspace_premium_outlined,
-          message: '证书不存在',
+          message: '证书不存�?,
         ),
       );
     }
@@ -156,7 +156,7 @@ class _CopyrightCertificateDetailPageState
             // 证书信息
             _buildCertificateInfo(certificate),
             const SizedBox(height: 16),
-            // 区块链信息
+            // 区块链信�?
             if (certificate.blockchainHash != null)
               _buildBlockchainInfo(certificate),
           ],
@@ -267,7 +267,7 @@ class _CopyrightCertificateDetailPageState
             ),
             _buildDivider(),
             _buildDetailRow(
-              '权利人',
+              '权利�?,
               certificate.userName,
               copiable: false,
             ),
@@ -319,7 +319,7 @@ class _CopyrightCertificateDetailPageState
                 Icon(Icons.verified_user, color: Color(0xFF1890FF), size: 24),
                 SizedBox(width: 8),
                 Text(
-                  '区块链存证',
+                  '区块链存�?,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -330,7 +330,7 @@ class _CopyrightCertificateDetailPageState
             ),
             const SizedBox(height: 16),
             const Text(
-              '该证书已上链存证，保证真实性和不可篡改性',
+              '该证书已上链存证，保证真实性和不可篡改�?,
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.text2,
@@ -364,7 +364,7 @@ class _CopyrightCertificateDetailPageState
                     icon: const Icon(Icons.copy, size: 16),
                     onPressed: () => _copyToClipboard(
                       certificate.blockchainHash!,
-                      '区块链哈希',
+                      '区块链哈�?,
                     ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
