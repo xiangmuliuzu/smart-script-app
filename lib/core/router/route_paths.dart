@@ -75,6 +75,37 @@ class RoutePath {
   /// 材料预览 URL。
   static String materialPreviewUrl(int materialId) => '$materialPreview?id=$materialId';
 
+  // ===== 版权模块（受登录守卫保护）=====
+  static const String copyrightHome = '/copyright/home';
+  static const String copyrightApplicationList = '/copyright/application/list';
+  static const String copyrightApplicationDetail = '/copyright/application/detail';
+  static const String copyrightForm = '/copyright/form';
+  static const String copyrightCertificateList = '/copyright/certificate/list';
+  static const String copyrightCertificateDetail = '/copyright/certificate/detail';
+
+  /// 版权首页 URL
+  static String copyrightHomeUrl() => copyrightHome;
+
+  /// 版权申请列表 URL
+  static String copyrightApplicationListUrl() => copyrightApplicationList;
+
+  /// 版权申请详情 URL
+  static String copyrightApplicationDetailUrl(int applyId) => 
+      '$copyrightApplicationDetail?id=$applyId';
+
+  /// 版权申请表单 URL（新建或编辑）
+  static String copyrightFormUrl({int? applyId}) => Uri(
+        path: copyrightForm,
+        queryParameters: applyId != null ? {'applyId': '$applyId'} : null,
+      ).toString();
+
+  /// 版权证书列表 URL
+  static String copyrightCertificateListUrl() => copyrightCertificateList;
+
+  /// 版权证书详情 URL
+  static String copyrightCertificateDetailUrl(int certId) =>
+      '$copyrightCertificateDetail?id=$certId';
+
   // B 模块我的收藏列表（受登录守卫保护）
   static const String favorites = '/favorites';
 
@@ -292,6 +323,15 @@ class RouteName {
   static const String sealEdit = 'sealEdit';
   static const String sealResubmit = 'sealResubmit';
   static const String materialPreview = 'materialPreview';
+  
+  // ===== 版权模块 =====
+  static const String copyrightHome = 'copyrightHome';
+  static const String copyrightApplicationList = 'copyrightApplicationList';
+  static const String copyrightApplicationDetail = 'copyrightApplicationDetail';
+  static const String copyrightForm = 'copyrightForm';
+  static const String copyrightCertificateList = 'copyrightCertificateList';
+  static const String copyrightCertificateDetail = 'copyrightCertificateDetail';
+  
   static const String workList = 'workList';
   static const String recommendList = 'recommendList';
   static const String workDetail = 'workDetail';
@@ -408,6 +448,11 @@ class ProtectedRoutes {
     RoutePath.aiCenter,
     // 印章管理（需登录）
     RoutePath.mySeal,
+    // 版权模块（需登录）
+    RoutePath.copyrightHome,
+    RoutePath.copyrightApplicationList,
+    RoutePath.copyrightForm,
+    RoutePath.copyrightCertificateList,
   ];
 
   static bool isProtected(String location) {
