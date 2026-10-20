@@ -679,9 +679,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePath.copyrightApplicationDetail,
         name: RouteName.copyrightApplicationDetail,
-        builder: (context, state) => CopyrightApplicationDetailPage(
-          applyId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
-        ),
+        builder: (context, state) {
+          final id = int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0;
+          final isDelivery = state.uri.queryParameters['type'] == 'delivery';
+          return CopyrightApplicationDetailPage(
+            id: id,
+            type: isDelivery
+                ? DetailPageType.delivery
+                : DetailPageType.application,
+          );
+        },
       ),
       GoRoute(
         path: RoutePath.copyrightForm,

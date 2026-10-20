@@ -25,10 +25,27 @@ class CopyrightFormPage extends ConsumerStatefulWidget {
 
   const CopyrightFormPage({
     super.key,
-    required this.mode,
+    CopyrightFormMode? mode,
     this.application,
-    this.originalApplyId,
-  });
+    int? originalApplyId,
+    int? applyId,
+  })  : originalApplyId = originalApplyId ?? applyId,
+        mode = mode ??
+            ((applyId != null && applyId > 0)
+                ? CopyrightFormMode.resubmit
+                : CopyrightFormMode.create);
+
+  /// 路由入口：带 `applyId` 时为重新提交，否则为新建。
+  factory CopyrightFormPage.fromRoute({Key? key, int? applyId}) {
+    if (applyId != null && applyId > 0) {
+      return CopyrightFormPage(
+        key: key,
+        mode: CopyrightFormMode.resubmit,
+        originalApplyId: applyId,
+      );
+    }
+    return CopyrightFormPage(key: key, mode: CopyrightFormMode.create);
+  }
 
   @override
   ConsumerState<CopyrightFormPage> createState() => _CopyrightFormPageState();

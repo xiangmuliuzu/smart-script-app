@@ -50,6 +50,8 @@ class RoutePath {
       '$userFollowList?userId=$userId&following=${following ? 1 : 0}';
   static const String realName = '/profile/real-name';
   static const String creatorApply = '/profile/creator-apply';
+  /// 创作者后台（版权管理入口）。
+  static const String creatorBackend = '/profile/creator-backend';
   static const String accountSecurity = '/profile/security';
   static const String phoneChange = '/profile/security/phone';
   static const String passwordEdit = '/profile/security/password';
@@ -311,6 +313,7 @@ class RouteName {
   static const String userFollowList = 'userFollowList';
   static const String realName = 'realName';
   static const String creatorApply = 'creatorApply';
+  static const String creatorBackend = 'creatorBackend';
   static const String accountSecurity = 'accountSecurity';
   static const String phoneChange = 'phoneChange';
   static const String passwordEdit = 'passwordEdit';
@@ -449,6 +452,7 @@ class ProtectedRoutes {
     // 印章管理（需登录）
     RoutePath.mySeal,
     // 版权模块（需登录）
+    RoutePath.creatorBackend,
     RoutePath.copyrightHome,
     RoutePath.copyrightApplicationList,
     RoutePath.copyrightForm,

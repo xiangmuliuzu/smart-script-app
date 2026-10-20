@@ -574,7 +574,9 @@ class _QuickGridState extends State<_QuickGrid> {
         _QuickEntry(ref, Icons.approval, '我的印章',
             onTap: (ctx, ref) =>
                 AuthGuard.pushProtected(ctx, ref, target: RoutePath.mySeal)),
-        _QuickEntry(ref, Icons.bar_chart, '创作者后台'),
+        _QuickEntry(ref, Icons.bar_chart, '创作者后台',
+            onTap: (ctx, ref) =>
+                AuthGuard.pushProtected(ctx, ref, target: RoutePath.creatorBackend)),
       ],
       if (user.isClient) ...[
         _QuickEntry(ref, Icons.fact_check_outlined, '我的选品'),

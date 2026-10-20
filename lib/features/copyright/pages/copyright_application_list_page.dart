@@ -1,6 +1,6 @@
-/// 版权申请列表页（App 端）�?
+/// 版权申请列表页（App 端）。
 ///
-/// 展示我的版权申请记录和版权交割记录，支持Tab切换、筛选、搜索、下拉刷新�?
+/// 展示我的版权申请记录和版权交割记录，支持Tab切换、筛选、搜索、下拉刷新。
 library;
 
 import 'package:flutter/material.dart';
@@ -13,7 +13,7 @@ import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
 import '../providers/copyright_provider.dart';
 
-/// 版权申请列表页（包含申请和交割两个Tab�?
+/// 版权申请列表页（包含申请和交割两个Tab）。
 class CopyrightApplicationListPage extends ConsumerStatefulWidget {
   const CopyrightApplicationListPage({super.key});
 
@@ -29,7 +29,7 @@ class _CopyrightApplicationListPageState
   String? _statusFilter;
   final TextEditingController _searchController = TextEditingController();
   
-  // 交割列表的角色筛选（seller/buyer�?
+  // 交割列表的角色筛选（seller/buyer）。
   String? _deliveryRole;
 
   @override
@@ -97,7 +97,7 @@ class _CopyrightApplicationListPageState
           if (_tabController.index == 0)
             IconButton(
               icon: const Icon(Icons.add_circle_outline),
-              onPressed: () => context.push(RoutePath.copyrightApply),
+              onPressed: () => context.push(RoutePath.copyrightForm),
               tooltip: '新建申请',
             ),
         ],
@@ -185,13 +185,13 @@ class _CopyrightApplicationListPageState
         children: [
           _buildFilterChip('全部', null),
           const SizedBox(width: 8),
-          _buildFilterChip('待审�?, CopyrightApplicationStatus.pending),
+          _buildFilterChip('待审核', CopyrightApplicationStatus.pending),
           const SizedBox(width: 8),
-          _buildFilterChip('审核�?, CopyrightApplicationStatus.reviewing),
+          _buildFilterChip('审核中', CopyrightApplicationStatus.reviewing),
           const SizedBox(width: 8),
           _buildFilterChip('已通过', CopyrightApplicationStatus.certificated),
           const SizedBox(width: 8),
-          _buildFilterChip('已拒�?, CopyrightApplicationStatus.rejected),
+          _buildFilterChip('已拒绝', CopyrightApplicationStatus.rejected),
         ],
       ),
     );
@@ -223,14 +223,14 @@ class _CopyrightApplicationListPageState
     }
 
     if (provider.applicationError != null) {
-      return CommonViews.errorView(
+      return ErrorView(
         message: provider.applicationError!,
         onRetry: _loadData,
       );
     }
 
     if (provider.applications.isEmpty) {
-      return CommonViews.emptyView(message: '暂无申请记录');
+      return const EmptyView(message: '暂无申请记录');
     }
 
     return Container(
@@ -261,7 +261,7 @@ class _CopyrightApplicationListPageState
         color: Colors.transparent,
         child: InkWell(
           onTap: () => context.push(
-            '${RoutePath.copyrightApplicationDetail}/${app.applyId}',
+            RoutePath.copyrightApplicationDetailUrl(app.applyId),
           ),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
@@ -425,7 +425,7 @@ class _CopyrightApplicationListPageState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '什么是版权交割�?,
+                  '什么是版权交割？',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -434,7 +434,7 @@ class _CopyrightApplicationListPageState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '版权交割是指在订单完成合同签署和资金托管后，向买方交付版权证书、作品源文件等约定内容的过程。买方确认收货后，托管资金将释放�?,
+                  '版权交割是指在订单完成合同签署和资金托管后，向买方交付版权证书、作品源文件等约定内容的过程。买方确认收货后，托管资金将释放。',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue.shade800,
@@ -462,13 +462,13 @@ class _CopyrightApplicationListPageState
               children: [
                 _buildDeliveryFilterChip('全部', null),
                 const SizedBox(width: 8),
-                _buildDeliveryFilterChip('待上�?, 'pending_upload'),
+                _buildDeliveryFilterChip('待上传', 'pending_upload'),
                 const SizedBox(width: 8),
-                _buildDeliveryFilterChip('待确�?, 'pending_confirm'),
+                _buildDeliveryFilterChip('待确认', 'pending_confirm'),
                 const SizedBox(width: 8),
-                _buildDeliveryFilterChip('已完�?, 'completed'),
+                _buildDeliveryFilterChip('已完成', 'completed'),
                 const SizedBox(width: 8),
-                _buildDeliveryFilterChip('已取�?, 'cancelled'),
+                _buildDeliveryFilterChip('已取消', 'cancelled'),
               ],
             ),
           ),
@@ -539,14 +539,14 @@ class _CopyrightApplicationListPageState
     }
 
     if (provider.deliveryError != null) {
-      return CommonViews.errorView(
+      return ErrorView(
         message: provider.deliveryError!,
         onRetry: _loadData,
       );
     }
 
     if (provider.deliveries.isEmpty) {
-      return CommonViews.emptyView(message: '暂无交割记录');
+      return const EmptyView(message: '暂无交割记录');
     }
 
     return Container(
@@ -577,8 +577,7 @@ class _CopyrightApplicationListPageState
         color: Colors.transparent,
         child: InkWell(
           onTap: () => context.push(
-            RoutePath.copyrightDeliveryDetail,
-            extra: delivery.deliveryId,
+            '${RoutePath.copyrightApplicationDetail}?id=${delivery.deliveryId}&type=delivery',
           ),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
@@ -614,7 +613,7 @@ class _CopyrightApplicationListPageState
                     const Icon(Icons.person_outline, size: 14, color: AppColors.text3),
                     const SizedBox(width: 4),
                     Text(
-                      '买方�?{delivery.buyerName} | 卖方�?{delivery.sellerName}',
+                      '买方：${delivery.buyerName} | 卖方：${delivery.sellerName}',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.text2,
@@ -706,7 +705,7 @@ class _CopyrightApplicationListPageState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除申请�?{app.workName}」吗�?),
+        content: Text('确定要删除申请「${app.workName}」吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -741,7 +740,7 @@ class _CopyrightApplicationListPageState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('删除失败�?e'),
+            content: Text('删除失败：$e'),
             backgroundColor: Colors.red,
           ),
         );
