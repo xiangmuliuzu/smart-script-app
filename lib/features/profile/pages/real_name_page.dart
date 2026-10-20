@@ -1,12 +1,9 @@
-import 'dart:async';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
-import '../../../core/services/native_image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
@@ -18,7 +15,7 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 ///
 /// 状态机：NOT_SUBMITTED -> PENDING -> APPROVED；PENDING -> REJECTED -> PENDING。
 /// 审核中不可重复提交，已通过不可自行覆盖；驳回后可重新提交。
-/// 身份证号只以掩码展示，材料通过平台上传服务提交引用。
+/// 仅提交姓名与 18 位身份证号，认证结果中的身份信息以掩码展示。
 class RealNamePage extends ConsumerWidget {
   const RealNamePage({super.key});
 
@@ -53,23 +50,16 @@ class _RealNameBody extends ConsumerStatefulWidget {
 class _RealNameBodyState extends ConsumerState<_RealNameBody> {
   final _nameCtrl = TextEditingController();
   final _idCtrl = TextEditingController();
-  PickedImage? _materialImage;
-  MemoryImage? _previewImage;
-  String? _materialRef;
-  String? _uploadError;
-  bool _uploading = false;
-  bool _picking = false;
   bool _submitting = false;
   RealNameStatus? _submittedStatus;
 
-  bool get _busy => _submitting || _uploading || _picking;
+  bool get _busy => _submitting;
 
-  /// 与后端校验一致的身份证号形态（15 位旧证 / 18 位新证，末位可为 X）。
-  static final RegExp _idPattern = RegExp(r'^\d{15}$|^\d{17}[0-9Xx]$');
+  /// 与后端校验一致的身份证号形态（18 位，末位可为 X）。
+  static final RegExp _idPattern = RegExp(r'^[0-9]{17}[0-9Xx]$');
 
   @override
   void dispose() {
-    _clearMaterialPreview();
     _nameCtrl.dispose();
     _idCtrl.dispose();
     super.dispose();
@@ -84,12 +74,7 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
       return;
     }
     if (!_idPattern.hasMatch(idNumber)) {
-      _toast('请输入正确的身份证号');
-      return;
-    }
-    final material = _materialRef;
-    if (material == null) {
-      _toast('请先上传证件照片');
+      _toast('请输入正确的 18 位身份证号，末位可为 X');
       return;
     }
     final resubmit = widget.status.state == RealNameState.rejected;
@@ -99,17 +84,11 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
           await ref.read(userCenterRepositoryProvider).submitRealName(
                 realName: realName,
                 idNumber: idNumber,
-                materialRefs: [material],
                 resubmit: resubmit,
               );
       if (!mounted) return;
       setState(() {
         _submittedStatus = result;
-        if (result.state != RealNameState.rejected) {
-          _clearMaterialPreview();
-          _materialRef = null;
-          _uploadError = null;
-        }
       });
       _toast(switch (result.state) {
         RealNameState.approved => '实名认证通过',
@@ -132,69 +111,6 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
-  }
-
-  Future<void> _pickMaterial() async {
-    if (_busy) return;
-    FocusScope.of(context).unfocus();
-    setState(() => _picking = true);
-    try {
-      final image =
-          await NativeImagePicker.pickImage(filenamePrefix: 'realname');
-      if (image == null || !mounted) return;
-      setState(() {
-        _clearMaterialPreview();
-        _materialImage = image;
-        _previewImage = MemoryImage(Uint8List.fromList(image.bytes));
-        _materialRef = null;
-        _uploadError = null;
-      });
-      await _uploadMaterial();
-    } on NativeImageException catch (e) {
-      _toast(e.message);
-    } catch (_) {
-      _toast('无法选择图片，请重试');
-    } finally {
-      if (mounted) setState(() => _picking = false);
-    }
-  }
-
-  Future<void> _uploadMaterial() async {
-    final image = _materialImage;
-    if (image == null || _uploading || _submitting) return;
-    setState(() {
-      _uploading = true;
-      _uploadError = null;
-    });
-    try {
-      final reference =
-          await ref.read(userCenterRepositoryProvider).uploadRealNameMaterial(
-                bytes: image.bytes,
-                filename: image.filename,
-              );
-      if (mounted) setState(() => _materialRef = reference);
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _uploadError = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _uploadError = '上传失败，请检查网络后重试');
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  void _removeMaterial() {
-    if (_busy) return;
-    setState(() {
-      _clearMaterialPreview();
-      _materialRef = null;
-      _uploadError = null;
-    });
-  }
-
-  void _clearMaterialPreview() {
-    unawaited(_previewImage?.evict());
-    _previewImage = null;
-    _materialImage = null;
   }
 
   void _toast(String message) {
@@ -264,16 +180,18 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
                 label: '身份证号',
                 child: TextField(
                   controller: _idCtrl,
+                  maxLength: 18,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9Xx]')),
+                  ],
                   enabled: !_busy,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
-                    hintText: '15 或 18 位',
+                    hintText: '18 位，末位可为 X',
+                    counterText: '',
                   ),
                 ),
-              ),
-              UserFieldRow(
-                label: '证件材料',
-                child: _buildMaterialPicker(),
               ),
             ],
           ),
@@ -295,78 +213,10 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            '请上传清晰、完整的证件照片，用于实名认证审核。支持 JPG、PNG、GIF、BMP，每张不超过 5 MB。',
+            '请输入与身份证一致的真实姓名和 18 位身份证号，末位为 X 时可输入 X 或 x。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildMaterialPicker() {
-    final image = _materialImage;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (image != null) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image(
-              image: _previewImage!,
-              height: 140,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
-              errorBuilder: (_, __, ___) => const SizedBox(
-                height: 100,
-                child: Center(child: Icon(Icons.image_outlined, size: 40)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (_uploading || _picking && image == null)
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2)),
-              SizedBox(width: 8),
-              Text('正在上传…'),
-            ],
-          )
-        else if (_uploadError != null)
-          Text(_uploadError!, style: const TextStyle(color: AppColors.danger))
-        else if (_materialRef != null)
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle_outline,
-                  color: AppColors.success, size: 18),
-              SizedBox(width: 6),
-              Text('上传成功', style: TextStyle(color: AppColors.success)),
-            ],
-          ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : _pickMaterial,
-          icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(image == null ? '选择证件照片' : '更换照片'),
-        ),
-        if (image != null)
-          Wrap(
-            alignment: WrapAlignment.center,
-            children: [
-              if (_uploadError != null)
-                TextButton(
-                    onPressed: _busy ? null : _uploadMaterial,
-                    child: const Text('重试上传')),
-              TextButton(
-                  onPressed: _busy ? null : _removeMaterial,
-                  child: const Text('移除照片')),
-            ],
-          ),
       ],
     );
   }

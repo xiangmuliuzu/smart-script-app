@@ -134,7 +134,7 @@ class UserCenterRepository {
   Future<RealNameStatus> submitRealName({
     required String realName,
     required String idNumber,
-    required List<String> materialRefs,
+    List<String> materialRefs = const [],
     required bool resubmit,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
@@ -142,7 +142,7 @@ class UserCenterRepository {
       data: {
         'realName': realName,
         'idNumber': idNumber,
-        'materialRefs': materialRefs,
+        if (materialRefs.isNotEmpty) 'materialRefs': materialRefs,
       },
       parser: _mapParser,
     );
