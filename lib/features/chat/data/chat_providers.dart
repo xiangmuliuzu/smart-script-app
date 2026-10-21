@@ -66,3 +66,11 @@ final chatUnreadCountProvider = FutureProvider<int>((ref) async {
   final repo = ref.watch(chatRepositoryProvider);
   return repo.getUnreadCount();
 });
+
+// ==================== 定型文模板 Providers ====================
+
+/// 交易会话定型文模板列表
+final tradeTemplatesProvider = FutureProvider<List<TradeTemplate>>((ref) async {
+  final repo = ref.watch(chatRepositoryProvider);
+  return repo.listTradeTemplates();
+});

@@ -246,3 +246,56 @@ DateTime? _parseDateTime(dynamic value) {
   }
   return null;
 }
+
+// ==================== 交易会话定型文模板 ====================
+
+/// 定型文分类
+class TemplateCategory {
+  static const String priceParam = 'price_param'; // 价格协商（含价格输入）
+  static const String priceText  = 'price_text';  // 价格协商（纯文字）
+  static const String progress   = 'progress';    // 交易进展
+  static const String general    = 'general';     // 通用沟通
+
+  static String label(String category) {
+    switch (category) {
+      case priceParam: return '💰 价格协商';
+      case priceText:  return '💰 价格协商';
+      case progress:   return '📋 交易进展';
+      case general:    return '💬 通用沟通';
+      default: return category;
+    }
+  }
+}
+
+/// 交易会话定型文模板
+class TradeTemplate {
+  const TradeTemplate({
+    required this.templateId,
+    required this.category,
+    required this.content,
+    required this.role,
+    this.hasAmount = false,
+  });
+
+  final int templateId;
+  final String category;
+  final String content;
+  final String role;        // buyer / seller / both
+  final bool hasAmount;     // 是否含 {price} 占位符
+
+  /// 判断模板是否对当前用户角色可见
+  bool isVisibleTo(bool isBuyer) {
+    if (role == 'both') return true;
+    if (role == 'buyer') return isBuyer;
+    if (role == 'seller') return !isBuyer;
+    return true;
+  }
+
+  factory TradeTemplate.fromJson(Map<String, dynamic> json) => TradeTemplate(
+    templateId: (json['templateId'] as num?)?.toInt() ?? 0,
+    category: json['category'] as String? ?? '',
+    content: json['content'] as String? ?? '',
+    role: json['role'] as String? ?? 'both',
+    hasAmount: json['hasAmount'] == 1 || json['hasAmount'] == true,
+  );
+}

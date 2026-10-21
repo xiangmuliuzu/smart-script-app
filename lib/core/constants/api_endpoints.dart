@@ -190,6 +190,8 @@ class ApiEndpoints {
   static String chatMarkRead(int sessionId) => '/users/me/chat/sessions/$sessionId/read';
   static const String chatUnreadCount = '/users/me/chat/unread-count';
   static String chatChangeStatus(int sessionId) => '/users/me/chat/sessions/$sessionId/status';
+  // 交易会话定型文模板
+  static const String chatTradeTemplates = '/users/me/chat/trade-templates';
   // TRADE 类型会话创建（通过询盘）
   static const String tradeChatSessions = '/trade/inquiry/chat/sessions';
   static const String orders = '/orders';

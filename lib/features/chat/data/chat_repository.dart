@@ -6,7 +6,7 @@ import 'chat_models.dart';
 
 /// A3 聊天域数据访问层。
 ///
-/// 封装会话列表、消息收发、已读/未读等 API 调用。
+/// 封装会话列表、消息收发、已读/未读、定型文模板等 API 调用。
 class ChatRepository {
   ChatRepository(this._api);
 
@@ -129,6 +129,21 @@ class ChatRepository {
       '${ApiEndpoints.chatChangeStatus(sessionId)}?action=reopen',
       parser: _mapParser,
     );
+  }
+
+  // ==================== 定型文模板 ====================
+
+  /// 获取交易会话定型文模板列表。
+  Future<List<TradeTemplate>> listTradeTemplates() async {
+    final data = await _api.get<List<dynamic>>(
+      ApiEndpoints.chatTradeTemplates,
+      parser: (raw) => raw is List ? raw : <dynamic>[],
+    );
+    if (data == null) return [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(TradeTemplate.fromJson)
+        .toList();
   }
 
   // ==================== 工具方法 ====================
