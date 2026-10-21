@@ -30,6 +30,9 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
   bool _loading = false;
   AiWriteResult? _result;
 
+  /// 流式输出中的实时文本（打字机效果）。
+  String _streaming = '';
+
   @override
   void dispose() {
     _content.dispose();
@@ -44,19 +47,27 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
     setState(() {
       _loading = true;
       _result = null;
+      _streaming = '';
     });
     try {
       final container = ProviderScope.containerOf(context, listen: false);
-      final result = await ref.read(aiRepositoryProvider).polish(
+      final result = await ref.read(aiRepositoryProvider).polishStream(
             content: _content.text.trim(),
             style: _selectedStyle,
+            onDelta: (delta) {
+              if (!mounted) return;
+              setState(() => _streaming += delta);
+            },
           );
       // 扣减已发生。用全局 container 失效缓存：即使用户在 AI 返回前已返回上一页
       // （页面已 dispose），AI 创作页/福利中心仍在监听，返回后即显示最新次数。
       container.invalidate(aiBalanceProvider);
       container.invalidate(welfareAssetProvider);
       if (!mounted) return;
-      setState(() => _result = result);
+      setState(() {
+        _streaming = '';
+        _result = result;
+      });
       if (result.content.isEmpty) {
         showAppToast(context, '未生成润色结果，请重试');
       }
@@ -104,9 +115,64 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
             onGenerate: _generate,
           ),
           const SizedBox(height: 12),
-          if (_result != null)
+          if (_streaming.isNotEmpty)
+            _StreamingCard(text: _streaming)
+          else if (_result != null)
             _ResultCard(result: _result!, onCopy: _copy),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+/// 流式输出中的实时文本卡（打字机效果）。
+class _StreamingCard extends StatelessWidget {
+  const _StreamingCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 8),
+              Text('AI 生成中…',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text1)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.fill,
+              borderRadius: BorderRadius.circular(AppRadius.rSmall),
+            ),
+            child: SelectableText(
+              text.isEmpty ? '正在接收内容…' : text,
+              style: const TextStyle(
+                  fontSize: 14, height: 1.6, color: AppColors.text2),
+            ),
+          ),
         ],
       ),
     );

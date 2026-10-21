@@ -14,7 +14,6 @@ import 'package:script_app/features/ai/ai_outline_page.dart';
 import 'package:script_app/features/ai/ai_polish_page.dart';
 import 'package:script_app/features/ai/ai_write_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
-import 'package:script_app/features/welfare/data/welfare_models.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
 import 'package:script_app/features/welfare/data/welfare_models.dart';
@@ -50,6 +49,20 @@ class _FakeAiRepository implements AiRepository {
   }
 
   @override
+  Future<AiWriteResult> writeStream({
+    required String prompt,
+    String? type,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('writeStream:$prompt');
+    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (shouldFail) throw ApiException('AI 服务不可用');
+    onDelta('夜色里，他站在');
+    onDelta('落地窗前，沉默良久。');
+    return AiWriteResult(content: writeContent, recordId: 11);
+  }
+
+  @override
   Future<AiWriteResult> polish({
     required String content,
     String? style,
@@ -57,6 +70,20 @@ class _FakeAiRepository implements AiRepository {
     calls.add('polish:$content|$style');
     if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
+    return AiWriteResult(content: polishContent, recordId: 22);
+  }
+
+  @override
+  Future<AiWriteResult> polishStream({
+    required String content,
+    String? style,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('polishStream:$content|$style');
+    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (shouldFail) throw ApiException('AI 服务不可用');
+    onDelta('【润色】夜色如墨，他立于');
+    onDelta('窗前，久久无言。');
     return AiWriteResult(content: polishContent, recordId: 22);
   }
 
@@ -69,6 +96,26 @@ class _FakeAiRepository implements AiRepository {
     calls.add('outline:$inspiration|$genre|$style');
     if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
+    return AiOutlineResult(
+      outline: outlineText,
+      requestNo: 'AIR20260101',
+      quotaUsed: 1,
+    );
+  }
+
+  @override
+  Future<AiOutlineResult> outlineStream({
+    String? inspiration,
+    String? genre,
+    String? style,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('outlineStream:$inspiration|$genre|$style');
+    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (shouldFail) throw ApiException('AI 服务不可用');
+    onDelta('第一幕：跌入谷底\n');
+    onDelta('第二幕：逆袭崛起\n');
+    onDelta('第三幕：登顶巅峰');
     return AiOutlineResult(
       outline: outlineText,
       requestNo: 'AIR20260101',
@@ -148,7 +195,7 @@ void main() {
           findsOneWidget);
       expect(find.text('消耗 1 次'), findsOneWidget);
       expect(find.text('保存（复制全文）'), findsOneWidget);
-      expect(fake.calls.first, contains('outline:都市青年逆袭|都市|爽文'));
+      expect(fake.calls.first, contains('outlineStream:都市青年逆袭|都市|爽文'));
     });
   });
 
@@ -174,7 +221,7 @@ void main() {
       expect(find.text('夜色里，他站在落地窗前，沉默良久。'), findsOneWidget);
       expect(find.text('复制'), findsOneWidget);
       expect(find.text('存草稿'), findsOneWidget);
-      expect(fake.calls.first, 'write:写一段重逢对手戏');
+      expect(fake.calls.first, 'writeStream:写一段重逢对手戏');
     });
   });
 
@@ -204,7 +251,7 @@ void main() {
       expect(find.text('【润色】夜色如墨，他立于落地窗前，久久无言。'),
           findsOneWidget);
       expect(find.text('复制润色结果'), findsOneWidget);
-      expect(fake.calls.first, 'polish:他很生气地走了。|文学优美');
+      expect(fake.calls.first, 'polishStream:他很生气地走了。|文学优美');
     });
   });
 
@@ -239,7 +286,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, 'test');
       await tester.tap(find.text('生成内容'));
       await tester.pumpAndSettle();
-      expect(fake.calls.first, 'write:test');
+      expect(fake.calls.first, 'writeStream:test');
 
       // 生成成功后页面已 invalidate → 再次读取触发重新获取
       await container.read(welfareAssetProvider.future);

@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import 'ai_models.dart';
+import 'ai_sse_parser.dart';
 
 /// AI 创作业务仓库（App 端 E 模块）。
 ///
@@ -111,6 +117,26 @@ class AiRepository {
     return AiWriteResult.fromJson(data);
   }
 
+  /// AI 写作（流式，SSE 打字机输出）。
+  ///
+  /// [onDelta] 逐块回调内容增量；后端流成功结束后才落记录并扣减次数，
+  /// 中途失败/断线不落库不扣次数。返回完整内容与记录ID。
+  Future<AiWriteResult> writeStream({
+    required String prompt,
+    String? type,
+    required void Function(String delta) onDelta,
+  }) async {
+    final body = await _api.postStream(
+      '$_contentPrefix/write/stream',
+      data: <String, dynamic>{
+        'prompt': prompt,
+        if (type != null && type.isNotEmpty) 'type': type,
+      },
+      receiveTimeout: _aiReceiveTimeout,
+    );
+    return await _consumeSseWrite(body.stream, onDelta);
+  }
+
   /// AI 润色：{content, style} → {content, recordId}。
   Future<AiWriteResult> polish({
     required String content,
@@ -127,6 +153,23 @@ class AiRepository {
     );
     if (data == null) throw ApiException('AI 润色失败');
     return AiWriteResult.fromJson(data);
+  }
+
+  /// AI 润色（流式，SSE 打字机输出）。
+  Future<AiWriteResult> polishStream({
+    required String content,
+    String? style,
+    required void Function(String delta) onDelta,
+  }) async {
+    final body = await _api.postStream(
+      '$_contentPrefix/polish/stream',
+      data: <String, dynamic>{
+        'content': content,
+        if (style != null && style.isNotEmpty) 'style': style,
+      },
+      receiveTimeout: _aiReceiveTimeout,
+    );
+    return await _consumeSseWrite(body.stream, onDelta);
   }
 
   /// AI 大纲：{inspiration, genre, style} → {outline, requestNo, quotaUsed}。
@@ -148,6 +191,82 @@ class AiRepository {
     );
     if (data == null) throw ApiException('AI 大纲生成失败');
     return AiOutlineResult.fromJson(data);
+  }
+
+  /// AI 大纲（流式，SSE 打字机输出）。
+  ///
+  /// 流式期间 [onDelta] 收到的是 JSON 文本增量；结束后解析为结构化大纲。
+  Future<AiOutlineResult> outlineStream({
+    String? inspiration,
+    String? genre,
+    String? style,
+    required void Function(String delta) onDelta,
+  }) async {
+    final body = await _api.postStream(
+      '$_contentPrefix/outline/stream',
+      data: <String, dynamic>{
+        if (inspiration != null && inspiration.isNotEmpty)
+          'inspiration': inspiration,
+        if (genre != null && genre.isNotEmpty) 'genre': genre,
+        if (style != null && style.isNotEmpty) 'style': style,
+      },
+      receiveTimeout: _aiReceiveTimeout,
+    );
+    final buffer = StringBuffer();
+    int quotaUsed = 0;
+    var requestNo = '';
+    await consumeSseEvents(body.stream, (event) {
+      switch (event.event) {
+        case 'delta':
+          final delta = event.text('delta');
+          if (delta.isNotEmpty) {
+            buffer.write(delta);
+            onDelta(delta);
+          }
+        case 'done':
+          quotaUsed = event.intValue('quotaUsed');
+          requestNo = event.text('requestNo');
+      }
+    });
+    final raw = buffer.toString();
+    return AiOutlineResult(
+      outline: _tryParseOutline(raw),
+      requestNo: requestNo,
+      quotaUsed: quotaUsed,
+    );
+  }
+
+  /// 消费写作/润色 SSE 流：逐块回调 delta，done 后返回 {content, recordId}。
+  Future<AiWriteResult> _consumeSseWrite(
+    Stream<Uint8List> stream,
+    void Function(String delta) onDelta,
+  ) async {
+    final buffer = StringBuffer();
+    int recordId = 0;
+    await consumeSseEvents(stream, (event) {
+      switch (event.event) {
+        case 'delta':
+          final delta = event.text('delta');
+          if (delta.isNotEmpty) {
+            buffer.write(delta);
+            onDelta(delta);
+          }
+        case 'done':
+          recordId = event.intValue('recordId');
+      }
+    });
+    return AiWriteResult(content: buffer.toString(), recordId: recordId);
+  }
+
+  /// 流式大纲：把完整 JSON 文本解析为对象；失败兜底 {text}。
+  static dynamic _tryParseOutline(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      return jsonDecode(trimmed);
+    } catch (_) {
+      return {'text': raw};
+    }
   }
 
   /// AI 写作记录（分页）。

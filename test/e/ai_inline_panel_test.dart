@@ -50,6 +50,24 @@ class _FakeAiRepository implements AiRepository {
   }
 
   @override
+  Future<AiOutlineResult> outlineStream({
+    String? inspiration,
+    String? genre,
+    String? style,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('outlineStream:$inspiration|$genre|$style');
+    if (shouldFail) throw ApiException('AI 服务不可用');
+    onDelta('第一幕：跌落谷底\n');
+    onDelta('第二幕：逆袭崛起');
+    return AiOutlineResult(
+      outline: outlineText,
+      requestNo: 'AIR01',
+      quotaUsed: 1,
+    );
+  }
+
+  @override
   Future<AiWriteResult> write({
     required String prompt,
     String? type,
@@ -60,12 +78,38 @@ class _FakeAiRepository implements AiRepository {
   }
 
   @override
+  Future<AiWriteResult> writeStream({
+    required String prompt,
+    String? type,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('writeStream:$prompt|$type');
+    if (shouldFail) throw ApiException('AI 服务不可用');
+    onDelta('夜色里，他站在');
+    onDelta('落地窗前，沉默良久。');
+    return AiWriteResult(content: writeContent, recordId: 1);
+  }
+
+  @override
   Future<AiWriteResult> polish({
     required String content,
     String? style,
   }) async {
     calls.add('polish:$content|$style');
     if (shouldFail) throw ApiException('AI 服务不可用');
+    return AiWriteResult(content: polishContent, recordId: 2);
+  }
+
+  @override
+  Future<AiWriteResult> polishStream({
+    required String content,
+    String? style,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('polishStream:$content|$style');
+    if (shouldFail) throw ApiException('AI 服务不可用');
+    onDelta('【润色】夜色如墨，他立于');
+    onDelta('窗前，久久无言。');
     return AiWriteResult(content: polishContent, recordId: 2);
   }
 
@@ -166,7 +210,7 @@ void main() {
       await tester.tap(find.text('生成'));
       await tester.pumpAndSettle();
 
-      expect(fake.calls.first, contains('outline:都市青年逆袭'));
+      expect(fake.calls.first, contains('outlineStream:都市青年逆袭'));
       expect(find.textContaining('第一幕：跌落谷底'), findsOneWidget);
       expect(find.text('消耗 1 次'), findsOneWidget);
 
@@ -194,7 +238,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, '写一段重逢对手戏');
       await tester.tap(find.text('生成'));
       await tester.pumpAndSettle();
-      expect(fake.calls.first, startsWith('write:写一段重逢对手戏'));
+      expect(fake.calls.first, startsWith('writeStream:写一段重逢对手戏'));
       expect(find.text('夜色里，他站在落地窗前，沉默良久。'), findsOneWidget);
     });
 
@@ -216,7 +260,7 @@ void main() {
       await tester.tap(find.text('生成'));
       await tester.pumpAndSettle();
 
-      expect(fake.calls.first, 'polish:他很生气地走了。|文学优美');
+      expect(fake.calls.first, 'polishStream:他很生气地走了。|文学优美');
       expect(find.textContaining('【润色】'), findsOneWidget);
       await tester.tap(find.text('插入正文'));
       await tester.pump();

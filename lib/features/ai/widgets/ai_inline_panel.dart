@@ -60,7 +60,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     super.dispose();
   }
 
-  /// 校验当前 tab 输入并生成。
+  /// 校验当前 tab 输入并生成（流式：逐块追加显示）。
   Future<void> _generate() async {
     final requiredEmpty = switch (_tab) {
       _AiTab.outline => _inspiration.text.trim().isEmpty,
@@ -85,31 +85,39 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     try {
       final container = ProviderScope.containerOf(context, listen: false);
       final repo = ref.read(aiRepositoryProvider);
+      void onDelta(String delta) {
+        if (!mounted) return;
+        setState(() => _result += delta);
+      }
+
       String text;
       String? emptyHint;
       switch (_tab) {
         case _AiTab.outline:
-          final result = await repo.outline(
+          final result = await repo.outlineStream(
             inspiration: _inspiration.text.trim(),
             genre: _genre.text.trim(),
             style: _style.text.trim(),
+            onDelta: onDelta,
           );
           text = result.outlineText;
           _quotaUsed = result.quotaUsed;
           if (text.trim().isEmpty) emptyHint = '未生成大纲，请重试';
           break;
         case _AiTab.write:
-          final result = await repo.write(
+          final result = await repo.writeStream(
             prompt: _prompt.text.trim(),
             type: _type.text.trim(),
+            onDelta: onDelta,
           );
           text = result.content;
           if (text.trim().isEmpty) emptyHint = '未生成内容，请重试';
           break;
         case _AiTab.polish:
-          final result = await repo.polish(
+          final result = await repo.polishStream(
             content: _content.text.trim(),
             style: _selectedStyle,
+            onDelta: onDelta,
           );
           text = result.content;
           if (text.trim().isEmpty) emptyHint = '未生成润色结果，请重试';

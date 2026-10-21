@@ -42,8 +42,8 @@ class ApiClient {
 
   final Dio _dio;
 
-  /// 直接访问底层 Dio（下载文件等特殊场景用；业务请求请走 get/post 等方法）。
-  Dio get dio => _dio;
+  /// Test/DI access to the underlying Dio (not for business pages).
+  Dio get dioForTest => _dio;
 
   /// 构造一个绑定了拦截器的 Dio（供 provider 调用）。
   static Dio buildDio(AuthInterceptor authInterceptor) {
@@ -95,6 +95,42 @@ class ApiClient {
               queryParameters: query,
               options: Options(headers: headers, receiveTimeout: receiveTimeout)),
           parser);
+
+  /// SSE 流式 POST（用于 AI 打字机输出）。
+  ///
+  /// 返回原始 [ResponseBody]，由调用方逐块解析 `event/data` 行；
+  /// 登录态失效（401）与网络错误仍按统一规则抛 [ApiException]。
+  Future<ResponseBody> postStream(
+    String path, {
+    dynamic data,
+    Duration? receiveTimeout,
+  }) async {
+    try {
+      final resp = await _dio.post<ResponseBody>(
+        path,
+        data: data,
+        options: Options(
+          responseType: ResponseType.stream,
+          receiveTimeout: receiveTimeout,
+        ),
+      );
+      if (resp.statusCode == 401) {
+        SessionEvents.instance.sessionExpired();
+        throw ApiException('登录状态已过期，请重新登录', code: 401);
+      }
+      final body = resp.data;
+      if (body == null) {
+        throw ApiException('响应格式错误', code: resp.statusCode);
+      }
+      return body;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 &&
+          e.requestOptions.extra['skipSessionExpiry'] != true) {
+        SessionEvents.instance.sessionExpired();
+      }
+      throw ApiException(_mapDioError(e), code: e.response?.statusCode);
+    }
+  }
 
   /// PUT 请求（JSON）。
   Future<T?> put<T>(
