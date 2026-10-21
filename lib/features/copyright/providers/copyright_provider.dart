@@ -275,15 +275,21 @@ class CopyrightProvider extends ChangeNotifier {
   bool _worksLoading = false;
   bool get worksLoading => _worksLoading;
 
+  String? _worksError;
+  String? get worksError => _worksError;
+
   /// 加载我的作品列表
   Future<void> loadMyWorks() async {
     _worksLoading = true;
+    _worksError = null;
     notifyListeners();
 
     try {
       _myWorks = await _apiService.getMyWorks();
+      _worksError = null;
     } catch (e) {
       _myWorks = [];
+      _worksError = e.toString();
     } finally {
       _worksLoading = false;
       notifyListeners();
@@ -302,6 +308,7 @@ class CopyrightProvider extends ChangeNotifier {
     _currentCertificate = null;
     _centers = [];
     _myWorks = [];
+    _worksError = null;
     notifyListeners();
   }
 

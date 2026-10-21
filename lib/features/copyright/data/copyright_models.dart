@@ -384,9 +384,18 @@ class MyWorkBrief {
 
   factory MyWorkBrief.fromJson(Map<String, dynamic> json) => MyWorkBrief(
         workId: _int(json['workId']),
-        title: _text(json['title']),
-        coverUrl: _textOrNull(json['coverUrl']),
+        title: _text(json['title'] ?? json['workName'] ?? json['workTitle']),
+        // /users/me/works 返回 cover；旧口径 coverUrl
+        coverUrl: _textOrNull(json['coverUrl'] ?? json['cover']),
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MyWorkBrief && runtimeType == other.runtimeType && workId == other.workId;
+
+  @override
+  int get hashCode => workId.hashCode;
 }
 
 // ==================== 版权交割模型 ====================

@@ -342,6 +342,8 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
   Widget _buildWorkSelector() {
     final provider = ref.watch(copyrightProvider);
     final works = provider.myWorks;
+    final loading = provider.worksLoading;
+    final error = provider.worksError;
 
     return Card(
       elevation: 1,
@@ -369,28 +371,57 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
               ],
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<MyWorkBrief>(
-              value: _selectedWork,
-              decoration: const InputDecoration(
-                hintText: '请选择要申请版权的作品',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            else if (error != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '作品列表加载失败，请重试',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                  ),
+                  TextButton(
+                    onPressed: () => ref.read(copyrightProvider).loadMyWorks(),
+                    child: const Text('重新加载'),
+                  ),
+                ],
+              )
+            else if (works.isEmpty)
+              const Text(
+                '暂无可选作品。请先在「创作」中创建作品后再来申请版权。',
+                style: TextStyle(color: AppColors.text3, fontSize: 13),
+              )
+            else
+              DropdownButtonFormField<MyWorkBrief>(
+                value: _selectedWork != null &&
+                        works.any((w) => w.workId == _selectedWork!.workId)
+                    ? works.firstWhere((w) => w.workId == _selectedWork!.workId)
+                    : null,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  hintText: '请选择要申请版权的作品',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                items: works
+                    .map((work) => DropdownMenuItem(
+                          value: work,
+                          child: Text(
+                            work.workName.isEmpty ? '作品 #${work.workId}' : work.workName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (work) {
+                  setState(() {
+                    _selectedWork = work;
+                  });
+                },
               ),
-              items: works
-                  .map((work) => DropdownMenuItem(
-                        value: work,
-                        child: Text(
-                          work.workName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (work) {
-                setState(() {
-                  _selectedWork = work;
-                });
-              },
-            ),
           ],
         ),
       ),

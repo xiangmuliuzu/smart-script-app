@@ -181,16 +181,22 @@ class CopyrightApiService {
 
   /// 获取我的作品列表（简要信息）
   ///
-  /// GET /content/works/my-list
+  /// 走创作域既有接口 GET /users/me/works（不传 pageNum 时 data 为数组）。
+  /// 旧路径 /content/works/my-list 后端不存在，会导致静默空列表、下拉“点不动”。
   Future<List<MyWorkBrief>> getMyWorks() async {
-    final data = await _client.get(
-      '/content/works/my-list',
-    );
+    final data = await _client.get('/users/me/works');
 
-    return (data as List?)
-            ?.map((e) => MyWorkBrief.fromJson(e))
-            .toList() ??
-        <MyWorkBrief>[];
+    final rawList = data is List
+        ? data
+        : (data is Map
+            ? ((data['list'] as List?) ?? (data['rows'] as List?) ?? const [])
+            : const []);
+
+    return rawList
+        .whereType<Map>()
+        .map((e) => MyWorkBrief.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.workId > 0)
+        .toList();
   }
 
   // ==================== 文件上传 ====================
