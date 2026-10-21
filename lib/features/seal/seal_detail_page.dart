@@ -39,11 +39,30 @@ class SealDetailPage extends ConsumerWidget {
         elevation: 0.5,
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(sealDetailProvider(sealId).future),
+        onRefresh: () async {
+          ref.invalidate(sealDetailProvider(sealId));
+          await ref.read(sealDetailProvider(sealId).future);
+        },
         child: detailAsync.when(
           data: (detail) {
             if (detail == null) {
-              return const Center(child: Text('印章不存在或无权限访问'));
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      '印章不存在或无权限访问',
+                      style: TextStyle(color: AppColors.text2),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(sealDetailProvider(sealId)),
+                      child: const Text('重试'),
+                    ),
+                  ],
+                ),
+              );
             }
             return _DetailContent(detail: detail);
           },
@@ -55,7 +74,7 @@ class SealDetailPage extends ConsumerWidget {
                 Text('加载失败: $error', style: const TextStyle(color: AppColors.text3)),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () => ref.refresh(sealDetailProvider(sealId).future),
+                  onPressed: () => ref.invalidate(sealDetailProvider(sealId)),
                   child: const Text('重试'),
                 ),
               ],
