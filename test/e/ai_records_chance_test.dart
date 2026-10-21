@@ -6,6 +6,7 @@
 //   - AI 记录页：大纲/写作/润色列表、类型筛选、展开详情；
 //   - AI 记录页：空态与失败提示。
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -267,6 +268,85 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('都市夜景提示词'), findsNothing);
       expect(find.text('润色一段对话'), findsOneWidget);
+    });
+
+    testWidgets('展开后一键复制输出按钮与提示', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeRecordsRepo(
+        records: _writeRecords,
+      );
+
+      // mock 剪贴板平台通道
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async => null,
+      );
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [aiRepositoryProvider.overrideWithValue(fake)],
+          child: const MaterialApp(home: AiRecordPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 展开写作卡片
+      await tester.tap(find.text('都市夜景提示词'));
+      await tester.pumpAndSettle();
+
+      // 应存在「复制输出」按钮
+      expect(find.text('复制输出'), findsOneWidget);
+
+      // 点击复制：出现成功提示
+      await tester.tap(find.text('复制输出'));
+      await tester.pumpAndSettle();
+      expect(find.text('已复制输出'), findsOneWidget);
+    });
+
+    testWidgets('输出为空时复制提示', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeRecordsRepo(
+        records: [
+          const AiWriteRecord(
+            recordId: 9,
+            title: '空输出',
+            writeType: 'outline',
+            inputPrompt: '灵感：空',
+            outputContent: '',
+            wordCount: 0,
+            aiModel: 'deepseek-flash',
+            status: 'success',
+            createdAt: '2026-10-14 09:00',
+          ),
+        ],
+      );
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async => null,
+      );
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [aiRepositoryProvider.overrideWithValue(fake)],
+          child: const MaterialApp(home: AiRecordPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('空输出'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('复制输出'));
+      await tester.pumpAndSettle();
+      expect(find.text('输出为空，无法复制'), findsOneWidget);
     });
 
     testWidgets('空态提示', (tester) async {

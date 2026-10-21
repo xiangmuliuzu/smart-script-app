@@ -69,7 +69,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
             ),
         ],
       ),
-      body: switch (authStatus) {
+      body: Stack(
+        children: [
+          switch (authStatus) {
         // 会话恢复中：不请求、不引导，等 /auth/me 定论。
         AuthStatus.unknown => const LoadingView(message: '加载中'),
         // 游客：页内登录引导，不离开创作 tab；登录成功由 RouteIntent 回跳本页。
@@ -110,7 +112,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
               ),
             ],
           ),
-      },
+        },
+      ],
+      ),
     );
   }
 

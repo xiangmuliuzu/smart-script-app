@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/auth_validators.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../welfare/data/welfare_providers.dart';
 import '../auth_feedback.dart';
 import '../auth_navigation.dart';
 import '../widgets/auth_buttons.dart';
@@ -89,6 +91,8 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
       if (!mounted) {
         return;
       }
+      // 登录成功：上报每日任务行为进度（fire-and-forget，失败静默）
+      unawaited(reportTaskProgressByType(ref, 'DAILY'));
       // 与验证码登录一致：登录成功后消费一次回跳意图
       resolvePostLoginTarget(context, ref);
     } on ApiException catch (e) {

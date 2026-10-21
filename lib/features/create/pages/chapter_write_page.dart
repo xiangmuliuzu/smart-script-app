@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../ai/widgets/ai_inline_panel.dart';
 import '../data/author_work_models.dart';
 import '../data/author_work_providers.dart';
 
@@ -52,6 +53,9 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
 
   /// 进行中的保存 Future；返回时复用以避免重复 POST。
   Future<bool>? _savingFuture;
+
+  /// 是否展示内嵌 AI 创作面板。
+  bool _aiPanelOpen = false;
 
   /// 是否已从 provider 回填数据（仅编辑模式，避免覆盖用户输入）。
   bool _initialized = false;
@@ -267,6 +271,19 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
     );
   }
 
+  /// 把 AI 生成内容追加到正文末尾（保留原正文，换行分隔）。
+  void _insertAiText(String text) {
+    if (text.trim().isEmpty) return;
+    final current = _contentCtrl.text;
+    final sep = current.isEmpty ? '' : '\n\n';
+    final updated = '$current$sep${text.trim()}';
+    _contentCtrl.text = updated;
+    // 光标移到文末，触发 _onChanged 的自动保存计时。
+    _contentCtrl.selection =
+        TextSelection.collapsed(offset: updated.length);
+    _onChanged();
+  }
+
   @override
   Widget build(BuildContext context) {
     // 从工作台详情派生 editable 状态 + 回填编辑数据
@@ -401,6 +418,57 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                 ),
               ),
               const Divider(height: 0.5, color: AppColors.divider),
+            ],
+            // AI 创作入口栏（仅可编辑状态显示）：展开内嵌 AI 大纲/写作/润色面板。
+            if (_editable) ...[
+              Container(
+                color: AppColors.card,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome,
+                        size: 16, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    const Text('AI 创作',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text2)),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => setState(() => _aiPanelOpen = !_aiPanelOpen),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _aiPanelOpen
+                              ? AppColors.primaryTint
+                              : AppColors.fill,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          _aiPanelOpen ? '收起' : '展开',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _aiPanelOpen
+                                ? AppColors.primary
+                                : AppColors.text2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0.5, color: AppColors.divider),
+              if (_aiPanelOpen) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                  child: AiInlinePanel(onInsert: _insertAiText),
+                ),
+                const SizedBox(height: 4),
+              ],
             ],
             // 正文输入
             Expanded(

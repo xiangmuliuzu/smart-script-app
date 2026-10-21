@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -234,6 +235,19 @@ class _RecordCard extends StatelessWidget {
 
   final AiWriteRecord record;
 
+  /// 一键复制输出内容到剪贴板。
+  Future<void> _copyOutput(BuildContext context) async {
+    final text = record.outputContent.isEmpty ? '' : record.outputContent;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text.isEmpty ? '输出为空，无法复制' : '已复制输出'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -276,9 +290,23 @@ class _RecordCard extends StatelessWidget {
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text('字数 ${record.wordCount}',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.text3)),
+              child: Row(
+                children: [
+                  Text('字数 ${record.wordCount}',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.text3)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _copyOutput(context),
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('复制输出'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

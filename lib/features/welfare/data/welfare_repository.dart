@@ -87,6 +87,29 @@ class WelfareRepository {
     );
   }
 
+  /// 上报任务行为进度（App 完成真实行为后调用，如阅读/上传/登录）。
+  /// 返回 {progress, targetCount, isCompleted}；任务不存在/未启用时抛异常由调用方静默。
+  Future<({int progress, int targetCount, int isCompleted})> reportTaskProgress({
+    required int userId,
+    required String taskCode,
+    int increment = 1,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/welfare/task/progress',
+      data: <String, dynamic>{
+        'taskCode': taskCode,
+        'userId': userId,
+        'increment': increment,
+      },
+      parser: _map,
+    );
+    return (
+      progress: (data?['progress'] as num?)?.toInt() ?? 0,
+      targetCount: (data?['targetCount'] as num?)?.toInt() ?? 1,
+      isCompleted: (data?['isCompleted'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   static List<T> _parseList<T>(
     Map<String, dynamic>? data,
     String key,

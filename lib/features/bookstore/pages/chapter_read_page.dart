@@ -9,6 +9,7 @@ import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../welfare/data/welfare_providers.dart';
 import '../data/bookstore_models.dart';
 import '../data/content_providers.dart';
 
@@ -50,6 +51,8 @@ class _ChapterReadPageState extends ConsumerState<ChapterReadPage> {
     if (!ref.read(authControllerProvider).isAuthenticated) return;
     _reportedChapterId = detail.chapterId;
     unawaited(_send(detail.workId, detail.chapterId));
+    // 真实阅读行为：上报阅读任务进度（fire-and-forget，失败静默）
+    unawaited(reportTaskProgressByType(ref, 'READING'));
   }
 
   Future<void> _send(int workId, int chapterId) async {

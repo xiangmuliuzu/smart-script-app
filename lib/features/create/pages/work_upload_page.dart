@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../shared/widgets/common_views.dart';
 import '../../bookstore/data/bookstore_models.dart';
 import '../../bookstore/data/content_providers.dart';
 import '../../user_center/widgets/user_center_scaffold.dart';
+import '../../welfare/data/welfare_providers.dart';
 import '../data/author_work_providers.dart';
 import '../data/create_providers.dart';
 
@@ -71,6 +74,8 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
             categoryId: categoryId,
             description: description,
           );
+      // 上传作品成功：上报上传任务行为进度（fire-and-forget，失败静默）
+      unawaited(reportTaskProgressByType(ref, 'UPLOAD'));
       // 失效整个 family（all/draft/reviewing/revision/rejected/published），
       // 避免只刷 'all' 而其它状态 Tab 的列表仍为旧数据。
       ref.invalidate(myWorksProvider);
