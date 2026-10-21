@@ -109,19 +109,19 @@ class _MaterialPreviewPageState extends State<MaterialPreviewPage> {
     }
   }
 
+  /// 按 URL 或材料文件名判断类型（上传路径可能带随机前缀，文件名更可靠）。
   bool _isImageUrl(String url) {
-    final lowercaseUrl = url.toLowerCase();
-    return lowercaseUrl.endsWith('.jpg') ||
-        lowercaseUrl.endsWith('.jpeg') ||
-        lowercaseUrl.endsWith('.png') ||
-        lowercaseUrl.endsWith('.gif') ||
-        lowercaseUrl.endsWith('.bmp') ||
-        lowercaseUrl.endsWith('.webp');
+    return _hasExt(url, const ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']) ||
+        _hasExt(widget.materialName, const ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']);
   }
 
   bool _isTextUrl(String url) {
-    final lowercaseUrl = url.toLowerCase();
-    return lowercaseUrl.endsWith('.txt');
+    return _hasExt(url, const ['.txt']) || _hasExt(widget.materialName, const ['.txt']);
+  }
+
+  bool _hasExt(String value, List<String> exts) {
+    final lower = value.toLowerCase().split('?').first;
+    return exts.any(lower.endsWith);
   }
 
   @override
