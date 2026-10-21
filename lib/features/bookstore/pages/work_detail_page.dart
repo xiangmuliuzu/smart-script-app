@@ -46,10 +46,6 @@ class WorkDetailPage extends ConsumerWidget {
               _ContactEntry(workId: work.workId),
               if (work.summary.isNotEmpty)
                 _Block(title: '作品简介', content: work.summary),
-              if (work.coreSetting.isNotEmpty)
-                _Block(title: '核心设置', content: work.coreSetting),
-              if (work.characterSetting.isNotEmpty)
-                _Block(title: '角色设定', content: work.characterSetting),
               _InfoBlock(work: work),
             ],
           ),
@@ -787,7 +783,7 @@ class _Stat extends StatelessWidget {
   }
 }
 
-/// 长文本区块（简介 / 核心设置 / 角色设定）。
+/// 长文本区块（简介）。
 class _Block extends StatelessWidget {
   const _Block({required this.title, required this.content});
 

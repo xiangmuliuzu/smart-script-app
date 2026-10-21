@@ -42,7 +42,7 @@ List<TagItem> _tags(dynamic value) {
       .toList();
 }
 
-/// 书城作品（列表与详情共用；详情才带 coreSetting/characterSetting）。
+/// 书城作品（列表与详情共用）。
 class BookItem {
   const BookItem({
     required this.workId,
@@ -56,8 +56,6 @@ class BookItem {
     this.uploadType = '',
     this.lengthType = '',
     this.summary = '',
-    this.coreSetting = '',
-    this.characterSetting = '',
     this.price = 0,
     this.tradeEnabled = false,
     this.wordCount = 0,
@@ -93,8 +91,6 @@ class BookItem {
   final String uploadType;
   final String lengthType;
   final String summary;
-  final String coreSetting;
-  final String characterSetting;
   final double price;
   final bool tradeEnabled;
   final int wordCount;
@@ -147,8 +143,6 @@ class BookItem {
         uploadType: _text(json['uploadType']),
         lengthType: _text(json['lengthType']),
         summary: _text(json['summary']),
-        coreSetting: _text(json['coreSetting']),
-        characterSetting: _text(json['characterSetting']),
         price: _decimal(json['price']),
         tradeEnabled: _flag(json['tradeEnabled']),
         wordCount: _int(json['wordCount']),

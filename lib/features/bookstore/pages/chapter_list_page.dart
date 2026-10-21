@@ -159,7 +159,7 @@ class _ChapterTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String name =
-        chapter.chapterTitle.isEmpty ? '第 ${chapter.chapterNo} 章' : chapter.chapterTitle;
+        '第 ' + chapter.chapterNo.toString() + ' 章' + (chapter.chapterTitle.isEmpty ? '' : ' · ' + chapter.chapterTitle);
     final String? tag = _readableTag;
     return InkWell(
       onTap: onTap,

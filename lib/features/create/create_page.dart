@@ -31,10 +31,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   static const List<({String value, String label})> _filters = [
     (value: 'all', label: '全部'),
     (value: 'draft', label: '草稿'),
+    (value: 'published', label: '已发布'),
     (value: 'reviewing', label: '审核中'),
     (value: 'revision', label: '待修改'),
     (value: 'rejected', label: '已驳回'),
-    (value: 'published', label: '已发布'),
   ];
 
   /// 网格列数（三列，同屏作品数更多）。
