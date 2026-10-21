@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/router/route_paths.dart';
@@ -206,6 +207,7 @@ class OrderDetailPage extends ConsumerWidget {
   /// 合同信息卡片
   Widget _buildContractCard(BuildContext context, Order order, ContractDetail contract) {
     final pdfUrl = contract.signedPdfUrl;
+    final hasContent = contract.content != null && contract.content!.isNotEmpty;
     return _buildCard('合同信息', [
       _infoRow('合同编号', contract.contractNo ?? '-'),
       _infoRow('签署状态', contract.statusLabel),
@@ -213,14 +215,15 @@ class OrderDetailPage extends ConsumerWidget {
       if (contract.buyerSignTime != null) _infoRow('买方签署时间', contract.buyerSignTime!),
       _infoRow('卖方签署', contract.isSellerSigned ? '已签署' : '未签署'),
       if (contract.sellerSignTime != null) _infoRow('卖方签署时间', contract.sellerSignTime!),
-      if (contract.isCompleted && pdfUrl != null && pdfUrl.isNotEmpty) ...[
+      // 查看合同原文（HTML WebView，APP 内展示）
+      if (hasContent) ...[
         const SizedBox(height: 4),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () => _openSignedPdf(context, pdfUrl),
-            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-            label: const Text('查看签署完成 PDF', style: TextStyle(fontSize: 14)),
+            onPressed: () => _showContractContent(context, contract),
+            icon: const Icon(Icons.description_outlined, size: 18),
+            label: const Text('查看合同内容', style: TextStyle(fontSize: 14)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: const BorderSide(color: AppColors.primary),
@@ -230,7 +233,34 @@ class OrderDetailPage extends ConsumerWidget {
           ),
         ),
       ],
+      if (contract.isCompleted && pdfUrl != null && pdfUrl.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _openSignedPdf(context, pdfUrl),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('查看签署完成 PDF', style: TextStyle(fontSize: 14)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.text2,
+              side: const BorderSide(color: AppColors.divider),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+      ],
     ]);
+  }
+
+  /// 在 APP 内以 WebView 全屏展示合同 HTML 内容（含签名/印章图片）。
+  void _showContractContent(BuildContext context, ContractDetail contract) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ContractContentView(contract: contract),
+      ),
+    );
   }
 
   /// 打开签署完成 PDF：/profile 为 root-relative，拼站点 origin；公开静态资源无需鉴权。
@@ -785,5 +815,101 @@ class OrderDetailPage extends ConsumerWidget {
     if (dt == null) return '-';
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+/// 合同内容全屏展示页（WebView 渲染 HTML，含签名/印章图片）。
+class _ContractContentView extends StatefulWidget {
+  const _ContractContentView({required this.contract});
+
+  final ContractDetail contract;
+
+  @override
+  State<_ContractContentView> createState() => _ContractContentViewState();
+}
+
+class _ContractContentViewState extends State<_ContractContentView> {
+  late final WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.disabled)
+      ..loadHtmlString(
+        widget.contract.content ?? '<p>合同内容加载中...</p>',
+        baseUrl: AppConfig.baseUrl,
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('合同内容 · ${widget.contract.contractNo ?? ''}'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.5,
+      ),
+      body: Column(
+        children: [
+          // 签署状态提示条
+          _buildStatusBanner(),
+          // WebView 合同正文
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: WebViewWidget(controller: _controller),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBanner() {
+    final contract = widget.contract;
+    if (contract.isCompleted) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: AppColors.success.withOpacity(0.08),
+        child: Row(
+          children: [
+            const Icon(Icons.verified, color: AppColors.success, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              '合同已完成签署',
+              style: TextStyle(fontSize: 13, color: AppColors.success.withOpacity(0.9), fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: AppColors.warning.withOpacity(0.08),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: AppColors.warning, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              contract.statusLabel,
+              style: TextStyle(fontSize: 13, color: AppColors.warning.withOpacity(0.9), fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

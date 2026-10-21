@@ -43,7 +43,6 @@ class WorkDetailPage extends ConsumerWidget {
               _Header(work: work),
               _RatingBar(workId: work.workId),
               _ChapterEntry(work: work),
-              _ContactEntry(workId: work.workId),
               if (work.summary.isNotEmpty)
                 _Block(title: '作品简介', content: work.summary),
               _InfoBlock(work: work),
@@ -617,107 +616,6 @@ class _TradeButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// 版权合作联系方式。
-///
-/// 展示作者登记的手机号/邮箱/微信号；未登记时显示提示文案。
-class _ContactEntry extends ConsumerWidget {
-  const _ContactEntry({required this.workId});
-
-  final int workId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final contactAsync = ref.watch(workContactProvider(workId));
-    final contact = contactAsync.valueOrNull;
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.r),
-        boxShadow: AppColors.cardShadow,
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题行
-          Row(
-            children: [
-              const Icon(Icons.contact_mail_outlined, size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              const Text(
-                '作者联系方式',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.text1,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // 联系方式内容
-          if (contact == null)
-            Text(
-              contactAsync.hasError ? '联系方式加载失败' : '加载中...',
-              style: const TextStyle(fontSize: 13, color: AppColors.text3),
-            )
-          else if (!contact.hasContact)
-            const Text(
-              '作者暂未登记联系方式',
-              style: TextStyle(fontSize: 13, color: AppColors.text3),
-            )
-          else
-            _buildContactItems(contact),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactItems(WorkContact contact) {
-    final items = <Widget>[];
-    if (contact.phone.isNotEmpty) {
-      items.add(_contactRow(Icons.phone, '手机号', contact.phone));
-    }
-    if (contact.email.isNotEmpty) {
-      items.add(_contactRow(Icons.email, '邮箱', contact.email));
-    }
-    if (contact.wechat.isNotEmpty) {
-      items.add(_contactRow(Icons.chat_bubble_outline, '微信号', contact.wechat));
-    }
-    if (items.isEmpty) {
-      return const Text(
-        '作者已登记联系方式，但当前不可见',
-        style: TextStyle(fontSize: 13, color: AppColors.text3),
-      );
-    }
-    return Column(children: items);
-  }
-
-  Widget _contactRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Text(
-            '$label：',
-            style: const TextStyle(fontSize: 13, color: AppColors.text3),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13, color: AppColors.text1),
-            ),
-          ),
-        ],
       ),
     );
   }
