@@ -58,7 +58,7 @@ Future<LiveStack> _stack() async {
   final storage = TokenStorage(secure, prefs);
   final graph = AuthNetworkGraph.create(storage);
   // AuthNetworkGraph 使用编译期 BASE_URL；此处指向运行时真实后端地址
-  graph.apiClient.dioForTest.options.baseUrl = kBase;
+  graph.apiClient.dio.options.baseUrl = kBase;
   return LiveStack(secure, storage, graph.apiClient, graph.repository);
 }
 

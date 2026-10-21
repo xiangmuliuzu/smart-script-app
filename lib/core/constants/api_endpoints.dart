@@ -63,6 +63,9 @@ class ApiEndpoints {
   static const String contentWorks = '/content/works';
   /// 作品详情
   static String contentWorkById(int workId) => '/content/works/$workId';
+  /// 向当前作者绑定手机号发送作品删除验证码（POST）。
+  static String contentWorkDeleteCode(int workId) =>
+      '/content/works/$workId/delete-code';
   /// 作品章节目录（含试读可读标记；游客可读）
   static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
   /// 作品试读包（可读章节 + 试读文件；游客可读）
@@ -299,6 +302,9 @@ class ApiEndpoints {
   static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
   static String appOrderDeliver(int orderId) => '/trade/order/$orderId/deliver';
   static String appOrderComplete(int orderId) => '/trade/order/$orderId/complete';
+  // 合同
+  static String appContractByOrder(int orderId) => '/trade/contracts/$orderId';
+  static String appContractSign(int contractId) => '/trade/contracts/$contractId/sign';
   // 财务（资金托管 / 发票 / 收益）
   static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
   static const String appFinanceIncomeDetail = '/trade/finance/income/detail';

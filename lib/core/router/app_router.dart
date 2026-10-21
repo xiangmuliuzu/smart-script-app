@@ -49,6 +49,12 @@ import '../../features/seal/my_seal_page.dart';
 import '../../features/seal/seal_detail_page.dart';
 import '../../features/seal/seal_edit_page.dart';
 import '../../features/seal/seal_upload_page.dart';
+import '../../features/copyright/pages/copyright_home_page.dart';
+import '../../features/copyright/pages/copyright_application_list_page.dart';
+import '../../features/copyright/pages/copyright_application_detail_page.dart';
+import '../../features/copyright/pages/copyright_form_page.dart';
+import '../../features/copyright/pages/copyright_certificate_list_page.dart';
+import '../../features/copyright/pages/copyright_certificate_detail_page.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/message/pages/message_detail_page.dart';
 import '../../features/message/pages/message_list_page.dart';
@@ -59,6 +65,7 @@ import '../../features/profile/pages/phone_change_page.dart';
 import '../../features/profile/pages/profile_edit_page.dart';
 import '../../features/profile/pages/real_name_page.dart';
 import '../../features/profile/pages/creator_apply_page.dart';
+import '../../features/profile/pages/creator_backend_page.dart';
 import '../../features/profile/pages/user_profile_page.dart';
 import '../../features/profile/pages/user_follow_list_page.dart';
 import '../../features/profile/profile_page.dart';
@@ -69,6 +76,7 @@ import '../../features/trade/pages/inquiry_list_page.dart';
 import '../../features/trade/pages/quote_records_page.dart';
 import '../../features/trade/pages/order_list_page.dart';
 import '../../features/trade/pages/order_detail_page.dart';
+import '../../features/trade/pages/contract_sign_page.dart';
 import '../../features/trade/pages/trade_management_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
 import '../../features/trade/pages/escrow_list_page.dart';
@@ -567,6 +575,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           return SealEditPage(sealId: sealId);
         },
       ),
+      // ===== 创作者后台 =====
+      GoRoute(
+        path: RoutePath.creatorBackend,
+        name: RouteName.creatorBackend,
+        builder: (_, __) => const CreatorBackendPage(),
+      ),
       // ===== C 交易域 =====
       GoRoute(
         path: RoutePath.tradeManagement,
@@ -642,6 +656,57 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.orderDetail,
         builder: (context, state) => OrderDetailPage(
           orderId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.contractSign,
+        name: RouteName.contractSign,
+        builder: (context, state) => ContractSignPage(
+          orderId: int.tryParse(state.uri.queryParameters['orderId'] ?? '') ?? 0,
+        ),
+      ),
+      // ===== 版权模块（受登录守卫保护）=====
+      GoRoute(
+        path: RoutePath.copyrightHome,
+        name: RouteName.copyrightHome,
+        builder: (_, __) => const CopyrightHomePage(),
+      ),
+      GoRoute(
+        path: RoutePath.copyrightApplicationList,
+        name: RouteName.copyrightApplicationList,
+        builder: (_, __) => const CopyrightApplicationListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.copyrightApplicationDetail,
+        name: RouteName.copyrightApplicationDetail,
+        builder: (context, state) {
+          final id = int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0;
+          final isDelivery = state.uri.queryParameters['type'] == 'delivery';
+          return CopyrightApplicationDetailPage(
+            id: id,
+            type: isDelivery
+                ? DetailPageType.delivery
+                : DetailPageType.application,
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePath.copyrightForm,
+        name: RouteName.copyrightForm,
+        builder: (context, state) => CopyrightFormPage(
+          applyId: int.tryParse(state.uri.queryParameters['applyId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.copyrightCertificateList,
+        name: RouteName.copyrightCertificateList,
+        builder: (_, __) => const CopyrightCertificateListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.copyrightCertificateDetail,
+        name: RouteName.copyrightCertificateDetail,
+        builder: (context, state) => CopyrightCertificateDetailPage(
+          certId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
       ),
       // ===== A3 聊天域 =====

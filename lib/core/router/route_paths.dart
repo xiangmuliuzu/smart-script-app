@@ -50,6 +50,8 @@ class RoutePath {
       '$userFollowList?userId=$userId&following=${following ? 1 : 0}';
   static const String realName = '/profile/real-name';
   static const String creatorApply = '/profile/creator-apply';
+  /// 创作者后台（版权管理入口）。
+  static const String creatorBackend = '/profile/creator-backend';
   static const String accountSecurity = '/profile/security';
   static const String phoneChange = '/profile/security/phone';
   static const String passwordEdit = '/profile/security/password';
@@ -74,6 +76,37 @@ class RoutePath {
 
   /// 材料预览 URL。
   static String materialPreviewUrl(int materialId) => '$materialPreview?id=$materialId';
+
+  // ===== 版权模块（受登录守卫保护）=====
+  static const String copyrightHome = '/copyright/home';
+  static const String copyrightApplicationList = '/copyright/application/list';
+  static const String copyrightApplicationDetail = '/copyright/application/detail';
+  static const String copyrightForm = '/copyright/form';
+  static const String copyrightCertificateList = '/copyright/certificate/list';
+  static const String copyrightCertificateDetail = '/copyright/certificate/detail';
+
+  /// 版权首页 URL
+  static String copyrightHomeUrl() => copyrightHome;
+
+  /// 版权申请列表 URL
+  static String copyrightApplicationListUrl() => copyrightApplicationList;
+
+  /// 版权申请详情 URL
+  static String copyrightApplicationDetailUrl(int applyId) => 
+      '$copyrightApplicationDetail?id=$applyId';
+
+  /// 版权申请表单 URL（新建或编辑）
+  static String copyrightFormUrl({int? applyId}) => Uri(
+        path: copyrightForm,
+        queryParameters: applyId != null ? {'applyId': '$applyId'} : null,
+      ).toString();
+
+  /// 版权证书列表 URL
+  static String copyrightCertificateListUrl() => copyrightCertificateList;
+
+  /// 版权证书详情 URL
+  static String copyrightCertificateDetailUrl(int certId) =>
+      '$copyrightCertificateDetail?id=$certId';
 
   // B 模块我的收藏列表（受登录守卫保护）
   static const String favorites = '/favorites';
@@ -231,6 +264,8 @@ class RoutePath {
   static const String orderList = '/trade/order/list';
   static const String orderDetail = '/trade/order/detail';
   static const String orderCancel = '/trade/order/cancel';
+  // 合同签署
+  static const String contractSign = '/trade/contract/sign';
   // 合作记录
   static const String cooperationCreate = '/trade/cooperation/create';
   static const String followUpList = '/trade/follow-up/list';
@@ -278,6 +313,7 @@ class RouteName {
   static const String userFollowList = 'userFollowList';
   static const String realName = 'realName';
   static const String creatorApply = 'creatorApply';
+  static const String creatorBackend = 'creatorBackend';
   static const String accountSecurity = 'accountSecurity';
   static const String phoneChange = 'phoneChange';
   static const String passwordEdit = 'passwordEdit';
@@ -290,6 +326,15 @@ class RouteName {
   static const String sealEdit = 'sealEdit';
   static const String sealResubmit = 'sealResubmit';
   static const String materialPreview = 'materialPreview';
+  
+  // ===== 版权模块 =====
+  static const String copyrightHome = 'copyrightHome';
+  static const String copyrightApplicationList = 'copyrightApplicationList';
+  static const String copyrightApplicationDetail = 'copyrightApplicationDetail';
+  static const String copyrightForm = 'copyrightForm';
+  static const String copyrightCertificateList = 'copyrightCertificateList';
+  static const String copyrightCertificateDetail = 'copyrightCertificateDetail';
+  
   static const String workList = 'workList';
   static const String recommendList = 'recommendList';
   static const String workDetail = 'workDetail';
@@ -332,6 +377,7 @@ class RouteName {
   static const String orderList = 'orderList';
   static const String orderDetail = 'orderDetail';
   static const String orderCancel = 'orderCancel';
+  static const String contractSign = 'contractSign';
   static const String cooperationCreate = 'cooperationCreate';
   static const String followUpList = 'followUpList';
   static const String demandList = 'demandList';
@@ -388,6 +434,8 @@ class ProtectedRoutes {
     RoutePath.orderList,
     RoutePath.orderDetail,
     RoutePath.orderCancel,
+    // 合同签署（需登录）
+    RoutePath.contractSign,
     RoutePath.cooperationCreate,
     RoutePath.followUpList,
     RoutePath.demandList,
@@ -403,6 +451,12 @@ class ProtectedRoutes {
     RoutePath.aiCenter,
     // 印章管理（需登录）
     RoutePath.mySeal,
+    // 版权模块（需登录）
+    RoutePath.creatorBackend,
+    RoutePath.copyrightHome,
+    RoutePath.copyrightApplicationList,
+    RoutePath.copyrightForm,
+    RoutePath.copyrightCertificateList,
   ];
 
   static bool isProtected(String location) {

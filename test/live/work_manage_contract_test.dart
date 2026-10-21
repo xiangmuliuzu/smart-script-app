@@ -71,7 +71,7 @@ Future<_Session> _loggedIn() async {
   final prefs = await SharedPreferences.getInstance();
   final storage = TokenStorage(InMemoryTokenSecureStorage(), prefs);
   final graph = AuthNetworkGraph.create(storage);
-  graph.apiClient.dioForTest.options.baseUrl = kBase;
+  graph.apiClient.dio.options.baseUrl = kBase;
 
   final phone = _randPhone();
   await graph.repository.sendSms(phone: phone, scene: 'REGISTER');
@@ -104,9 +104,11 @@ Future<int> _createDisposableWork(_Session s, {String prefix = '联调'}) async 
   );
   addTearDown(() async {
     try {
-      await s.create.deleteWork(workId);
-    } on ApiException {
+      await s.create.sendDeletionCode(workId);
+      await s.create.deleteWork(workId, code: kSmsCode);
+    } on ApiException catch (e) {
       // 用例已自行删除：忽略重复删除的 404
+      if (e.code != 404) rethrow;
     }
   });
   return workId;
@@ -140,7 +142,7 @@ void main() {
     await expectLater(
         guest.createWork(title: '联调未登录', categoryId: 1), throwsA(_code(401)));
     await expectLater(guest.updateWork(1, title: '联调未登录'), throwsA(_code(401)));
-    await expectLater(guest.deleteWork(1), throwsA(_code(401)));
+    await expectLater(guest.deleteWork(1, code: kSmsCode), throwsA(_code(401)));
     await expectLater(guest.listVersions(1), throwsA(_code(401)));
     await expectLater(guest.createVersion(1, content: '联调未登录'), throwsA(_code(401)));
     await expectLater(guest.versionDetail(1), throwsA(_code(401)));
@@ -173,9 +175,11 @@ void main() {
     expect(workId, greaterThan(0));
     addTearDown(() async {
       try {
-        await s.create.deleteWork(workId);
-      } on ApiException {
+        await s.create.sendDeletionCode(workId);
+        await s.create.deleteWork(workId, code: kSmsCode);
+      } on ApiException catch (e) {
         // 用例末尾已删除
+        if (e.code != 404) rethrow;
       }
     });
 
@@ -186,8 +190,10 @@ void main() {
     await expectLater(s.create.updateWork(workId, price: -1), throwsA(_code(400)));
 
     // 删除（逻辑删除）：再删按 404。
-    await s.create.deleteWork(workId);
-    await expectLater(s.create.deleteWork(workId), throwsA(_code(404)));
+    await expectLater(s.create.deleteWork(workId, code: ''), throwsA(_code(40000)));
+    await s.create.sendDeletionCode(workId);
+    await s.create.deleteWork(workId, code: kSmsCode);
+    await expectLater(s.create.deleteWork(workId, code: kSmsCode), throwsA(_code(404)));
   });
 
   test('创作：版本新建 → 列表当前版本标记 → 详情正文往返', () async {
@@ -231,7 +237,7 @@ void main() {
     // 他人作品（work_id=1 为既有数据，必不属于刚注册的账号）：不区分「不存在」与「无权」。
     await expectLater(s.create.listVersions(1), throwsA(_code(404)));
     await expectLater(s.create.updateWork(1, title: '越权修改'), throwsA(_code(404)));
-    await expectLater(s.create.deleteWork(1), throwsA(_code(404)));
+    await expectLater(s.create.deleteWork(1, code: kSmsCode), throwsA(_code(404)));
 
     // 不存在的主键：同样 404。
     const ghost = 999999999;

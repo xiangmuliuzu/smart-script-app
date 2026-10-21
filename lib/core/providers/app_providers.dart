@@ -61,7 +61,7 @@ final authInterceptorProvider = Provider<AuthInterceptor>(
 );
 
 final dioProvider = Provider<Dio>(
-  (ref) => ref.watch(authNetworkGraphProvider).apiClient.dioForTest,
+  (ref) => ref.watch(authNetworkGraphProvider).apiClient.dio,
 );
 
 final apiClientProvider = Provider<ApiClient>(

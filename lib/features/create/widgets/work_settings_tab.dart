@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/services/native_image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bookstore/data/bookstore_models.dart';
@@ -10,6 +12,7 @@ import '../../bookstore/widgets/bookstore_widgets.dart';
 import '../data/author_work_models.dart';
 import '../data/author_work_providers.dart';
 import '../data/create_providers.dart';
+import 'work_delete_dialog.dart';
 
 /// 工作台 Tab2：作品设置。
 ///
@@ -36,6 +39,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
   late final TextEditingController _priceCtrl;
   int? _genreId;
   bool _saving = false;
+  bool _deleting = false;
 
   /// 已选标签ID（全量覆盖提交，仅变化时下发）。
   late final Set<int> _tagIds;
@@ -140,6 +144,30 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
       _toast('保存失败，请稍后重试');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _deleteWork() async {
+    if (_saving || _uploading || _deleting) return;
+    setState(() => _deleting = true);
+    final work = widget.detail.work;
+    final deleted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WorkDeleteDialog(
+        workId: work.workId,
+        title: work.title.isEmpty ? '未命名作品' : work.title,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _deleting = false);
+    if (deleted != true) return;
+    ref.invalidate(myWorksProvider);
+    _toast('作品已删除');
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go(RoutePath.create);
     }
   }
 
@@ -347,7 +375,9 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
         Padding(
           padding: const EdgeInsets.all(16),
           child: ElevatedButton(
-            onPressed: (editable && !_saving && !_uploading) ? _save : null,
+            onPressed: (editable && !_saving && !_uploading && !_deleting)
+                ? _save
+                : null,
             child: _saving
                 ? const SizedBox(
                     height: 20,
@@ -355,6 +385,15 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('保存'),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: TextButton.icon(
+            onPressed: (_saving || _uploading || _deleting) ? null : _deleteWork,
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('删除作品'),
           ),
         ),
       ],
