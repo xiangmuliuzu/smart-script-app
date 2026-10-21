@@ -53,8 +53,12 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
   bool _isSubmitting = false;
   bool _isLoading = true;
   String? _loadError;
+  /// 加载时的印章状态；启用中须先停用才能提交。
+  String _sealStatus = '';
 
   bool get _busy => _isSubmitting || _uploadingSeal || _uploadingMaterial || _pickingSeal || _pickingMaterial;
+
+  bool get _needsDisableBeforeEdit => _sealStatus == 'enabled';
 
   @override
   void initState() {
@@ -92,6 +96,7 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
       // 填充数据
       _sealNameController.text = detail.sealName;
       _sealImageRef = AppConfig.resolveAssetUrl(detail.sealImageUrl);
+      _sealStatus = detail.sealStatus;
 
       // 解析材料URL列表
       final materialUrls = detail.materialUrlList;
@@ -162,6 +167,10 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (_needsDisableBeforeEdit) ...[
+              _buildDisableRequiredBanner(),
+              const SizedBox(height: 16),
+            ],
             _buildSealNameInput(),
             const SizedBox(height: 16),
             _buildSealImageUpload(),
@@ -425,6 +434,36 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
     );
   }
 
+  /// 启用中拦截提示条。
+  Widget _buildDisableRequiredBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '该印章当前为启用状态，请先返回详情页停用后再提交修改。'
+              '停用后需重新审核，审核通过后由管理员重新启用。',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.orange.shade900,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 提交按钮。
   Widget _buildSubmitButton() {
     return SizedBox(
@@ -443,7 +482,10 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
                 height: 20,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               )
-            : const Text('提交修改', style: TextStyle(fontSize: 16)),
+            : Text(
+                _needsDisableBeforeEdit ? '请先停用后再提交' : '提交修改',
+                style: const TextStyle(fontSize: 16),
+              ),
       ),
     );
   }
@@ -475,10 +517,10 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '1. 修改印章后需要重新审核\n'
-            '2. 审核通过前无法使用该印章\n'
-            '3. 请确保印章图片清晰完整\n'
-            '4. 审核材料可帮助加快审核速度',
+            '1. 启用中的印章须先停用，才能提交编辑\n'
+            '2. 修改印章后需要重新审核\n'
+            '3. 审核通过前无法使用该印章\n'
+            '4. 请确保印章图片清晰完整',
             style: TextStyle(fontSize: 13, color: Colors.blue.shade900, height: 1.5),
           ),
         ],
@@ -636,6 +678,32 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
 
   /// 提交表单。
   Future<void> _handleSubmit() async {
+    if (_needsDisableBeforeEdit) {
+      final goBack = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('请先停用印章'),
+          content: const Text(
+            '启用中的印章不能直接提交编辑。请先返回详情页停用印章，再重新进入编辑并提交。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('知道了'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('返回详情'),
+            ),
+          ],
+        ),
+      );
+      if (goBack == true && mounted) {
+        context.pop();
+      }
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     // 检查印章图片

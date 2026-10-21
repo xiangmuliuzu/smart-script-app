@@ -75,8 +75,11 @@ class SealItem {
   /// 是否可以重新提交（驳回状态）。
   bool get canResubmit => reviewStatus == 'rejected';
 
-  /// 是否可以停用（已审核通过且启用状态）。
-  bool get canDisable => reviewStatus == 'approved' && sealStatus == 'enabled';
+  /// 是否可以停用（启用中即可；含「审核中但仍启用」的异常数据）。
+  bool get canDisable => sealStatus == 'enabled';
+
+  /// 启用中须先停用才能提交编辑。
+  bool get needsDisableBeforeEdit => sealStatus == 'enabled';
 
   /// 材料 URL 列表（逗号分隔）。
   List<String> get materialUrlList {

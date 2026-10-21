@@ -284,16 +284,11 @@ class _ManagementCard extends ConsumerWidget {
           children: [
             const Text('印章管理', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.text1)),
             const SizedBox(height: 12),
-            // 编辑按钮
+            // 编辑按钮（启用中须先停用）
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  context.pushNamed(
-                    RouteName.sealEdit,
-                    pathParameters: {'sealId': '${detail.sealId}'},
-                  );
-                },
+                onPressed: () => _onEditPressed(context, ref),
                 icon: const Icon(Icons.edit),
                 label: const Text('编辑印章'),
               ),
@@ -325,6 +320,43 @@ class _ManagementCard extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _onEditPressed(BuildContext context, WidgetRef ref) async {
+    if (detail.needsDisableBeforeEdit) {
+      final action = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('请先停用印章'),
+          content: const Text(
+            '该印章当前为启用状态。请先停用后再编辑修改；'
+            '停用后需重新审核，审核通过后由管理员重新启用。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'disable'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.warning),
+              child: const Text('去停用'),
+            ),
+          ],
+        ),
+      );
+      if (!context.mounted) return;
+      if (action == 'disable') {
+        await _confirmDisable(context, ref);
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    context.pushNamed(
+      RouteName.sealEdit,
+      pathParameters: {'sealId': '${detail.sealId}'},
     );
   }
 
