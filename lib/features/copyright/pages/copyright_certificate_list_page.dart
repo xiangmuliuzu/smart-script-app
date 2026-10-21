@@ -196,7 +196,7 @@ class _CopyrightCertificateListPageState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '证书编号：{item.certNo}',
+                          '证书编号：${item.certNo}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.text2,

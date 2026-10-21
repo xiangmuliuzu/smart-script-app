@@ -36,12 +36,13 @@ class CopyrightApiService {
       query: params,
     );
 
+    // 后端 AppPageResult 字段为 list；兼容若依风格 rows
+    final rawList = (data['list'] as List?) ?? (data['rows'] as List?) ?? [];
     return {
       'total': data['total'] ?? 0,
-      'rows': (data['rows'] as List?)
-              ?.map((e) => CopyrightApplication.fromJson(e))
-              .toList() ??
-          <CopyrightApplication>[],
+      'rows': rawList
+          .map((e) => CopyrightApplication.fromJson(e))
+          .toList(),
     };
   }
 
@@ -125,12 +126,11 @@ class CopyrightApiService {
       query: params,
     );
 
+    // 后端 AppPageResult 字段为 list；兼容若依风格 rows
+    final rawList = (data['list'] as List?) ?? (data['rows'] as List?) ?? [];
     return {
       'total': data['total'] ?? 0,
-      'rows': (data['rows'] as List?)
-              ?.map((e) => CopyrightCert.fromJson(e))
-              .toList() ??
-          <CopyrightCert>[],
+      'rows': rawList.map((e) => CopyrightCert.fromJson(e)).toList(),
     };
   }
 
