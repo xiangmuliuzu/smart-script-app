@@ -30,8 +30,9 @@ final tagsProvider = FutureProvider.autoDispose.family<List<TagItem>, int?>(
   (ref, categoryId) => ref.watch(contentRepositoryProvider).listTags(categoryId: categoryId),
 );
 
-/// 榜单：首页预览与榜单页共用；type 取 view/favorite/sale/rating。
-final rankingProvider = FutureProvider.autoDispose.family<List<RankingItem>, String>(
+/// 榜单：首页预览与榜单页共用；type 取 view/favorite/sale/rating/new，
+/// 返回载荷含 list 与 updatedAt（榜单更新时间）。
+final rankingProvider = FutureProvider.autoDispose.family<RankingPayload, String>(
   (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
 );
 

@@ -400,7 +400,8 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
             message: error is ApiException ? error.message : '榜单加载失败',
             onRetry: () => ref.invalidate(rankingProvider(_type)),
           ),
-          data: (items) {
+          data: (payload) {
+            final items = payload.list;
             if (items.isEmpty) return const _SectionEmpty(message: '榜单暂无数据');
             final preview = items.take(_previewSize).toList();
             return Padding(

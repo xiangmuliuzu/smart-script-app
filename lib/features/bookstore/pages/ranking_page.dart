@@ -12,7 +12,8 @@ import '../widgets/bookstore_widgets.dart';
 
 /// 作品榜单（B 模块，接口 2.7.7 作品榜单）。
 ///
-/// 公开页，游客可读。四种 tab 即后端 type：热门（浏览量）/ 收藏 / 交易热度（销量）/ 评分。
+/// 公开页，游客可读。五个 tab 即后端 type：热门（近 7 天阅读）/ 收藏（近 7 天收藏）/
+/// 交易热度（近 7 天订单）/ 评分（贝叶斯加权）/ 新书（近 30 天上架）。
 class RankingPage extends ConsumerStatefulWidget {
   const RankingPage({super.key, this.type});
 
@@ -63,7 +64,8 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                 message: error is ApiException ? error.message : '加载失败，请稍后重试',
                 onRetry: () => ref.invalidate(rankingProvider(_type)),
               ),
-              data: (items) {
+              data: (payload) {
+                final items = payload.list;
                 if (items.isEmpty) {
                   return const EmptyView(message: '榜单暂无数据', icon: Icons.leaderboard_outlined);
                 }
@@ -91,12 +93,14 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                           onTap: () => context
                               .push(RoutePath.workDetailUrl(items[i].workId)),
                         ),
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                         child: Text(
-                          '榜单仅展示热度前 $_rankingLimit 名',
+                          payload.updatedAt.isEmpty
+                              ? '榜单仅展示热度前 $_rankingLimit 名'
+                              : '榜单仅展示热度前 $_rankingLimit 名\n更新时间：${payload.updatedAt}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 12, color: AppColors.text3),
                         ),
                       ),

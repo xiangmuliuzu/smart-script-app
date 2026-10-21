@@ -281,7 +281,7 @@ class RankingItem {
   final String authorName;
   final String genreName;
 
-  /// 榜单分数：等于当前榜单类型对应的指标值。
+  /// 榜单分数：等于当前榜单类型对应的主指标值（近 7 天计数 / 贝叶斯评分 / 阅读量）。
   final double score;
   final int viewCount;
   final int favoriteCount;
@@ -334,6 +334,11 @@ class WorkSortOption {
 }
 
 /// 榜单类型（值与后端 `normalizeRankingType` 白名单一致）。
+///
+/// 方案 A「时间窗口 + 分级」，type 与主指标强绑定：
+/// view 热门榜=近 7 天阅读量 / favorite 收藏榜=近 7 天收藏数 /
+/// sale 交易热度榜=近 7 天已支付订单数 / rating 评分榜=贝叶斯加权评分 /
+/// new 新书榜=近 30 天上架按阅读量。
 class RankingType {
   const RankingType(this.code, this.label);
 
@@ -345,10 +350,36 @@ class RankingType {
     RankingType('favorite', '收藏榜'),
     RankingType('sale', '交易热度榜'),
     RankingType('rating', '评分榜'),
+    RankingType('new', '新书榜'),
   ];
 
   static RankingType of(String? code) =>
       all.firstWhere((type) => type.code == code, orElse: () => all.first);
+}
+
+/// 榜单响应载荷（接口 2.7.7 的 data：{list, updatedAt}）。
+class RankingPayload {
+  const RankingPayload({this.list = const <RankingItem>[], this.updatedAt = ''});
+
+  final List<RankingItem> list;
+
+  /// 榜单更新时间（后端实时取数时刻，yyyy-MM-dd HH:mm:ss）；缺失时为空串。
+  final String updatedAt;
+
+  factory RankingPayload.fromJson(Map<String, dynamic>? data) => RankingPayload(
+        list: _rankingItems(data),
+        updatedAt: _text(data?['updatedAt']),
+      );
+}
+
+/// 榜单条目解析：非数组或元素非对象时按空集合处理。
+List<RankingItem> _rankingItems(Map<String, dynamic>? data) {
+  final raw = data?['list'];
+  if (raw is! List) return const <RankingItem>[];
+  return raw
+      .whereType<Map>()
+      .map((e) => RankingItem.fromJson(Map<String, dynamic>.from(e)))
+      .toList();
 }
 
 /// 章节目录条目（AppChapterDto）。目录不下发正文。

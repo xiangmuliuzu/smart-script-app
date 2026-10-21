@@ -133,14 +133,15 @@ class ContentRepository {
     return WorkContact.fromJson(data);
   }
 
-  /// 作品榜单；[type] 取 view/favorite/sale/rating，空值由后端回落 view。
-  Future<List<RankingItem>> listRankings({String? type, int? limit}) async {
+  /// 作品榜单（接口 2.7.7，五榜：view/favorite/sale/rating/new）；
+  /// [type] 空值由后端回落 view，返回 { list, updatedAt }。
+  Future<RankingPayload> listRankings({String? type, int? limit}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentRankings,
       query: _compact({'type': type, 'limit': limit}),
       parser: _mapParser,
     );
-    return _items(data, RankingItem.fromJson);
+    return RankingPayload.fromJson(data);
   }
 
   /// 我的书架列表（需 App Token，接口 2.7.12，分页 {total, list}）。
