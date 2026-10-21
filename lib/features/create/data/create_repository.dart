@@ -114,10 +114,21 @@ class CreateRepository {
     );
   }
 
-  /// 删除作品（接口 2.9.4）；非本人/不存在时后端按 404 拒绝。
-  Future<void> deleteWork(int workId) async {
+  /// 删除验证码只发往当前账号绑定的手机号，返回掩码号码与重发间隔。
+  Future<Map<String, dynamic>> sendDeletionCode(int workId) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkDeleteCode(workId),
+      parser: _mapParser,
+    );
+    if (data?['sent'] != true) throw ApiException('验证码发送失败，请稍后重试');
+    return data!;
+  }
+
+  /// 删除作品（接口 2.9.4）；必须通过绑定手机号的删除场景验证码验证。
+  Future<void> deleteWork(int workId, {required String code}) async {
     await _api.delete<Map<String, dynamic>>(
       ApiEndpoints.contentWorkById(workId),
+      data: {'code': code},
       parser: _mapParser,
     );
   }

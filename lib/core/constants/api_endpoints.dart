@@ -63,6 +63,9 @@ class ApiEndpoints {
   static const String contentWorks = '/content/works';
   /// 作品详情
   static String contentWorkById(int workId) => '/content/works/$workId';
+  /// 向当前作者绑定手机号发送作品删除验证码（POST）。
+  static String contentWorkDeleteCode(int workId) =>
+      '/content/works/$workId/delete-code';
   /// 作品章节目录（含试读可读标记；游客可读）
   static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
   /// 作品试读包（可读章节 + 试读文件；游客可读）
