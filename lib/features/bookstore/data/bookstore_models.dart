@@ -275,7 +275,7 @@ class RankingItem {
   final String authorName;
   final String genreName;
 
-  /// 榜单分数：等于当前榜单类型对应的主指标值（近 7 天计数 / 贝叶斯评分 / 阅读量）。
+  /// 榜单分数：等于当前榜单类型对应的主指标值（近 7 天计数 / 平均评分 / 阅读量）。
   final double score;
   final int viewCount;
   final int favoriteCount;
@@ -331,7 +331,7 @@ class WorkSortOption {
 ///
 /// 方案 A「时间窗口 + 分级」，type 与主指标强绑定：
 /// view 热门榜=近 7 天阅读量 / favorite 收藏榜=近 7 天收藏数 /
-/// sale 交易热度榜=近 7 天已支付订单数 / rating 评分榜=贝叶斯加权评分 /
+/// sale 交易热度榜=近 7 天已支付订单数 / rating 评分榜=平均评分 /
 /// new 新书榜=近 30 天上架按阅读量。
 class RankingType {
   const RankingType(this.code, this.label);
