@@ -60,7 +60,10 @@ class MySealPage extends ConsumerWidget {
                 final seal = seals[index];
                 return _SealCard(
                   seal: seal,
-                  onTap: () => context.push('${RoutePath.sealDetail}/${seal.sealId}'),
+                  onTap: () {
+                    if (seal.sealId <= 0) return;
+                    context.push('${RoutePath.sealDetail}/${seal.sealId}');
+                  },
                 );
               },
             ),

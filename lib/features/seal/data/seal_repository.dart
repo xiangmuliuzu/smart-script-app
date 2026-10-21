@@ -23,13 +23,16 @@ class SealRepository {
   }
 
   /// 印章详情（含材料、日志）。
+  ///
+  /// 业务 404（不存在 / 非本人）返回 null；其它错误继续抛出，由页面展示重试。
   Future<SealDetail?> sealDetail(int sealId) async {
+    if (sealId <= 0) return null;
     try {
-      final data = await _api.get<Map<String, dynamic>>(
+      final data = await _api.get<dynamic>(
         '/content/copyright-seals/$sealId',
       );
-      if (data == null) return null;
-      return SealDetail.fromJson(data);
+      if (data is! Map) return null;
+      return SealDetail.fromJson(Map<String, dynamic>.from(data));
     } on ApiException catch (e) {
       if (e.code == 404) return null;
       rethrow;
