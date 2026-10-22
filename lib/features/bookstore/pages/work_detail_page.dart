@@ -751,9 +751,6 @@ class _InfoBlock extends StatelessWidget {
           _InfoRow(label: '作者', value: work.authorName),
           _InfoRow(label: '字数', value: '${work.wordCount}'),
           _InfoRow(label: '集数', value: '${work.episodeCount}'),
-          // duration 后端默认 0（未填时长）：0 分钟是无意义占位，按信息区既有「空值 → —」
-          // 惯例（见 _InfoRow 的 value.isEmpty ? '—'）置空，不显示「0 分钟」。
-          _InfoRow(label: '时长', value: work.duration > 0 ? '${work.duration} 分钟' : ''),
           _InfoRow(label: '是否开启交易', value: work.tradeEnabled ? '是' : '否'),
           _InfoRow(
             label: '试读',
@@ -764,9 +761,6 @@ class _InfoBlock extends StatelessWidget {
                     : '未开启'),
           ),
           _InfoRow(label: '上架时间', value: work.createTime ?? '—'),
-          const Divider(height: 18, thickness: 0.5, color: AppColors.divider),
-          // 作品类型/上传类型/篇幅类型/质量等级等后台字段收进「更多信息」折叠
-          _MoreInfo(work: work),
         ],
       ),
     );
@@ -799,62 +793,6 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 「更多信息」折叠区：后台技术字段（类型/上传/篇幅/质量等级）默认收起，
-/// 点击展开，避免像后台表格一样铺满读者页面。
-class _MoreInfo extends StatefulWidget {
-  const _MoreInfo({required this.work});
-
-  final BookItem work;
-
-  @override
-  State<_MoreInfo> createState() => _MoreInfoState();
-}
-
-class _MoreInfoState extends State<_MoreInfo> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final work = widget.work;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                const Text(
-                  '更多信息',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text1,
-                  ),
-                ),
-                const Spacer(),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.text3),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded) ...[
-          _InfoRow(label: '作品类型', value: work.workType),
-          _InfoRow(label: '上传类型', value: work.uploadType),
-          _InfoRow(label: '篇幅类型', value: work.lengthType),
-          _InfoRow(label: '质量等级', value: work.qualityLevel),
-          const SizedBox(height: 4),
-        ],
-      ],
     );
   }
 }
