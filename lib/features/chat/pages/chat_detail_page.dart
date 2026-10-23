@@ -5,7 +5,6 @@ import '../../../core/providers/auth_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
-import '../../trade/data/trade_models.dart';
 import '../../trade/data/trade_providers.dart';
 import '../../user_center/data/paged_data.dart';
 import '../data/chat_models.dart';
@@ -33,7 +32,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
-  _TradeContext? _tradeContext; // 交易会话上下文
 
   @override
   void initState() {
@@ -127,13 +125,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           isSeller = inquiry.sellerId == currentUserId;
           budget = inquiry.budget;
           licenseType = inquiry.licenseType;
-          // 缓存交易上下文供发送消息时使用
-          _tradeContext = _TradeContext(
-            inquiryId: inquiryId,
-            isBuyer: isBuyer,
-            isSeller: isSeller,
-            licenseType: licenseType,
-          );
         },
       );
     }
@@ -422,19 +413,4 @@ class _MessageBubble extends StatelessWidget {
           : null,
     );
   }
-}
-
-/// 交易会话上下文（缓存询盘ID和角色信息，供发送消息时判断是否需要更新报价）
-class _TradeContext {
-  final int inquiryId;
-  final bool isBuyer;
-  final bool isSeller;
-  final String? licenseType;
-
-  const _TradeContext({
-    required this.inquiryId,
-    required this.isBuyer,
-    required this.isSeller,
-    this.licenseType,
-  });
 }

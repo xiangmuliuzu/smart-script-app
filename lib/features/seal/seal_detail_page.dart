@@ -8,7 +8,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_toast.dart';
 import 'data/seal_models.dart';
 import 'data/seal_providers.dart';
-import 'data/seal_repository.dart';
 import 'material_preview_page.dart';
 
 /// 印章详情页（查看印章详情、材料、审核状态、操作日志）。

@@ -41,8 +41,6 @@ class _InquiryListPageState extends ConsumerState<InquiryListPage>
     super.dispose();
   }
 
-  String get _currentRole => _tabController.index == 0 ? 'buyer' : 'seller';
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

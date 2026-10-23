@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
-import '../data/bookstore_models.dart';
 import '../data/content_providers.dart';
 import '../widgets/bookstore_widgets.dart';
 

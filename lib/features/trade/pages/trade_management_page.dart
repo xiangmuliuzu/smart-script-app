@@ -99,14 +99,6 @@ class TradeManagementPage extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context, String name) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$name 功能建设中，敬请期待'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 }
 
 class _MenuItem {

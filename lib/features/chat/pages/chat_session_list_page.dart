@@ -2,21 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
-import '../../bookstore/data/content_repository.dart';
-import '../../bookstore/data/bookstore_models.dart';
-import '../../bookstore/data/content_providers.dart';
-import '../../create/data/author_work_repository.dart';
 import '../../create/data/author_work_providers.dart';
-import '../../trade/data/trade_repository.dart';
 import '../../trade/data/trade_providers.dart';
 import '../data/chat_models.dart';
 import '../data/chat_providers.dart';
-import '../data/chat_repository.dart';
 
 /// 聊天会话列表页
 ///
@@ -52,15 +45,6 @@ class _ChatSessionListPageState extends ConsumerState<ChatSessionListPage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  String? get _currentSessionType {
-    switch (_tabController.index) {
-      case 0: return null;  // 全部
-      case 1: return SessionType.trade;
-      case 2: return SessionType.admin;
-      default: return null;
-    }
   }
 
   @override
@@ -528,7 +512,6 @@ class _AnimatedConsultButtonState extends State<_AnimatedConsultButton>
     final margin = 16.0;
     final targetWidth = screenSize.width - margin * 2;
     final targetHeight = screenSize.height * 0.5;
-    final targetWidthScale = targetWidth / buttonSize.width;
     final targetHeightScale = targetHeight / buttonSize.height;
     
     // 重新创建动画

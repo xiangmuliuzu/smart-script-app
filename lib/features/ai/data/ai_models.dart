@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// AI 创作模块数据模型（App 端 E 模块）。
 ///
 /// 接口口径（后端 smartscript-review）：
@@ -262,11 +260,6 @@ class AiPageResult<T> {
           : const [],
     );
   }
-}
-
-String _prettyJson(dynamic value) {
-  // 轻量 JSON 缩进（避免引入额外依赖时的格式问题）
-  return const JsonEncoder.withIndent('  ').convert(value);
 }
 
 /// 递归把大纲对象渲染成「字段：值」的多行中文文本（与后端 outlineToText 对齐）。
