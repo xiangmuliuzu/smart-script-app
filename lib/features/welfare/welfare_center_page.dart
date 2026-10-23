@@ -106,11 +106,10 @@ class _AssetBar extends ConsumerWidget {
 }
 
 class _AssetItem extends StatelessWidget {
-  const _AssetItem({required this.label, required this.value, this.overflow});
+  const _AssetItem({required this.label, required this.value});
 
   final String label;
   final String value;
-  final TextOverflow? overflow;
 
   @override
   Widget build(BuildContext context) {
@@ -122,25 +121,9 @@ class _AssetItem extends StatelessWidget {
             style: const TextStyle(color: Colors.white70, fontSize: 12)),
         const SizedBox(height: 4),
         Text(value,
-            overflow: overflow,
-            maxLines: overflow == null ? null : 1,
             style: const TextStyle(
                 color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
       ],
-    );
-  }
-}
-
-class _AssetDivider extends StatelessWidget {
-  const _AssetDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 34,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.white24,
     );
   }
 }

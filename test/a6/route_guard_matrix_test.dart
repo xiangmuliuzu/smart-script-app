@@ -249,7 +249,7 @@ void main() {
   group('G6-D 游客拦截与回跳（widget）', () {
     testWidgets('游客冷启动落在公开入口，不停留登录页', (tester) async {
       await _pumpApp(tester);
-      expect(find.text('书城'), findsWidgets);
+      expect(find.text('首页'), findsWidgets);
       expect(find.byType(LoginPage), findsNothing);
     });
 

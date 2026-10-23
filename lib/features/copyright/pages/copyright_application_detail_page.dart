@@ -476,47 +476,6 @@ class _CopyrightApplicationDetailPageState
     );
   }
 
-  Widget _buildMaterialItem(String label, String url) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.text2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                url,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.text1,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        IconButton(
-          icon: const Icon(Icons.download, color: AppColors.primary),
-          onPressed: () {
-            // TODO: 实现文件下载
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('文件下载功能开发中')),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _buildOldMaterialItem(String label, String url) {
     return Container(
       padding: const EdgeInsets.all(12),

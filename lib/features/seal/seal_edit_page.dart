@@ -10,7 +10,6 @@ import '../../core/network/api_exception.dart';
 import '../../core/services/native_file_picker.dart';
 import '../../core/services/native_image_picker.dart';
 import '../../core/theme/app_colors.dart';
-import '../../features/user_center/data/user_center_providers.dart';
 import 'data/seal_providers.dart';
 
 /// 印章编辑页（编辑已有印章）。

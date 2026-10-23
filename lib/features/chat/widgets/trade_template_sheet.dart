@@ -8,7 +8,6 @@ import '../../trade/data/trade_models.dart';
 import '../../trade/data/trade_providers.dart';
 import '../data/chat_models.dart';
 import '../data/chat_providers.dart';
-import '../data/chat_repository.dart';
 
 /// 交易会话定型文选择面板（底部弹出式）。
 ///

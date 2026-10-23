@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';

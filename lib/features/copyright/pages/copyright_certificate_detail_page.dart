@@ -51,14 +51,14 @@ class _CopyrightCertificateDetailPageState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('证书下载链接：url')),
+          SnackBar(content: Text('证书下载链接：$url')),
         );
         // 这里可以集成下载管理器或打开浏览器
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败：e')),
+          SnackBar(content: Text('下载失败：$e')),
         );
       }
     } finally {

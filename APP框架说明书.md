@@ -69,12 +69,10 @@ lib/
 │       └── app_theme.dart            # 全局 ThemeData
 │
 ├── models/               # 跨模块基础模型
-│   ├── user.dart                     # User / UserType(user,creator,client,admin)
-│   └── paged_result.dart             # PagedResult {total,list}
+│   └── user.dart                     # User / UserType(user,creator,client,admin)
 │
 ├── shared/widgets/       # 通用组件
-│   ├── common_views.dart             # LoadingView / EmptyView / ErrorView 三态
-│   └── placeholder_page.dart         # 占位页（未实现模块用）
+│   └── common_views.dart             # LoadingView / EmptyView / ErrorView 三态
 │
 └── features/             # 【业务层·各负责人只改自己的子目录】
     ├── splash/splash_page.dart       # 启动页（会话恢复中）

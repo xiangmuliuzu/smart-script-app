@@ -93,7 +93,7 @@ void main() {
 
     // A6 起：未登录冷启动落在公开入口（书城），不再强制跳登录页。
     // 规格 §8.1 只要求书架、收藏、福利、AI、上传、询盘、订单、合同、印章等入口走守卫。
-    expect(find.text('书城'), findsWidgets);
+    expect(find.text('首页'), findsWidgets);
     expect(find.byType(LoginPage), findsNothing);
   });
 
