@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -103,13 +102,14 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
           if (contract == null) {
             return const ErrorView(message: '该订单尚未生成合同');
           }
-          if (contract.isCompleted) {
-            return _buildCompletedView(contract);
-          }
           // 加载合同 HTML 到 WebView（每个订单只加载一次，后续状态刷新不重复加载）
           if (_loadedOrderId != widget.orderId) {
             _loadedOrderId = widget.orderId;
             _loadContractHtml(contract);
+          }
+          // completed 状态：展示已签署合同内容 + PDF 入口
+          if (contract.isCompleted) {
+            return _buildCompletedView(contract);
           }
           // WebView 弹性占满剩余空间（内部滚动阅读合同），签名区固定在下部；
           // WebView 平台视图会吃掉拖动手势，刷新改由 AppBar 按钮触发
@@ -228,35 +228,23 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
     _webViewController.loadHtmlString(html, baseUrl: AppConfig.baseUrl);
   }
 
-  /// 双签完成视图：展示签署结论与最终 PDF 入口
+  /// 双签完成视图：展示已签署的合同内容（签名/印章已持久化在 HTML 中）+ PDF 入口
   Widget _buildCompletedView(ContractDetail contract) {
     final pdfUrl = contract.signedPdfUrl;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.verified_outlined, color: AppColors.success, size: 56),
-          const SizedBox(height: 12),
-          const Text('合同已完成签署',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
-          if (pdfUrl != null && pdfUrl.isNotEmpty)
-            OutlinedButton.icon(
+    return Column(
+      children: [
+        _buildStatusBar(contract),
+        Expanded(child: _buildContractContent(contract)),
+        if (pdfUrl != null && pdfUrl.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            child: OutlinedButton.icon(
               onPressed: () => _openSignedPdf(pdfUrl),
               icon: const Icon(Icons.picture_as_pdf_outlined),
               label: const Text('查看签署完成 PDF'),
-            )
-          else
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                '签署完成，PDF 生成中；若长时间未生成可联系管理员重建',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.text3),
-              ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -287,7 +275,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('签署方式（至少选择一项）',
+          const Text('签署方式（可同时使用签名+盖章）',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text1)),
           const SizedBox(height: 12),
           // 手写签名
@@ -386,7 +374,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
   Widget _buildSealPreview() {
     final sealUrl = _selectedSeal?.sealImageUrl ?? '';
     if (sealUrl.isEmpty) return const SizedBox.shrink();
-    final fullUrl = sealUrl.startsWith('http') ? sealUrl : '${AppConfig.baseUrl}$sealUrl';
+    final fullUrl = AppConfig.resolveAssetUrl(sealUrl);
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       padding: const EdgeInsets.all(12),
@@ -552,8 +540,9 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
 
   /// 选择印章
   Future<void> _selectSeal() async {
-    final sealsAsync = ref.read(mySealsProvider);
-    final seals = sealsAsync.valueOrNull ?? <SealItem>[];
+    // 直接调用 repository 并 await，避免 ref.read(FutureProvider) 同步读到空数据
+    final repo = ref.read(sealRepositoryProvider);
+    final seals = await repo.mySeals();
     final approvedSeals = seals.where((s) => s.reviewStatus == 'approved' && s.sealStatus == 'enabled').toList();
 
     if (approvedSeals.isEmpty) {
@@ -602,12 +591,16 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
     if (selected != null) {
       // 选中即预下载印章图，提交时直接使用，避免慢网干等
       final sealBytes = await _downloadImage(selected.sealImageUrl);
-      if (mounted) {
-        setState(() {
-          _selectedSeal = selected;
-          _selectedSealBytes = sealBytes;
-        });
+      if (!mounted) return;
+      if (sealBytes == null) {
+        // 图片下载失败或不是合法图片（如印章源文件已被删）：不选中，给出明确提示
+        showAppToast(context, '印章图片读取失败，请重新上传该印章');
+        return;
       }
+      setState(() {
+        _selectedSeal = selected;
+        _selectedSealBytes = sealBytes;
+      });
     }
   }
 
@@ -631,14 +624,31 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
     if (confirmed != true) return;
 
     setState(() => _submitting = true);
-
+    
     try {
-      // 获取印章图片字节（选中时已预下载；为空则提交时兕底重试一次）
+      // 获取印章图片字节（选中时已预下载；为空则提交时兜底重试一次）
       Uint8List? sealBytes;
       if (_selectedSeal != null && _selectedSeal!.sealImageUrl.isNotEmpty) {
         sealBytes = _selectedSealBytes ?? await _downloadImage(_selectedSeal!.sealImageUrl);
+        if (sealBytes == null) {
+          // 选了印章但图片确实取不到（源文件丢失/非图片）：明确报错，不上传垃圾字节
+          if (mounted) {
+            showAppToast(context, '印章图片读取失败，请重新选择或上传印章');
+            setState(() => _submitting = false);
+          }
+          return;
+        }
       }
-
+    
+      // 客户端预校验：签名与印章至少一项，避免空提交后靠后端报错
+      if (_signatureBytes == null && sealBytes == null) {
+        if (mounted) {
+          showAppToast(context, '请先手写签名或选择印章');
+          setState(() => _submitting = false);
+        }
+        return;
+      }
+    
       final contractRepo = ref.read(contractRepositoryProvider);
       await contractRepo.signContract(
         contract.contractId,
@@ -660,29 +670,59 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
     }
   }
 
-  /// 下载图片为字节
+  /// 下载图片为字节（公开静态资源，不带鉴权头）。
+  ///
+  /// 为什么不能用带 token 的 apiClient：/profile/** 是匿名可访问的静态资源，
+  /// 一旦携带 APP 域 Bearer 头，后端安全过滤器校验该 token 失败会返回 403，
+  /// 于是把 403 错误体当成印章字节上传，最终报「格式不支持」。
   Future<Uint8List?> _downloadImage(String url) async {
     try {
-      final fullUrl = url.startsWith('http') ? url : '${AppConfig.baseUrl}$url';
-      final response = Uri.parse(fullUrl).hasScheme
-          ? await _fetchUrl(fullUrl)
-          : null;
-      return response;
+      if (url.isEmpty) return null;
+      // 归一为当前后端 origin（相对路径 / 其他 host 的绝对地址均按 /profile/ 锚点重拼）。
+      final assetUrl = AppConfig.resolveAssetUrl(url);
+      final bytes = await _fetchPublicUrl(assetUrl);
+      if (bytes == null || !_looksLikeImage(bytes)) return null;
+      return bytes;
     } catch (_) {
       return null;
     }
   }
 
-  Future<Uint8List?> _fetchUrl(String url) async {
+  /// 无鉴权裸下载：临时 Dio 实例，不挂 AuthInterceptor、不注入 Authorization 头。
+  Future<Uint8List?> _fetchPublicUrl(String url) async {
+    final dio = Dio(BaseOptions(
+      connectTimeout: AppConfig.connectTimeout,
+      receiveTimeout: AppConfig.receiveTimeout,
+      responseType: ResponseType.bytes,
+      validateStatus: (s) => s != null && s >= 200 && s < 300,
+    ));
     try {
-      final client = ref.read(apiClientProvider);
-      final resp = await client.dio.get<Uint8List>(
-        url,
-        options: Options(responseType: ResponseType.bytes),
-      );
-      return resp.data;
+      final resp = await dio.get<Uint8List>(url);
+      final data = resp.data;
+      return data == null ? null : Uint8List.fromList(data);
     } catch (_) {
       return null;
+    } finally {
+      dio.close(force: true);
     }
+  }
+
+  /// 魔数嗅探：仅当字节头匹配 png/jpg/gif/bmp/webp 才认作图片，
+  /// 避免把 403/404 错误体当印章上传导致后端报「格式不支持」的误导性错误。
+  bool _looksLikeImage(Uint8List b) {
+    if (b.length < 4) return false;
+    // PNG: 89 50 4E 47
+    if (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return true;
+    // JPEG: FF D8 FF
+    if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return true;
+    // GIF: 47 49 46 38 ('GIF8')
+    if (b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x38) return true;
+    // BMP: 42 4D ('BM')
+    if (b[0] == 0x42 && b[1] == 0x4D) return true;
+    // WEBP: RIFF....WEBP
+    if (b.length >= 12 &&
+        b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
+        b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50) return true;
+    return false;
   }
 }

@@ -480,10 +480,12 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
     setState(() => _operating = true);
     try {
       await ref.read(tradeRepositoryProvider).acceptInquiry(widget.inquiryId);
-      if (mounted) {
-        showAppToast(context, '已接受询盘');
-        context.pop(true);
-      }
+      if (!mounted) return;
+      showAppToast(context, '已接受询盘，开始双方谈判');
+      // 询盘状态已转为「议价中」：刷新详情缓存，返回本页时呈现最新状态与解锁的联系入口
+      ref.invalidate(inquiryDetailProvider(widget.inquiryId));
+      // 接受后直接进入 TRADE 交易会话，双方就地开始谈判（复用 _startChat：建会话 + 跳聊天详情）
+      await _startChat();
     } catch (e) {
       if (mounted) {
         showAppToast(context, '操作失败: $e');

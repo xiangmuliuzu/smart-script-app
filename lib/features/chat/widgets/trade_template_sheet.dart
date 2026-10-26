@@ -71,9 +71,9 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
 
   /// 三个 Tab：价格协商（含价格 + 纯文字合并）、交易进展、通用沟通
   static const List<_TabInfo> _tabs = [
-    _TabInfo(label: '💰 价格协商', categories: {'price_param', 'price_text'}),
-    _TabInfo(label: '📋 交易进展', categories: {'progress'}),
-    _TabInfo(label: '💬 通用沟通', categories: {'general'}),
+    _TabInfo(label: '价格协商', categories: {'price_param', 'price_text'}),
+    _TabInfo(label: '交易进展', categories: {'progress'}),
+    _TabInfo(label: '通用沟通', categories: {'general'}),
   ];
 
   @override
@@ -101,7 +101,7 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.4,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -112,35 +112,41 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
         children: [
           // 拖拽手柄
           Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 36,
+            margin: const EdgeInsets.only(top: 10),
+            width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.divider,
+              color: AppColors.divider.withOpacity(0.6),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           // 标题
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: EdgeInsets.fromLTRB(20, 14, 20, 8),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 '选择消息',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.text1),
               ),
             ),
           ),
           // Tab 栏
-          TabBar(
-            controller: _tabController,
-            tabs: _tabs.map((t) => Tab(text: t.label)).toList(),
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.text3,
-            indicatorColor: AppColors.primary,
-            labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.divider.withOpacity(0.5))),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              tabs: _tabs.map((t) => Tab(text: t.label)).toList(),
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.text3,
+              indicatorColor: AppColors.primary,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal),
+            ),
           ),
-          const Divider(height: 1),
           // Tab 内容
           Flexible(
             child: templatesAsync.when(
@@ -193,18 +199,24 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
   Widget _buildTextTemplateItem(TradeTemplate template) {
     return InkWell(
       onTap: _isSending ? null : () => _sendTextMessage(template.content),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.card,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Text(
           template.content,
-          style: const TextStyle(fontSize: 14, color: AppColors.text1),
+          style: const TextStyle(fontSize: 14, color: AppColors.text1, height: 1.4),
         ),
       ),
     );
@@ -224,11 +236,18 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isExpanded ? AppColors.primary : AppColors.divider,
-          width: isExpanded ? 1.5 : 1,
+          color: isExpanded ? AppColors.primary : Colors.transparent,
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -237,56 +256,38 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
           InkWell(
             onTap: () {
               setState(() {
-              if (_expandedIndex == index) {
-                _expandedIndex = -1;
-                _priceController.clear();
-              } else {
-                _expandedIndex = index;
-                _priceController.clear();
-              }
-            });
+                if (_expandedIndex == index) {
+                  _expandedIndex = -1;
+                  _priceController.clear();
+                } else {
+                  _expandedIndex = index;
+                  _priceController.clear();
+                }
+              });
             },
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  if (beforePrice.isNotEmpty)
-                    Text(
-                      beforePrice,
-                      style: const TextStyle(fontSize: 14, color: AppColors.text1),
-                    ),
-                  if (isExpanded)
-                    const Icon(Icons.expand_more, size: 18, color: AppColors.primary)
-                  else
-                    const Icon(Icons.expand_less, size: 18, color: AppColors.text3),
-                  if (afterPrice.isNotEmpty)
-                    Flexible(
-                      child: Text(
-                        afterPrice,
-                        style: const TextStyle(fontSize: 14, color: AppColors.text1),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: isExpanded
+                  ? _buildPriceTextWithInput(beforePrice, afterPrice)
+                  : _buildPriceTextPreview(beforePrice, afterPrice),
             ),
           ),
           // 展开态：金额输入行
           if (isExpanded)
             Container(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               child: Row(
                 children: [
                   const Text(
                     '¥',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _priceController,
@@ -294,33 +295,47 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                       ],
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: '输入金额',
+                        hintStyle: TextStyle(color: AppColors.text3.withOpacity(0.6)),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.divider),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                       autofocus: true,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   SizedBox(
-                    height: 36,
+                    height: 38,
                     child: ElevatedButton(
                       onPressed: _isSending ? null : () => _sendPriceMessage(template),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
                       ),
                       child: _isSending
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: 18,
+                              height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
                           : const Text('发送', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
@@ -328,7 +343,51 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
                   ),
                 ],
               ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 未展开时的价格模板预览（价格部分显示为下划线占位）
+  Widget _buildPriceTextPreview(String beforePrice, String afterPrice) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontSize: 14, color: AppColors.text1),
+        children: [
+          if (beforePrice.isNotEmpty)
+            TextSpan(text: beforePrice),
+          WidgetSpan(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.primary, width: 1.5)),
+              ),
+              child: const Text(
+                '金额',
+                style: TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w500),
+              ),
             ),
+          ),
+          if (afterPrice.isNotEmpty)
+            TextSpan(text: afterPrice),
+        ],
+      ),
+    );
+  }
+
+  /// 展开时的价格模板文案（带输入框）
+  Widget _buildPriceTextWithInput(String beforePrice, String afterPrice) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontSize: 14, color: AppColors.text1),
+        children: [
+          if (beforePrice.isNotEmpty)
+            TextSpan(text: beforePrice),
+          const TextSpan(text: ' ______ '),
+          if (afterPrice.isNotEmpty)
+            TextSpan(text: afterPrice),
         ],
       ),
     );
@@ -347,7 +406,8 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
       await chatRepo.markRead(widget.sessionId);
       ref.invalidate(chatUnreadCountProvider);
       widget.onSent();
-      Navigator.of(context).pop();
+      // 关闭面板
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) showAppToast(context, '发送失败：$e');
     } finally {
@@ -375,23 +435,7 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
     if (_isSending) return;
     setState(() => _isSending = true);
     try {
-      // 1. 先更新报价
-      final tradeRepo = ref.read(tradeRepositoryProvider);
-      final quote = Quote(
-        inquiryId: widget.inquiryId,
-        amount: amountFen,
-        licenseType: widget.licenseType ?? 'non_exclusive',
-        role: widget.isSeller ? 'seller' : 'buyer',
-      );
-      if (widget.isSeller) {
-        await tradeRepo.appCreateQuote(quote);
-      } else {
-        await tradeRepo.appCounterOffer(quote);
-      }
-      // 刷新报价状态
-      ref.invalidate(latestQuoteProvider(widget.inquiryId));
-
-      // 2. 发送定型文消息
+      // 1. 先发送定型文消息（即使报价更新失败也要发出消息）
       final chatRepo = ref.read(chatRepositoryProvider);
       await chatRepo.sendMessage(widget.sessionId, messageContent);
       // 刷新消息列表
@@ -399,8 +443,33 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
       // 标记已读
       await chatRepo.markRead(widget.sessionId);
       ref.invalidate(chatUnreadCountProvider);
+
+      // 2. 尝试更新报价（inquiryId 有效时）
+      if (widget.inquiryId > 0) {
+        try {
+          final tradeRepo = ref.read(tradeRepositoryProvider);
+          final quote = Quote(
+            inquiryId: widget.inquiryId,
+            amount: amountFen,
+            licenseType: widget.licenseType ?? 'non_exclusive',
+            role: widget.isSeller ? 'seller' : 'buyer',
+          );
+          if (widget.isSeller) {
+            await tradeRepo.appCreateQuote(quote);
+          } else {
+            await tradeRepo.appCounterOffer(quote);
+          }
+          // 刷新报价状态
+          ref.invalidate(latestQuoteProvider(widget.inquiryId));
+        } catch (quoteError) {
+          // 报价更新失败不影响消息发送，仅记录日志
+          debugPrint('报价更新失败: $quoteError');
+        }
+      }
+
       widget.onSent();
-      Navigator.of(context).pop();
+      // 关闭面板
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) showAppToast(context, '发送失败：$e');
     } finally {
