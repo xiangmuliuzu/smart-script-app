@@ -44,7 +44,7 @@ class AiSseEvent {
   }
 }
 
-/// 消费 SSE 字节流，按 `\n\n` 分隔事件块并逐块回调。
+/// 消费 SSE 字节流，兼容 LF / CRLF 和跨字节分片，按空行分隔事件并逐块回调。
 ///
 /// `error` 事件直接抛 [ApiException]（后端约定：流中错误不落库、不扣次数）；
 /// 其余事件交回 [onEvent] 处理。
@@ -52,48 +52,21 @@ Future<void> consumeSseEvents(
   Stream<Uint8List> stream,
   void Function(AiSseEvent event) onEvent,
 ) async {
-  const decoder = Utf8Decoder(allowMalformed: true);
-  var carry = <int>[];
-  await for (final chunk in stream) {
-    carry.addAll(chunk);
-    carry = _drainBlocks(carry, decoder, onEvent);
-  }
-  // 流结束后可能仍有多个未切分块，继续按 \n\n 切分直到耗尽。
-  _drainBlocks(carry, decoder, onEvent, flush: true);
-}
-
-/// 把字节缓冲中的完整事件块（\n\n 分隔）切出并分发，返回剩余不完整的字节。
-List<int> _drainBlocks(
-  List<int> carry,
-  Utf8Decoder decoder,
-  void Function(AiSseEvent event) onEvent, {
-  bool flush = false,
-}) {
-  while (true) {
-    final splitAt = _findBlockBoundary(carry);
-    if (splitAt < 0) break;
-    final block = carry.sublist(0, splitAt);
-    carry = carry.sublist(splitAt + 2);
-    _dispatch(decoder.convert(block), onEvent);
-  }
-  if (flush && carry.isNotEmpty) {
-    _dispatch(decoder.convert(carry), onEvent);
-  }
-  return carry;
-}
-
-/// 查找第一个 `\n\n` 的起始下标；未找到返回 -1。
-int _findBlockBoundary(List<int> bytes) {
-  for (var i = 0; i + 1 < bytes.length; i++) {
-    if (bytes[i] == 0x0A && bytes[i + 1] == 0x0A) {
-      return i;
+  final lines = stream.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter());
+  final block = StringBuffer();
+  await for (final line in lines) {
+    if (line.isEmpty) {
+      if (_dispatch(block.toString(), onEvent)) return;
+      block.clear();
+    } else {
+      block.writeln(line);
     }
   }
-  return -1;
+  if (block.isNotEmpty) _dispatch(block.toString(), onEvent);
 }
 
 /// 解析并分发单个 SSE 事件块（event:xxx + data:xxx，可多行 data）。
-void _dispatch(
+bool _dispatch(
   String block,
   void Function(AiSseEvent event) onEvent,
 ) {
@@ -106,10 +79,10 @@ void _dispatch(
       dataLines.add(line.substring(5).trim());
     }
   }
-  if (dataLines.isEmpty) return;
+  if (dataLines.isEmpty) return false;
   final payload = _tryParseJson(dataLines.join('\n'));
   // 无法解析的 data 行（非 JSON）视为中间噪声，直接跳过不发事件。
-  if (payload == null) return;
+  if (payload == null) return false;
   if (event == 'error') {
     final message = payload['message']?.toString() ?? '';
     throw ApiException(
@@ -118,6 +91,7 @@ void _dispatch(
     );
   }
   onEvent(AiSseEvent(event, payload));
+  return payload['done'] == true;
 }
 
 /// 尝试解析 JSON；失败返回 null。
