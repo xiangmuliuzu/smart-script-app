@@ -4,11 +4,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:script_app/core/constants/app_constants.dart';
 import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/core/providers/app_providers.dart';
+import 'package:script_app/core/router/route_paths.dart';
 import 'package:script_app/core/storage/secure_token_storage.dart';
+import 'package:script_app/features/auth/data/auth_repository.dart';
+import 'package:script_app/features/profile/profile_page.dart';
 import 'package:script_app/features/profile/pages/real_name_page.dart';
 import 'package:script_app/features/user_center/data/user_center_repository.dart';
 
@@ -38,6 +43,63 @@ void main() {
   void status(ScriptedApi api) {
     api.reply('/users/me/real-name', Envelope.ok({'status': 'NOT_SUBMITTED'}));
   }
+
+  testWidgets('approved users can reopen masked real-name details from the profile drawer',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final secure = InMemoryTokenSecureStorage();
+    await secure.write(AppConstants.kAccessToken, 'test-only-token');
+    final api = ScriptedApi();
+    api.reply('/auth/getInfo', Envelope.ok({
+      'userId': 12, 'userType': '01', 'nickname': '测试用户',
+      'realNameStatus': 'APPROVED',
+    }));
+    api.reply('/messages/unread-count', Envelope.ok({'total': 0}));
+    api.reply('/content/shelf', Envelope.ok({'total': 0, 'list': []}));
+    api.reply('/public-profile', Envelope.ok({'userId': 12}));
+    api.reply('/stats', Envelope.ok({'likeCount': 0}));
+    api.reply('/users/me/real-name', Envelope.ok({
+      'status': 'APPROVED',
+      'realNameMasked': '测**户',
+      'idNumberMasked': '110101********123X',
+      'submittedAt': '2026-10-26 09:00:00',
+      'reviewedAt': '2026-10-26 09:01:00',
+    }));
+    final router = GoRouter(initialLocation: RoutePath.profile, routes: [
+      GoRoute(path: RoutePath.profile, builder: (_, __) => const ProfilePage()),
+      GoRoute(path: RoutePath.realName, builder: (_, __) => const RealNamePage()),
+    ]);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureTokenStorageProvider.overrideWithValue(secure),
+        authRepositoryProvider.overrideWithValue(AuthRepository(ApiClient(api.buildDio()))),
+        api.override,
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('已认证'), findsOneWidget);
+    expect(find.text('去认证'), findsNothing);
+    for (var visit = 0; visit < 2; visit++) {
+      await tester.tap(find.byTooltip('工具与设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, '实名认证'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RealNamePage), findsOneWidget);
+      expect(find.text('测**户'), findsOneWidget);
+      expect(find.text('110101********123X'), findsOneWidget);
+      expect(find.text('2026-10-26 09:01:00'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      expect(api.countOf('/users/me/real-name'), visit + 1);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfilePage), findsOneWidget);
+    }
+    expect(api.requests.every((request) => request.method == 'GET'), isTrue);
+  });
 
   test(
       'repository uploads multipart to private material endpoint and rejects empty results',
