@@ -463,9 +463,12 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
               ),
               const Divider(height: 0.5, color: AppColors.divider),
               if (_aiPanelOpen) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                  child: AiInlinePanel(onInsert: _insertAiText),
+                // 键盘弹起时面板随剩余空间压缩并可滚动，避免底部溢出（黄黑警戒条）。
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: AiInlinePanel(onInsert: _insertAiText),
+                  ),
                 ),
                 const SizedBox(height: 4),
               ],
