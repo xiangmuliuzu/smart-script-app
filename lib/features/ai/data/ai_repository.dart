@@ -194,7 +194,7 @@ class AiRepository {
 
   /// AI 大纲（流式，SSE 打字机输出）。
   ///
-  /// 流式期间 [onDelta] 收到的是 JSON 文本增量；结束后解析为结构化大纲。
+  /// 流式期间 [onDelta] 收到可读文本；兼容历史 JSON 大纲，完成事件后返回结果。
   Future<AiOutlineResult> outlineStream({
     String? inspiration,
     String? genre,
@@ -214,19 +214,19 @@ class AiRepository {
     final buffer = StringBuffer();
     int quotaUsed = 0;
     var requestNo = '';
+    var completed = false;
     await consumeSseEvents(body.stream, (event) {
-      switch (event.event) {
-        case 'delta':
-          final delta = event.text('delta');
-          if (delta.isNotEmpty) {
-            buffer.write(delta);
-            onDelta(delta);
-          }
-        case 'done':
-          quotaUsed = event.intValue('quotaUsed');
-          requestNo = event.text('requestNo');
+      if (event.payload?['done'] == true) {
+        completed = true;
+        quotaUsed = event.intValue('quotaUsed');
+        requestNo = event.text('requestNo');
+      } else {
+        final delta = event.text('delta');
+        if (delta.isNotEmpty) { buffer.write(delta); onDelta(delta); }
       }
     });
+    if (!completed) throw ApiException('生成中断，已保留收到的内容，请重试');
+    if (buffer.toString().trim().isEmpty) throw ApiException('本次未返回生成内容，请重试');
     final raw = buffer.toString();
     return AiOutlineResult(
       outline: _tryParseOutline(raw),
@@ -242,29 +242,29 @@ class AiRepository {
   ) async {
     final buffer = StringBuffer();
     int recordId = 0;
+    var completed = false;
     await consumeSseEvents(stream, (event) {
-      switch (event.event) {
-        case 'delta':
-          final delta = event.text('delta');
-          if (delta.isNotEmpty) {
-            buffer.write(delta);
-            onDelta(delta);
-          }
-        case 'done':
-          recordId = event.intValue('recordId');
+      if (event.payload?['done'] == true) {
+        completed = true;
+        recordId = event.intValue('recordId');
+      } else {
+        final delta = event.text('delta');
+        if (delta.isNotEmpty) { buffer.write(delta); onDelta(delta); }
       }
     });
+    if (!completed) throw ApiException('生成中断，已保留收到的内容，请重试');
+    if (buffer.toString().trim().isEmpty) throw ApiException('本次未返回生成内容，请重试');
     return AiWriteResult(content: buffer.toString(), recordId: recordId);
   }
 
-  /// 流式大纲：把完整 JSON 文本解析为对象；失败兜底 {text}。
+  /// 流式大纲：把完整 JSON 文本解析为对象；非 JSON 则保留可读文本。
   static dynamic _tryParseOutline(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
     try {
       return jsonDecode(trimmed);
     } catch (_) {
-      return {'text': raw};
+      return raw;
     }
   }
 

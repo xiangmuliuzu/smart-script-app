@@ -111,6 +111,7 @@ class ApiClient {
         data: data,
         options: Options(
           responseType: ResponseType.stream,
+          headers: const {'Accept': 'text/event-stream'},
           receiveTimeout: receiveTimeout,
         ),
       );

@@ -120,7 +120,7 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
           ),
           const SizedBox(height: 12),
           if (_streaming.isNotEmpty)
-            _StreamingCard(text: _streaming)
+            _StreamingCard(text: _streaming, loading: _loading)
           else if (_result != null)
             _ResultCard(
               result: _result!,
@@ -136,9 +136,10 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
 
 /// 流式输出中的实时文本卡（打字机效果）。
 class _StreamingCard extends StatelessWidget {
-  const _StreamingCard({required this.text});
+  const _StreamingCard({required this.text, required this.loading});
 
   final String text;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -152,16 +153,16 @@ class _StreamingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              SizedBox(
+              if (loading) const SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              SizedBox(width: 8),
-              Text('AI 生成中…',
-                  style: TextStyle(
+              const SizedBox(width: 8),
+              Text(loading ? 'AI 生成中…' : '生成已中断，已保留内容',
+                  style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.text1)),
