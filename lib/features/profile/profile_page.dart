@@ -167,7 +167,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// 侧边抽屉：收纳账号安全、通知偏好、意见反馈与退出登录（原型的抽屉入口）。
+/// 侧边抽屉：收纳账号安全、实名认证、通知偏好、意见反馈与退出登录。
 class _ProfileDrawer extends StatelessWidget {
   const _ProfileDrawer({required this.user, required this.ref});
 
@@ -223,6 +223,11 @@ class _ProfileDrawer extends StatelessWidget {
               icon: Icons.lock_outline,
               label: '账号安全',
               onTap: () => _push(context, RoutePath.accountSecurity),
+            ),
+            _DrawerItem(
+              icon: Icons.verified_user_outlined,
+              label: '实名认证',
+              onTap: () => _push(context, RoutePath.realName),
             ),
             _DrawerItem(
               icon: Icons.tune,
