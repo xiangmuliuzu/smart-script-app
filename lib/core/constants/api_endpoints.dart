@@ -307,9 +307,21 @@ class ApiEndpoints {
   // 合同
   static String appContractByOrder(int orderId) => '/trade/contracts/$orderId';
   static String appContractSign(int contractId) => '/trade/contracts/$contractId/sign';
-  // 财务（资金托管 / 发票 / 收益）
+  // 财务（资金托管 / 发票 / 收益 / 待结算 / 提现）
   static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
   static const String appFinanceIncomeDetail = '/trade/finance/income/detail';
+  static const String appFinanceIncomeStats = '/trade/finance/income/stats';
+  static String appFinanceIncomeBillDetail(int billId) =>
+      '/trade/finance/income/detail/$billId';
+  static const String appFinanceSettleList = '/trade/finance/income/settle/list';
+  static String appFinanceSettleById(int settleId) =>
+      '/trade/finance/income/settle/$settleId';
+  static String appFinanceSettleConfirm(int settleId) =>
+      '/trade/finance/income/settle/$settleId/confirm';
+  static String appFinanceSettleDispute(int settleId) =>
+      '/trade/finance/income/settle/$settleId/dispute';
+  static const String appFinanceWithdrawApply = '/trade/finance/withdraw/apply';
+  static const String appFinanceWithdrawList = '/trade/finance/withdraw/list';
   static const String appFinanceEscrowList = '/trade/finance/escrow/list';
   static String appFinanceEscrowById(int escrowId) => '/trade/finance/escrow/$escrowId';
   static const String appFinanceInvoiceList = '/trade/finance/invoice/list';

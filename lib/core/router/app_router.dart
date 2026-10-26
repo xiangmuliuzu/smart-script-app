@@ -55,6 +55,12 @@ import '../../features/copyright/pages/copyright_application_detail_page.dart';
 import '../../features/copyright/pages/copyright_form_page.dart';
 import '../../features/copyright/pages/copyright_certificate_list_page.dart';
 import '../../features/copyright/pages/copyright_certificate_detail_page.dart';
+import '../../features/income/pages/income_overview_page.dart';
+import '../../features/income/pages/income_detail_page.dart';
+import '../../features/income/pages/income_bill_detail_page.dart';
+import '../../features/income/pages/income_settle_list_page.dart';
+import '../../features/income/pages/income_settle_detail_page.dart';
+import '../../features/income/pages/income_withdraw_page.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/message/pages/message_detail_page.dart';
 import '../../features/message/pages/message_list_page.dart';
@@ -65,7 +71,6 @@ import '../../features/profile/pages/phone_change_page.dart';
 import '../../features/profile/pages/profile_edit_page.dart';
 import '../../features/profile/pages/real_name_page.dart';
 import '../../features/profile/pages/creator_apply_page.dart';
-import '../../features/profile/pages/creator_backend_page.dart';
 import '../../features/profile/pages/user_profile_page.dart';
 import '../../features/profile/pages/user_follow_list_page.dart';
 import '../../features/profile/profile_page.dart';
@@ -575,12 +580,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           return SealEditPage(sealId: sealId);
         },
       ),
-      // ===== 创作者后台 =====
-      GoRoute(
-        path: RoutePath.creatorBackend,
-        name: RouteName.creatorBackend,
-        builder: (_, __) => const CreatorBackendPage(),
-      ),
       // ===== C 交易域 =====
       GoRoute(
         path: RoutePath.tradeManagement,
@@ -708,6 +707,41 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => CopyrightCertificateDetailPage(
           certId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
+      ),
+      // ===== 我的收益（总览 + 待结算/明细/提现）=====
+      GoRoute(
+        path: RoutePath.myIncomeOverview,
+        name: RouteName.myIncomeOverview,
+        builder: (_, __) => const MyIncomeOverviewPage(),
+      ),
+      GoRoute(
+        path: RoutePath.myIncomeSettleList,
+        name: RouteName.myIncomeSettleList,
+        builder: (_, __) => const MyIncomeSettleListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.myIncomeSettleDetail,
+        name: RouteName.myIncomeSettleDetail,
+        builder: (context, state) => MyIncomeSettleDetailPage(
+          settleId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.myIncomeDetail,
+        name: RouteName.myIncomeDetail,
+        builder: (_, __) => const MyIncomeDetailPage(),
+      ),
+      GoRoute(
+        path: RoutePath.myIncomeBillDetail,
+        name: RouteName.myIncomeBillDetail,
+        builder: (context, state) => MyIncomeBillDetailPage(
+          billId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.myIncomeWithdraw,
+        name: RouteName.myIncomeWithdraw,
+        builder: (_, __) => const MyIncomeWithdrawPage(),
       ),
       // ===== A3 聊天域 =====
       GoRoute(

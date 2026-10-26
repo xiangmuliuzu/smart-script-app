@@ -579,9 +579,10 @@ class _QuickGridState extends State<_QuickGrid> {
         _QuickEntry(ref, Icons.approval, '我的印章',
             onTap: (ctx, ref) =>
                 AuthGuard.pushProtected(ctx, ref, target: RoutePath.mySeal)),
-        _QuickEntry(ref, Icons.bar_chart, '创作者后台',
+        // 相对 GitHub：创作者后台 → 版权管理（直接进入版权首页）
+        _QuickEntry(ref, Icons.copyright_outlined, '版权管理',
             onTap: (ctx, ref) =>
-                AuthGuard.pushProtected(ctx, ref, target: RoutePath.creatorBackend)),
+                AuthGuard.pushProtected(ctx, ref, target: RoutePath.copyrightHome)),
       ],
       if (user.isClient) ...[
         _QuickEntry(ref, Icons.fact_check_outlined, '我的选品'),

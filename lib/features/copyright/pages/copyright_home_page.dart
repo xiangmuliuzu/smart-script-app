@@ -1,6 +1,6 @@
 /// 版权管理主页（App 端）。
 ///
-/// 从创作者后台进入，提供版权申请和证书管理入口。
+/// 从「我的」快捷入口进入，提供版权申请和证书管理入口。
 library;
 
 import 'package:flutter/material.dart';

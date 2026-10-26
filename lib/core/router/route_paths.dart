@@ -50,8 +50,6 @@ class RoutePath {
       '$userFollowList?userId=$userId&following=${following ? 1 : 0}';
   static const String realName = '/profile/real-name';
   static const String creatorApply = '/profile/creator-apply';
-  /// 创作者后台（版权管理入口）。
-  static const String creatorBackend = '/profile/creator-backend';
   static const String accountSecurity = '/profile/security';
   static const String phoneChange = '/profile/security/phone';
   static const String passwordEdit = '/profile/security/password';
@@ -107,6 +105,20 @@ class RoutePath {
   /// 版权证书详情 URL
   static String copyrightCertificateDetailUrl(int certId) =>
       '$copyrightCertificateDetail?id=$certId';
+
+  // ===== 我的收益（独立于交易管理「作者收益」）=====
+  static const String myIncomeOverview = '/income/overview';
+  static const String myIncomeDetail = '/income/detail';
+  static const String myIncomeBillDetail = '/income/bill';
+  static const String myIncomeSettleList = '/income/settle';
+  static const String myIncomeSettleDetail = '/income/settle/detail';
+  static const String myIncomeWithdraw = '/income/withdraw';
+
+  static String myIncomeBillDetailUrl(int billId) =>
+      '$myIncomeBillDetail?id=$billId';
+
+  static String myIncomeSettleDetailUrl(int settleId) =>
+      '$myIncomeSettleDetail?id=$settleId';
 
   // B 模块我的收藏列表（受登录守卫保护）
   static const String favorites = '/favorites';
@@ -313,7 +325,6 @@ class RouteName {
   static const String userFollowList = 'userFollowList';
   static const String realName = 'realName';
   static const String creatorApply = 'creatorApply';
-  static const String creatorBackend = 'creatorBackend';
   static const String accountSecurity = 'accountSecurity';
   static const String phoneChange = 'phoneChange';
   static const String passwordEdit = 'passwordEdit';
@@ -334,6 +345,14 @@ class RouteName {
   static const String copyrightForm = 'copyrightForm';
   static const String copyrightCertificateList = 'copyrightCertificateList';
   static const String copyrightCertificateDetail = 'copyrightCertificateDetail';
+
+  // ===== 我的收益 =====
+  static const String myIncomeOverview = 'myIncomeOverview';
+  static const String myIncomeDetail = 'myIncomeDetail';
+  static const String myIncomeBillDetail = 'myIncomeBillDetail';
+  static const String myIncomeSettleList = 'myIncomeSettleList';
+  static const String myIncomeSettleDetail = 'myIncomeSettleDetail';
+  static const String myIncomeWithdraw = 'myIncomeWithdraw';
   
   static const String workList = 'workList';
   static const String recommendList = 'recommendList';
@@ -452,11 +471,17 @@ class ProtectedRoutes {
     // 印章管理（需登录）
     RoutePath.mySeal,
     // 版权模块（需登录）
-    RoutePath.creatorBackend,
     RoutePath.copyrightHome,
     RoutePath.copyrightApplicationList,
     RoutePath.copyrightForm,
     RoutePath.copyrightCertificateList,
+    // 我的收益（需登录）
+    RoutePath.myIncomeOverview,
+    RoutePath.myIncomeDetail,
+    RoutePath.myIncomeBillDetail,
+    RoutePath.myIncomeSettleList,
+    RoutePath.myIncomeSettleDetail,
+    RoutePath.myIncomeWithdraw,
   ];
 
   static bool isProtected(String location) {
