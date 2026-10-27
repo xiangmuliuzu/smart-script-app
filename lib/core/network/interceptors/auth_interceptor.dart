@@ -21,6 +21,7 @@ class AuthInterceptor extends Interceptor {
           '/auth/password/reset',
           '/auth/agreements',
           '/captchaImage',
+          '/ad/splash',
         ].contains(normalized) ||
         normalized.startsWith('/auth/oauth/');
   }

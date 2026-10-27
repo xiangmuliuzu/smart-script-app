@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_constants.dart';
+import 'features/splash/splash_ad_overlay.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/services/notification_poller.dart';
@@ -53,8 +54,8 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       scaffoldMessengerKey: _messengerKey,
-      builder: (context, child) =>
-          AppPageBackground(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => SplashAdOverlay(
+          child: AppPageBackground(child: child ?? const SizedBox.shrink())),
       routerConfig: ref.watch(routerProvider),
     );
   }
