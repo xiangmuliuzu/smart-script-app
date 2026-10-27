@@ -25,7 +25,7 @@ class _MyIncomeSettleDetailPageState
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('确认入账'),
-        content: const Text('确认金额无误后，收益将进入可提现余额，并写入收益明细。'),
+        content: const Text('确认后将按订单总额扣除 5% 平台抽成，剩余作者实得进入可提现余额，并写入收益明细。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确认')),
@@ -141,7 +141,7 @@ class _MyIncomeSettleDetailPageState
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text('作者应得（确认后到账）',
+                    const Text('作者实得（已扣 5% 平台抽成，确认后到账）',
                         style: TextStyle(fontSize: 12, color: AppColors.text3)),
                   ],
                 ),
@@ -152,11 +152,16 @@ class _MyIncomeSettleDetailPageState
                 _kv('订单号', d.orderNo ?? '-'),
                 _kv('作品', d.workTitle ?? '-'),
                 _kv('订单总额', d.fenYuan(d.totalAmount)),
-                _kv('平台费用', d.fenYuan(d.platformFee)),
-                _kv('分成比例', d.splitRate == null ? '-' : '${d.splitRate}'),
+                _kv('平台抽成', d.fenYuan(d.platformFee)),
+                _kv('抽成比例', d.splitRateLabel),
                 _kv('作者实得', d.fenYuan(d.sellerAmount)),
                 _kv('创建时间', d.createdAt ?? '-'),
               ]),
+              const SizedBox(height: 12),
+              const Text(
+                '说明：订单完成后先进入待结算。平台按订单总额抽取 5%，作者实得 = 订单总额 − 平台抽成。仅在卖家确认无误后入账。',
+                style: TextStyle(fontSize: 12, color: AppColors.text3, height: 1.4),
+              ),
               if (d.status == 'disputed' && d.disputeReason != null) ...[
                 const SizedBox(height: 12),
                 _card('异议信息', [

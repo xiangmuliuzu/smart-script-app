@@ -36,6 +36,21 @@ class _MyIncomeSettleListPageState extends ConsumerState<MyIncomeSettleListPage>
         child: Column(
           children: [
             Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7E6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  '平台抽成 5%：订单完成后生成待结算记录，按订单总额扣除 5% 平台费用，剩余为作者实得。核对无误并确认后才会入账。',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFAD6800), height: 1.4),
+                ),
+              ),
+            ),
+            Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
