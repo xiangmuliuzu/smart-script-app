@@ -243,7 +243,7 @@ class _MyIncomeWithdrawPageState extends ConsumerState<MyIncomeWithdrawPage> {
     try {
       final token =
           'wd_${DateTime.now().millisecondsSinceEpoch}_${amount.toStringAsFixed(2)}';
-      await ref.read(incomeRepositoryProvider).applyWithdraw(
+      final result = await ref.read(incomeRepositoryProvider).applyWithdraw(
             amount: amount,
             withdrawType: _withdrawType,
             accountName: bind.accountName,
@@ -252,7 +252,8 @@ class _MyIncomeWithdrawPageState extends ConsumerState<MyIncomeWithdrawPage> {
             clientToken: token,
           );
       if (!mounted) return;
-      _toast('提现申请已提交');
+      final pending = result['status']?.toString() == 'pending';
+      _toast(pending ? '提现申请已提交，等待人工审核' : '提现已自动通过');
       _amountCtrl.clear();
       ref.invalidate(myIncomeOverviewProvider);
       ref.invalidate(withdrawListProvider(const WithdrawListParams()));
@@ -358,6 +359,7 @@ class _MyIncomeWithdrawPageState extends ConsumerState<MyIncomeWithdrawPage> {
                         ],
                         decoration: const InputDecoration(
                           labelText: '提现金额（元）',
+                          helperText: '1 万元及以下自动通过；超过 1 万元需人工审核',
                           border: OutlineInputBorder(),
                         ),
                         validator: (v) {
