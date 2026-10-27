@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
@@ -237,13 +238,23 @@ class _BannerImage extends StatelessWidget {
 
   final BannerItem banner;
 
+  /// 点击跳转：仅 linkType=work 且有关联作品时跳作品详情，否则无动作。
+  void _onTap(BuildContext context) {
+    if (banner.linkType == 'work' && banner.linkId != null) {
+      context.push(RoutePath.workDetailUrl(banner.linkId!));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (banner.imageUrl.isEmpty) return _placeholder();
-    return Image.network(
-      AppConfig.resolveAssetUrl(banner.imageUrl),
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _placeholder(),
+    return GestureDetector(
+      onTap: () => _onTap(context),
+      child: Image.network(
+        AppConfig.resolveAssetUrl(banner.imageUrl),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      ),
     );
   }
 
