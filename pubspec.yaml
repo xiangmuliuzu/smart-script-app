@@ -56,6 +56,8 @@ dependencies:
   webview_flutter: ^4.4.2
   # 印章模块：材料预览页面下载文本文件内容
   http: ^1.1.0
+  # 开屏素材落到应用缓存目录；复用锁文件中已有版本。
+  path_provider: ^2.1.4
   # 合同签署：手写签名画布
   signature: ^5.5.0
 

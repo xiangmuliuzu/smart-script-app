@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/providers/app_providers.dart';
+import 'splash_ad_image_cache.dart';
 
 class SplashAd {
   const SplashAd(
@@ -38,11 +39,16 @@ final splashAdProvider = FutureProvider<SplashAd?>((ref) async {
   );
 });
 
-final splashAdImageProvider = Provider.family<ImageProvider, String>(
-  (ref, url) => NetworkImage(url),
+final splashAdImageCacheProvider = Provider((ref) => SplashAdImageCache());
+
+final splashAdImageProvider = FutureProvider.family<ImageProvider?, String>(
+  (ref, url) async {
+    final file = await ref.read(splashAdImageCacheProvider).load(url);
+    return file == null ? null : FileImage(file);
+  },
 );
 
-/// 启动时只请求一次；加载或图片失败、超时均不阻塞路由和登录恢复。
+/// 启动最多等待三秒；慢素材继续在后台缓存，为下一次开屏准备。
 class SplashAdOverlay extends ConsumerStatefulWidget {
   const SplashAdOverlay({super.key, required this.child});
   final Widget child;
@@ -52,6 +58,7 @@ class SplashAdOverlay extends ConsumerStatefulWidget {
 
 class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
   SplashAd? _ad;
+  ImageProvider? _image;
   Timer? _timeout;
   Timer? _countdown;
   int _remaining = 0;
@@ -62,7 +69,12 @@ class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
   void initState() {
     super.initState();
     _timeout = Timer(const Duration(seconds: 3), _dismiss);
-    ref.read(splashAdProvider.future).then((ad) {
+    _loadAd();
+  }
+
+  Future<void> _loadAd() async {
+    try {
+      final ad = await ref.read(splashAdProvider.future);
       if (!mounted || _dismissed) return;
       if (ad == null) {
         _dismiss();
@@ -72,9 +84,16 @@ class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
         _ad = ad;
         _remaining = ad.durationSeconds;
       });
-    }).catchError((Object _) {
+      final image = await ref.read(splashAdImageProvider(ad.imageUrl).future);
+      if (!mounted || _dismissed) return;
+      if (image == null) {
+        _dismiss();
+        return;
+      }
+      setState(() => _image = image);
+    } catch (_) {
       if (mounted) _dismiss();
-    });
+    }
   }
 
   void _dismiss() {
@@ -124,11 +143,22 @@ class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
             child: Material(
           color: const Color(0xfff6f8fb),
           child: Stack(fit: StackFit.expand, children: [
-            if (_ad != null)
+            if (!_started)
+              const Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('剧云策',
+                    style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xff244a59))),
+                SizedBox(height: 16),
+                Text('广告加载中…', style: TextStyle(color: Colors.black54)),
+              ])),
+            if (_image != null)
               GestureDetector(
-                onTap: _openAd,
+                onTap: _started ? _openAd : null,
                 child: Image(
-                  image: ref.read(splashAdImageProvider(_ad!.imageUrl)),
+                  image: _image!,
                   fit: BoxFit.cover,
                   frameBuilder: (context, child, frame, synchronous) {
                     if (frame != null || synchronous) {
@@ -143,15 +173,8 @@ class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
                     return const SizedBox.shrink();
                   },
                 ),
-              )
-            else
-              const Center(
-                  child: Text('剧云策',
-                      style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xff244a59)))),
-            if (_ad != null)
+              ),
+            if (_started)
               const Positioned(
                   left: 16,
                   bottom: 24,
