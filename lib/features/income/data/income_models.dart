@@ -220,6 +220,8 @@ class IncomeBillDetail {
     return '¥${(fen / 100).toStringAsFixed(2)}';
   }
 
+  String get splitRateLabel => formatSplitRate(splitRate);
+
   bool get hasOrder => orderNo != null && orderNo!.isNotEmpty;
 }
 
@@ -288,6 +290,8 @@ class IncomeSettleItem {
     if (fen == null) return '-';
     return '¥${(fen / 100).toStringAsFixed(2)}';
   }
+
+  String get splitRateLabel => formatSplitRate(splitRate);
 
   String get statusLabel {
     switch (status) {
@@ -395,6 +399,16 @@ class WithdrawRecord {
   }
 
   bool get isFailed => status == 'rejected';
+}
+
+/// 结算抽成比例展示：0.05 → 5%。
+String formatSplitRate(num? rate) {
+  if (rate == null) return '-';
+  final pct = rate.abs() <= 1 ? rate * 100 : rate;
+  if (pct == pct.roundToDouble()) {
+    return '${pct.toStringAsFixed(0)}%';
+  }
+  return '${pct.toStringAsFixed(2)}%';
 }
 
 DateTime? _parseDateTime(dynamic value) {

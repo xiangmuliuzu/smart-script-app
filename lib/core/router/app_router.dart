@@ -82,9 +82,9 @@ import '../../features/trade/pages/quote_records_page.dart';
 import '../../features/trade/pages/order_list_page.dart';
 import '../../features/trade/pages/order_detail_page.dart';
 import '../../features/trade/pages/contract_sign_page.dart';
+import '../../features/trade/pages/contract_list_page.dart';
 import '../../features/trade/pages/trade_management_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
-import '../../features/trade/pages/escrow_list_page.dart';
 import '../../features/trade/pages/invoice_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
@@ -597,11 +597,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const IncomeOverviewPage(),
       ),
       GoRoute(
-        path: RoutePath.escrowList,
-        name: RouteName.escrowList,
-        builder: (_, __) => const EscrowListPage(),
-      ),
-      GoRoute(
         path: RoutePath.invoiceManage,
         name: RouteName.invoiceManage,
         builder: (_, __) => const InvoicePage(),
@@ -663,6 +658,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ContractSignPage(
           orderId: int.tryParse(state.uri.queryParameters['orderId'] ?? '') ?? 0,
         ),
+      ),
+      GoRoute(
+        path: RoutePath.contractList,
+        name: RouteName.contractList,
+        builder: (_, __) => const ContractListPage(),
       ),
       // ===== 版权模块（受登录守卫保护）=====
       GoRoute(

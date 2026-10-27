@@ -63,12 +63,12 @@ class MyIncomeBillDetailPage extends ConsumerWidget {
                     title: '分成核算',
                     children: [
                       _kv('订单总额', d.fenYuan(d.totalAmount)),
-                      _kv('平台费用', d.fenYuan(d.platformFee)),
-                      _kv('分成比例', d.splitRate == null ? '-' : '${d.splitRate}'),
+                      _kv('平台抽成', d.fenYuan(d.platformFee)),
+                      _kv('抽成比例', d.splitRateLabel),
                       _kv('作者实得', d.fenYuan(d.sellerAmount ?? d.amount)),
                       const SizedBox(height: 8),
                       const Text(
-                        '说明：当前业务规则为暂不抽成时，平台费用为 0，作者实得等于订单总额。',
+                        '说明：平台按订单总额抽取 5%，作者实得 = 订单总额 − 平台抽成。入账金额为作者实得。',
                         style: TextStyle(fontSize: 12, color: AppColors.text3),
                       ),
                     ],

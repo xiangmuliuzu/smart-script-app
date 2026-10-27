@@ -46,21 +46,24 @@ class QuoteStatus {
   }
 }
 
-/// 订单状态（对齐后端状态机：confirmed → contract signing → escrow_pending → delivering → completed）
+/// 订单状态（对齐后端状态机：confirmed(签合同) →双方签完自动→ paying →买方付款→ delivering →买方确认收货→ completed）
 class OrderStatus {
   static const String confirmed = 'confirmed';            // 已确认（待双方签署合同）
-  static const String escrowPending = 'escrow_pending';   // 已托管（资金入托管，待卖方交割）
+  static const String paying = 'paying';                  // 付款中（合同已签，待买方付款）
   static const String delivering = 'delivering';          // 交割中
-  static const String completed = 'completed';            // 已完成（托管释放，收益入账）
+  static const String completed = 'completed';            // 已完成（收益入账）
+  // 以下为遗留状态，仅历史数据只读展示，不再产生
+  static const String escrowPending = 'escrow_pending';   // 已托管
   static const String cancelled = 'cancelled';            // 已取消
   static const String refunded = 'refunded';              // 已退款
 
   static String label(String? status) {
     switch (status) {
-      case confirmed: return '已确认';
-      case escrowPending: return '已托管';
+      case confirmed: return '待签署';
+      case paying: return '付款中';
       case delivering: return '交割中';
       case completed: return '已完成';
+      case escrowPending: return '已托管';
       case cancelled: return '已取消';
       case refunded: return '已退款';
       default: return status ?? '未知';
@@ -801,7 +804,7 @@ class ContractDetail {
   final int contractId;
   final String? contractNo;
   final String? contractType;
-  final int? amount;          // 元
+  final double? amount;          // 元（DECIMAL，保留小数，不可截断为 int）
   final int? orderId;
   final String? orderNo;
   final int? buyerId;
@@ -819,6 +822,12 @@ class ContractDetail {
   final String? signedPdfUrl;
   final String? status;       // pending / partial_signed / completed
   final String? content;      // HTML 合同内容
+  final String? templateId;   // 平台模板：TPL_COPYRIGHT_TRANSFER / TPL_COPYRIGHT_LICENSE
+  final String? clausesText;  // 可编辑正文条款纯文本（null=模板默认）
+  final String? sourceType;   // template 平台模板 / uploaded 用户上传 PDF
+  final String? sourcePdfUrl; // 上传合同 PDF 文件 URL（uploaded 时）
+  final int? pageCount;       // 上传 PDF 页数（uploaded 时）
+  final List<String> pageImageUrls; // 上传件分页渲染图 URL（uploaded 时，供拖拽定位）
   final String? workTitle;
   final String? licenseType;
   final String? createdAt;
@@ -845,6 +854,12 @@ class ContractDetail {
     this.signedPdfUrl,
     this.status,
     this.content,
+    this.templateId,
+    this.clausesText,
+    this.sourceType,
+    this.sourcePdfUrl,
+    this.pageCount,
+    this.pageImageUrls = const <String>[],
     this.workTitle,
     this.licenseType,
     this.createdAt,
@@ -855,7 +870,7 @@ class ContractDetail {
       contractId: (json['contractId'] as num?)?.toInt() ?? 0,
       contractNo: json['contractNo'] as String?,
       contractType: json['contractType'] as String?,
-      amount: (json['amount'] as num?)?.toInt(),
+      amount: (json['amount'] as num?)?.toDouble(),
       orderId: (json['orderId'] as num?)?.toInt(),
       orderNo: json['orderNo'] as String?,
       buyerId: (json['buyerId'] as num?)?.toInt(),
@@ -873,6 +888,16 @@ class ContractDetail {
       signedPdfUrl: json['signedPdfUrl'] as String?,
       status: json['status'] as String?,
       content: json['content'] as String?,
+      templateId: json['templateId'] as String?,
+      clausesText: json['clausesText'] as String?,
+      sourceType: json['sourceType'] as String?,
+      sourcePdfUrl: json['sourcePdfUrl'] as String?,
+      pageCount: (json['pageCount'] as num?)?.toInt(),
+      pageImageUrls: (json['pageImageUrls'] as List?)
+              ?.map((e) => e?.toString() ?? '')
+              .where((e) => e.isNotEmpty)
+              .toList() ??
+          const <String>[],
       workTitle: json['workTitle'] as String?,
       licenseType: json['licenseType'] as String?,
       createdAt: json['createdAt'] as String?,
@@ -888,11 +913,42 @@ class ContractDetail {
   /// 合同是否已完成（双方均已签署）
   bool get isCompleted => status == ContractStatus.completed;
 
+  /// 是否可编辑正文条款：待签署且双方均未签
+  bool get isEditable =>
+      status == ContractStatus.pending && !isBuyerSigned && !isSellerSigned;
+
+  /// 是否为上传 PDF 件（走拖拽定位签署，不可在线编辑条款）
+  bool get isUploaded => sourceType == 'uploaded';
+
+  /// 是否为平台模板件（系统自动落章、可编辑条款）
+  bool get isTemplate => !isUploaded;
+
   /// 合同状态标签
   String get statusLabel => ContractStatus.label(status);
 
-  /// 金额展示（合同金额后端存元）
-  String get amountYuan => amount != null ? '¥$amount' : '-';
+  /// 金额展示（合同金额后端存元，保留两位小数）
+  String get amountYuan => amount != null ? '¥${amount!.toStringAsFixed(2)}' : '-';
+}
+
+/// 平台合同模板（供切换模板时填充默认条款）。
+class ContractTemplate {
+  final String templateId;
+  final String name;
+  final String defaultClausesText;
+
+  const ContractTemplate({
+    required this.templateId,
+    required this.name,
+    this.defaultClausesText = '',
+  });
+
+  factory ContractTemplate.fromJson(Map<String, dynamic> json) {
+    return ContractTemplate(
+      templateId: json['templateId'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      defaultClausesText: json['defaultClausesText'] as String? ?? '',
+    );
+  }
 }
 
 // ==================== 工具函数 ====================

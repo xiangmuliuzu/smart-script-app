@@ -300,13 +300,19 @@ class ApiEndpoints {
   static String adminTradeOrderById(int id) => '/admin/trade/orders/$id';
   static const String appOrderList = '/trade/order/list';
   static String appOrderById(int orderId) => '/trade/order/$orderId';
-  static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
   static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
-  static String appOrderDeliver(int orderId) => '/trade/order/$orderId/deliver';
   static String appOrderComplete(int orderId) => '/trade/order/$orderId/complete';
+  static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
   // 合同
+  static const String appContractList = '/trade/contracts/list';
   static String appContractByOrder(int orderId) => '/trade/contracts/$orderId';
   static String appContractSign(int contractId) => '/trade/contracts/$contractId/sign';
+  // 合同模板目录（GET，可带 contractId）与正文条款编辑（PUT）
+  static const String appContractTemplates = '/trade/contracts/templates';
+  static String appContractContent(int contractId) => '/trade/contracts/$contractId/content';
+  // 上传 PDF 替换模板（POST multipart）与从上传件切回平台模板（PUT）
+  static String appContractSourcePdf(int contractId) => '/trade/contracts/$contractId/source-pdf';
+  static String appContractSourcePdfOff(int contractId) => '/trade/contracts/$contractId/source-pdf/off';
   // 财务（资金托管 / 发票 / 收益 / 待结算 / 提现）
   static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
   static const String appFinanceIncomeDetail = '/trade/finance/income/detail';

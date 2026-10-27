@@ -53,7 +53,7 @@ class MyIncomeOverviewPage extends ConsumerWidget {
                 data: (data) => _SubEntryCard(
                   icon: Icons.pending_actions_outlined,
                   title: '待结算',
-                  subtitle: '确认无误后收益才会到账',
+                  subtitle: '平台抽成 5%，确认无误后收益才会到账',
                   color: Colors.orange,
                   badgeCount: data.pendingSettleCount,
                   onTap: () => context.push(RoutePath.myIncomeSettleList),
@@ -61,7 +61,7 @@ class MyIncomeOverviewPage extends ConsumerWidget {
                 orElse: () => _SubEntryCard(
                   icon: Icons.pending_actions_outlined,
                   title: '待结算',
-                  subtitle: '确认无误后收益才会到账',
+                  subtitle: '平台抽成 5%，确认无误后收益才会到账',
                   color: Colors.orange,
                   onTap: () => context.push(RoutePath.myIncomeSettleList),
                 ),

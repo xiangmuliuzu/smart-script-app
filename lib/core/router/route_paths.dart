@@ -260,7 +260,6 @@ class RoutePath {
   // 财务
   static const String finance = '/trade/finance';
   static const String incomeOverview = '/trade/finance/income';
-  static const String escrowList = '/trade/finance/escrow';
   static const String invoiceManage = '/trade/finance/invoice';
   static const String financeOrders = '/trade/finance/orders';
   static const String financeContracts = '/trade/finance/contracts';
@@ -277,6 +276,7 @@ class RoutePath {
   static const String orderDetail = '/trade/order/detail';
   static const String orderCancel = '/trade/order/cancel';
   // 合同签署
+  static const String contractList = '/trade/contract/list';
   static const String contractSign = '/trade/contract/sign';
   // 合作记录
   static const String cooperationCreate = '/trade/cooperation/create';
@@ -383,7 +383,6 @@ class RouteName {
   static const String tradeSessionList = 'tradeSessionList';
   static const String finance = 'finance';
   static const String incomeOverview = 'incomeOverview';
-  static const String escrowList = 'escrowList';
   static const String invoiceManage = 'invoiceManage';
   static const String financeOrders = 'financeOrders';
   static const String financeContracts = 'financeContracts';
@@ -396,6 +395,7 @@ class RouteName {
   static const String orderList = 'orderList';
   static const String orderDetail = 'orderDetail';
   static const String orderCancel = 'orderCancel';
+  static const String contractList = 'contractList';
   static const String contractSign = 'contractSign';
   static const String cooperationCreate = 'cooperationCreate';
   static const String followUpList = 'followUpList';
@@ -454,6 +454,7 @@ class ProtectedRoutes {
     RoutePath.orderDetail,
     RoutePath.orderCancel,
     // 合同签署（需登录）
+    RoutePath.contractList,
     RoutePath.contractSign,
     RoutePath.cooperationCreate,
     RoutePath.followUpList,
@@ -463,7 +464,6 @@ class ProtectedRoutes {
     RoutePath.chatSessionList,
     // 财务（需登录）
     RoutePath.incomeOverview,
-    RoutePath.escrowList,
     RoutePath.invoiceManage,
     // E 模块：福利中心与 AI 创作（需登录）
     RoutePath.welfareCenter,

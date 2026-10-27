@@ -236,39 +236,48 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     );
   }
 
-  /// TRADE 会话输入区：只显示「选择消息」按钮
+  /// TRADE 会话输入区：左下角圆角「定型文」按钮（附加功能）+ 自由打字输入行
   Widget _buildTradeInputArea(
     int? inquiryId,
     bool isBuyer,
     bool isSeller,
     String? licenseType,
   ) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () {
-          TradeTemplateSheet.show(
-            context,
-            sessionId: widget.sessionId,
-            inquiryId: inquiryId ?? 0,
-            isBuyer: isBuyer,
-            isSeller: isSeller,
-            licenseType: licenseType,
-            onSent: () {
-              // 发送成功后刷新消息列表
-              ref.invalidate(messagesProvider(widget.sessionId));
+    return Row(
+      children: [
+        // 左下角圆角「定型文」按钮：打开定型文选择面板（保留为附加功能）
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: TextButton.icon(
+            onPressed: () {
+              TradeTemplateSheet.show(
+                context,
+                sessionId: widget.sessionId,
+                inquiryId: inquiryId ?? 0,
+                isBuyer: isBuyer,
+                isSeller: isSeller,
+                licenseType: licenseType,
+                onSent: () {
+                  // 发送成功后刷新消息列表
+                  ref.invalidate(messagesProvider(widget.sessionId));
+                },
+              );
             },
-          );
-        },
-        icon: const Icon(Icons.notes, size: 20),
-        label: const Text('选择消息'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          side: const BorderSide(color: AppColors.primary),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            icon: const Icon(Icons.notes, size: 18),
+            label: const Text('定型文'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              backgroundColor: AppColors.primary.withOpacity(0.08),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          ),
         ),
-      ),
+        // 自由打字输入行（与非交易会话同款：TextField + 发送）
+        Expanded(child: _buildInputRow()),
+      ],
     );
   }
 
