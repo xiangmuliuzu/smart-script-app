@@ -20,6 +20,22 @@ class TradeSessionListPage extends ConsumerStatefulWidget {
 
 class _TradeSessionListPageState extends ConsumerState<TradeSessionListPage> {
   final Set<int> _expandedPeers = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _keyword = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _keyword = _searchController.text.trim());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +49,28 @@ class _TradeSessionListPageState extends ConsumerState<TradeSessionListPage> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(54),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: TextField(
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: '搜索会话/对方/消息',
+                prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.text3),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                filled: true,
+                fillColor: AppColors.fill,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(sessionListProvider(params)),
@@ -61,10 +99,21 @@ class _TradeSessionListPageState extends ConsumerState<TradeSessionListPage> {
               if (!a.hasUnread && b.hasUnread) return 1;
               return b.latestTime.compareTo(a.latestTime);
             });
+            final kw = _keyword.toLowerCase();
+            final visible = kw.isEmpty
+                ? grouped
+                : grouped.where((g) => g.matches(kw)).toList();
+            if (visible.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [SizedBox(height: 80), EmptyView(message: '无匹配会话')],
+              );
+            }
             return ListView.builder(
-              itemCount: grouped.length,
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: visible.length,
               itemBuilder: (context, index) {
-                final group = grouped[index];
+                final group = visible[index];
                 final isExpanded = _expandedPeers.contains(group.peerId);
                 return _PeerGroupTile(
                   group: group,
@@ -135,6 +184,18 @@ class _PeerGroup {
       }
     }
     return latest?.session.lastMessage;
+  }
+
+  /// 客户端搜索匹配：对方昵称 / 会话业务名 / 最后一条消息，任一命中即保留（kw 已转小写）。
+  bool matches(String kw) {
+    if (peerName.toLowerCase().contains(kw)) return true;
+    for (final s in sessions) {
+      final biz = s.session.businessName?.toLowerCase();
+      if (biz != null && biz.contains(kw)) return true;
+      final last = s.session.lastMessage?.toLowerCase();
+      if (last != null && last.contains(kw)) return true;
+    }
+    return false;
   }
 }
 

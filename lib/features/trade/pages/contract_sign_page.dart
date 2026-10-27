@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:signature/signature.dart';
@@ -8,12 +10,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/services/native_file_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../seal/data/seal_models.dart';
 import '../../seal/data/seal_providers.dart';
 import '../data/contract_providers.dart';
+import '../data/contract_repository.dart';
 import '../data/trade_models.dart';
 
 /// 合同签署页面。
@@ -53,6 +57,9 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
   /// 已加载过 HTML 的订单 ID（避免 build 重复 loadHtmlString 导致 WebView 白屏/闪烁）
   int? _loadedOrderId;
 
+  /// 上传件拖拽定位（提交签署时序列化为 placements JSON）
+  List<Map<String, dynamic>> _placements = [];
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +90,30 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
         foregroundColor: Colors.black,
         elevation: 0.5,
         actions: [
+          // 编辑正文条款：仅待签署且双方均未签时可改，否则弹锁定提示
+          IconButton(
+            icon: const Icon(Icons.edit_note),
+            tooltip: '编辑内容',
+            onPressed: () {
+              final contract = contractAsync.value;
+              if (contract == null) return;
+              if (contract.isUploaded) {
+                showAppToast(context, '上传合同不支持在线编辑，可重新上传或切回模板');
+                return;
+              }
+              if (!contract.isEditable) {
+                showAppToast(context, '合同已进入签署，内容已锁定，不可修改');
+                return;
+              }
+              _openContentEditor(contract);
+            },
+          ),
+          // 合同来源管理：未锁定可上传 PDF / 切回模板，锁定则提示
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: '合同来源',
+            onPressed: () => _openSourceMenu(contractAsync.value),
+          ),
           // 刷新同步对方签署状态（partial_signed → completed）；refresh 保留旧内容不闪 loading
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -103,7 +134,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
             return const ErrorView(message: '该订单尚未生成合同');
           }
           // 加载合同 HTML 到 WebView（每个订单只加载一次，后续状态刷新不重复加载）
-          if (_loadedOrderId != widget.orderId) {
+          if (_loadedOrderId != widget.orderId && !contract.isUploaded) {
             _loadedOrderId = widget.orderId;
             _loadContractHtml(contract);
           }
@@ -116,7 +147,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
           return Column(
             children: [
               _buildStatusBar(contract),
-              Expanded(child: _buildContractContent(contract)),
+              Expanded(child: _buildSigningContentArea(contract)),
               SingleChildScrollView(
                 child: Column(
                   children: [
@@ -228,13 +259,220 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
     _webViewController.loadHtmlString(html, baseUrl: AppConfig.baseUrl);
   }
 
+  /// 签署区内容：上传件走分页拖拽定位，模板件走 WebView。
+  Widget _buildSigningContentArea(ContractDetail contract) {
+    if (contract.isUploaded) {
+      return _PdfPlacementViewer(
+        pageImageUrls: contract.pageImageUrls,
+        signatureBytes: _signatureBytes,
+        sealFullUrl: _selectedSeal != null && _selectedSeal!.sealImageUrl.isNotEmpty
+            ? AppConfig.resolveAssetUrl(_selectedSeal!.sealImageUrl)
+            : null,
+        onPlacementsChanged: (p) => _placements = p,
+      );
+    }
+    return _buildContractContent(contract);
+  }
+
+  /// 上传件已完成：只读分页展示（盖章结果在最终 PDF 中，页面图为签署底稿）。
+  Widget _buildUploadedReadonly(ContractDetail contract) {
+    final urls = contract.pageImageUrls;
+    if (urls.isEmpty) {
+      return const Center(child: Text('上传合同无可预览页面', style: TextStyle(color: AppColors.text3)));
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          for (final u in urls)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Image.network(
+                AppConfig.resolveAssetUrl(u),
+                fit: BoxFit.fitWidth,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 合同来源菜单：上传 PDF 替换 / 切回平台模板（仅未锁定时可用）。
+  void _openSourceMenu(ContractDetail? contract) {
+    if (contract == null) return;
+    if (!contract.isEditable) {
+      showAppToast(context, '合同已进入签署，已锁定，不可修改');
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('合同来源', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload_file, color: AppColors.primary),
+              title: Text(contract.isUploaded ? '重新上传合同 PDF' : '上传合同 PDF 替换模板'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _uploadSourcePdf(contract);
+              },
+            ),
+            if (contract.isUploaded)
+              ListTile(
+                leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
+                title: const Text('切回平台模板'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _switchToTemplate(contract);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 上传 PDF 替换模板（选 PDF → 上传 → 清签并刷新）。
+  Future<void> _uploadSourcePdf(ContractDetail contract) async {
+    PickedFile? file;
+    try {
+      file = await NativeFilePicker.pickFile(
+        filenamePrefix: 'contract',
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+    } catch (e) {
+      if (mounted) showAppToast(context, '$e');
+      return;
+    }
+    if (file == null) return;
+    final repo = ref.read(contractRepositoryProvider);
+    try {
+      await repo.uploadContractSourcePdf(
+        contract.contractId,
+        Uint8List.fromList(file.bytes),
+        fileName: file.filename,
+      );
+      if (mounted) {
+        showAppToast(context, '合同 PDF 已上传，可拖拽定位签署');
+        _resetSignAndReload();
+      }
+    } catch (e) {
+      if (mounted) showAppToast(context, '上传失败：$e');
+    }
+  }
+
+  /// 从上传件切回平台模板（选模板 → 切换 → 清定位并刷新）。
+  Future<void> _switchToTemplate(ContractDetail contract) async {
+    final repo = ref.read(contractRepositoryProvider);
+    List<ContractTemplate> templates;
+    try {
+      templates = await repo.listContractTemplates(contractId: contract.contractId);
+    } catch (e) {
+      if (mounted) showAppToast(context, '加载模板失败：$e');
+      return;
+    }
+    if (!mounted) return;
+    final chosen = await showModalBottomSheet<ContractTemplate>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('选择平台模板', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            for (final t in templates)
+              ListTile(
+                leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
+                title: Text(t.name),
+                onTap: () => Navigator.pop(ctx, t),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    try {
+      await repo.switchContractToTemplate(contract.contractId, templateId: chosen.templateId);
+      if (mounted) {
+        showAppToast(context, '已切回平台模板');
+        _resetSignAndReload();
+      }
+    } catch (e) {
+      if (mounted) showAppToast(context, '切回失败：$e');
+    }
+  }
+
+  /// 清空当前签名/印章/定位并重新加载合同（用于上传/切换后回到干净态）。
+  void _resetSignAndReload() {
+    setState(() {
+      _signatureBytes = null;
+      _signatureController.clear();
+      _selectedSeal = null;
+      _selectedSealBytes = null;
+      _placements = [];
+    });
+    _loadedOrderId = null;
+    ref.invalidate(contractByOrderProvider(widget.orderId));
+  }
+
+  /// 打开正文条款编辑底部弹窗（仅未锁定时可达）。
+  Future<void> _openContentEditor(ContractDetail contract) async {
+    final repo = ref.read(contractRepositoryProvider);
+    List<ContractTemplate> templates;
+    try {
+      templates = await repo.listContractTemplates(contractId: contract.contractId);
+    } catch (e) {
+      if (mounted) showAppToast(context, '加载模板失败：$e');
+      return;
+    }
+    if (!mounted) return;
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _ContractContentEditorSheet(
+        contract: contract,
+        templates: templates,
+        repo: repo,
+      ),
+    );
+    if (saved == true && mounted) {
+      // 重新加载合同正文（HTML 随条款更新）
+      _loadedOrderId = null;
+      ref.invalidate(contractByOrderProvider(widget.orderId));
+    }
+  }
+
   /// 双签完成视图：展示已签署的合同内容（签名/印章已持久化在 HTML 中）+ PDF 入口
   Widget _buildCompletedView(ContractDetail contract) {
     final pdfUrl = contract.signedPdfUrl;
     return Column(
       children: [
         _buildStatusBar(contract),
-        Expanded(child: _buildContractContent(contract)),
+        Expanded(child: contract.isUploaded ? _buildUploadedReadonly(contract) : _buildContractContent(contract)),
         if (pdfUrl != null && pdfUrl.isNotEmpty)
           Container(
             padding: const EdgeInsets.all(12),
@@ -649,11 +887,25 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
         return;
       }
     
+      // 上传件：必须已把签名/印章拖拽定位到页面，随签署一并提交 placements
+      String? placementsJson;
+      if (contract.isUploaded) {
+        if (_placements.isEmpty) {
+          if (mounted) {
+            showAppToast(context, '请先将签名/印章拖动到合同页面');
+            setState(() => _submitting = false);
+          }
+          return;
+        }
+        placementsJson = jsonEncode(_placements);
+      }
+
       final contractRepo = ref.read(contractRepositoryProvider);
       await contractRepo.signContract(
         contract.contractId,
         signatureImage: _signatureBytes,
         sealImage: sealBytes,
+        placements: placementsJson,
       );
 
       if (mounted) {
@@ -724,5 +976,520 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
         b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
         b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50) return true;
     return false;
+  }
+}
+
+/// 上传 PDF 分页拖拽定位层。
+///
+/// 服务端已将上传合同逐页渲染为公开静态图（/profile/.../page_{i}.png），
+/// 本组件按页展示图片，并把当前方的签名（Image.memory）与印章（Image.network）
+/// 作为可拖动/缩放的浮块叠在页面上；坐标以页面比例 (0..1) 维护，切页保留。
+/// 签名/印章各一枚，出现即默认落在当前页、消失即移除；变更通过 [onPlacementsChanged]
+/// 回传（不触发父级 setState，避免重建环）。
+class _PdfPlacementViewer extends StatefulWidget {
+  const _PdfPlacementViewer({
+    required this.pageImageUrls,
+    required this.signatureBytes,
+    required this.sealFullUrl,
+    required this.onPlacementsChanged,
+  });
+
+  final List<String> pageImageUrls;
+  final Uint8List? signatureBytes;
+  final String? sealFullUrl;
+  final void Function(List<Map<String, dynamic>> placements) onPlacementsChanged;
+
+  @override
+  State<_PdfPlacementViewer> createState() => _PdfPlacementViewerState();
+}
+
+class _PdfPlacementViewerState extends State<_PdfPlacementViewer> {
+  static const double _minW = 0.03;
+
+  int _page = 0;
+  String? _selectedKind;
+  final List<_PlacementChip> _chips = [];
+  // 页面图固有宽高比缓存（键为解析后的完整 URL）：用于按页面真实比例等比展示，
+  // 消除 BoxFit.fill 的非等比拉伸，并保证浮块纵向尺寸与后端按图片宽高比换算一致。
+  final Map<String, double> _aspectByUrl = {};
+  final Set<String> _pendingAspect = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _syncChips();
+    // 默认浮块落位后立即回传父层，保证用户不拖动直接提交时 _placements 非空；
+    // initState 处于 build 阶段，直接回调会触发祖先 setState 报错，故延到帧后。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _emit());
+  }
+
+  @override
+  void didUpdateWidget(covariant _PdfPlacementViewer old) {
+    super.didUpdateWidget(old);
+    final sigChanged = old.signatureBytes != widget.signatureBytes;
+    final sealChanged = old.sealFullUrl != widget.sealFullUrl;
+    if (sigChanged || sealChanged) {
+      _syncChips();
+      _emit();
+    }
+  }
+
+  /// 依据当前签名/印章是否存在，增删对应定位浮块（各一枚）。
+  void _syncChips() {
+    _ensureChip('signature', widget.signatureBytes != null, _PlacementChip(
+        kind: 'signature', page: 0, x: 0.08, y: 0.72, w: 0.28));
+    _ensureChip('seal', widget.sealFullUrl != null && widget.sealFullUrl!.isNotEmpty,
+        _PlacementChip(kind: 'seal', page: 0, x: 0.6, y: 0.68, w: 0.2));
+    if (_page >= widget.pageImageUrls.length) {
+      _page = widget.pageImageUrls.isEmpty ? 0 : widget.pageImageUrls.length - 1;
+    }
+  }
+
+  void _ensureChip(String kind, bool shouldExist, _PlacementChip defaultChip) {
+    final idx = _chips.indexWhere((c) => c.kind == kind);
+    if (shouldExist && idx < 0) {
+      _chips.add(defaultChip.copyWith(page: _page));
+    } else if (!shouldExist && idx >= 0) {
+      _chips.removeAt(idx);
+    }
+  }
+
+  void _emit() {
+    widget.onPlacementsChanged(_chips
+        .map((c) => {
+              'kind': c.kind,
+              'page': c.page,
+              'x': _r4(c.x),
+              'y': _r4(c.y),
+              'w': _r4(c.w),
+            })
+        .toList());
+  }
+
+  static double _r4(double v) => (v * 10000).roundToDouble() / 10000;
+  static double _clamp(double v, double min, double max) =>
+      v < min ? min : (v > max ? max : v);
+
+  _PlacementChip? get _selected {
+    for (final c in _chips) {
+      if (c.kind == _selectedKind) return c;
+    }
+    return null;
+  }
+
+  /// 解析当前页图片固有尺寸得到宽高比，驱动等比展示；未就绪前保持空（回退为拉伸，仅首帧瞬态）。
+  void _ensurePageAspect() {
+    if (widget.pageImageUrls.isEmpty || _page >= widget.pageImageUrls.length) {
+      return;
+    }
+    final url = AppConfig.resolveAssetUrl(widget.pageImageUrls[_page]);
+    if (_aspectByUrl.containsKey(url) || _pendingAspect.contains(url)) {
+      return;
+    }
+    _pendingAspect.add(url);
+    final stream = NetworkImage(url).resolve(const ImageConfiguration());
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, _) {
+      _pendingAspect.remove(url);
+      if (!mounted) return;
+      final h = info.image.height;
+      if (h > 0) {
+        setState(() => _aspectByUrl[url] = info.image.width / h);
+      }
+      stream.removeListener(listener);
+    }, onError: (e, s) {
+      _pendingAspect.remove(url);
+    });
+    stream.addListener(listener);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = widget.pageImageUrls;
+    if (pages.isEmpty) {
+      return const Center(
+          child: Text('上传合同无可预览页面',
+              style: TextStyle(color: AppColors.text3)));
+    }
+    if (_page >= pages.length) _page = pages.length - 1;
+    if (_page < 0) _page = 0;
+    _ensurePageAspect();
+    final currentUrl = AppConfig.resolveAssetUrl(pages[_page]);
+    final aspect = _aspectByUrl[currentUrl];
+
+    return Column(
+      children: [
+        // 翻页工具条 + 拖拽提示
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: Colors.white,
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: _page > 0
+                    ? () => setState(() => _page--)
+                    : null,
+                visualDensity: VisualDensity.compact,
+              ),
+              Expanded(
+                child: Text('第 ${_page + 1} / ${pages.length} 页 · 拖动定位，右下角缩放，点击选中可跨页移动',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: _page < pages.length - 1
+                    ? () => setState(() => _page++)
+                    : null,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LayoutBuilder(builder: (context, outer) {
+                // 按页面真实宽高比等比内缩（letterbox），使显示区宽高比 == 页面宽高比，
+                // BoxFit.fill 因此不再拉伸页面图，浮块纵向尺寸也与后端换算一致（缺陷 #4）。
+                double innerW = outer.maxWidth;
+                double innerH = outer.maxHeight;
+                if (aspect != null && aspect > 0) {
+                  if (innerW / innerH > aspect) {
+                    innerW = innerH * aspect;
+                  } else {
+                    innerH = innerW / aspect;
+                  }
+                }
+                return Center(
+                  child: SizedBox(
+                    width: innerW,
+                    height: innerH,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          currentUrl,
+                          fit: BoxFit.fill,
+                          gaplessPlayback: true,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: AppColors.fill),
+                        ),
+                        // 当前页的每个浮块
+                        for (final chip in _chips)
+                          if (chip.page == _page)
+                            _buildChipWidget(chip, innerW, innerH),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+        _buildSelectionBar(),
+      ],
+    );
+  }
+
+  /// 选中浮块后的跨页操作栏：将选中的签名/印章移到当前查看页（缺陷 #3）。
+  Widget _buildSelectionBar() {
+    final sel = _selected;
+    if (sel == null) return const SizedBox.shrink();
+    final onCurrent = sel.page == _page;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 2, 8, 10),
+      child: Row(
+        children: [
+          const Icon(Icons.touch_app_outlined, size: 16, color: AppColors.text2),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '已选中${sel.kind == 'signature' ? '签名' : '印章'}（第 ${sel.page + 1} 页）',
+              style: const TextStyle(fontSize: 12, color: AppColors.text2),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (!onCurrent)
+            TextButton.icon(
+              onPressed: () {
+                setState(() => sel.page = _page);
+                _emit();
+              },
+              icon: const Icon(Icons.login, size: 16),
+              label: const Text('移到当前页'),
+            ),
+          TextButton(
+            onPressed: () => setState(() => _selectedKind = null),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipWidget(_PlacementChip chip, double boxW, double boxH) {
+    final chipWPx = _clamp(chip.w * boxW, 24, boxW);
+    final left = _clamp(chip.x * boxW, 0, boxW - chipWPx);
+    final top = _clamp(chip.y * boxH, 0, boxH * 0.99);
+    final isSignature = chip.kind == 'signature';
+    final selected = chip.kind == _selectedKind;
+
+    final image = isSignature
+        ? (widget.signatureBytes == null
+            ? const SizedBox.shrink()
+            : Image.memory(widget.signatureBytes!, fit: BoxFit.contain))
+        : (widget.sealFullUrl == null
+            ? const SizedBox.shrink()
+            : Image.network(widget.sealFullUrl!, fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink()));
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: chipWPx,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () =>
+            setState(() => _selectedKind = selected ? null : chip.kind),
+        onPanUpdate: (d) {
+          setState(() {
+            chip.x = _clamp(chip.x + d.delta.dx / boxW, 0, 1 - chip.w);
+            chip.y = _clamp(chip.y + d.delta.dy / boxH, 0, 0.99);
+          });
+          _emit();
+        },
+        onPanEnd: (_) => _emit(),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                    color: isSignature ? AppColors.primary : AppColors.danger,
+                    width: selected ? 2.5 : 1),
+                color: selected ? Colors.black.withOpacity(0.06) : Colors.transparent,
+              ),
+              child: image,
+            ),
+            // 右下角缩放手柄
+            Positioned(
+              right: -8,
+              bottom: -8,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (d) {
+                  setState(() {
+                    chip.w = _clamp(chip.w + d.delta.dx / boxW, _minW, 1 - chip.x);
+                  });
+                  _emit();
+                },
+                onPanEnd: (_) => _emit(),
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: isSignature ? AppColors.primary : AppColors.danger,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 单个签章定位浮块（比例坐标）：x/y 为左上角相对页面，w 为宽度比例。
+class _PlacementChip {
+  _PlacementChip({
+    required this.kind,
+    required this.page,
+    required this.x,
+    required this.y,
+    required this.w,
+  });
+
+  final String kind;
+  int page;
+  double x;
+  double y;
+  double w;
+
+  _PlacementChip copyWith({int? page}) => _PlacementChip(
+        kind: kind,
+        page: page ?? this.page,
+        x: x,
+        y: y,
+        w: w,
+      );
+}
+
+/// 合同正文条款编辑底部弹窗：模板下拉 + 多行条款输入 + 保存。
+class _ContractContentEditorSheet extends StatefulWidget {
+  const _ContractContentEditorSheet({
+    required this.contract,
+    required this.templates,
+    required this.repo,
+  });
+
+  final ContractDetail contract;
+  final List<ContractTemplate> templates;
+  final ContractRepository repo;
+
+  @override
+  State<_ContractContentEditorSheet> createState() =>
+      _ContractContentEditorSheetState();
+}
+
+class _ContractContentEditorSheetState
+    extends State<_ContractContentEditorSheet> {
+  late String _templateId;
+  late final TextEditingController _controller;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _templateId = widget.contract.templateId?.trim().isNotEmpty == true
+        ? widget.contract.templateId!
+        : (widget.templates.isNotEmpty ? widget.templates.first.templateId : '');
+    _controller = TextEditingController(text: widget.contract.clausesText ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _defaultFor(String templateId) {
+    for (final t in widget.templates) {
+      if (t.templateId == templateId) return t.defaultClausesText;
+    }
+    return '';
+  }
+
+  void _onTemplateChanged(String tid) {
+    setState(() {
+      _templateId = tid;
+      _controller.text = _defaultFor(tid);
+    });
+  }
+
+  Future<void> _save() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      showAppToast(context, '合同正文条款不能为空');
+      return;
+    }
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await widget.repo.updateContractContent(
+        widget.contract.contractId,
+        templateId: _templateId,
+        clausesText: text,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      // 锁定/非法参数：后端 message 直接弹提示，保持弹窗供用户修改
+      if (mounted) {
+        showAppToast(context, '$e');
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('编辑合同内容',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text1)),
+            const SizedBox(height: 12),
+            const Text('平台模板',
+                style: TextStyle(fontSize: 13, color: AppColors.text2)),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: _templateId.isEmpty ? null : _templateId,
+              isExpanded: true,
+              items: widget.templates
+                  .map((t) =>
+                      DropdownMenuItem(value: t.templateId, child: Text(t.name)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) _onTemplateChanged(v);
+              },
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('正文条款（第一条~第六条，可自由修改；切换模板将填充默认条款）',
+                style: TextStyle(fontSize: 13, color: AppColors.text2)),
+            const SizedBox(height: 6),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                style: const TextStyle(fontSize: 14, height: 1.6),
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.all(12),
+                  hintText: '请输入合同正文条款',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed:
+                        _saving ? null : () => Navigator.pop(context, false),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _saving ? null : _save,
+                    child: Text(_saving ? '保存中…' : '保存'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

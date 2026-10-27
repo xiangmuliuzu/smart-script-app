@@ -98,11 +98,10 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
   Widget _buildStatusFilter() {
     const statuses = [
       (null, '全部'),
-      (OrderStatus.confirmed, '已确认'),
-      (OrderStatus.escrowPending, '已托管'),
+      (OrderStatus.confirmed, '待签署'),
+      (OrderStatus.paying, '付款中'),
       (OrderStatus.delivering, '交割中'),
       (OrderStatus.completed, '已完成'),
-      (OrderStatus.cancelled, '已取消'),
     ];
 
     return SizedBox(
@@ -276,6 +275,8 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
     switch (status) {
       case OrderStatus.confirmed:
         color = AppColors.primary;
+      case OrderStatus.paying:
+        color = AppColors.warning;
       case OrderStatus.escrowPending:
         color = AppColors.warning;
       case OrderStatus.delivering:

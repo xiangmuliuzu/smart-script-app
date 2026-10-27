@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 
 /// 交易管理页
 ///
-/// 包含 6 个功能入口：询盘管理、交易会话、订单管理、资金托管记录、我的收益、发票申请。
+/// 包含 6 个功能入口：询盘管理、交易会话、订单管理、作者收益、发票申请、我的合同。
 class TradeManagementPage extends StatelessWidget {
   const TradeManagementPage({super.key});
 
@@ -56,14 +56,8 @@ class TradeManagementPage extends StatelessWidget {
                     const SizedBox(height: 20),
                     _buildMenuRow([
                       _MenuItem(
-                        icon: Icons.account_balance_wallet_outlined,
-                        label: '资金托管',
-                        color: Colors.blue,
-                        onTap: () => context.push(RoutePath.escrowList),
-                      ),
-                      _MenuItem(
-                        icon: Icons.payments_outlined,
-                        label: '我的收益',
+                        icon: Icons.monetization_on_outlined,
+                        label: '作者收益',
                         color: Colors.green,
                         onTap: () => context.push(RoutePath.myIncomeOverview),
                       ),
@@ -72,6 +66,12 @@ class TradeManagementPage extends StatelessWidget {
                         label: '发票申请',
                         color: Colors.orange,
                         onTap: () => context.push(RoutePath.invoiceManage),
+                      ),
+                      _MenuItem(
+                        icon: Icons.description_outlined,
+                        label: '我的合同',
+                        color: Colors.blueGrey,
+                        onTap: () => context.push(RoutePath.contractList),
                       ),
                     ]),
                   ],

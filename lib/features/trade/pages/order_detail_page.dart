@@ -80,26 +80,23 @@ class OrderDetailPage extends ConsumerWidget {
     final Color color;
     final String desc;
     final int currentStep;
-    final contractCompleted = contract?.isCompleted ?? false;
     switch (order.status) {
       case OrderStatus.confirmed:
         color = AppColors.primary;
-        desc = contractCompleted
-            ? '合同已签署完成，请买方付款至托管'
-            : '订单已确认，请双方签署合同';
-        currentStep = contractCompleted ? 1 : 0;
-      case OrderStatus.escrowPending:
+        desc = '订单已确认，请双方签署合同';
+        currentStep = 0;
+      case OrderStatus.paying:
         color = AppColors.warning;
-        desc = '资金已托管，等待卖方交割';
-        currentStep = 2;
+        desc = '合同已签署，等待买方付款';
+        currentStep = 1;
       case OrderStatus.delivering:
         color = AppColors.warning;
         desc = '订单交割中，请配合完成相关手续';
-        currentStep = 3;
+        currentStep = 2;
       case OrderStatus.completed:
         color = AppColors.success;
-        desc = '订单已完成，托管资金已释放给卖方';
-        currentStep = 4;
+        desc = '订单已完成';
+        currentStep = 3;
       case OrderStatus.refunded:
         color = AppColors.text2;
         desc = '订单已退款';
@@ -142,7 +139,7 @@ class OrderDetailPage extends ConsumerWidget {
 
   /// 横向进度步骤条
   Widget _buildProgressSteps(int currentStep, Color activeColor) {
-    const steps = ['已确认', '已签约', '已托管', '交割中', '已完成'];
+    const steps = ['待签署', '付款中', '交割中', '已完成'];
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
         if (i.isOdd) {
@@ -337,22 +334,15 @@ class OrderDetailPage extends ConsumerWidget {
   Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, ContractDetail? contract) {
     final status = order.status;
 
-    // 已确认：先检查合同签署状态
+    // 待签署：显示合同签署入口（双方签满后后端自动进入付款中）
     if (status == OrderStatus.confirmed) {
-      final contractCompleted = contract?.isCompleted ?? false;
-      if (!contractCompleted) {
-        // 合同未完成签署 → 显示签署入口
-        return _buildContractSignBar(context, ref, order);
-      }
-      // 合同已完成 → 买方付款/取消，卖方等待
-      if (isBuyer) return _buildPayBar(context, ref, order);
-      return _buildContactBar(context, ref, order, isBuyer, '合同已签署完成，等待买方付款至托管');
+      return _buildContractSignBar(context, ref, order);
     }
 
-    // 已托管：卖方开始交割，买方等待
-    if (status == OrderStatus.escrowPending) {
-      if (!isBuyer) return _buildDeliverBar(context, ref, order);
-      return _buildContactBar(context, ref, order, isBuyer, '资金已托管，等待卖方交割');
+    // 付款中：买方付款，卖方等待
+    if (status == OrderStatus.paying) {
+      if (isBuyer) return _buildPayBar(context, ref, order);
+      return _buildContactBar(context, ref, order, isBuyer, '合同已签署，等待买方付款');
     }
 
     // 交割中：买方确认收货，卖方等待
@@ -376,38 +366,6 @@ class OrderDetailPage extends ConsumerWidget {
               const Expanded(
                 child: Text('交易已完成，如有问题请联系管理员', style: TextStyle(fontSize: 13, color: AppColors.text2)),
               ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 已取消
-    if (status == OrderStatus.cancelled) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.divider)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (order.cancelReason != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline, color: AppColors.text3, size: 16),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text('取消原因：${order.cancelReason}', style: const TextStyle(fontSize: 12, color: AppColors.text3)),
-                      ),
-                    ],
-                  ),
-                ),
-              const Text('订单已取消，可重新发起交易', style: TextStyle(fontSize: 13, color: AppColors.text2)),
             ],
           ),
         ),
@@ -448,13 +406,29 @@ class OrderDetailPage extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            // 取消订单：仅合同双签完成前（confirmed）可取消，买卖双方任一方均可发起
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _cancelOrder(context, ref, order),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text('取消订单', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: const BorderSide(color: AppColors.danger),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// 买方付款栏：付款至托管 + 取消订单
+  /// 买方付款栏
   Widget _buildPayBar(BuildContext context, WidgetRef ref, Order order) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
@@ -466,72 +440,21 @@ class OrderDetailPage extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('付款后资金由平台托管，确认收货后才会释放给卖方',
-                style: TextStyle(fontSize: 12, color: AppColors.text3)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _showCancelDialog(context, ref, order),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.text2,
-                      side: const BorderSide(color: AppColors.divider),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('取消订单'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () => _payToEscrow(context, ref, order),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: Text('付款至托管 ${order.amountYuan}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 卖方交割栏：开始交割
-  Widget _buildDeliverBar(BuildContext context, WidgetRef ref, Order order) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.divider)),
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('买方资金已托管，请放心开始交割',
+            const Text('合同已签署完成，请买方付款，付款后订单进入交割',
                 style: TextStyle(fontSize: 12, color: AppColors.text3)),
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => _deliverOrder(context, ref, order),
+                onPressed: () => _payOrder(context, ref, order),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warning,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('开始交割', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                child: Text('付款 ${order.amountYuan}',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -552,7 +475,7 @@ class OrderDetailPage extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('确认收货后订单完成，托管资金将释放给卖方',
+            const Text('确认收货后订单完成',
                 style: TextStyle(fontSize: 12, color: AppColors.text3)),
             const SizedBox(height: 8),
             SizedBox(
@@ -624,13 +547,13 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 买方付款至托管（confirmed → escrow_pending）
-  Future<void> _payToEscrow(BuildContext context, WidgetRef ref, Order order) async {
+  /// 买方付款（paying → delivering）
+  Future<void> _payOrder(BuildContext context, WidgetRef ref, Order order) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dlgCtx) => AlertDialog(
         title: const Text('确认付款'),
-        content: Text('付款 ${order.amountYuan} 至平台托管？资金将在您确认收货后释放给卖方。'),
+        content: Text('确认支付 ${order.amountYuan}？付款后订单进入交割。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
           TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确认付款')),
@@ -641,24 +564,11 @@ class OrderDetailPage extends ConsumerWidget {
     try {
       await ref.read(tradeRepositoryProvider).appPayOrder(order.orderId!);
       if (context.mounted) {
-        showAppToast(context, '付款成功，资金已托管');
+        showAppToast(context, '付款成功，订单进入交割');
         ref.invalidate(appOrderDetailProvider(order.orderId!));
       }
     } catch (e) {
       if (context.mounted) showAppToast(context, '付款失败：$e');
-    }
-  }
-
-  /// 卖方开始交割（escrow_pending → delivering）
-  Future<void> _deliverOrder(BuildContext context, WidgetRef ref, Order order) async {
-    try {
-      await ref.read(tradeRepositoryProvider).appDeliverOrder(order.orderId!);
-      if (context.mounted) {
-        showAppToast(context, '已开始交割');
-        ref.invalidate(appOrderDetailProvider(order.orderId!));
-      }
-    } catch (e) {
-      if (context.mounted) showAppToast(context, '操作失败：$e');
     }
   }
 
@@ -668,7 +578,7 @@ class OrderDetailPage extends ConsumerWidget {
       context: context,
       builder: (dlgCtx) => AlertDialog(
         title: const Text('确认收货'),
-        content: const Text('确认收货后订单完成，托管资金将释放给卖方，此操作不可撤销。'),
+        content: const Text('确认收货后订单完成，此操作不可撤销。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
           TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确认收货', style: TextStyle(color: AppColors.success))),
@@ -679,7 +589,7 @@ class OrderDetailPage extends ConsumerWidget {
     try {
       await ref.read(tradeRepositoryProvider).appCompleteOrder(order.orderId!);
       if (context.mounted) {
-        showAppToast(context, '订单已完成，托管资金已释放给卖方');
+        showAppToast(context, '订单已完成');
         ref.invalidate(appOrderDetailProvider(order.orderId!));
       }
     } catch (e) {
@@ -687,128 +597,29 @@ class OrderDetailPage extends ConsumerWidget {
     }
   }
 
-  /// 取消订单底部弹窗
-  void _showCancelDialog(BuildContext context, WidgetRef ref, Order order) {
-    String? selectedReason;
-    final customController = TextEditingController();
-
-    showModalBottomSheet(
+  /// 取消订单（仅 confirmed，双方签署完成前；买卖双方任一方）
+  Future<void> _cancelOrder(BuildContext context, WidgetRef ref, Order order) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 拖拽手柄
-                  Container(width: 36, height: 4, decoration: BoxDecoration(
-                    color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-                  const SizedBox(height: 12),
-                  const Text('取消订单', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 16),
-                  // 预设原因
-                  ...[
-                    '与卖方协商一致',
-                    '作品不符合需求',
-                    '价格原因',
-                  ].map((r) => RadioListTile<String>(
-                    title: Text(r, style: const TextStyle(fontSize: 14)),
-                    value: r,
-                    groupValue: selectedReason,
-                    activeColor: AppColors.primary,
-                    onChanged: (v) {
-                      setSheetState(() {
-                        selectedReason = v;
-                        customController.clear();
-                      });
-                    },
-                  )),
-                  RadioListTile<String>(
-                    title: const Text('其他', style: TextStyle(fontSize: 14)),
-                    value: 'other',
-                    groupValue: selectedReason,
-                    activeColor: AppColors.primary,
-                    onChanged: (v) {
-                      setSheetState(() {
-                        selectedReason = v;
-                      });
-                    },
-                  ),
-                  if (selectedReason == 'other')
-                    Padding(
-                      padding: const EdgeInsets.only(left: 48, right: 8, bottom: 8),
-                      child: TextField(
-                        controller: customController,
-                        decoration: const InputDecoration(
-                          hintText: '请输入取消原因',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        maxLines: 2,
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final reason = selectedReason == 'other'
-                            ? customController.text.trim()
-                            : selectedReason;
-                        if (reason == null || reason.isEmpty) {
-                          showAppToast(context, '请选择或输入取消原因');
-                          return;
-                        }
-                        // 二次确认
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (dlgCtx) => AlertDialog(
-                            title: const Text('确认取消'),
-                            content: const Text('确定取消此订单？取消后不可恢复。'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
-                              TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确定取消', style: TextStyle(color: Colors.red))),
-                            ],
-                          ),
-                        );
-                        if (confirmed != true) return;
-                        try {
-                          await ref.read(tradeRepositoryProvider).appCancelOrder(order.orderId!, reason);
-                          if (context.mounted) {
-                            Navigator.pop(ctx);
-                            showAppToast(context, '订单已取消');
-                            ref.invalidate(appOrderDetailProvider(order.orderId!));
-                            // 返回列表页
-                            context.pop();
-                          }
-                        } catch (e) {
-                          if (context.mounted) showAppToast(context, '取消失败：$e');
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('确认取消', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      builder: (dlgCtx) => AlertDialog(
+        title: const Text('取消订单'),
+        content: const Text('确定取消该订单吗？合同双方签署完成后将不可取消。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确定取消', style: TextStyle(color: AppColors.danger))),
+        ],
+      ),
     );
+    if (confirmed != true) return;
+    try {
+      await ref.read(tradeRepositoryProvider).appCancelOrder(order.orderId!);
+      if (context.mounted) {
+        showAppToast(context, '订单已取消');
+        ref.invalidate(appOrderDetailProvider(order.orderId!));
+      }
+    } catch (e) {
+      if (context.mounted) showAppToast(context, '取消失败：$e');
+    }
   }
 
   String _formatDateTime(DateTime? dt) {

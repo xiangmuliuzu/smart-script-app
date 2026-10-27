@@ -342,30 +342,19 @@ class TradeRepository {
     return Order.fromJson(data);
   }
 
-  /// APP取消订单。
-  Future<void> appCancelOrder(int orderId, String reason) async {
-    await _api.put<void>(
-      ApiEndpoints.appOrderCancel(orderId),
-      data: {'reason': reason},
-    );
-  }
-
-  /// APP买方付款至托管（confirmed → escrow_pending）。
-  Future<void> appPayOrder(int orderId, {String? payChannel}) async {
-    await _api.post<void>(
-      ApiEndpoints.appOrderPay(orderId),
-      data: {'payChannel': payChannel ?? 'balance'},
-    );
-  }
-
-  /// APP卖方开始交割（escrow_pending → delivering）。
-  Future<void> appDeliverOrder(int orderId) async {
-    await _api.post<void>(ApiEndpoints.appOrderDeliver(orderId));
+  /// APP买方付款（paying → delivering）。
+  Future<void> appPayOrder(int orderId) async {
+    await _api.post<void>(ApiEndpoints.appOrderPay(orderId));
   }
 
   /// APP买方确认收货（delivering → completed，托管释放+收益入账）。
   Future<void> appCompleteOrder(int orderId) async {
     await _api.post<void>(ApiEndpoints.appOrderComplete(orderId));
+  }
+
+  /// APP取消订单（仅 confirmed 可取消，双方签署完成前；买卖双方任一方可发起）。
+  Future<void> appCancelOrder(int orderId) async {
+    await _api.post<void>(ApiEndpoints.appOrderCancel(orderId));
   }
 
   // ==================== 合作记录 ====================
