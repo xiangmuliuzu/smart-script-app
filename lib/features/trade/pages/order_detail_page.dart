@@ -11,6 +11,8 @@ import '../../../core/providers/auth_providers.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../chat/data/chat_providers.dart';
+import '../../copyright/data/copyright_models.dart';
+import '../../copyright/data/copyright_providers.dart';
 import '../data/contract_providers.dart';
 import '../data/trade_models.dart';
 import '../data/trade_providers.dart';
@@ -27,6 +29,7 @@ class OrderDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final orderAsync = ref.watch(appOrderDetailProvider(orderId));
     final contractAsync = ref.watch(contractByOrderProvider(orderId));
+    final deliveryAsync = ref.watch(deliveryByOrderProvider(orderId));
 
     return Scaffold(
       appBar: AppBar(
@@ -43,6 +46,7 @@ class OrderDetailPage extends ConsumerWidget {
           final currentUserId = authState.user?.userId ?? 0;
           final isBuyer = order.buyerId == currentUserId;
           final contract = contractAsync.valueOrNull;
+          final delivery = deliveryAsync.valueOrNull;
           return Column(
             children: [
               Expanded(
@@ -50,7 +54,7 @@ class OrderDetailPage extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      _buildStatusCard(order, contract),
+                      _buildStatusCard(order, delivery),
                       const SizedBox(height: 10),
                       _buildWorkCard(order),
                       const SizedBox(height: 10),
@@ -58,6 +62,10 @@ class OrderDetailPage extends ConsumerWidget {
                       if (contract != null) ...[
                         const SizedBox(height: 10),
                         _buildContractCard(context, order, contract),
+                      ],
+                      if (delivery != null) ...[
+                        const SizedBox(height: 10),
+                        _buildDeliveryCard(context, ref, order, delivery),
                       ],
                       const SizedBox(height: 10),
                       _buildPartyCard(order),
@@ -67,7 +75,7 @@ class OrderDetailPage extends ConsumerWidget {
                   ),
                 ),
               ),
-              _buildBottomBar(context, ref, order, isBuyer, contract),
+              _buildBottomBar(context, ref, order, isBuyer, delivery),
             ],
           );
         },
@@ -76,7 +84,7 @@ class OrderDetailPage extends ConsumerWidget {
   }
 
   /// 状态卡片 + 进度步骤条
-  Widget _buildStatusCard(Order order, ContractDetail? contract) {
+  Widget _buildStatusCard(Order order, CopyrightDelivery? delivery) {
     final Color color;
     final String desc;
     final int currentStep;
@@ -91,7 +99,9 @@ class OrderDetailPage extends ConsumerWidget {
         currentStep = 1;
       case OrderStatus.delivering:
         color = AppColors.warning;
-        desc = '订单交割中，请配合完成相关手续';
+        desc = delivery?.status == 'pending_confirm'
+            ? '交割材料已提交，待买方确认'
+            : '订单交割中，请配合完成相关手续';
         currentStep = 2;
       case OrderStatus.completed:
         color = AppColors.success;
@@ -330,8 +340,40 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
+  Widget _buildDeliveryCard(
+    BuildContext context,
+    WidgetRef ref,
+    Order order,
+    CopyrightDelivery delivery,
+  ) {
+    final fileCount = delivery.files?.length ?? 0;
+    return _buildCard('交割信息', [
+      _infoRow('交割单号', delivery.deliveryNo),
+      _infoRow('交割状态', delivery.status.deliveryStatusName),
+      if (delivery.uploadTime != null) _infoRow('提交时间', delivery.uploadTime!),
+      _infoRow('交割文件', fileCount > 0 ? '$fileCount 个' : '暂未上传'),
+      if (delivery.certNo != null && delivery.certNo!.isNotEmpty)
+        _infoRow('版权证书号', delivery.certNo!),
+      const SizedBox(height: 4),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => _openDeliveryPage(context, ref, order),
+          icon: const Icon(Icons.folder_open_outlined, size: 18),
+          label: const Text('查看交割详情', style: TextStyle(fontSize: 14)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: const BorderSide(color: AppColors.primary),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ),
+    ]);
+  }
+
   /// 底部操作栏：按状态与角色分化
-  Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, ContractDetail? contract) {
+  Widget _buildBottomBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, CopyrightDelivery? delivery) {
     final status = order.status;
 
     // 待签署：显示合同签署入口（双方签满后后端自动进入付款中）
@@ -345,10 +387,45 @@ class OrderDetailPage extends ConsumerWidget {
       return _buildContactBar(context, ref, order, isBuyer, '合同已签署，等待买方付款');
     }
 
-    // 交割中：买方确认收货，卖方等待
+    // 交割中：按交割单状态区分上传 / 待确认
     if (status == OrderStatus.delivering) {
-      if (isBuyer) return _buildCompleteBar(context, ref, order);
-      return _buildContactBar(context, ref, order, isBuyer, '交割已开始，等待买方确认收货');
+      final uploaded = delivery?.status == 'pending_confirm' || delivery?.status == 'completed';
+      if (isBuyer) {
+        if (uploaded) {
+          return _buildGoDeliveryBar(
+            context,
+            ref,
+            order,
+            hint: '卖方已提交交割材料，请确认收货',
+            buttonLabel: '去确认收货',
+          );
+        }
+        return _buildGoDeliveryBar(
+          context,
+          ref,
+          order,
+          hint: '等待卖方上传交割材料',
+          buttonLabel: '查看交割',
+          outlined: true,
+        );
+      }
+      if (uploaded) {
+        return _buildGoDeliveryBar(
+          context,
+          ref,
+          order,
+          hint: '交割材料已提交，等待买方确认',
+          buttonLabel: '待买方确认',
+          outlined: true,
+        );
+      }
+      return _buildGoDeliveryBar(
+        context,
+        ref,
+        order,
+        hint: '请上传版权证书等交割材料',
+        buttonLabel: '去交割',
+      );
     }
     // 已完成
     if (status == OrderStatus.completed) {
@@ -463,8 +540,16 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 买方确认收货栏
-  Widget _buildCompleteBar(BuildContext context, WidgetRef ref, Order order) {
+  Widget _buildGoDeliveryBar(
+    BuildContext context,
+    WidgetRef ref,
+    Order order, {
+    required String hint,
+    required String buttonLabel,
+    bool outlined = false,
+  }) {
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+    final child = Text(buttonLabel, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600));
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: const BoxDecoration(
@@ -475,21 +560,31 @@ class OrderDetailPage extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('确认收货后订单完成',
-                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            Text(hint, style: const TextStyle(fontSize: 12, color: AppColors.text3)),
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _completeOrder(context, ref, order),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('确认收货', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              ),
+              child: outlined
+                  ? OutlinedButton(
+                      onPressed: () => _openDeliveryPage(context, ref, order),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: shape,
+                      ),
+                      child: child,
+                    )
+                  : ElevatedButton(
+                      onPressed: () => _openDeliveryPage(context, ref, order),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: shape,
+                      ),
+                      child: child,
+                    ),
             ),
           ],
         ),
@@ -566,34 +661,32 @@ class OrderDetailPage extends ConsumerWidget {
       if (context.mounted) {
         showAppToast(context, '付款成功，订单进入交割');
         ref.invalidate(appOrderDetailProvider(order.orderId!));
+        ref.invalidate(deliveryByOrderProvider(order.orderId!));
       }
     } catch (e) {
       if (context.mounted) showAppToast(context, '付款失败：$e');
     }
   }
 
-  /// 买方确认收货（delivering → completed，托管释放+收益入账）
-  Future<void> _completeOrder(BuildContext context, WidgetRef ref, Order order) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: const Text('确认收货'),
-        content: const Text('确认收货后订单完成，此操作不可撤销。'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
-          TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确认收货', style: TextStyle(color: AppColors.success))),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
+  Future<void> _openDeliveryPage(BuildContext context, WidgetRef ref, Order order) async {
+    final orderId = order.orderId;
+    if (orderId == null) return;
     try {
-      await ref.read(tradeRepositoryProvider).appCompleteOrder(order.orderId!);
+      final delivery = await ref.read(copyrightProvider).loadDeliveryByOrder(orderId);
+      if (!context.mounted) return;
+      if (delivery == null) {
+        showAppToast(context, '暂无交割单，请稍后重试');
+        return;
+      }
+      await context.push(
+        '${RoutePath.copyrightApplicationDetail}?id=${delivery.deliveryId}&type=delivery',
+      );
       if (context.mounted) {
-        showAppToast(context, '订单已完成');
-        ref.invalidate(appOrderDetailProvider(order.orderId!));
+        ref.invalidate(appOrderDetailProvider(orderId));
+        ref.invalidate(deliveryByOrderProvider(orderId));
       }
     } catch (e) {
-      if (context.mounted) showAppToast(context, '操作失败：$e');
+      if (context.mounted) showAppToast(context, '打开交割失败：$e');
     }
   }
 

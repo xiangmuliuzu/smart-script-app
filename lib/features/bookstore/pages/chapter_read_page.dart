@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/storage/reading_progress_store.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../welfare/data/welfare_providers.dart';
@@ -48,8 +49,16 @@ class _ChapterReadPageState extends ConsumerState<ChapterReadPage> {
   /// 上报阅读进度；失败静默（进度是附加信息，不应打断阅读）。
   void _reportProgress(ChapterDetail detail) {
     if (_reportedChapterId == detail.chapterId) return;
-    if (!ref.read(authControllerProvider).isAuthenticated) return;
     _reportedChapterId = detail.chapterId;
+    // 本地进度：游客与未加书架用户同样记录，保证作品详情页「试读」可续读。
+    unawaited(ReadingProgressStore.save(
+      workId: detail.workId,
+      chapterId: detail.chapterId,
+      chapterNo: detail.chapterNo,
+      chapterTitle: detail.chapterTitle,
+    ));
+    // 服务端书架进度：仅登录用户上报（游客必然 401）。
+    if (!ref.read(authControllerProvider).isAuthenticated) return;
     unawaited(_send(detail.workId, detail.chapterId));
     // 真实阅读行为：上报阅读任务进度（fire-and-forget，失败静默）
     unawaited(reportTaskProgressByType(ref, 'READING'));

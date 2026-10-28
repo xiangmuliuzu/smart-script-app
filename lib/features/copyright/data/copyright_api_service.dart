@@ -4,6 +4,7 @@
 library;
 
 import 'package:dio/dio.dart';
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import 'copyright_models.dart';
 
@@ -257,9 +258,8 @@ class CopyrightApiService {
     return url;
   }
 
-  // ==================== 版权交割 ====================
+  // ==================== 版权交割（交易域 /trade/delivery） ====================
 
-  /// 获取交割列表
   Future<DeliveryListResponse> getDeliveryList({
     String? role,
     String? status,
@@ -278,33 +278,40 @@ class CopyrightApiService {
     }
 
     final data = await _client.get(
-      '/content/copyright/delivery/list',
+      ApiEndpoints.appDeliveryList,
       query: params,
     );
 
     return DeliveryListResponse.fromJson(data as Map<String, dynamic>);
   }
 
-  /// 获取交割详情
   Future<CopyrightDelivery> getDeliveryDetail(int deliveryId) async {
-    final data = await _client.get(
-      '/content/copyright/delivery/$deliveryId',
-    );
-
+    final data = await _client.get(ApiEndpoints.appDeliveryById(deliveryId));
     return CopyrightDelivery.fromJson(data as Map<String, dynamic>);
   }
 
-  /// 上传交割内容
-  Future<void> uploadDelivery(int deliveryId) async {
-    await _client.post(
-      '/content/copyright/delivery/$deliveryId/upload',
-    );
+  Future<CopyrightDelivery> getDeliveryByOrder(int orderId) async {
+    final data = await _client.get(ApiEndpoints.appDeliveryByOrder(orderId));
+    return CopyrightDelivery.fromJson(data as Map<String, dynamic>);
   }
 
-  /// 确认收货
-  Future<void> confirmDelivery(int deliveryId) async {
-    await _client.post(
-      '/content/copyright/delivery/$deliveryId/confirm',
+  Future<CopyrightDelivery> uploadDelivery(
+    int deliveryId, {
+    required List<Map<String, dynamic>> files,
+    String? remark,
+  }) async {
+    final data = await _client.post(
+      ApiEndpoints.appDeliveryUpload(deliveryId),
+      data: {
+        'files': files,
+        if (remark != null) 'remark': remark,
+      },
     );
+    return CopyrightDelivery.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<CopyrightDelivery> confirmDelivery(int deliveryId) async {
+    final data = await _client.post(ApiEndpoints.appDeliveryConfirm(deliveryId));
+    return CopyrightDelivery.fromJson(data as Map<String, dynamic>);
   }
 }

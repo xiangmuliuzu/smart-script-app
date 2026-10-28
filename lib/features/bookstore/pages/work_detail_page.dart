@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/storage/reading_progress_store.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -470,18 +471,75 @@ class _ChapterEntry extends StatelessWidget {
   }
 }
 
-/// C 交易域底部固定栏（发起询盘 / 我的询盘）。
+/// 作品详情底部固定栏（开启/继续试读 / 发起询盘）。
 ///
-/// 固定在页面底部，始终可见。未开启交易的作品点击时给提示。
-class _TradeBottomBar extends ConsumerWidget {
+/// 固定在页面底部，始终可见。试读与询盘对所有书城作品开放：
+/// 能在书城刷到或搜到的作品均已审核上架，可直接发起询盘，不再区分是否开启交易。
+/// 试读按钮文案随本地阅读进度切换：未读过=「开启试读」进第一章，
+/// 读过=「继续试读」+小字展示最后读到的章节，点击续读；从阅读页返回后自动刷新。
+class _TradeBottomBar extends ConsumerStatefulWidget {
   const _TradeBottomBar({required this.workId});
 
   final int workId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final work = ref.watch(workDetailProvider(workId)).valueOrNull;
-    final tradeEnabled = work?.tradeEnabled ?? false;
+  ConsumerState<_TradeBottomBar> createState() => _TradeBottomBarState();
+}
+
+class _TradeBottomBarState extends ConsumerState<_TradeBottomBar> {
+  /// 本地阅读进度；null 表示未读过（或尚未加载完）。
+  ReadProgress? _progress;
+
+  /// 监听「本页重新露出」：阅读页章末跳章用 pushReplacement，
+  /// 原 push 的 Future 被替换后永不完成，await 后的刷新不可靠；
+  /// 改听 secondaryAnimation——上方页面推入/退出的动画结束都会触发，
+  /// 借此重读进度，覆盖 pop、replace 后返回、手势返回等全部退出路径。
+  ModalRoute? _route;
+  Animation<double>? _secondary;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProgress();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (!identical(route, _route)) {
+      _secondary?.removeStatusListener(_onSecondaryStatus);
+      _route = route;
+      _secondary = route?.secondaryAnimation;
+      _secondary?.addStatusListener(_onSecondaryStatus);
+    }
+  }
+
+  void _onSecondaryStatus(AnimationStatus status) {
+    // completed=上方页面完全退出/ dismissed=上方页面完全盖住，两个时刻都重读一次进度；
+    // 读到相同值时 setState 不致重绘差异，多刷无害。
+    if (status == AnimationStatus.completed ||
+        status == AnimationStatus.dismissed) {
+      _loadProgress();
+    }
+  }
+
+  @override
+  void dispose() {
+    _secondary?.removeStatusListener(_onSecondaryStatus);
+    super.dispose();
+  }
+
+  Future<void> _loadProgress() async {
+    final saved = await ReadingProgressStore.load(widget.workId);
+    if (!mounted) return;
+    setState(() => _progress = saved);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final work = ref.watch(workDetailProvider(widget.workId)).valueOrNull;
+    final progress = _progress;
 
     return Container(
       decoration: const BoxDecoration(
@@ -496,26 +554,27 @@ class _TradeBottomBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // 发起询盘：主按钮（实心主色、更高更宽），页面主 CTA
+          // 试读：主按钮（实心主色）；读过则改「继续试读」并附进度小字
           Expanded(
             flex: 3,
             child: _TradeButton(
-              icon: Icons.send_outlined,
-              label: '发起询盘',
-              enabled: tradeEnabled,
+              icon: Icons.auto_stories_outlined,
+              label: progress == null ? '开启试读' : '继续试读',
+              subtitle: progress == null ? null : _progressLine(progress),
+              enabled: true,
               primary: true,
-              onTap: () => _onInquiryTap(context, ref, work),
+              onTap: _onTrialReadTap,
             ),
           ),
           const SizedBox(width: 12),
-          // 我的询盘：次要按钮（浅底描边）
+          // 发起询盘：次要按钮（浅底描边）；书城作品均可直接询盘，不再置灰
           Expanded(
             flex: 2,
             child: _TradeButton(
-              icon: Icons.list_alt_outlined,
-              label: '我的询盘',
+              icon: Icons.send_outlined,
+              label: '发起询盘',
               enabled: true,
-              onTap: () => _onListTap(context, ref),
+              onTap: () => _onInquiryTap(work),
             ),
           ),
         ],
@@ -523,9 +582,18 @@ class _TradeBottomBar extends ConsumerWidget {
     );
   }
 
-  void _onInquiryTap(BuildContext context, WidgetRef ref, BookItem? work) {
-    if (work == null || !work.tradeEnabled) {
-      showAppToast(context, '该作品尚未开启交易，暂不能发起询盘');
+  /// 进度小字：优先章节标题，无标题退回「第N章」。
+  static String _progressLine(ReadProgress p) {
+    final name = p.chapterTitle.isNotEmpty
+        ? p.chapterTitle
+        : (p.chapterNo > 0 ? '第${p.chapterNo}章' : '');
+    return name.isEmpty ? '已读到正文' : '读到了「$name」';
+  }
+
+  void _onInquiryTap(BookItem? work) {
+    // 书城作品统一开放询盘；仅防详情未加载完时拿不到作品标题的瞬时态
+    if (work == null) {
+      showAppToast(context, '作品信息加载中，请稍后重试');
       return;
     }
     if (!AuthGuard.isLoggedIn(ref)) {
@@ -541,19 +609,47 @@ class _TradeBottomBar extends ConsumerWidget {
     );
   }
 
-  void _onListTap(BuildContext context, WidgetRef ref) {
-    if (!AuthGuard.isLoggedIn(ref)) {
-      AuthGuard.pushProtected(context, ref, target: RoutePath.inquiryList);
-      return;
+  /// 试读入口：优先续读本地记录的上次章节，无记录则进第一章可读章节。
+  ///
+  /// 与「发起询盘」不同，试读面向所有身份（含游客），故不做登录前置。
+  Future<void> _onTrialReadTap() async {
+    // 1) 有本地进度：直接跳上次读到的章节（首次阅读时无记录，落到下一步）。
+    final saved = _progress ?? await ReadingProgressStore.load(widget.workId);
+    if (saved != null && saved.chapterId > 0) {
+      if (!mounted) return;
+      await context.push(
+        RoutePath.chapterReadUrl(saved.chapterId, title: saved.chapterTitle),
+      );
+    } else {
+      // 2) 首次：定位目录里第一个可读章节（即第一章）作为试读起点。
+      try {
+        final payload =
+            await ref.read(chapterListProvider(widget.workId).future);
+        final int idx =
+            payload.chapters.indexWhere((chapter) => chapter.readable);
+        if (!mounted) return;
+        if (idx < 0) {
+          showAppToast(context, '本作品暂未开启试读');
+          return;
+        }
+        final first = payload.chapters[idx];
+        await context.push(
+          RoutePath.chapterReadUrl(first.chapterId, title: first.chapterTitle),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        showAppToast(context, '试读加载失败，请稍后重试');
+      }
     }
-    context.push(RoutePath.inquiryList);
+    // 从阅读页返回：重拉进度，按钮文案与小字切到「继续试读」态。
+    _loadProgress();
   }
 }
 
 /// 交易域操作按钮。
 ///
 /// [primary] 为 true 时作为主按钮（实心主色、加粗加高）；否则为次要按钮
-/// （浅底描边），用于「我的询盘」这类次级操作，形成视觉主次。
+/// （浅底描边），用于「发起询盘」这类次级操作，形成视觉主次。
 class _TradeButton extends StatelessWidget {
   const _TradeButton({
     required this.icon,
@@ -561,6 +657,7 @@ class _TradeButton extends StatelessWidget {
     required this.enabled,
     required this.onTap,
     this.primary = false,
+    this.subtitle,
   });
 
   final IconData icon;
@@ -568,6 +665,9 @@ class _TradeButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
   final bool primary;
+
+  /// 可选小字副标题（如「读到了「第三章」」），显示在主文字下方一行。
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -587,7 +687,8 @@ class _TradeButton extends StatelessWidget {
       textColor = AppColors.primary;
       borderColor = AppColors.primary;
     }
-    final suffix = enabled ? '' : '（未开启）';
+    // 不在按钮上拼「（未开启）」后缀：窄按钮容不下 8 字会溢出成花条（详情页加载期间
+    // 作品未就绪时尤其明显）；禁用态由置灰表达，点击时另有 toast 提示。
 
     return Material(
       color: bgColor,
@@ -599,20 +700,49 @@ class _TradeButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: primary ? 14 : 11),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          // 带副标题时压缩上下留白，让小字占用原 padding 空间，
+          // 按钮总高度与无小字时基本一致，不撑高底栏、不致两按钮高低不齐。
+          padding: EdgeInsets.symmetric(
+            vertical: subtitle != null ? 6 : (primary ? 14 : 11),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: textColor),
-              const SizedBox(width: 6),
-              Text(
-                '$label$suffix',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: textColor,
-                  fontWeight: primary ? FontWeight.w600 : FontWeight.w400,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: textColor),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: textColor,
+                          fontWeight: primary
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              if (subtitle != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: textColor.withOpacity(0.8),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -751,7 +881,6 @@ class _InfoBlock extends StatelessWidget {
           _InfoRow(label: '作者', value: work.authorName),
           _InfoRow(label: '字数', value: '${work.wordCount}'),
           _InfoRow(label: '集数', value: '${work.episodeCount}'),
-          _InfoRow(label: '是否开启交易', value: work.tradeEnabled ? '是' : '否'),
           _InfoRow(
             label: '试读',
             value: work.previewEnabled
