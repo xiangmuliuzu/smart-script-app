@@ -4,7 +4,7 @@
 
 ## 依赖与启动
 
-后端环境变量、数据库初始化及启动流程见 [后端 README](../smart-script-backend/README.md)。App 的接口约定见 [共享资源](../shared/README.md)。
+后端环境变量、数据库初始化及启动流程见 [后端 README](../smart-script-backend/README.md)。App 接口与当前后端各业务模块保持一致。
 
 ```powershell
 flutter pub get
