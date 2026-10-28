@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:script_app/features/bookstore/data/bookstore_models.dart';
 
-/// 榜单模型单元测试（接口 2.7.7：五榜 + {list, updatedAt} 载荷）。
+/// 榜单模型单元测试（接口 2.7.7：四榜 + {list, updatedAt} 载荷）。
 void main() {
-  test('RankingType 为五榜，of() 未知值回落 view', () {
+  test('RankingType 为四榜，of() 未知值回落 view', () {
     expect(
       RankingType.all.map((type) => type.code).toList(),
-      <String>['view', 'favorite', 'sale', 'rating', 'new'],
+      <String>['view', 'favorite', 'rating', 'new'],
     );
     expect(RankingType.of('new').label, '新书榜');
     expect(RankingType.of('unknown').code, 'view');

@@ -327,12 +327,11 @@ class WorkSortOption {
   ];
 }
 
-/// 榜单类型（值与后端 `normalizeRankingType` 白名单一致）。
+/// 榜单类型（App 展示四榜；交易热度榜因剧本通常只交易一次已下线，后端仍兼容 sale 参数）。
 ///
 /// 方案 A「时间窗口 + 分级」，type 与主指标强绑定：
 /// view 热门榜=近 7 天阅读量 / favorite 收藏榜=近 7 天收藏数 /
-/// sale 交易热度榜=近 7 天已支付订单数 / rating 评分榜=平均评分 /
-/// new 新书榜=近 30 天上架按阅读量。
+/// rating 评分榜=平均评分 / new 新书榜=近 30 天上架按阅读量。
 class RankingType {
   const RankingType(this.code, this.label);
 
@@ -342,7 +341,6 @@ class RankingType {
   static const List<RankingType> all = <RankingType>[
     RankingType('view', '热门榜'),
     RankingType('favorite', '收藏榜'),
-    RankingType('sale', '交易热度榜'),
     RankingType('rating', '评分榜'),
     RankingType('new', '新书榜'),
   ];
