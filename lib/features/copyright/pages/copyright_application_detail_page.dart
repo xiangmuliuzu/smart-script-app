@@ -7,12 +7,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/services/native_file_picker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
 import '../widgets/material_upload_section.dart';
 import '../widgets/image_viewer.dart';
+
+class _PendingDeliveryFile {
+  const _PendingDeliveryFile({
+    required this.fileName,
+    required this.fileType,
+    required this.fileUrl,
+    required this.fileSize,
+  });
+
+  final String fileName;
+  final String fileType;
+  final String fileUrl;
+  final int fileSize;
+}
 
 /// 详情页类型
 enum DetailPageType {
@@ -61,6 +78,9 @@ class CopyrightApplicationDetailPage extends ConsumerStatefulWidget {
 
 class _CopyrightApplicationDetailPageState
     extends ConsumerState<CopyrightApplicationDetailPage> {
+  final List<_PendingDeliveryFile> _pendingFiles = [];
+  bool _submitting = false;
+
   @override
   void initState() {
     super.initState();
@@ -816,6 +836,12 @@ class _CopyrightApplicationDetailPageState
       );
     }
 
+    final userId = ref.watch(authControllerProvider).user?.userId ?? 0;
+    final isSeller = userId == delivery.sellerId;
+    final isBuyer = userId == delivery.buyerId;
+    final canUpload = isSeller && delivery.status == 'pending_upload';
+    final canConfirm = isBuyer && delivery.status == 'pending_confirm';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('交割详情'),
@@ -837,6 +863,10 @@ class _CopyrightApplicationDetailPageState
                 const SizedBox(height: 12),
                 _buildDeliveryFiles(delivery),
               ],
+              if (canUpload) ...[
+                const SizedBox(height: 12),
+                _buildDeliveryUploadSection(),
+              ],
               if (delivery.remark != null) ...[
                 const SizedBox(height: 12),
                 _buildDeliveryRemark(delivery),
@@ -847,7 +877,11 @@ class _CopyrightApplicationDetailPageState
           ),
         ),
       ),
-      bottomNavigationBar: _buildDeliveryBottomTip(),
+      bottomNavigationBar: _buildDeliveryActionBar(
+        delivery: delivery,
+        canUpload: canUpload,
+        canConfirm: canConfirm,
+      ),
     );
   }
 
@@ -934,7 +968,9 @@ class _CopyrightApplicationDetailPageState
                 ),
               ),
               TextButton.icon(
-                onPressed: _showDeliveryContractTip,
+                onPressed: () => context.push(
+                  '${RoutePath.contractSign}?orderId=${delivery.orderId}',
+                ),
                 icon: const Icon(Icons.description, size: 18),
                 label: const Text('查看合同'),
                 style: TextButton.styleFrom(
@@ -976,51 +1012,289 @@ class _CopyrightApplicationDetailPageState
   }
 
   Widget _buildDeliveryFileItem(DeliveryFile file) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.divider),
+    return InkWell(
+      onTap: () => _openDeliveryFile(file),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _getDeliveryFileIcon(file.fileType),
+              color: AppColors.primary,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    file.fileName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.text1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${file.fileType.fileTypeName} ${_formatDeliveryFileSize(file.fileSize)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.text3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.download, size: 20),
+              onPressed: () => _openDeliveryFile(file),
+              color: AppColors.primary,
+            ),
+          ],
+        ),
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildDeliveryUploadSection() {
+    return Container(
+      color: AppColors.card,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            _getDeliveryFileIcon(file.fileType),
-            color: AppColors.primary,
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.fileName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.text1,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${file.fileType.fileTypeName} ${_formatDeliveryFileSize(file.fileSize)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.text3,
-                  ),
-                ),
-              ],
+          const Text(
+            '上传交割材料',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text1,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.download, size: 20),
-            onPressed: () => _showDeliveryDownloadTip(file.fileName),
-            color: AppColors.primary,
+          const SizedBox(height: 8),
+          const Text(
+            '须至少上传 1 个文件，且必须包含版权证书（cert）',
+            style: TextStyle(fontSize: 12, color: AppColors.text3),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAddFileChip('证书', 'cert'),
+              _buildAddFileChip('源文件', 'source'),
+              _buildAddFileChip('文档', 'doc'),
+              _buildAddFileChip('其他', 'other'),
+            ],
+          ),
+          if (_pendingFiles.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ..._pendingFiles.asMap().entries.map((e) {
+              final i = e.key;
+              final f = e.value;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(_getDeliveryFileIcon(f.fileType), color: AppColors.primary),
+                title: Text(f.fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text('${f.fileType.fileTypeName} ${_formatDeliveryFileSize(f.fileSize)}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => setState(() => _pendingFiles.removeAt(i)),
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddFileChip(String label, String fileType) {
+    return ActionChip(
+      label: Text('+$label'),
+      onPressed: _submitting ? null : () => _pickAndUploadDeliveryFile(fileType),
+    );
+  }
+
+  Widget _buildDeliveryActionBar({
+    required CopyrightDelivery delivery,
+    required bool canUpload,
+    required bool canConfirm,
+  }) {
+    if (!canUpload && !canConfirm) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        ),
+        child: SafeArea(
+          child: Text(
+            delivery.status == 'completed'
+                ? '交割已完成'
+                : delivery.status == 'cancelled'
+                    ? '交割已取消'
+                    : delivery.status == 'pending_upload'
+                        ? '等待卖方上传交割材料'
+                        : '当前无需操作',
+            style: const TextStyle(fontSize: 12, color: AppColors.text3),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _submitting
+                ? null
+                : () {
+                    if (canUpload) {
+                      _submitDeliveryUpload(delivery.deliveryId);
+                    } else if (canConfirm) {
+                      _confirmDeliveryReceipt(delivery.deliveryId);
+                    }
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: canUpload ? AppColors.warning : AppColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              _submitting
+                  ? '提交中...'
+                  : canUpload
+                      ? '提交交割'
+                      : '确认收货',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadDeliveryFile(String fileType) async {
+    try {
+      final picked = await NativeFilePicker.pickAny(filenamePrefix: fileType);
+      if (picked == null) return;
+      showAppToast(context, '正在上传...');
+      final url = await ref.read(copyrightProvider).apiService.uploadMaterialFileBytes(
+            bytes: picked.bytes,
+            fileName: picked.filename,
+          );
+      if (!mounted) return;
+      setState(() {
+        _pendingFiles.add(_PendingDeliveryFile(
+          fileName: picked.filename,
+          fileType: fileType,
+          fileUrl: url,
+          fileSize: picked.size,
+        ));
+      });
+      showAppToast(context, '已添加：${picked.filename}');
+    } catch (e) {
+      if (mounted) showAppToast(context, '上传失败：$e');
+    }
+  }
+
+  Future<void> _submitDeliveryUpload(int deliveryId) async {
+    if (_pendingFiles.isEmpty) {
+      showAppToast(context, '请至少上传 1 个文件');
+      return;
+    }
+    if (!_pendingFiles.any((f) => f.fileType == 'cert')) {
+      showAppToast(context, '必须上传版权证书文件');
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await ref.read(copyrightProvider).uploadDelivery(
+            deliveryId,
+            files: _pendingFiles
+                .map((f) => {
+                      'fileName': f.fileName,
+                      'fileType': f.fileType,
+                      'fileUrl': f.fileUrl,
+                      'fileSize': f.fileSize,
+                    })
+                .toList(),
+          );
+      if (!mounted) return;
+      setState(() {
+        _pendingFiles.clear();
+        _submitting = false;
+      });
+      showAppToast(context, '交割材料已提交，等待买方确认');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        showAppToast(context, '提交失败：$e');
+      }
+    }
+  }
+
+  Future<void> _confirmDeliveryReceipt(int deliveryId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Text('确认收货'),
+        content: const Text('确认已收到交割材料？确认后订单将完成，此操作不可撤销。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx, true),
+            child: const Text('确认收货', style: TextStyle(color: AppColors.success)),
           ),
         ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _submitting = true);
+    try {
+      await ref.read(copyrightProvider).confirmDelivery(deliveryId);
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      showAppToast(context, '已确认收货，交割完成');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        showAppToast(context, '确认失败：$e');
+      }
+    }
+  }
+
+  void _openDeliveryFile(DeliveryFile file) {
+    final url = file.fileUrl.trim();
+    if (url.isEmpty) {
+      showAppToast(context, '文件地址无效');
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MaterialPreviewPage(
+          url: url,
+          filename: file.fileName,
+          fileType: file.fileType,
+        ),
       ),
     );
   }
@@ -1185,24 +1459,6 @@ class _CopyrightApplicationDetailPageState
     );
   }
 
-  Widget _buildDeliveryBottomTip() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: const Text(
-        '合同签署和文件下载功能开发中，暂时仅展示交割记录',
-        style: TextStyle(
-          fontSize: 12,
-          color: AppColors.text3,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
   IconData _getDeliveryFileIcon(String fileType) {
     switch (fileType) {
       case 'cert':
@@ -1220,17 +1476,5 @@ class _CopyrightApplicationDetailPageState
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
-  void _showDeliveryContractTip() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('合同模块开发中，功能即将开放')),
-    );
-  }
-
-  void _showDeliveryDownloadTip(String fileName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('文件下载功能开发中：$fileName')),
-    );
   }
 }

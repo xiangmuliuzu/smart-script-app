@@ -378,23 +378,38 @@ class CopyrightProvider extends ChangeNotifier {
     }
   }
 
-  /// 上传交割内容
-  Future<bool> uploadDelivery(int deliveryId) async {
-    try {
-      await _apiService.uploadDelivery(deliveryId);
-      return true;
-    } catch (e) {
-      rethrow;
-    }
+  /// 上传交割内容（须含证书文件）
+  Future<bool> uploadDelivery(
+    int deliveryId, {
+    required List<Map<String, dynamic>> files,
+    String? remark,
+  }) async {
+    _currentDelivery = await _apiService.uploadDelivery(
+      deliveryId,
+      files: files,
+      remark: remark,
+    );
+    notifyListeners();
+    return true;
   }
 
   /// 确认收货
   Future<bool> confirmDelivery(int deliveryId) async {
+    _currentDelivery = await _apiService.confirmDelivery(deliveryId);
+    notifyListeners();
+    return true;
+  }
+
+  /// 按订单加载交割单
+  Future<CopyrightDelivery?> loadDeliveryByOrder(int orderId) async {
     try {
-      await _apiService.confirmDelivery(deliveryId);
-      return true;
+      _currentDelivery = await _apiService.getDeliveryByOrder(orderId);
+      notifyListeners();
+      return _currentDelivery;
     } catch (e) {
-      rethrow;
+      _deliveryError = e.toString();
+      notifyListeners();
+      return null;
     }
   }
 

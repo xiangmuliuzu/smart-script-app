@@ -434,7 +434,7 @@ class _CopyrightApplicationListPageState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '版权交割是指在订单完成合同签署和资金托管后，向买方交付版权证书、作品源文件等约定内容的过程。买方确认收货后，托管资金将释放。',
+                  '版权交割是指合同签署并付款后，卖方交付版权证书、作品源文件等约定内容，买方确认收货后订单完成。',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue.shade800,
