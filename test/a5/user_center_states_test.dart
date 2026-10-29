@@ -129,6 +129,34 @@ void main() {
 
   // ================================================================
   group('H-01-B 空态', () {
+    testWidgets('通知偏好按业务保存独立开关', (tester) async {
+      final api = ScriptedApi();
+      api.handle('/notification-preferences', (request) {
+        if (request.method == 'PUT') return Envelope.ok({'changed': true});
+        return Envelope.ok({'preferences': [
+          {'channel': 'INBOX', 'type': 'INQUIRY', 'enabled': true},
+          {'channel': 'INBOX', 'type': 'ORDER', 'enabled': true},
+          {'channel': 'INBOX', 'type': 'CONTRACT', 'enabled': true},
+          {'channel': 'INBOX', 'type': 'SYSTEM', 'enabled': true},
+          {'channel': 'PUSH', 'type': 'INQUIRY', 'enabled': true},
+        ]});
+      });
+      await _pumpPage(tester, const NotificationPreferencePage(), api);
+      await tester.pumpAndSettle();
+      expect(find.text('询盘通知'), findsOneWidget);
+      expect(find.text('订单通知'), findsOneWidget);
+      expect(find.text('合同通知'), findsOneWidget);
+      expect(find.text('平台通知'), findsOneWidget);
+      await tester.tap(find.text('询盘通知'));
+      await tester.pump();
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      final request = api.requests.singleWhere((r) => r.method == 'PUT');
+      expect(request.data, {'preferences': [
+        {'channel': 'INBOX', 'type': 'INQUIRY', 'enabled': false},
+      ]});
+    });
+
     testWidgets('消息列表为空展示空态文案', (tester) async {
       final api = ScriptedApi();
       api.reply('/messages', Envelope.ok({'total': 0, 'list': <Object>[]}));

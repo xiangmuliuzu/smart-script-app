@@ -8,13 +8,15 @@ import '../../user_center/data/paged_data.dart';
 import '../data/contract_providers.dart';
 import '../data/trade_models.dart';
 
-/// 我的合同列表页（交易管理子功能）。
+/// 我的合同列表页。
 ///
 /// 双 Tab：买方合同 / 作者合同，叠加状态筛选（全部 / 待签署 / 部分签署 / 已完成）。
 /// 每条展示合同号、作品、金额、双方签署状态；点击进入合同详情页
 /// （内容预览、PDF 下载、签署状态、签署均复用 [ContractSignPage]）。
 class ContractListPage extends ConsumerStatefulWidget {
-  const ContractListPage({super.key});
+  const ContractListPage({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<ContractListPage> createState() => _ContractListPageState();
@@ -67,7 +69,10 @@ class _ContractListPageState extends ConsumerState<ContractListPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('我的合同'),
+        title: widget.embedded ? null : const Text('我的合同'),
+        automaticallyImplyLeading: !widget.embedded,
+        primary: !widget.embedded,
+        toolbarHeight: widget.embedded ? 0 : kToolbarHeight,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
