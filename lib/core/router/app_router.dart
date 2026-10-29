@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -90,8 +90,11 @@ import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
 import '../providers/auth_providers.dart';
+import 'auth_guard.dart';
 import 'route_intent.dart';
 import 'route_paths.dart';
+
+const _loginRequired = '/login-required';
 
 /// 把 Riverpod 的 auth 状态变化桥接给 GoRouter 的 refreshListenable。
 class _RouterRefresh extends ChangeNotifier {
@@ -114,7 +117,7 @@ class _RouterRefresh extends ChangeNotifier {
 /// 全局路由（含登录态重定向 + 底部导航 Shell + A5 用户中心页面）。
 ///
 /// 守卫策略（规格 §8.1）：
-///   - 受保护路径未登录时保存结构化 RouteIntent 后进入登录页；
+///   - 游客访问受保护路径时先确认，确认后保存 RouteIntent 并进入登录页；
 ///   - 登录成功后由登录页消费一次意图回跳，非法或不可恢复时回安全默认首页；
 ///   - 用户主动点击登录入口不产生回跳（URL 无 redirect 参数即不产生意图）。
 final routerProvider = Provider<GoRouter>((ref) {
@@ -144,12 +147,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (isSplash) return RoutePath.home;
           // 未登录：
           //   - 受保护入口（书架、收藏、福利、AI、上传、询盘、订单、合同、印章等）
-          //     -> 保存回跳意图后进入登录页；
+          //     -> 请游客确认登录；会话失效则按原有流程直接进入登录页；
           //   - 公开入口（书城、漫剧、分类等）-> 允许游客浏览，不做跳转。
           //     规格 §8.1 只要求受保护入口走守卫，公开内容不强制登录。
           if (!ProtectedRoutes.isProtected(loc)) return null;
-          _rememberIntent(ref, state);
-          return RoutePath.login;
+          if (auth.errorMessage != null) {
+            _rememberIntent(ref, state);
+            return RoutePath.login;
+          }
+          return Uri(path: _loginRequired, queryParameters: {'target': state.uri.toString()}).toString();
         case AuthStatus.authenticated:
           // 创作子页面（含深链）统一按能力准入，账号类型不赋予创作权限。
           if (loc.startsWith('${RoutePath.create}/') &&
@@ -164,6 +170,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.splash,
         name: RouteName.splash,
         builder: (_, __) => const SplashPage(),
+      ),
+      GoRoute(
+        path: _loginRequired,
+        pageBuilder: (_, state) => NoTransitionPage(child: _LoginRequiredPage(target: state.uri.queryParameters['target'] ?? '')),
       ),
       GoRoute(
         path: RoutePath.login,
@@ -759,6 +769,29 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _LoginRequiredPage extends ConsumerWidget {
+  const _LoginRequiredPage({required this.target});
+  final String target;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    void cancel() {
+      if (context.canPop()) { context.pop(); } else { context.go(RoutePath.home); }
+    }
+    void confirm() {
+      final intent = RouteIntent.fromParam(Uri.encodeComponent(target));
+      final safeTarget = intent != null && ProtectedRoutes.isProtected(intent.target) ? intent.target : RoutePath.home;
+      final login = AuthGuard.loginLocation(ref, safeTarget);
+      if (context.canPop()) { context.pushReplacement(login); } else { context.go(login); }
+    }
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvoked: (didPop) { if (!didPop) context.go(RoutePath.home); },
+      child: Scaffold(body: Center(child: AuthGuard.loginConfirmationDialog(context, onCancel: cancel, onConfirm: confirm))),
+    );
+  }
+}
 
 /// 保存受保护入口的定位串（含查询参数），供登录成功后回跳。
 ///

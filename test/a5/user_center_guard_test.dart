@@ -123,7 +123,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    // 仍停在登录页，且意图已保存（结构化定位串，含查询参数）
+    expect(find.text('需要登录'), findsOneWidget);
+    await tester.tap(find.text('去登录'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 确认后进入登录页并保存回跳意图。
     expect(find.byType(LoginPage), findsOneWidget);
     expect(container.read(routeIntentStoreProvider).pending?.target,
         '${RoutePath.feedbackDetail}?id=42');

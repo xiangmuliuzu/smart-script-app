@@ -253,30 +253,68 @@ void main() {
       expect(find.byType(LoginPage), findsNothing);
     });
 
-    testWidgets('游客访问每一个受保护入口都被拦到登录页', (tester) async {
-      await _pumpApp(tester);
-      final container = _containerOf(tester);
-      final router = container.read(routerProvider);
-
-      for (final path in kProtectedEntries) {
-        router.go(path);
+    for (final path in kProtectedEntries) {
+      testWidgets('游客访问 $path 需确认，取消不保存意图', (tester) async {
+        await _pumpApp(tester);
+        final container = _containerOf(tester);
+        container.read(routerProvider).go(path);
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 30));
-        expect(find.byType(LoginPage), findsOneWidget,
-            reason: '未登录访问 $path 必须被拦到登录页');
-      }
-    });
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('需要登录'), findsOneWidget);
+        expect(find.byType(LoginPage), findsNothing);
+        expect(container.read(routeIntentStoreProvider).pending, isNull);
+        await tester.tap(find.text('暂不登录'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(LoginPage), findsNothing);
+      });
+    }
 
-    testWidgets('深链保存结构化意图，且保留查询参数', (tester) async {
+    testWidgets('确认登录后深链保留查询参数', (tester) async {
       await _pumpApp(tester);
       final container = _containerOf(tester);
       container.read(routerProvider).go('${RoutePath.feedbackDetail}?id=42');
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 30));
-
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(container.read(routeIntentStoreProvider).pending, isNull);
+      await tester.tap(find.text('去登录'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(LoginPage), findsOneWidget);
       expect(container.read(routeIntentStoreProvider).pending?.target,
           '${RoutePath.feedbackDetail}?id=42');
+    });
+
+    testWidgets('游客主动点击我的直接进入登录页', (tester) async {
+      await _pumpApp(tester);
+      await tester.tap(find.text('我的').first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('需要登录'), findsNothing);
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(_containerOf(tester).read(routeIntentStoreProvider).pending?.target, RoutePath.profile);
+    });
+
+    testWidgets('游客点击消息可取消或确认登录', (tester) async {
+      await _pumpApp(tester);
+      final container = _containerOf(tester);
+      await tester.tap(find.byTooltip('消息'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('需要登录'), findsOneWidget);
+      await tester.tap(find.text('暂不登录'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(LoginPage), findsNothing);
+      expect(container.read(routeIntentStoreProvider).pending, isNull);
+      await tester.tap(find.byTooltip('消息'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('去登录'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(container.read(routeIntentStoreProvider).pending?.target, RoutePath.messages);
     });
 
     testWidgets('公开入口不产生回跳意图', (tester) async {
@@ -288,24 +326,6 @@ void main() {
       expect(container.read(routeIntentStoreProvider).pending, isNull);
     });
 
-    testWidgets('既有深链意图不会被后续导航覆盖（登录页参数不顶掉最初目标）', (tester) async {
-      await _pumpApp(tester);
-      final container = _containerOf(tester);
-      final router = container.read(routerProvider);
-
-      router.go('${RoutePath.feedbackDetail}?id=42');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 30));
-      final first = container.read(routeIntentStoreProvider).pending?.target;
-
-      // 再次触发受保护导航：不应把最初意图替换掉
-      router.go(RoutePath.messages);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 30));
-      expect(container.read(routeIntentStoreProvider).pending?.target, first);
-      expect(first, '${RoutePath.feedbackDetail}?id=42');
-    });
-
     testWidgets('敏感提交页在未登录时不可能被自动回跳（强制失效后不回敏感页）', (tester) async {
       await _pumpApp(tester);
       final container = _containerOf(tester);
@@ -313,6 +333,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 30));
 
+      expect(find.text('需要登录'), findsOneWidget);
+      await tester.tap(find.text('去登录'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(LoginPage), findsOneWidget);
 
       // 实现分两层：路由层可能记录意图，但唯一的回跳解析点

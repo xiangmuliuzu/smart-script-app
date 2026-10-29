@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/router/auth_guard.dart';
+import '../../core/router/route_paths.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 
 /// 主框架的底部导航容器（对应 UI 原型 `.tabbar` 五格平铺 + 中间圆形凸起）。
 ///
 /// 五个分支由 [StatefulNavigationShell] 管理，切 tab 会保留各自导航栈。
-class HomeShell extends StatelessWidget {
+class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
@@ -19,7 +23,13 @@ class HomeShell extends StatelessWidget {
     _TabItem('我的', Icons.person_outline, Icons.person),
   ];
 
-  void _onTap(int index) {
+  void _onTap(BuildContext context, WidgetRef ref, int index) {
+    if (index == 4 && !AuthGuard.isLoggedIn(ref)) {
+      if (ref.read(authControllerProvider).status == AuthStatus.unauthenticated) {
+        context.go(AuthGuard.loginLocation(ref, RoutePath.profile));
+      }
+      return;
+    }
     shell.goBranch(
       index,
       // 点击当前 tab 时回到该分支首页
@@ -28,7 +38,7 @@ class HomeShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: shell,
       bottomNavigationBar: Container(
@@ -48,12 +58,12 @@ class HomeShell extends StatelessWidget {
                         ? _CenterTab(
                             tab: _tabs[i],
                             active: shell.currentIndex == i,
-                            onTap: () => _onTap(i),
+                            onTap: () => _onTap(context, ref, i),
                           )
                         : _TabButton(
                             tab: _tabs[i],
                             active: shell.currentIndex == i,
-                            onTap: () => _onTap(i),
+                            onTap: () => _onTap(context, ref, i),
                           ),
                   ),
               ],

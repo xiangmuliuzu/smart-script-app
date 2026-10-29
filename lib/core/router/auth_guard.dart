@@ -11,7 +11,7 @@ import 'route_paths.dart';
 /// 唯一职责边界：
 ///   - 页面**不得**自行判断 Token 字符串，也不得自行构造登录页跳转；
 ///     需要登录的入口一律调用 [requireLogin]。
-///   - 未登录时保存结构化 [RouteIntent]，进入登录页；
+///   - 游客确认登录后保存结构化 [RouteIntent]，进入登录页；
 ///   - 登录成功后由登录页消费一次意图并回跳（见 [consumeAndResolve]）。
 ///
 /// 「会话恢复中」（[AuthStatus.unknown]）不视为未登录：此时用户可能已登录，
@@ -23,7 +23,7 @@ class AuthGuard {
   static bool isLoggedIn(WidgetRef ref) =>
       ref.read(authControllerProvider).status == AuthStatus.authenticated;
 
-  /// 需要登录的入口统一调用：已登录返回 true 由页面继续；未登录保存意图并跳登录页。
+  /// 已登录返回 true；游客确认后进入登录页，取消则留在当前页面。
   ///
   /// [target] 传当前页面的定位串（含查询参数），用于登录成功后原样回跳。
   static bool requireLogin(
@@ -32,6 +32,43 @@ class AuthGuard {
     required String target,
   }) {
     if (isLoggedIn(ref)) return true;
+    if (ref.read(authControllerProvider).status == AuthStatus.unknown) return false;
+    _confirmLogin(context, ref, target);
+    return false;
+  }
+
+  static bool _promptOpen = false;
+
+  static Future<void> _confirmLogin(BuildContext context, WidgetRef ref, String target) async {
+    if (_promptOpen) return;
+    _promptOpen = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => loginConfirmationDialog(dialogContext),
+      );
+      if (confirmed != true || !context.mounted || !ref.context.mounted) return;
+      if (ref.read(authControllerProvider).status != AuthStatus.unauthenticated) return;
+      goLogin(context, ref, target: target);
+    } finally {
+      _promptOpen = false;
+    }
+  }
+
+  static Widget loginConfirmationDialog(BuildContext context, {VoidCallback? onCancel, VoidCallback? onConfirm}) => AlertDialog(
+        title: const Text('需要登录'),
+        content: const Text('使用此功能需要登录，是否现在登录？'),
+        actions: [
+          TextButton(onPressed: onCancel ?? () => Navigator.of(context).pop(false), child: const Text('暂不登录')),
+          TextButton(onPressed: onConfirm ?? () => Navigator.of(context).pop(true), child: const Text('去登录')),
+        ],
+      );
+
+  static void goLogin(BuildContext context, WidgetRef ref, {required String target}) {
+    context.push(loginLocation(ref, target));
+  }
+
+  static String loginLocation(WidgetRef ref, String target) {
     final store = ref.read(routeIntentStoreProvider);
     if (!ProtectedRoutes.canResume(target)) {
       // 敏感提交页（换绑、账号安全）不参与自动回跳
@@ -40,8 +77,8 @@ class AuthGuard {
       final intent = RouteIntent.fromParam(Uri.encodeComponent(target));
       if (intent != null) store.save(intent);
     }
-    _goLogin(context, ref);
-    return false;
+    final encoded = store.pending?.encoded;
+    return encoded == null ? RoutePath.login : '${RoutePath.login}?${RouteIntent.paramName}=$encoded';
   }
 
   /// 打开受保护的应用内页面。
@@ -50,7 +87,7 @@ class AuthGuard {
   /// 这样 AppBar 返回箭头与系统返回键都能自然回到上一页。
   /// 用 `go` 打开根级页面会让历史栈只剩当前一条，按返回键会直接退出应用。
   ///
-  /// 已登录：直接 push；未登录：保存意图后去登录页，登录成功再由
+  /// 已登录：直接 push；游客确认后保存意图并进入登录页，登录成功再由
   /// [consumeAndResolve] 交回目标并跳转。
   static void pushProtected(BuildContext context, WidgetRef ref, {required String target}) {
     if (requireLogin(context, ref, target: target)) {
@@ -76,20 +113,4 @@ class AuthGuard {
     ref.read(routeIntentStoreProvider).clear();
   }
 
-  /// 进入登录页。
-  ///
-  /// 用 `push` 而不是 `go`：本方法只被用户主动触发的 [requireLogin] 调用，
-  /// push 保留下方原浏览栈（首页→列表→详情），登录成功后由
-  /// [resolvePostLoginTarget] 弹出/替换登录页即可回原栈，返回落点正确。
-  /// 路由级 redirect / 深链路径不经过这里（由 GoRouter redirect 以 go 语义
-  /// 直接进入登录页），那条路径栈里只剩登录页，回跳时仍会补首页底栈。
-  static void _goLogin(BuildContext context, WidgetRef ref) {
-    final intent = ref.read(routeIntentStoreProvider).pending;
-    final target = intent?.encoded;
-    context.push(
-      target == null
-          ? RoutePath.login
-          : '${RoutePath.login}?${RouteIntent.paramName}=$target',
-    );
-  }
 }
