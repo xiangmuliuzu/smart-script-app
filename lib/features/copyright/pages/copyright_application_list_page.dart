@@ -1,6 +1,6 @@
 /// 版权申请列表页（App 端）。
 ///
-/// 展示我的版权申请记录和版权交割记录，支持Tab切换、筛选、搜索、下拉刷新。
+/// 展示我的版权申请记录，支持筛选、搜索、下拉刷新。
 library;
 
 import 'package:flutter/material.dart';
@@ -13,7 +13,7 @@ import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
 import '../providers/copyright_provider.dart';
 
-/// 版权申请列表页（包含申请和交割两个Tab）。
+/// 版权申请列表页。
 class CopyrightApplicationListPage extends ConsumerStatefulWidget {
   const CopyrightApplicationListPage({super.key});
 
@@ -23,20 +23,13 @@ class CopyrightApplicationListPage extends ConsumerStatefulWidget {
 }
 
 class _CopyrightApplicationListPageState
-    extends ConsumerState<CopyrightApplicationListPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+    extends ConsumerState<CopyrightApplicationListPage> {
   String? _statusFilter;
   final TextEditingController _searchController = TextEditingController();
-  
-  // 交割列表的角色筛选（seller/buyer）。
-  String? _deliveryRole;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_onTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
@@ -44,39 +37,17 @@ class _CopyrightApplicationListPageState
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onTabChanged() {
-    if (_tabController.indexIsChanging) {
-      setState(() {
-        _statusFilter = null;
-        _searchController.clear();
-      });
-      _loadData();
-    }
-  }
-
   Future<void> _loadData() async {
-    final provider = ref.read(copyrightProvider);
-    if (_tabController.index == 0) {
-      // 申请列表
-      await provider.loadApplications(
-        status: _statusFilter,
-        workName: _searchController.text.trim().isEmpty
-            ? null
-            : _searchController.text.trim(),
-      );
-    } else {
-      // 交割列表
-      await provider.loadDeliveries(
-        role: _deliveryRole,
-        status: _statusFilter,
-      );
-    }
+    await ref.read(copyrightProvider).loadApplications(
+          status: _statusFilter,
+          workName: _searchController.text.trim().isEmpty
+              ? null
+              : _searchController.text.trim(),
+        );
   }
 
   Future<void> _onRefresh() async {
@@ -89,50 +60,25 @@ class _CopyrightApplicationListPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('版权申请'),
+        title: const Text('申请列表'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
         actions: [
-          if (_tabController.index == 0)
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline),
-              onPressed: () => context.push(RoutePath.copyrightForm),
-              tooltip: '新建申请',
-            ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: () => context.push(RoutePath.copyrightForm),
+            tooltip: '新建申请',
+          ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.text2,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: '我的申请'),
-            Tab(text: '版权交割'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildApplicationTab(provider),
-          _buildDeliveryTab(provider),
+          _buildSearchBar(),
+          _buildApplicationFilterBar(),
+          Expanded(child: _buildApplicationListView(provider)),
         ],
       ),
-    );
-  }
-
-  // ==================== 申请列表Tab ====================
-
-  Widget _buildApplicationTab(CopyrightProvider provider) {
-    return Column(
-      children: [
-        _buildSearchBar(),
-        _buildApplicationFilterBar(),
-        Expanded(
-          child: _buildApplicationListView(provider),
-        ),
-      ],
     );
   }
 
@@ -171,6 +117,7 @@ class _CopyrightApplicationListPageState
         ),
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => _loadData(),
+        onChanged: (_) => setState(() {}),
       ),
     );
   }
@@ -365,22 +312,18 @@ class _CopyrightApplicationListPageState
                       ],
                     ),
                     if (app.status == CopyrightApplicationStatus.pending)
-                      Row(
-                        children: [
-                          TextButton(
-                            onPressed: () => _confirmDelete(app),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text('删除', style: TextStyle(fontSize: 13)),
+                      TextButton(
+                        onPressed: () => _confirmDelete(app),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
                           ),
-                        ],
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('删除', style: TextStyle(fontSize: 13)),
                       ),
                   ],
                 ),
@@ -391,314 +334,6 @@ class _CopyrightApplicationListPageState
       ),
     );
   }
-
-  // ==================== 交割列表Tab ====================
-
-  Widget _buildDeliveryTab(CopyrightProvider provider) {
-    return Column(
-      children: [
-        _buildDeliveryInfoCard(),
-        _buildDeliveryFilterBar(),
-        Expanded(
-          child: _buildDeliveryListView(provider),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDeliveryInfoCard() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '什么是版权交割？',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '版权交割是指合同签署并付款后，卖方交付版权证书、作品源文件等约定内容，买方确认收货后订单完成。',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.blue.shade800,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeliveryFilterBar() {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildDeliveryFilterChip('全部', null),
-                const SizedBox(width: 8),
-                _buildDeliveryFilterChip('待上传', 'pending_upload'),
-                const SizedBox(width: 8),
-                _buildDeliveryFilterChip('待确认', 'pending_confirm'),
-                const SizedBox(width: 8),
-                _buildDeliveryFilterChip('已完成', 'completed'),
-                const SizedBox(width: 8),
-                _buildDeliveryFilterChip('已取消', 'cancelled'),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          PopupMenuButton<String>(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _deliveryRole == null
-                        ? '全部角色'
-                        : _deliveryRole == 'seller'
-                            ? '我转出的'
-                            : '我获得的',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down, size: 20),
-                ],
-              ),
-            ),
-            onSelected: (value) {
-              setState(() {
-                _deliveryRole = value.isEmpty ? null : value;
-              });
-              _loadData();
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: '', child: Text('全部角色')),
-              const PopupMenuItem(value: 'seller', child: Text('我转出的')),
-              const PopupMenuItem(value: 'buyer', child: Text('我获得的')),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeliveryFilterChip(String label, String? status) {
-    final isSelected = _statusFilter == status;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _statusFilter = selected ? status : null;
-        });
-        _loadData();
-      },
-      selectedColor: AppColors.primary.withOpacity(0.2),
-      backgroundColor: Colors.grey.shade100,
-      labelStyle: TextStyle(
-        fontSize: 13,
-        color: isSelected ? AppColors.primary : AppColors.text2,
-      ),
-    );
-  }
-
-  Widget _buildDeliveryListView(CopyrightProvider provider) {
-    if (provider.deliveryLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (provider.deliveryError != null) {
-      return ErrorView(
-        message: provider.deliveryError!,
-        onRetry: _loadData,
-      );
-    }
-
-    if (provider.deliveries.isEmpty) {
-      return const EmptyView(message: '暂无交割记录');
-    }
-
-    return Container(
-      color: AppColors.pageBackground,
-      child: RefreshIndicator(
-        onRefresh: _onRefresh,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: provider.deliveries.length,
-          itemBuilder: (context, index) {
-            final delivery = provider.deliveries[index];
-            return _buildDeliveryCard(delivery);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDeliveryCard(CopyrightDelivery delivery) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: AppColors.cardShadow,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.push(
-            '${RoutePath.copyrightApplicationDetail}?id=${delivery.deliveryId}&type=delivery',
-          ),
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      delivery.deliveryNo,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.text3,
-                      ),
-                    ),
-                    _buildDeliveryStatusBadge(delivery.status),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  delivery.workTitle,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.person_outline, size: 14, color: AppColors.text3),
-                    const SizedBox(width: 4),
-                    Text(
-                      '买方：${delivery.buyerName} | 卖方：${delivery.sellerName}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.text2,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.monetization_on_outlined, size: 14, color: AppColors.text3),
-                    const SizedBox(width: 4),
-                    Text(
-                      '¥${delivery.amount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.text1,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.shield_outlined, size: 14, color: AppColors.text3),
-                    const SizedBox(width: 4),
-                    Text(
-                      delivery.licenseType.licenseTypeName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.text2,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  delivery.createTime,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.text3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDeliveryStatusBadge(String status) {
-    Color color;
-    switch (status) {
-      case 'pending_upload':
-        color = Colors.orange;
-        break;
-      case 'pending_confirm':
-        color = Colors.blue;
-        break;
-      case 'completed':
-        color = Colors.green;
-        break;
-      case 'cancelled':
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.grey;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        status.deliveryStatusName,
-        style: TextStyle(
-          fontSize: 12,
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  // ==================== 辅助方法 ====================
 
   Future<void> _confirmDelete(CopyrightApplication app) async {
     final confirm = await showDialog<bool>(
@@ -747,8 +382,6 @@ class _CopyrightApplicationListPageState
       }
     }
   }
-
-
 
   Color _getStatusColor(String status) {
     switch (status) {
