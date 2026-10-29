@@ -374,7 +374,7 @@ class _RankingPreview extends ConsumerStatefulWidget {
 }
 
 class _RankingPreviewState extends ConsumerState<_RankingPreview> {
-  static const int _previewSize = 3;
+  static const int _previewSize = 5;
 
   String _type = RankingType.all.first.code;
 

@@ -17,7 +17,7 @@ class HomeShell extends ConsumerWidget {
 
   static const _tabs = <_TabItem>[
     _TabItem('首页', Icons.menu_book_outlined, Icons.menu_book),
-    _TabItem('漫剧', Icons.smart_display_outlined, Icons.smart_display),
+    _TabItem('视频', Icons.smart_display_outlined, Icons.smart_display),
     _TabItem('创作', Icons.library_books_outlined, Icons.library_books),
     _TabItem('分类', Icons.grid_view_outlined, Icons.grid_view),
     _TabItem('我的', Icons.person_outline, Icons.person),
