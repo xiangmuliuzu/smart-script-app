@@ -100,18 +100,25 @@ class _TabButton extends StatelessWidget {
         children: [
           Icon(active ? tab.iconActive : tab.icon, color: color, size: 22),
           const SizedBox(height: 3),
-          Text(tab.label, style: TextStyle(fontSize: 12, color: color)),
+          Text(
+            tab.label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// 中间「创作」按钮：圆形凸起样式，落点为「我的作品列表」（create_page）。
+/// 中间「创作」按钮：立体渐变圆形凸起样式，落点为「我的作品列表」（create_page）。
 ///
-/// 造型：40×40 圆形，用 [Stack] + [Positioned] 让其顶部高出底栏上沿 8px
-/// （`top: -8`），形成跨越顶部分隔线的「凸起」观感；label 贴底对齐，与其余
-/// 四个 tab 的文字基线保持一致。Stack 设 `Clip.none`，允许圆形溢出到 body 区。
+/// 造型：44×44 圆形（内含 2.5px 纯白护圈与深湖蓝立体渐变），用 [Stack] + [Positioned]
+/// 让其顶部高出底栏上沿 10px（`top: -10`），配柔和弥散投影；label 贴底对齐，
+/// 与其余四个 tab 的文字基线保持一致。Stack 设 `Clip.none`，允许圆形溢出到 body 区。
 class _CenterTab extends StatelessWidget {
   const _CenterTab(
       {required this.tab, required this.active, required this.onTap});
@@ -131,35 +138,58 @@ class _CenterTab extends StatelessWidget {
         children: [
           // label：位于圆形正下方、水平居中
           Positioned(
-            bottom: 7,
+            bottom: 6,
             left: 0,
             right: 0,
             child: Center(
               child: Text(
                 tab.label,
-                style: TextStyle(fontSize: 12, color: labelColor),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  color: labelColor,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
           ),
-          // 圆形凸起：top=-8 使其高出 56px 栏顶 8px
+          // 圆形凸起：top=-10 使其高出 56px 栏顶 10px，外包纯白护圈与弥散蓝影
           Positioned(
-            top: -8,
+            top: -10,
             left: 0,
             right: 0,
             child: Center(
               child: Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
+                padding: const EdgeInsets.all(2.5),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: active ? AppColors.primary : AppColors.primaryTint,
-                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  color: AppColors.card,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(active ? 0.32 : 0.20),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  active ? tab.iconActive : tab.icon,
-                  color: active ? Colors.white : AppColors.primary,
-                  size: 24,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: active
+                          ? const [Color(0xFF3264B8), Color(0xFF1A3868)]
+                          : const [Color(0xFF2B59A2), Color(0xFF20437C)],
+                    ),
+                  ),
+                  child: Icon(
+                    active ? tab.iconActive : tab.icon,
+                    color: Colors.white,
+                    size: 21,
+                  ),
                 ),
               ),
             ),

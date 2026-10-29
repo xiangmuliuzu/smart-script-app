@@ -10,9 +10,7 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 
 /// 通知偏好（规格 §8.6，契约 §1.5）。
 ///
-/// 按「渠道 × 类型」保存开关；关闭推送不等于删除站内消息，
-/// 因此站内消息与推送是两组独立开关。
-/// 保存采用「只提交改动项」策略，未改动组合保持原值。
+/// 按具体业务控制站内消息；保存时只提交改动项。
 class NotificationPreferencePage extends ConsumerStatefulWidget {
   const NotificationPreferencePage({super.key});
 
@@ -70,17 +68,20 @@ class _NotificationPreferencePageState extends ConsumerState<NotificationPrefere
     if (items.isEmpty) {
       return const EmptyView(message: '暂无可配置的通知类型');
     }
-    if (_error != null) {
-      return ErrorView(message: _error!, onRetry: () => ref.invalidate(notificationPreferencesProvider));
-    }
+    final hasTradeCategories = items.any((item) =>
+        item.channel == NotificationChannel.inbox && item.type == PreferenceType.inquiry);
+    final visible = items.where((item) =>
+        item.channel == NotificationChannel.inbox &&
+        item.type != null && (item.type != PreferenceType.transaction || !hasTradeCategories)).toList();
+    if (visible.isEmpty) return const EmptyView(message: '暂无可配置的通知类型');
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
-        for (final channel in NotificationChannel.values) _buildChannel(channel, items),
+        _buildChannel(NotificationChannel.inbox, visible),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            '关闭推送仅停止推送提醒，站内消息仍会保留在消息中心。',
+            '关闭后不再接收该类站内通知，已有消息保留。平台公告关闭期间暂不显示，重新开启后可再次查看。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),
@@ -109,8 +110,9 @@ class _NotificationPreferencePageState extends ConsumerState<NotificationPrefere
                 SwitchListTile(
                   value: item.enabled,
                   title: Text(item.typeLabel),
+                  subtitle: Text(_description(item.type!)),
                   activeColor: AppColors.primary,
-                  onChanged: (value) => _toggle(item, channel, value),
+                  onChanged: _saving ? null : (value) => _toggle(item, channel, value),
                 ),
             ],
           ),
@@ -119,6 +121,16 @@ class _NotificationPreferencePageState extends ConsumerState<NotificationPrefere
       ],
     );
   }
+
+  String _description(PreferenceType type) => switch (type) {
+        PreferenceType.inquiry => '新询盘、询盘被接受',
+        PreferenceType.order => '订单生成、付款、完成及取消',
+        PreferenceType.contract => '合同签署和签署完成',
+        PreferenceType.system => '平台消息和公告',
+        PreferenceType.review => '实名和创作者申请审核结果',
+        PreferenceType.benefit => '福利相关消息',
+        PreferenceType.transaction => '询盘、订单及合同通知',
+      };
 
   /// 本地先改状态，保存时只提交改动项。
   void _toggle(NotificationPreference item, NotificationChannel channel, bool value) {
@@ -159,6 +171,7 @@ class _NotificationPreferencePageState extends ConsumerState<NotificationPrefere
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = '保存失败，请稍后重试');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error!)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -170,6 +170,27 @@ enum MessageType {
   }
 }
 
+enum PreferenceType {
+  inquiry('INQUIRY', '询盘通知'),
+  order('ORDER', '订单通知'),
+  contract('CONTRACT', '合同通知'),
+  system('SYSTEM', '平台通知'),
+  review('REVIEW', '审核通知'),
+  benefit('BENEFIT', '福利通知'),
+  transaction('TRANSACTION', '交易');
+
+  const PreferenceType(this.code, this.label);
+  final String code;
+  final String label;
+
+  static PreferenceType? fromCode(String? code) {
+    for (final value in values) {
+      if (value.code == code) return value;
+    }
+    return null;
+  }
+}
+
 /// 通知渠道（§1.5）。
 enum NotificationChannel {
   inbox('INBOX', '站内消息'),
@@ -255,7 +276,7 @@ class NotificationPreference {
   });
 
   final NotificationChannel channel;
-  final MessageType? type;
+  final PreferenceType? type;
   final bool enabled;
 
   String get typeCode => type?.code ?? '';
@@ -264,7 +285,7 @@ class NotificationPreference {
   factory NotificationPreference.fromJson(Map<String, dynamic> json) =>
       NotificationPreference(
         channel: NotificationChannel.fromCode(json['channel'] as String?),
-        type: MessageType.fromCode(json['type'] as String?),
+        type: PreferenceType.fromCode(json['type'] as String?),
         enabled: json['enabled'] as bool? ?? true,
       );
 

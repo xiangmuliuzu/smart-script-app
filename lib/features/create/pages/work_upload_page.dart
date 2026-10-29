@@ -115,10 +115,15 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
 
   Widget _buildForm(List<CategoryItem> categories) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Container(
-          color: AppColors.card,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(AppRadius.r),
+            boxShadow: AppColors.cardShadow,
+          ),
           child: Column(
             children: [
               _Labeled(
@@ -128,7 +133,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
                   maxLength: _titleMax,
                   decoration: const InputDecoration(
                     hintText: '请输入作品标题',
-                    border: InputBorder.none,
                     counterText: '',
                   ),
                 ),
@@ -140,7 +144,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
                   isExpanded: true,
                   decoration: const InputDecoration(
                     hintText: '请选择分类',
-                    border: InputBorder.none,
                   ),
                   items: [
                     for (final category in categories)
@@ -160,7 +163,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
                   minLines: 1,
                   decoration: const InputDecoration(
                     hintText: '一句话介绍你的故事（至少10字）',
-                    border: InputBorder.none,
                   ),
                 ),
               ),
@@ -168,8 +170,8 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: ElevatedButton(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: FilledButton(
             onPressed: _submitting ? null : _submit,
             child: _submitting
                 ? const SizedBox(
@@ -181,7 +183,7 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
           ),
         ),
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 2),
           child: Text(
             '提示：书名、分类与简介为必填；创建后可在作品工作台补充封面、定价等资料。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
@@ -193,7 +195,7 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
   }
 }
 
-/// 左标签 + 右输入行。
+/// 标题与输入控件垂直排列，使用全局输入框样式。
 class _Labeled extends StatelessWidget {
   const _Labeled({required this.label, required this.child});
 
@@ -202,22 +204,14 @@ class _Labeled extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
-      ),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 64,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(label, style: const TextStyle(color: AppColors.text2)),
-            ),
-          ),
-          Expanded(child: child),
+          Text(label, style: const TextStyle(color: AppColors.text1, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          child,
         ],
       ),
     );

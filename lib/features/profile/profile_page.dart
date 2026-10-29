@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,13 +19,13 @@ import '../user_center/data/user_center_providers.dart';
 import '../user_center/data/user_social_models.dart';
 import '../user_center/widgets/user_center_widgets.dart';
 
-/// 我的（对照 H5 原型 `profile.html` / `profile_client.html`）。
+/// 我的（东方书卷·创作者工作台风格）。
 ///
-/// 结构与原型一致：
-///   1. 头部卡：头像、昵称、实名标签、简介与「去认证」按钮；
-///   2. 快捷宫格：一行四个圆形入口，创作者与甲方角色分流（原型两套入口）；
-///   3. 我的书架：一行三本的竖版书封网格。
-/// 数据来源：`/auth/me` 的全局身份 + `/messages/unread-count` 未读数 + 书架接口。
+/// 视觉层次：
+///   1. 沉浸式去卡片化头部：头像、昵称、实名标签、会话入口 + 独立三栏等宽社交统计；
+///   2. 创作者/甲方专属 Bento 工作台横幅 + 单行零翻页高频工具栏；
+///   3. 仿真立体书封书架：带内描边、装订书脊光泽与左对齐杂志感排版。
+/// 数据来源：`/auth/me` 的全局身份 + 公开资料统计 + 书架接口。
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
@@ -64,7 +65,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     final auth = ref.watch(authControllerProvider);
     // 该路由受登录守卫保护，正常情况必有会话；兜底空用户避免游客态空指针。
     final user = auth.user ?? const User(userId: 0, userType: UserType.user);
-    final unread = ref.watch(unreadCountProvider);
     final shelf = ref.watch(shelfProvider);
     // 粉丝/关注/获赞统计来自公开资料接口；加载中或失败时头部显示占位。
     final profileView = ref.watch(userProfileViewProvider(user.userId));
@@ -77,33 +77,68 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
         // 直接用 build 的 context 会命中外层 HomeShell 的 Scaffold（无抽屉）导致点击无效。
         child: Builder(
           builder: (context) => RefreshIndicator(
+            color: AppColors.primary,
             onRefresh: () async {
-              ref.invalidate(unreadCountProvider);
               ref.invalidate(shelfProvider);
               ref.invalidate(userProfileViewProvider(user.userId));
               await ref.read(authControllerProvider.notifier).refreshMe();
             },
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 28),
               children: [
-                _TopBar(onDrawer: () => Scaffold.of(context).openDrawer()),
+                _TopBar(
+                  onDrawer: () => Scaffold.of(context).openDrawer(),
+                  onChat: () => AuthGuard.pushProtected(
+                    context,
+                    ref,
+                    target: RoutePath.chatSessionList,
+                  ),
+                ),
                 _Header(
                   user: user,
                   profileView: profileView,
                   // 点击头像/昵称进入个人主页（0 = 自己）；编辑资料移到个人主页「···」菜单。
-                  onEdit: () =>
-                      AuthGuard.pushProtected(context, ref, target: RoutePath.userProfileUrl(0)),
-                  onAuth: () =>
-                      AuthGuard.pushProtected(context, ref, target: RoutePath.realName),
+                  onEdit: () => AuthGuard.pushProtected(
+                    context,
+                    ref,
+                    target: RoutePath.userProfileUrl(0),
+                  ),
+                  onAuth: () => AuthGuard.pushProtected(
+                    context,
+                    ref,
+                    target: RoutePath.realName,
+                  ),
+                  onTapFollowing: () => AuthGuard.pushProtected(
+                    context,
+                    ref,
+                    target: RoutePath.userFollowListUrl(
+                      user.userId,
+                      following: true,
+                    ),
+                  ),
+                  onTapFollowers: () => AuthGuard.pushProtected(
+                    context,
+                    ref,
+                    target: RoutePath.userFollowListUrl(
+                      user.userId,
+                      following: false,
+                    ),
+                  ),
                 ),
+                if (user.authorCapability)
+                  _CreatorBentoSection(ref: ref)
+                else if (user.isClient)
+                  _ClientBentoSection(ref: ref),
                 _CardBox(
-                  child: _QuickGrid(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                  child: _QuickToolRow(
                     ref: ref,
-                    user: user,
-                    unread: unread.valueOrNull?.total ?? 0,
                   ),
                 ),
                 _CardBox(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
                   child: _ShelfSection(shelf: shelf),
                 ),
               ],
@@ -115,50 +150,168 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
   }
 }
 
-/// 卡片容器：对应原型 `.cardbox`（白底圆角 + 浅阴影，左右 16 上下 12 间距）。
-class _CardBox extends StatelessWidget {
-  const _CardBox({required this.child});
+/// Emil 规范按压反馈组件：
+/// 按压时以强 ease-out 曲线微缩放到 `0.97`（130ms），松手回弹（180ms），
+/// 并遵守系统无障碍减少动态效果（`disableAnimations`）。
+class _ScaleTap extends StatefulWidget {
+  const _ScaleTap({
+    required this.child,
+    this.onTap,
+  });
 
   final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  State<_ScaleTap> createState() => _ScaleTapState();
+}
+
+class _ScaleTapState extends State<_ScaleTap> {
+  static const Cubic _easeOutStrong = Cubic(0.23, 1.0, 0.32, 1.0);
+  static const double _scaleDown = 0.97;
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final targetScale = (_pressed && !reduceMotion) ? _scaleDown : 1.0;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: widget.onTap != null ? (_) => _setPressed(true) : null,
+      onTapUp: widget.onTap != null ? (_) => _setPressed(false) : null,
+      onTapCancel: widget.onTap != null ? () => _setPressed(false) : null,
+      onTap: widget.onTap != null
+          ? () {
+              HapticFeedback.selectionClick();
+              widget.onTap!();
+            }
+          : null,
+      child: AnimatedScale(
+        scale: targetScale,
+        duration: Duration(milliseconds: _pressed ? 120 : 180),
+        curve: _easeOutStrong,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// 卡片容器：白底连续圆角 + 柔和深蓝投影 + 极细高光描边。
+class _CardBox extends StatelessWidget {
+  const _CardBox({
+    required this.child,
+    this.margin = const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    this.padding = const EdgeInsets.all(14),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry margin;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      margin: margin,
+      padding: padding,
+      decoration: ShapeDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.r),
-        boxShadow: AppColors.cardShadow,
+        shape: ContinuousRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: Colors.white.withOpacity(0.85), width: 1),
+        ),
+        shadows: const [
+          BoxShadow(
+            color: Color(0x0C183A6E),
+            offset: Offset(0, 6),
+            blurRadius: 20,
+          ),
+        ],
       ),
       child: child,
     );
   }
 }
 
-/// 顶栏：左上抽屉按钮 + 居中标题（切换账号/退出登录已统一收进抽屉）。
+/// 顶栏：左侧抽屉菜单按钮和右侧会话入口。
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onDrawer});
+  const _TopBar({required this.onDrawer, required this.onChat});
 
   final VoidCallback onDrawer;
+  final VoidCallback onChat;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            '我的',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.text1),
+          _ScaleTap(
+            onTap: onDrawer,
+            child: Tooltip(
+              message: '工具与设置',
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.95),
+                    width: 1,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.notes_rounded,
+                  size: 21,
+                  color: AppColors.text1,
+                ),
+              ),
+            ),
           ),
-          Positioned(
-            left: 4,
-            child: IconButton(
-              onPressed: onDrawer,
-              icon: const Icon(Icons.menu, size: 22, color: AppColors.text2),
-              tooltip: '工具与设置',
+          _ScaleTap(
+            onTap: onChat,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.78),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.95),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.forum_outlined,
+                    size: 15,
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    '会话',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -176,7 +329,8 @@ class _ProfileDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nickname = (user.nickname == null || user.nickname!.isEmpty) ? '未设置用户名称' : user.nickname!;
+    final nickname =
+        (user.nickname == null || user.nickname!.isEmpty) ? '未设置用户名称' : user.nickname!;
     return Drawer(
       backgroundColor: AppColors.card,
       child: SafeArea(
@@ -187,10 +341,10 @@ class _ProfileDrawer extends StatelessWidget {
               // 抽屉头部（头像+昵称）：进入个人主页（0 = 自己）。
               onTap: () => _push(context, RoutePath.userProfileUrl(0)),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                 child: Row(
                   children: [
-                    _Avatar(nickname: nickname, avatar: user.avatar),
+                    _Avatar(nickname: nickname, avatar: user.avatar, size: 52),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -213,6 +367,11 @@ class _ProfileDrawer extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.text3,
                     ),
                   ],
                 ),
@@ -264,7 +423,10 @@ class _ProfileDrawer extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(dialogContext, true),
-                        child: const Text('退出', style: TextStyle(color: AppColors.danger)),
+                        child: const Text(
+                          '退出',
+                          style: TextStyle(color: AppColors.danger),
+                        ),
                       ),
                     ],
                   ),
@@ -312,13 +474,15 @@ class _DrawerItem extends StatelessWidget {
   }
 }
 
-/// 头部卡：头像 + 昵称/实名标签/简介 + 「去认证」按钮（原型 `.prof-head`）。
+/// 沉浸式头部：去卡片化设计，直接融于顶部浅冰蓝渐变，包含头像、昵称、实名标签与三栏独立统计。
 class _Header extends StatelessWidget {
   const _Header({
     required this.user,
     required this.profileView,
     required this.onEdit,
     required this.onAuth,
+    required this.onTapFollowing,
+    required this.onTapFollowers,
   });
 
   final User user;
@@ -327,61 +491,88 @@ class _Header extends StatelessWidget {
   final AsyncValue<UserProfileView> profileView;
   final VoidCallback onEdit;
   final VoidCallback onAuth;
+  final VoidCallback onTapFollowing;
+  final VoidCallback onTapFollowers;
 
   @override
   Widget build(BuildContext context) {
     final state = RealNameState.fromCode(user.realNameStatus);
     final approved = state == RealNameState.approved;
-    final nickname = (user.nickname == null || user.nickname!.isEmpty) ? '未设置用户名称' : user.nickname!;
+    final nickname =
+        (user.nickname == null || user.nickname!.isEmpty) ? '未设置用户名称' : user.nickname!;
+    final roleSubtitle = user.authorCapability
+        ? '认证创作者 · 剧本与漫剧工作台'
+        : (user.isClient ? '认证甲方 · 剧本选品与合作' : user.userType.label);
 
-    return _CardBox(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+      child: Column(
         children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onEdit,
-            child: _Avatar(nickname: nickname, avatar: user.avatar),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _ScaleTap(
+                onTap: onEdit,
+                child: _Avatar(
+                  nickname: nickname,
+                  avatar: user.avatar,
+                  size: 64,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onEdit,
-                        child: Text(
-                          nickname,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.text1,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onEdit,
+                            child: Text(
+                              nickname,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                                color: AppColors.text1,
+                              ),
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        UserStatusChip(text: state.label, color: _tagColor(state)),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      roleSubtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.text2,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    UserStatusChip(text: state.label, color: _tagColor(state)),
                   ],
                 ),
-                const SizedBox(height: 6),
-                // 昵称下方改为展示关注/粉丝/获赞等社交数据。
-                _StatsLine(view: profileView),
+              ),
+              if (!approved) ...[
+                const SizedBox(width: 8),
+                _AuthButton(onTap: onAuth),
               ],
-            ),
+            ],
           ),
-          // 昵称旁已有「已认证」标签，通过后不再重复展示按钮；
-          // 未通过时保留「去认证」入口（待审核/被驳回同样可进入查看状态）。
-          if (!approved) ...[
-            const SizedBox(width: 8),
-            _AuthButton(onTap: onAuth),
-          ],
+          const SizedBox(height: 16),
+          _StatsBar(
+            view: profileView,
+            onTapFollowing: onTapFollowing,
+            onTapFollowers: onTapFollowers,
+            onTapLikes: onEdit,
+          ),
         ],
       ),
     );
@@ -401,51 +592,120 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// 昵称下方的社交数据行：关注 / 粉丝 / 获赞。
-///
-/// 数据来自公开资料接口，加载中或失败时以「-」占位，避免数字跳变。
-class _StatsLine extends StatelessWidget {
-  const _StatsLine({required this.view});
+/// 独立三栏社交资产栏：关注 / 粉丝 / 获赞。
+/// 采用 Tabular Figures 等宽数字排版，防止异步加载回填时产生水平抖动。
+class _StatsBar extends StatelessWidget {
+  const _StatsBar({
+    required this.view,
+    required this.onTapFollowing,
+    required this.onTapFollowers,
+    required this.onTapLikes,
+  });
 
   final AsyncValue<UserProfileView> view;
+  final VoidCallback onTapFollowing;
+  final VoidCallback onTapFollowers;
+  final VoidCallback onTapLikes;
 
   @override
   Widget build(BuildContext context) {
     final profile = view.valueOrNull;
-    return Row(
-      children: [
-        _StatValue(label: '关注', value: profile?.followingCount),
-        const SizedBox(width: 16),
-        _StatValue(label: '粉丝', value: profile?.followerCount),
-        const SizedBox(width: 16),
-        _StatValue(label: '获赞', value: profile?.likeCount),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: ShapeDecoration(
+        color: Colors.white.withOpacity(0.68),
+        shape: ContinuousRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.white.withOpacity(0.9), width: 1),
+        ),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(
+              child: _StatMetricItem(
+                label: '关注',
+                value: profile?.followingCount,
+                onTap: onTapFollowing,
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              indent: 6,
+              endIndent: 6,
+              color: AppColors.primary.withOpacity(0.10),
+            ),
+            Expanded(
+              child: _StatMetricItem(
+                label: '粉丝',
+                value: profile?.followerCount,
+                onTap: onTapFollowers,
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              indent: 6,
+              endIndent: 6,
+              color: AppColors.primary.withOpacity(0.10),
+            ),
+            Expanded(
+              child: _StatMetricItem(
+                label: '获赞',
+                value: profile?.likeCount,
+                onTap: onTapLikes,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _StatValue extends StatelessWidget {
-  const _StatValue({required this.label, required this.value});
+class _StatMetricItem extends StatelessWidget {
+  const _StatMetricItem({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
 
   final String label;
   final int? value;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value == null ? '-' : _compact(value!),
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.text1,
-          ),
+    return _ScaleTap(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value == null ? '-' : _compact(value!),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.text1,
+                fontFeatures: [FontFeature.tabularFigures()],
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.text2,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 3),
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text3)),
-      ],
+      ),
     );
   }
 
@@ -457,19 +717,32 @@ class _StatValue extends StatelessWidget {
   }
 }
 
-/// 圆形头像：优先网络图，缺省显示昵称首字（原型 `.ava`）。
+/// 圆形头像：带纯白外环与柔和立体阴影，缺省显示渐变底色 + 昵称首字。
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.nickname, this.avatar});
+  const _Avatar({required this.nickname, this.avatar, this.size = 56});
 
   final String nickname;
   final String? avatar;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return ClipOval(
-      child: SizedBox(
-        width: 56,
-        height: 56,
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(2.5),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1A183A6E),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipOval(
         child: (avatar != null && avatar!.isNotEmpty)
             ? Image.network(
                 avatarUrl(avatar),
@@ -482,12 +755,18 @@ class _Avatar extends StatelessWidget {
   }
 
   Widget get _placeholder => Container(
-        color: AppColors.primaryTint,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFDCE9FA), Color(0xFFC2D8F6)],
+          ),
+        ),
         alignment: Alignment.center,
         child: Text(
           nickname.characters.first,
-          style: const TextStyle(
-            fontSize: 20,
+          style: TextStyle(
+            fontSize: size * 0.36,
             fontWeight: FontWeight.w700,
             color: AppColors.primary,
           ),
@@ -503,219 +782,213 @@ class _AuthButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.primaryTint,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Text(
-            '去认证',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.primary,
+    return _ScaleTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26254E90),
+              blurRadius: 8,
+              offset: Offset(0, 3),
             ),
-          ),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-/// 快捷宫格：一行四个圆形图标入口（原型 `.quick`）。
-///
-/// 入口按账号类型分流（原型 profile.html 创作者 / profile_client.html 甲方）；
-/// 未接入真实页面的入口点击仅提示「建设中」。
-class _QuickGrid extends StatefulWidget {
-  const _QuickGrid({required this.ref, required this.user, required this.unread});
-
-  final WidgetRef ref;
-  final User user;
-  final int unread;
-
-  @override
-  State<_QuickGrid> createState() => _QuickGridState();
-}
-
-class _QuickGridState extends State<_QuickGrid> {
-  static const int _columns = 4;
-  static const int _rows = 2;
-  static const double _cellHeight = 84;
-  static const int _perPage = _columns * _rows;
-
-  final PageController _controller = PageController();
-  int _page = 0;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  List<_QuickEntry> _entries() {
-    final ref = widget.ref;
-    final user = widget.user;
-    return <_QuickEntry>[
-      _QuickEntry(ref, Icons.star_outline, '收藏',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.favorites)),
-      _QuickEntry(ref, Icons.chat_bubble_outline, '消息',
-          badge: widget.unread,
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.messages)),
-      _QuickEntry(ref, Icons.forum_outlined, '会话',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.chatSessionList)),
-      _QuickEntry(ref, Icons.person_outline, '个人主页',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.userProfileUrl(0))),
-      if (user.authorCapability) ...[
-        _QuickEntry(ref, Icons.auto_awesome, 'AI 创作',
-            onTap: (ctx, ref) =>
-                AuthGuard.pushProtected(ctx, ref, target: RoutePath.aiCenter)),
-        _QuickEntry(ref, Icons.approval, '我的印章',
-            onTap: (ctx, ref) =>
-                AuthGuard.pushProtected(ctx, ref, target: RoutePath.mySeal)),
-        // 相对 GitHub：创作者后台 → 版权管理（直接进入版权首页）
-        _QuickEntry(ref, Icons.copyright_outlined, '版权管理',
-            onTap: (ctx, ref) =>
-                AuthGuard.pushProtected(ctx, ref, target: RoutePath.copyrightHome)),
-      ],
-      if (user.isClient) ...[
-        _QuickEntry(ref, Icons.fact_check_outlined, '我的选品'),
-        _QuickEntry(ref, Icons.campaign_outlined, '需求发布'),
-        _QuickEntry(ref, Icons.movie_outlined, '短剧管理'),
-        _QuickEntry(ref, Icons.approval, '我的印章',
-            onTap: (ctx, ref) =>
-                AuthGuard.pushProtected(ctx, ref, target: RoutePath.mySeal)),
-      ],
-      _QuickEntry(ref, Icons.account_balance_wallet_outlined, '交易管理',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.tradeManagement)),
-      _QuickEntry(ref, Icons.card_giftcard, '福利',
-          onTap: (ctx, ref) =>
-              AuthGuard.pushProtected(ctx, ref, target: RoutePath.welfareCenter)),
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = _entries();
-    // 每页 2 行 × 4 列；多余按钮进入后续页，横向滑动切换。
-    final pages = <List<_QuickEntry>>[];
-    for (var i = 0; i < entries.length; i += _perPage) {
-      pages.add(entries.sublist(i, (i + _perPage).clamp(0, entries.length)));
-    }
-    if (pages.isEmpty) pages.add(const []);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cellWidth = constraints.maxWidth / _columns;
-        return Column(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              height: _cellHeight * _rows,
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: pages.length,
-                onPageChanged: (index) => setState(() => _page = index),
-                itemBuilder: (context, pageIndex) {
-                  return Wrap(
-                    children: [
-                      for (final entry in pages[pageIndex])
-                        SizedBox(width: cellWidth, height: _cellHeight, child: entry),
-                    ],
-                  );
-                },
+            Text(
+              '去认证',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
-            if (pages.length > 1) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < pages.length; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == _page ? 16 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: i == _page ? AppColors.primary : AppColors.divider,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                ],
-              ),
-            ],
+            SizedBox(width: 2),
+            Icon(Icons.chevron_right_rounded, size: 15, color: Colors.white),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _QuickEntry extends StatelessWidget {
-  const _QuickEntry(this.ref, this.icon, this.label, {this.onTap, this.badge = 0});
+/// 创作者专属 Bento 工作台区：
+/// 左侧主卡突出「AI 创作」，右侧上下叠放「版权管理」与「我的印章」，
+/// 将核心生产力工具从普通宫格中提权，同时解放下方工具栏实现零翻页。
+class _CreatorBentoSection extends StatelessWidget {
+  const _CreatorBentoSection({required this.ref});
 
   final WidgetRef ref;
-  final IconData icon;
-  final String label;
-
-  /// 入口尚未接入页面时为 null，点击仅提示建设中。
-  final void Function(BuildContext context, WidgetRef ref)? onTap;
-  final int badge;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap != null ? () => onTap!(context, ref) : () => showAppToast(context, '「$label」建设中'),
-      child: Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: SizedBox(
+        height: 118,
+        child: Row(
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryTint,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 20, color: AppColors.primary),
+            // 左主卡：AI 创作
+            Expanded(
+              flex: 11,
+              child: _ScaleTap(
+                onTap: () => AuthGuard.pushProtected(
+                  context,
+                  ref,
+                  target: RoutePath.aiCenter,
                 ),
-                if (badge > 0)
-                  Positioned(
-                    top: -3,
-                    right: -3,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      constraints: const BoxConstraints(minWidth: 16),
-                      decoration: const BoxDecoration(
-                        color: AppColors.danger,
-                        borderRadius: BorderRadius.all(Radius.circular(9)),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                  decoration: ShapeDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF2B59A2), Color(0xFF1A3868)],
+                    ),
+                    shape: ContinuousRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    shadows: const [
+                      BoxShadow(
+                        color: Color(0x281D3E73),
+                        blurRadius: 16,
+                        offset: Offset(0, 6),
                       ),
-                      child: Text(
-                        badge > 99 ? '99+' : '$badge',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ],
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        right: -6,
+                        bottom: -8,
+                        child: Icon(
+                          Icons.auto_awesome,
+                          size: 64,
+                          color: Colors.white.withOpacity(0.10),
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.16),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.auto_awesome,
+                                  size: 16,
+                                  color: Color(0xFFFFE082),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'AI 创作',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '灵感大纲 · 智能续写润色',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withOpacity(0.82),
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 3.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '进入工作台',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 2),
+                                Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // 右侧双横卡：版权管理 + 我的印章
+            Expanded(
+              flex: 10,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _BentoSubCard(
+                      icon: Icons.copyright_outlined,
+                      iconColor: const Color(0xFF1F6E5A),
+                      iconBg: const Color(0xFFE6F4F0),
+                      title: '版权管理',
+                      subtitle: '确权登记 · 证书',
+                      onTap: () => AuthGuard.pushProtected(
+                        context,
+                        ref,
+                        target: RoutePath.copyrightHome,
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _BentoSubCard(
+                      icon: Icons.approval_outlined,
+                      iconColor: const Color(0xFFB76E1D),
+                      iconBg: const Color(0xFFFCF3E6),
+                      title: '我的印章',
+                      subtitle: '电子签章管理',
+                      onTap: () => AuthGuard.pushProtected(
+                        context,
+                        ref,
+                        target: RoutePath.mySeal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -724,7 +997,295 @@ class _QuickEntry extends StatelessWidget {
   }
 }
 
-/// 我的书架：一行三本的竖版书封网格（原型 `.shelf` / `.book`）。
+/// 甲方专属 Bento 区：展示我的选品、需求发布、短剧管理、我的印章。
+class _ClientBentoSection extends StatelessWidget {
+  const _ClientBentoSection({required this.ref});
+
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _BentoSubCard(
+                  icon: Icons.fact_check_outlined,
+                  iconColor: AppColors.primary,
+                  iconBg: AppColors.primaryTint,
+                  title: '我的选品',
+                  subtitle: '意向剧本清单',
+                  onTap: () => showAppToast(context, '「我的选品」建设中'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _BentoSubCard(
+                  icon: Icons.campaign_outlined,
+                  iconColor: const Color(0xFFC96A1B),
+                  iconBg: const Color(0xFFFEF3E8),
+                  title: '需求发布',
+                  subtitle: '征稿与定制需求',
+                  onTap: () => showAppToast(context, '「需求发布」建设中'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _BentoSubCard(
+                  icon: Icons.movie_outlined,
+                  iconColor: const Color(0xFF534696),
+                  iconBg: const Color(0xFFF1EFFB),
+                  title: '短剧管理',
+                  subtitle: '制作与上线跟进',
+                  onTap: () => showAppToast(context, '「短剧管理」建设中'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _BentoSubCard(
+                  icon: Icons.approval_outlined,
+                  iconColor: const Color(0xFF1F6E5A),
+                  iconBg: const Color(0xFFE6F4F0),
+                  title: '我的印章',
+                  subtitle: '电子签章管理',
+                  onTap: () => AuthGuard.pushProtected(
+                    context,
+                    ref,
+                    target: RoutePath.mySeal,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BentoSubCard extends StatelessWidget {
+  const _BentoSubCard({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ScaleTap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: ShapeDecoration(
+          color: AppColors.card,
+          shape: ContinuousRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(color: Colors.white.withOpacity(0.9), width: 1),
+          ),
+          shadows: const [
+            BoxShadow(
+              color: Color(0x0A183A6E),
+              offset: Offset(0, 4),
+              blurRadius: 14,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: ShapeDecoration(
+                color: iconBg,
+                shape: ContinuousRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text1,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppColors.text3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: AppColors.text3,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 常用工具单行直达：5 个高频入口一行排开，采用语义淡彩圆角矩形图标，零翻页隐藏。
+class _QuickToolRow extends StatelessWidget {
+  const _QuickToolRow({required this.ref});
+
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    final tools = <_QuickToolItem>[
+      _QuickToolItem(
+        icon: Icons.star_outline_rounded,
+        label: '收藏',
+        iconColor: const Color(0xFFD48806),
+        bgColor: const Color(0xFFFDF6EC),
+        onTap: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.favorites,
+        ),
+      ),
+      _QuickToolItem(
+        icon: Icons.headset_mic_outlined,
+        label: '询盘管理',
+        iconColor: AppColors.primary,
+        bgColor: AppColors.primaryTint,
+        onTap: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.inquiryList,
+        ),
+      ),
+      _QuickToolItem(
+        icon: Icons.shopping_bag_outlined,
+        label: '订单管理',
+        iconColor: const Color(0xFF1F7A6E),
+        bgColor: const Color(0xFFE7F6F4),
+        onTap: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.orderList,
+        ),
+      ),
+      _QuickToolItem(
+        icon: Icons.monetization_on_outlined,
+        label: '作者收益',
+        iconColor: const Color(0xFF4C4B99),
+        bgColor: const Color(0xFFF1F0FC),
+        onTap: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.myIncomeOverview,
+        ),
+      ),
+      _QuickToolItem(
+        icon: Icons.card_giftcard_rounded,
+        label: '福利',
+        iconColor: const Color(0xFFD54941),
+        bgColor: const Color(0xFFFEF0EE),
+        onTap: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.welfareCenter,
+        ),
+      ),
+    ];
+
+    return Row(
+      children: [
+        for (final item in tools) Expanded(child: item),
+      ],
+    );
+  }
+}
+
+class _QuickToolItem extends StatelessWidget {
+  const _QuickToolItem({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+    required this.bgColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+  final Color bgColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ScaleTap(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: ShapeDecoration(
+              color: bgColor,
+              shape: ContinuousRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Icon(icon, size: 22, color: iconColor),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.text1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 我的书架：一行三本的竖版仿真书封网格。
 class _ShelfSection extends StatelessWidget {
   const _ShelfSection({required this.shelf});
 
@@ -732,17 +1293,80 @@ class _ShelfSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final count = shelf.valueOrNull?.list.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '我的书架',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text1),
+        Row(
+          children: [
+            Container(
+              width: 3.5,
+              height: 15,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              '我的书架',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.text1,
+              ),
+            ),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTint,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count 本',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+            const Spacer(),
+            _ScaleTap(
+              onTap: () => context.go(RoutePath.bookstore),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '去书城',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.text3,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: AppColors.text3,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         shelf.when(
           loading: () => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
+            padding: EdgeInsets.symmetric(vertical: 36),
             child: Center(
               child: SizedBox(
                 width: 22,
@@ -752,19 +1376,34 @@ class _ShelfSection extends StatelessWidget {
             ),
           ),
           error: (error, _) => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
+            padding: EdgeInsets.symmetric(vertical: 28),
             child: Center(
-              child: Text('书架加载失败，下拉可重试',
-                  style: TextStyle(fontSize: 12, color: AppColors.text3)),
+              child: Text(
+                '书架加载失败，下拉可重试',
+                style: TextStyle(fontSize: 12, color: AppColors.text3),
+              ),
             ),
           ),
           data: (payload) {
             if (payload.list.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 28),
                 child: Center(
-                  child: Text('书架暂无作品，去首页添加吧',
-                      style: TextStyle(fontSize: 12, color: AppColors.text3)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_stories_outlined,
+                        size: 38,
+                        color: AppColors.text3.withOpacity(0.55),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '书架暂无作品，去首页添加吧',
+                        style: TextStyle(fontSize: 12, color: AppColors.text3),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
@@ -772,9 +1411,9 @@ class _ShelfSection extends StatelessWidget {
               crossAxisCount: 3,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.62,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 14,
+              childAspectRatio: 0.58,
               padding: EdgeInsets.zero,
               children: [
                 for (var i = 0; i < payload.list.length; i++)
@@ -788,57 +1427,118 @@ class _ShelfSection extends StatelessWidget {
   }
 }
 
-/// 竖版书封：优先展示真实封面图，缺失/加载失败时回退到 3:4 渐变底 + 书名
-/// （对照原型 `.book .cv.g1/g2/g3` 的三套蓝色系书封）。
-///
-/// 修复：原实现固定渲染「渐变底 + 书名白字」，导致书架预览显示名字而非
-/// 作品真实封面，与详情页/书城（WorkCover 封面图）不一致；现改为封面图优先。
+/// 竖版立体书封：优先展示真实封面图，缺失/加载失败时回退到 3:4 书卷渐变底 + 书名。
+/// 叠加仿真书脊折痕高光与 1px 内描边，避免纯白/纯黑封面与背景粘连。
 class _ShelfBook extends StatelessWidget {
   const _ShelfBook({required this.work, required this.gradientIndex});
 
   final BookItem work;
   final int gradientIndex;
 
-  // 对照原型 app.css `.book .cv.g1/g2/g3` 的三套蓝色系书封渐变（兜底用）。
+  // 东方书卷三套深邃兜底书封渐变（黛蓝 / 绛紫 / 苍青）。
   static const _gradients = <List<Color>>[
-    <Color>[Color(0xFF2F5FA8), Color(0xFF1B3A6B)],
-    <Color>[Color(0xFF254E90), Color(0xFF16305C)],
-    <Color>[Color(0xFF4A76B8), Color(0xFF2A4C86)],
+    <Color>[Color(0xFF2F5FA8), Color(0xFF193560)],
+    <Color>[Color(0xFF42366E), Color(0xFF241C42)],
+    <Color>[Color(0xFF285963), Color(0xFF16353B)],
   ];
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return _ScaleTap(
       onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: AppColors.cardShadow,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x16183A6E),
+                    offset: Offset(0, 5),
+                    blurRadius: 12,
+                  ),
+                  BoxShadow(
+                    color: Color(0x0A000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 3,
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: work.cover.isEmpty ? _fallback() : _coverImage(),
+                borderRadius: BorderRadius.circular(9),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    work.cover.isEmpty ? _fallback() : _coverImage(),
+                    // 仿真左侧书脊明暗折痕光泽
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 8,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.black.withOpacity(0.18),
+                                Colors.white.withOpacity(0.22),
+                                Colors.black.withOpacity(0.06),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.35, 0.7, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 1px 内描边：解决浅白封面或纯黑封面与背景糊化的问题
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: Colors.black.withOpacity(0.08),
+                              width: 0.8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             work.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: AppColors.text1),
+            textAlign: TextAlign.start,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text1,
+              height: 1.2,
+            ),
           ),
+          const SizedBox(height: 2),
           Text(
-            work.authorName,
+            work.authorName.isEmpty ? '佚名' : work.authorName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: AppColors.text3),
+            textAlign: TextAlign.start,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.text3,
+              height: 1.2,
+            ),
           ),
         ],
       ),
@@ -855,10 +1555,10 @@ class _ShelfBook extends StatelessWidget {
         errorBuilder: (_, __, ___) => _fallback(),
       );
 
-  /// 封面缺失/加载失败时的兜底书封：蓝色渐变 + 左侧书脊线 + 书名白字。
+  /// 封面缺失/加载失败时的兜底书封：深邃书卷渐变 + 书脊装订线 + 书名白字。
   Widget _fallback() => Container(
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -868,13 +1568,26 @@ class _ShelfBook extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            const Positioned(
-              left: 7,
-              top: 0,
-              bottom: 0,
-              width: 1,
-              child: ColoredBox(color: Colors.white24),
-            ),
+            if (work.genreName.isNotEmpty)
+              Positioned(
+                top: 0,
+                left: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    work.genreName,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
             Center(
               child: Text(
                 work.title,
