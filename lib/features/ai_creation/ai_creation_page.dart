@@ -70,8 +70,6 @@ class _AssetCard extends ConsumerWidget {
         data: (value) => Row(
           children: [
             _AssetItem(label: '积分', value: '${value.points.balance}'),
-            const SizedBox(width: 32),
-            _AssetItem(label: 'AI 机会', value: '${value.aiAvailable}'),
           ],
         ),
       ),
@@ -158,11 +156,6 @@ class _FeatureCard extends StatelessWidget {
         icon: Icons.history,
         label: 'AI 记录',
         onTap: () => context.push(RoutePath.aiRecords),
-      ),
-      _FeatureCell(
-        icon: Icons.bolt,
-        label: 'AI 机会',
-        onTap: () => context.push(RoutePath.aiOpportunity),
       ),
     ];
   }

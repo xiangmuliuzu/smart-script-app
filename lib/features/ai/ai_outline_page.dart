@@ -289,7 +289,7 @@ class _ResultCard extends StatelessWidget {
                       color: AppColors.text1)),
               const Spacer(),
               if (result.quotaUsed > 0)
-                Text('消耗 ${result.quotaUsed} 次',
+                Text('消耗 ${result.quotaUsed} token',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.text3)),
             ],

@@ -196,6 +196,7 @@ class AiWriteRecord {
     this.outputContent = '',
     this.wordCount = 0,
     this.aiModel = '',
+    this.tokensUsed = 0,
     this.status = '',
     this.createdAt = '',
   });
@@ -207,6 +208,9 @@ class AiWriteRecord {
   final String outputContent;
   final int wordCount;
   final String aiModel;
+
+  /// 【去次数化】本次调用实际消耗 token 数（tokens_used）。
+  final int tokensUsed;
   final String status;
   final String createdAt;
 
@@ -232,6 +236,7 @@ class AiWriteRecord {
         outputContent: _text(json['outputContent']),
         wordCount: _int(json['wordCount']),
         aiModel: _text(json['aiModel']),
+        tokensUsed: _int(json['tokensUsed']),
         status: _text(json['status']),
         createdAt: _text(json['createdAt'] ?? json['createTime']),
       );

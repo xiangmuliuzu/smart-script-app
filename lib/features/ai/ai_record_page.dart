@@ -295,6 +295,11 @@ class _RecordCard extends StatelessWidget {
                   Text('字数 ${record.wordCount}',
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.text3)),
+                  const SizedBox(width: 12),
+                  if (record.tokensUsed > 0)
+                    Text('消耗 ${record.tokensUsed} token',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.text3)),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: () => _copyOutput(context),

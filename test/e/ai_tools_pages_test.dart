@@ -43,7 +43,7 @@ class _FakeAiRepository implements AiRepository {
     String? type,
   }) async {
     calls.add('write:$prompt');
-    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     return AiWriteResult(content: writeContent, recordId: 11);
   }
@@ -55,7 +55,7 @@ class _FakeAiRepository implements AiRepository {
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt');
-    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     onDelta('夜色里，他站在');
     onDelta('落地窗前，沉默良久。');
@@ -68,7 +68,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
   }) async {
     calls.add('polish:$content|$style');
-    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     return AiWriteResult(content: polishContent, recordId: 22);
   }
@@ -80,7 +80,7 @@ class _FakeAiRepository implements AiRepository {
     required void Function(String delta) onDelta,
   }) async {
     calls.add('polishStream:$content|$style');
-    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     onDelta('【润色】夜色如墨，他立于');
     onDelta('窗前，久久无言。');
@@ -94,7 +94,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
-    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     return AiOutlineResult(
       outline: outlineText,
@@ -111,7 +111,7 @@ class _FakeAiRepository implements AiRepository {
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
-    if (quotaInsufficient) throw ApiException('AI次数不足，当前可用: 0 次', code: 400);
+    if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
     if (shouldFail) throw ApiException('AI 服务不可用');
     onDelta('第一幕：跌入谷底\n');
     onDelta('第二幕：逆袭崛起\n');
@@ -193,7 +193,7 @@ void main() {
       expect(find.text('生成的大纲'), findsOneWidget);
       expect(find.text('第一幕：跌入谷底\n第二幕：逆袭崛起\n第三幕：登顶巅峰'),
           findsOneWidget);
-      expect(find.text('消耗 1 次'), findsOneWidget);
+      expect(find.text('消耗 1 token'), findsOneWidget);
       expect(find.text('保存（复制全文）'), findsOneWidget);
       expect(fake.calls.first, contains('outlineStream:都市青年逆袭|都市|爽文'));
     });
@@ -309,10 +309,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('AI 次数不足'), findsOneWidget);
-      expect(find.textContaining('当前可用: 0 次'), findsOneWidget);
-      expect(find.text('积分兑换'), findsOneWidget);
-      expect(find.text('看广告获取'), findsOneWidget);
+      expect(find.text('积分不足'), findsOneWidget);
+      expect(find.textContaining('当前余额: 0 分'), findsOneWidget);
+      expect(find.text('去福利中心获取积分'), findsOneWidget);
+      expect(find.text('去福利中心获取积分'), findsOneWidget);
     });
   });
 
