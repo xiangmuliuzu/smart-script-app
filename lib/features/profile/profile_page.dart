@@ -573,6 +573,10 @@ class _QuickGridState extends State<_QuickGrid> {
           onTap: (ctx, ref) =>
               AuthGuard.pushProtected(ctx, ref, target: RoutePath.userProfileUrl(0))),
       if (user.authorCapability) ...[
+        // 我的作品（原底部「创作」tab 的根页面，现收进「我的」快捷宫格）
+        _QuickEntry(ref, Icons.library_books_outlined, '我的作品',
+            onTap: (ctx, ref) =>
+                AuthGuard.pushProtected(ctx, ref, target: RoutePath.create)),
         _QuickEntry(ref, Icons.auto_awesome, 'AI 创作',
             onTap: (ctx, ref) =>
                 AuthGuard.pushProtected(ctx, ref, target: RoutePath.aiCenter)),

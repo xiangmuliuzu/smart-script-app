@@ -9,7 +9,8 @@ import '../../core/theme/app_colors.dart';
 
 /// 主框架的底部导航容器（对应 UI 原型 `.tabbar` 五格平铺 + 中间圆形凸起）。
 ///
-/// 五个分支由 [StatefulNavigationShell] 管理，切 tab 会保留各自导航栈。
+/// 四个 tab 分支（书城 / 视频 / 分类 / 我的）由 [StatefulNavigationShell] 管理，
+/// 切 tab 会保留各自导航栈；中间「创作」是新建作品的快捷入口，不占用分支。
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
 
@@ -24,16 +25,23 @@ class HomeShell extends ConsumerWidget {
   ];
 
   void _onTap(BuildContext context, WidgetRef ref, int index) {
+    // 中间「创作」是新建作品的快捷入口：直接进入新建表单，不占用/切换 tab 分支。
+    if (index == 2) {
+      AuthGuard.pushProtected(context, ref, target: RoutePath.workUpload);
+      return;
+    }
     if (index == 4 && !AuthGuard.isLoggedIn(ref)) {
       if (ref.read(authControllerProvider).status == AuthStatus.unauthenticated) {
         context.go(AuthGuard.loginLocation(ref, RoutePath.profile));
       }
       return;
     }
+    // 去掉创作分支后，其余四个 tab 映射到 0-3 四个分支（视觉 index>2 时减 1）。
+    final branchIndex = index > 2 ? index - 1 : index;
     shell.goBranch(
-      index,
+      branchIndex,
       // 点击当前 tab 时回到该分支首页
-      initialLocation: index == shell.currentIndex,
+      initialLocation: branchIndex == shell.currentIndex,
     );
   }
 
@@ -57,12 +65,13 @@ class HomeShell extends ConsumerWidget {
                     child: i == 2
                         ? _CenterTab(
                             tab: _tabs[i],
-                            active: shell.currentIndex == i,
+                            // 创作是快捷动作，不存在常驻选中态。
+                            active: false,
                             onTap: () => _onTap(context, ref, i),
                           )
                         : _TabButton(
                             tab: _tabs[i],
-                            active: shell.currentIndex == i,
+                            active: shell.currentIndex == (i > 2 ? i - 1 : i),
                             onTap: () => _onTap(context, ref, i),
                           ),
                   ),
@@ -107,7 +116,8 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-/// 中间「创作」按钮：圆形凸起样式，落点为「我的作品列表」（create_page）。
+/// 中间「创作」按钮：圆形凸起样式，作为**新建作品**的快捷入口，点击直接进入
+/// 新建表单（workUpload），不占用底部 tab 分支，故无常驻选中态。
 ///
 /// 造型：40×40 圆形，用 [Stack] + [Positioned] 让其顶部高出底栏上沿 8px
 /// （`top: -8`），形成跨越顶部分隔线的「凸起」观感；label 贴底对齐，与其余

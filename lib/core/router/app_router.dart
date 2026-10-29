@@ -206,7 +206,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.privacyPolicy,
         builder: (_, __) => const PrivacyPolicyPage(),
       ),
-      // 底部导航五格：书城 / 漫剧 / 创作(+) / 分类 / 我的
+      // 底部导航：四个 tab 分支（书城 / 视频 / 分类 / 我的）+ 中间「创作」快捷入口
+      // （创作不再占用分支，点击直接进入新建作品，见 HomeShell）。
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
         branches: [
@@ -225,15 +226,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: RoutePath.comic,
                 name: RouteName.comic,
                 builder: (_, __) => const ComicPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: RoutePath.create,
-                name: RouteName.create,
-                builder: (_, __) => const CreatePage(),
               ),
             ],
           ),
@@ -377,6 +369,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       // ===== B 模块创作链路（受登录守卫保护，见 ProtectedRoutes）=====
+      // 我的作品列表（原「创作」tab 根页面，现收进「我的」页的「我的作品」入口，
+      // 作为普通页面 push 打开；页面内自带游客引导与创作能力引导）。
+      GoRoute(
+        path: RoutePath.create,
+        name: RouteName.create,
+        builder: (_, __) => const CreatePage(),
+      ),
       GoRoute(
         path: RoutePath.workUpload,
         name: RouteName.workUpload,
