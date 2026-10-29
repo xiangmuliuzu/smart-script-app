@@ -81,16 +81,9 @@ class BookstorePage extends ConsumerWidget {
             const AppCard(
               child: Padding(
                 padding: EdgeInsets.only(bottom: 12),
-                child: _CategoryEntries(),
-              ),
-            ),
-            const AppCard(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 12),
                 child: _RankingPreview(),
               ),
             ),
-            const _BannerCarousel(position: 'home_middle'),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
