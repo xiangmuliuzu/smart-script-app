@@ -134,6 +134,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
                   child: _QuickToolRow(
                     ref: ref,
+                    isCreator: user.authorCapability,
                   ),
                 ),
                 _CardBox(
@@ -818,7 +819,7 @@ class _AuthButton extends StatelessWidget {
 }
 
 /// 创作者专属 Bento 工作台区：
-/// 左侧主卡突出「AI 创作」，右侧上下叠放「我的作品」「版权管理」与「我的印章」，
+/// 左侧主卡突出「AI 创作」，右侧上下叠放「我的作品」「询盘管理」与「订单管理」，
 /// 将核心生产力工具从普通宫格中提权，同时解放下方工具栏实现零翻页。
 class _CreatorBentoSection extends StatelessWidget {
   const _CreatorBentoSection({required this.ref});
@@ -953,7 +954,7 @@ class _CreatorBentoSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // 右侧三横卡：我的作品 + 版权管理 + 我的印章
+            // 右侧三横卡：我的作品 + 询盘管理 + 订单管理
             Expanded(
               flex: 10,
               child: Column(
@@ -976,30 +977,30 @@ class _CreatorBentoSection extends StatelessWidget {
                   const SizedBox(height: 8),
                   Expanded(
                     child: _BentoSubCard(
-                      icon: Icons.copyright_outlined,
+                      icon: Icons.headset_mic_outlined,
                       iconColor: const Color(0xFF1F6E5A),
                       iconBg: const Color(0xFFE6F4F0),
-                      title: '版权管理',
-                      subtitle: '确权登记 · 证书',
+                      title: '询盘管理',
+                      subtitle: '查看与处理询盘',
                       onTap: () => AuthGuard.pushProtected(
                         context,
                         ref,
-                        target: RoutePath.copyrightHome,
+                        target: RoutePath.inquiryList,
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
                     child: _BentoSubCard(
-                      icon: Icons.approval_outlined,
+                      icon: Icons.shopping_bag_outlined,
                       iconColor: const Color(0xFFB76E1D),
                       iconBg: const Color(0xFFFCF3E6),
-                      title: '我的印章',
-                      subtitle: '电子签章管理',
+                      title: '订单管理',
+                      subtitle: '查看订单与合同',
                       onTap: () => AuthGuard.pushProtected(
                         context,
                         ref,
-                        target: RoutePath.mySeal,
+                        target: RoutePath.orderList,
                       ),
                     ),
                   ),
@@ -1179,9 +1180,10 @@ class _BentoSubCard extends StatelessWidget {
 
 /// 常用工具单行直达：5 个高频入口一行排开，采用语义淡彩圆角矩形图标，零翻页隐藏。
 class _QuickToolRow extends StatelessWidget {
-  const _QuickToolRow({required this.ref});
+  const _QuickToolRow({required this.ref, required this.isCreator});
 
   final WidgetRef ref;
+  final bool isCreator;
 
   @override
   Widget build(BuildContext context) {
@@ -1198,25 +1200,25 @@ class _QuickToolRow extends StatelessWidget {
         ),
       ),
       _QuickToolItem(
-        icon: Icons.headset_mic_outlined,
-        label: '询盘管理',
+        icon: isCreator ? Icons.copyright_outlined : Icons.headset_mic_outlined,
+        label: isCreator ? '版权管理' : '询盘管理',
         iconColor: AppColors.primary,
         bgColor: AppColors.primaryTint,
         onTap: () => AuthGuard.pushProtected(
           context,
           ref,
-          target: RoutePath.inquiryList,
+          target: isCreator ? RoutePath.copyrightHome : RoutePath.inquiryList,
         ),
       ),
       _QuickToolItem(
-        icon: Icons.shopping_bag_outlined,
-        label: '订单管理',
+        icon: isCreator ? Icons.approval_outlined : Icons.shopping_bag_outlined,
+        label: isCreator ? '我的印章' : '订单管理',
         iconColor: const Color(0xFF1F7A6E),
         bgColor: const Color(0xFFE7F6F4),
         onTap: () => AuthGuard.pushProtected(
           context,
           ref,
-          target: RoutePath.orderList,
+          target: isCreator ? RoutePath.mySeal : RoutePath.orderList,
         ),
       ),
       _QuickToolItem(
