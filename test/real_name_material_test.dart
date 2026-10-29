@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,20 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:script_app/core/constants/app_constants.dart';
 import 'package:script_app/core/network/api_client.dart';
-import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/core/providers/app_providers.dart';
 import 'package:script_app/core/router/route_paths.dart';
 import 'package:script_app/core/storage/secure_token_storage.dart';
 import 'package:script_app/features/auth/data/auth_repository.dart';
 import 'package:script_app/features/profile/profile_page.dart';
 import 'package:script_app/features/profile/pages/real_name_page.dart';
-import 'package:script_app/features/user_center/data/user_center_repository.dart';
 
 import 'support/scripted_api.dart';
-
-const _image =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-const _reference = 'realname/12/0123456789abcdef0123456789abcdef.png';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -99,26 +90,6 @@ void main() {
       expect(find.byType(ProfilePage), findsOneWidget);
     }
     expect(api.requests.every((request) => request.method == 'GET'), isTrue);
-  });
-
-  test(
-      'repository uploads multipart to private material endpoint and rejects empty results',
-      () async {
-    final api = ScriptedApi();
-    final repository = UserCenterRepository(ApiClient(api.buildDio()));
-    api.reply('/users/me/real-name/material',
-        Envelope.ok({'materialRef': _reference}));
-    expect(
-        await repository.uploadRealNameMaterial(
-            bytes: base64Decode(_image), filename: 'realname.png'),
-        _reference);
-    final form = api.requests.single.data as FormData;
-    expect(form.files.single.key, 'file');
-    expect(form.files.single.value.filename, 'realname.png');
-    api.reply('/users/me/real-name/material', Envelope.ok({'materialRef': ''}));
-    await expectLater(
-        repository.uploadRealNameMaterial(bytes: [1], filename: 'realname.png'),
-        throwsA(isA<ApiException>()));
   });
 
   for (final id in [

@@ -103,25 +103,6 @@ class UserCenterRepository {
   // 实名认证（§1.3）
   // ------------------------------------------------------------------
 
-  /// 上传审核专用材料；返回内部引用，不提供公开图片地址。
-  Future<String> uploadRealNameMaterial({
-    required List<int> bytes,
-    required String filename,
-  }) async {
-    final data = await _api.upload<Map<String, dynamic>>(
-      ApiEndpoints.myRealNameMaterial,
-      formData: FormData.fromMap({
-        'file': MultipartFile.fromBytes(bytes, filename: filename),
-      }),
-      parser: _mapParser,
-    );
-    final reference = data?['materialRef'];
-    if (reference is! String || reference.trim().isEmpty) {
-      throw ApiException('材料上传失败，请稍后重试');
-    }
-    return reference;
-  }
-
   Future<RealNameStatus> realNameStatus() async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.myRealName,
@@ -134,7 +115,6 @@ class UserCenterRepository {
   Future<RealNameStatus> submitRealName({
     required String realName,
     required String idNumber,
-    List<String> materialRefs = const [],
     required bool resubmit,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
@@ -142,7 +122,6 @@ class UserCenterRepository {
       data: {
         'realName': realName,
         'idNumber': idNumber,
-        if (materialRefs.isNotEmpty) 'materialRefs': materialRefs,
       },
       parser: _mapParser,
     );

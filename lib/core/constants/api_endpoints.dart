@@ -20,7 +20,6 @@ class ApiEndpoints {
   // ===== A5 用户中心契约：个人资料与账号安全 =====
   static const String myProfile = '/users/me/profile';
   static const String myRealName = '/users/me/real-name';
-  static const String myRealNameMaterial = '/users/me/real-name/material';
   static const String myRealNameResubmit = '/users/me/real-name/resubmit';
   /// 创作者申请（GET 查状态，POST 提交）。
   static const String myCreatorApply = '/users/me/creator-application';

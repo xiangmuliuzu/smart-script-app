@@ -15,7 +15,6 @@
 //   LIVE_SMS_CODE       测试环境 Mock 短信验证码（与后端 APP_SMS_MOCK_CODE 一致）
 //   LIVE_ADMIN_USER     管理端账号（已实名 / 有角色路径需要）
 //   LIVE_ADMIN_PASSWORD 管理端口令
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -267,14 +266,9 @@ void main() {
     final account = await _registerAccount(stack);
 
     final userCenter = UserCenterRepository(stack.apiClient);
-    final material = await userCenter.uploadRealNameMaterial(
-      bytes: base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='),
-      filename: 'realname.png',
-    );
     await userCenter.submitRealName(
       realName: '联调用户',
       idNumber: '110101199001011234',
-      materialRefs: [material],
       resubmit: false,
     );
 
