@@ -391,10 +391,7 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: '榜单',
-          onMore: () => context.push(RoutePath.rankingUrl(_type)),
-        ),
+        const SectionHeader(title: '榜单'),
         FilterChipBar(
           items: [
             for (final type in RankingType.all)
@@ -416,7 +413,6 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
             if (items.isEmpty) return const _SectionEmpty(message: '榜单暂无数据');
             final preview = items.take(_previewSize).toList();
             return Padding(
-              // 行内留白由卡片承担，只在卡片内补水平内边距。
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Column(
                 children: [
@@ -427,6 +423,11 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
                       showDivider: i != preview.length - 1,
                       onTap: () => context.push(RoutePath.workDetailUrl(preview[i].workId)),
                     ),
+                  // 底部"查看更多"按钮，明确表达"当前榜单还有更多内容"
+                  TextButton(
+                    onPressed: () => context.push(RoutePath.rankingUrl(_type)),
+                    child: const Text('查看更多 >', style: TextStyle(fontSize: 13)),
+                  ),
                 ],
               ),
             );
@@ -436,8 +437,16 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
     );
   }
 
-  String _scoreText(RankingItem item) =>
-      _type == 'rating' ? '${item.score.toStringAsFixed(1)} 分' : '${item.score.toInt()}';
+  String _scoreText(RankingItem item) {
+    if (_type == 'rating') return '${item.score.toStringAsFixed(1)} 分';
+    // 新书榜按上架时间排序，右侧展示上架日期而非阅读量
+    if (_type == 'new') {
+      return item.shelfTime.isNotEmpty
+          ? item.shelfTime.substring(0, 10)
+          : '—';
+    }
+    return '${item.score.toInt()}';
+  }
 }
 
 /// 首页作品区块（热门 / 最新共用）：按 provider 取前若干部，完整列表进作品列表页。

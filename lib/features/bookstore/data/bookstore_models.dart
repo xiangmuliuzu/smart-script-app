@@ -266,6 +266,7 @@ class RankingItem {
     this.episodeCount = 0,
     this.price = 0,
     this.isFree = false,
+    this.shelfTime = '',
   });
 
   final int rankNo;
@@ -275,7 +276,7 @@ class RankingItem {
   final String authorName;
   final String genreName;
 
-  /// 榜单分数：等于当前榜单类型对应的主指标值（近 7 天计数 / 平均评分 / 阅读量）。
+  /// 榜单分数：等于当前榜单类型对应的主指标值（累计浏览量 / 近 7 天计数 / 平均评分）。
   final double score;
   final int viewCount;
   final int favoriteCount;
@@ -285,6 +286,9 @@ class RankingItem {
   final int episodeCount;
   final double price;
   final bool isFree;
+
+  /// 上架时间（新书榜用）
+  final String shelfTime;
 
   String get priceLabel => isFree ? '免费' : '¥${price.toStringAsFixed(2)}';
 
@@ -304,6 +308,7 @@ class RankingItem {
         episodeCount: _int(json['episodeCount']),
         price: _decimal(json['price']),
         isFree: _flag(json['isFree']),
+        shelfTime: _text(json['shelfTime']),
       );
 }
 
@@ -330,8 +335,8 @@ class WorkSortOption {
 /// 榜单类型（App 展示四榜；交易热度榜因剧本通常只交易一次已下线，后端仍兼容 sale 参数）。
 ///
 /// 方案 A「时间窗口 + 分级」，type 与主指标强绑定：
-/// view 热门榜=近 7 天阅读量 / favorite 收藏榜=近 7 天收藏数 /
-/// rating 评分榜=平均评分 / new 新书榜=近 30 天上架按阅读量。
+/// view 热门榜=累计浏览量 / favorite 收藏榜=近 7 天收藏数 /
+/// rating 评分榜=平均评分 / new 新书榜=近 30 天上架，按上架时间倒序（shelfTime）。
 class RankingType {
   const RankingType(this.code, this.label);
 

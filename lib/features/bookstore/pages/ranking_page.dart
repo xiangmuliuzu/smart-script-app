@@ -12,8 +12,8 @@ import '../widgets/bookstore_widgets.dart';
 
 /// 作品榜单（B 模块，接口 2.7.7 作品榜单）。
 ///
-/// 公开页，游客可读。四个 tab 即后端 type：热门（近 7 天阅读）/ 收藏（近 7 天收藏）/
-/// 评分（平均评分）/ 新书（近 30 天上架）。
+/// 公开页，游客可读。四个 tab 即后端 type：热门（累计浏览量）/ 收藏（近 7 天收藏）/
+/// 评分（平均评分）/ 新书（近 30 天上架，按上架时间倒序）。
 class RankingPage extends ConsumerStatefulWidget {
   const RankingPage({super.key, this.type});
 
@@ -115,9 +115,16 @@ class _RankingPageState extends ConsumerState<RankingPage> {
     );
   }
 
-  String _scoreText(RankingItem item) => _type == 'rating'
-      ? '${item.score.toStringAsFixed(1)} 分'
-      : _formatThousands(item.score);
+  String _scoreText(RankingItem item) {
+    if (_type == 'rating') {
+      return '${item.score.toStringAsFixed(1)} 分';
+    } else if (_type == 'new') {
+      // 新书榜显示上架时间，截取前10位（yyyy-MM-dd）
+      return item.shelfTime.isNotEmpty ? item.shelfTime.substring(0, 10) : '—';
+    } else {
+      return _formatThousands(item.score);
+    }
+  }
 
   /// 千分位分隔：1234567 → 1,234,567（项目未引入 intl，手写分隔避免新增依赖）。
   String _formatThousands(num value) {
