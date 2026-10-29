@@ -70,7 +70,7 @@ class _ComicPageState extends ConsumerState<ComicPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('漫剧'),
+        title: const Text('视频'),
         actions: [
           IconButton(
             tooltip: '播放历史',
@@ -105,7 +105,7 @@ class _ComicPageState extends ConsumerState<ComicPage> {
       );
     }
     if (_controller.isEmpty) {
-      return const EmptyView(message: '暂无漫剧内容', icon: Icons.smart_display_outlined);
+      return const EmptyView(message: '暂无视频内容', icon: Icons.smart_display_outlined);
     }
     return PageView.builder(
       scrollDirection: Axis.vertical,

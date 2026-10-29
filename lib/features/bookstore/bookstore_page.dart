@@ -81,16 +81,9 @@ class BookstorePage extends ConsumerWidget {
             const AppCard(
               child: Padding(
                 padding: EdgeInsets.only(bottom: 12),
-                child: _CategoryEntries(),
-              ),
-            ),
-            const AppCard(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 12),
                 child: _RankingPreview(),
               ),
             ),
-            const _BannerCarousel(position: 'home_middle'),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -381,7 +374,7 @@ class _RankingPreview extends ConsumerStatefulWidget {
 }
 
 class _RankingPreviewState extends ConsumerState<_RankingPreview> {
-  static const int _previewSize = 3;
+  static const int _previewSize = 5;
 
   String _type = RankingType.all.first.code;
 

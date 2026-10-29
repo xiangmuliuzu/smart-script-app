@@ -10,7 +10,9 @@ import '../data/trade_providers.dart';
 
 /// 订单列表页（双Tab：买方订单 / 作者订单，状态筛选）。
 class OrderListPage extends ConsumerStatefulWidget {
-  const OrderListPage({super.key});
+  const OrderListPage({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<OrderListPage> createState() => _OrderListPageState();
@@ -68,7 +70,10 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('我的订单'),
+        title: widget.embedded ? null : const Text('我的订单'),
+        automaticallyImplyLeading: !widget.embedded,
+        primary: !widget.embedded,
+        toolbarHeight: widget.embedded ? 0 : kToolbarHeight,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,

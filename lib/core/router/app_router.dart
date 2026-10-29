@@ -79,13 +79,10 @@ import '../../features/trade/pages/inquiry_create_page.dart';
 import '../../features/trade/pages/inquiry_detail_page.dart';
 import '../../features/trade/pages/inquiry_list_page.dart';
 import '../../features/trade/pages/quote_records_page.dart';
-import '../../features/trade/pages/order_list_page.dart';
+import '../../features/trade/pages/order_contract_page.dart';
 import '../../features/trade/pages/order_detail_page.dart';
 import '../../features/trade/pages/contract_sign_page.dart';
-import '../../features/trade/pages/contract_list_page.dart';
-import '../../features/trade/pages/trade_management_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
-import '../../features/trade/pages/invoice_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
@@ -206,7 +203,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.privacyPolicy,
         builder: (_, __) => const PrivacyPolicyPage(),
       ),
-      // 底部导航五格：书城 / 漫剧 / 创作(+) / 分类 / 我的
+      // 底部导航：四个 tab 分支（书城 / 视频 / 分类 / 我的）+ 中间「创作」快捷入口
+      // （创作不再占用分支，点击直接进入新建作品，见 HomeShell）。
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
         branches: [
@@ -225,15 +223,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: RoutePath.comic,
                 name: RouteName.comic,
                 builder: (_, __) => const ComicPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: RoutePath.create,
-                name: RouteName.create,
-                builder: (_, __) => const CreatePage(),
               ),
             ],
           ),
@@ -377,6 +366,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       // ===== B 模块创作链路（受登录守卫保护，见 ProtectedRoutes）=====
+      // 我的作品列表（原「创作」tab 根页面，现收进「我的」页的「我的作品」入口，
+      // 作为普通页面 push 打开；页面内自带游客引导与创作能力引导）。
+      GoRoute(
+        path: RoutePath.create,
+        name: RouteName.create,
+        builder: (_, __) => const CreatePage(),
+      ),
       GoRoute(
         path: RoutePath.workUpload,
         name: RouteName.workUpload,
@@ -592,11 +588,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // ===== C 交易域 =====
       GoRoute(
-        path: RoutePath.tradeManagement,
-        name: RouteName.tradeManagement,
-        builder: (_, __) => const TradeManagementPage(),
-      ),
-      GoRoute(
         path: RoutePath.tradeSessionList,
         name: RouteName.tradeSessionList,
         builder: (_, __) => const TradeSessionListPage(),
@@ -605,11 +596,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.incomeOverview,
         name: RouteName.incomeOverview,
         builder: (_, __) => const IncomeOverviewPage(),
-      ),
-      GoRoute(
-        path: RoutePath.invoiceManage,
-        name: RouteName.invoiceManage,
-        builder: (_, __) => const InvoicePage(),
       ),
       GoRoute(
         path: RoutePath.inquiryCreate,
@@ -653,7 +639,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePath.orderList,
         name: RouteName.orderList,
-        builder: (_, __) => const OrderListPage(),
+        builder: (_, __) => const OrderContractPage(),
       ),
       GoRoute(
         path: RoutePath.orderDetail,
@@ -672,7 +658,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePath.contractList,
         name: RouteName.contractList,
-        builder: (_, __) => const ContractListPage(),
+        builder: (_, __) => const OrderContractPage(initialIndex: 1),
       ),
       // ===== 版权模块（受登录守卫保护）=====
       GoRoute(

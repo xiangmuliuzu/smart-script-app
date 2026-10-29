@@ -27,7 +27,7 @@ class DramaDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(detail.valueOrNull?.title.isNotEmpty == true
             ? detail.valueOrNull!.title
-            : '漫剧详情'),
+            : '视频详情'),
         actions: [
           IconButton(
             tooltip: '举报',
