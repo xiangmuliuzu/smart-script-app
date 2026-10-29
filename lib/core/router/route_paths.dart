@@ -78,6 +78,7 @@ class RoutePath {
   // ===== 版权模块（受登录守卫保护）=====
   static const String copyrightHome = '/copyright/home';
   static const String copyrightApplicationList = '/copyright/application/list';
+  static const String copyrightDeliveryList = '/copyright/delivery/list';
   static const String copyrightApplicationDetail = '/copyright/application/detail';
   static const String copyrightForm = '/copyright/form';
   static const String copyrightCertificateList = '/copyright/certificate/list';
@@ -88,6 +89,9 @@ class RoutePath {
 
   /// 版权申请列表 URL
   static String copyrightApplicationListUrl() => copyrightApplicationList;
+
+  /// 版权交割列表 URL
+  static String copyrightDeliveryListUrl() => copyrightDeliveryList;
 
   /// 版权申请详情 URL
   static String copyrightApplicationDetailUrl(int applyId) => 
@@ -341,6 +345,7 @@ class RouteName {
   // ===== 版权模块 =====
   static const String copyrightHome = 'copyrightHome';
   static const String copyrightApplicationList = 'copyrightApplicationList';
+  static const String copyrightDeliveryList = 'copyrightDeliveryList';
   static const String copyrightApplicationDetail = 'copyrightApplicationDetail';
   static const String copyrightForm = 'copyrightForm';
   static const String copyrightCertificateList = 'copyrightCertificateList';
@@ -473,6 +478,7 @@ class ProtectedRoutes {
     // 版权模块（需登录）
     RoutePath.copyrightHome,
     RoutePath.copyrightApplicationList,
+    RoutePath.copyrightDeliveryList,
     RoutePath.copyrightForm,
     RoutePath.copyrightCertificateList,
     // 我的收益（需登录）

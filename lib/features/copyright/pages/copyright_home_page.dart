@@ -1,6 +1,6 @@
 /// 版权管理主页（App 端）。
 ///
-/// 从「我的」快捷入口进入，提供版权申请和证书管理入口。
+/// 从「我的」快捷入口进入，提供版权申请表单、申请列表、交割和证书管理入口。
 library;
 
 import 'package:flutter/material.dart';
@@ -30,10 +30,19 @@ class CopyrightHomePage extends ConsumerWidget {
             // 功能入口区域
             _buildFunctionCard(
               context,
-              icon: Icons.assignment_outlined,
+              icon: Icons.edit_document,
               title: '版权申请',
-              subtitle: '为您的作品申请版权保护',
+              subtitle: '填写并提交版权登记申请',
               color: AppColors.primary,
+              onTap: () => context.push(RoutePath.copyrightForm),
+            ),
+            const SizedBox(height: 12),
+            _buildFunctionCard(
+              context,
+              icon: Icons.assignment_outlined,
+              title: '申请列表',
+              subtitle: '查看已提交的版权申请进度',
+              color: const Color(0xFF1890FF),
               onTap: () => context.push(RoutePath.copyrightApplicationList),
             ),
             const SizedBox(height: 12),
@@ -44,6 +53,15 @@ class CopyrightHomePage extends ConsumerWidget {
               subtitle: '查看已获得的版权证书',
               color: const Color(0xFF52C41A),
               onTap: () => context.push(RoutePath.copyrightCertificateList),
+            ),
+            const SizedBox(height: 12),
+            _buildFunctionCard(
+              context,
+              icon: Icons.swap_horiz_outlined,
+              title: '版权交割',
+              subtitle: '付款后的交割材料上传与确认收货',
+              color: const Color(0xFFFA8C16),
+              onTap: () => context.push(RoutePath.copyrightDeliveryList),
             ),
             const SizedBox(height: 24),
             // 说明区域

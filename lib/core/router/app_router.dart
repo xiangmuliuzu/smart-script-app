@@ -51,6 +51,7 @@ import '../../features/seal/seal_edit_page.dart';
 import '../../features/seal/seal_upload_page.dart';
 import '../../features/copyright/pages/copyright_home_page.dart';
 import '../../features/copyright/pages/copyright_application_list_page.dart';
+import '../../features/copyright/pages/copyright_delivery_list_page.dart';
 import '../../features/copyright/pages/copyright_application_detail_page.dart';
 import '../../features/copyright/pages/copyright_form_page.dart';
 import '../../features/copyright/pages/copyright_certificate_list_page.dart';
@@ -670,6 +671,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.copyrightApplicationList,
         name: RouteName.copyrightApplicationList,
         builder: (_, __) => const CopyrightApplicationListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.copyrightDeliveryList,
+        name: RouteName.copyrightDeliveryList,
+        builder: (_, __) => const CopyrightDeliveryListPage(),
       ),
       GoRoute(
         path: RoutePath.copyrightApplicationDetail,
