@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../welfare/data/welfare_providers.dart';
@@ -158,6 +160,13 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
 
   @override
   Widget build(BuildContext context) {
+    // 积分余额（与 PC 用户端一致：AI 创作旁展示剩余积分）。
+    final asset = ref.watch(welfareAssetProvider);
+    final pointsText = asset.when(
+      loading: () => '积分 —',
+      error: (_, __) => '积分 —',
+      data: (value) => '积分 ${value.points.balance}',
+    );
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -178,6 +187,42 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                       fontWeight: FontWeight.w600,
                       color: AppColors.text1)),
               const Spacer(),
+              Text(pointsText,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary)),
+              const SizedBox(width: 12),
+              // AI 记录入口：记录内容多，内嵌展示不便，直接跳转记录页。
+              InkWell(
+                onTap: () => context.push(RoutePath.aiRecords),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTint,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.history, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text('AI 记录',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
               _tabChip(_AiTab.outline, '大纲'),
               const SizedBox(width: 6),
               _tabChip(_AiTab.write, '写作'),
