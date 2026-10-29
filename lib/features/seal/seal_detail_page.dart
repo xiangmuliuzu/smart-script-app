@@ -10,14 +10,13 @@ import 'data/seal_models.dart';
 import 'data/seal_providers.dart';
 import 'material_preview_page.dart';
 
-/// 印章详情页（查看印章详情、材料、审核状态、操作日志）。
+/// 印章详情页（查看印章详情、材料、审核状态）。
 ///
 /// 功能：
 /// 1. 查看印章图片、材料 URL
 /// 2. 查看审核状态、驳回原因
 /// 3. 重新提交（驳回后）
 /// 4. 停用印章（审核通过后）
-/// 5. 查看操作日志
 class SealDetailPage extends ConsumerWidget {
   const SealDetailPage({
     super.key,
@@ -103,10 +102,6 @@ class _DetailContent extends ConsumerWidget {
         _StatusCard(detail: detail),
         const SizedBox(height: 12),
         _ManagementCard(detail: detail),
-        if (detail.logs.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _LogsCard(logs: detail.logs),
-        ],
         const SizedBox(height: 24),
       ],
     );
@@ -433,89 +428,6 @@ class _ManagementCard extends ConsumerWidget {
         showAppToast(context, '停用失败: $e');
       }
     }
-  }
-}
-
-/// 操作日志卡片。
-class _LogsCard extends StatelessWidget {
-  const _LogsCard({required this.logs});
-
-  final List<SealLog> logs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('操作日志', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.text1)),
-            const SizedBox(height: 12),
-            ...logs.asMap().entries.map((entry) {
-              final index = entry.key;
-              final log = entry.value;
-              return Padding(
-                padding: EdgeInsets.only(bottom: index < logs.length - 1 ? 12 : 0),
-                child: _LogItem(log: log),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 日志条目。
-class _LogItem extends StatelessWidget {
-  const _LogItem({required this.log});
-
-  final SealLog log;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.fill,
-        borderRadius: BorderRadius.circular(AppRadius.rSmall),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  log.operationTypeLabel,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text1),
-                ),
-              ),
-              if (log.createTime != null)
-                Text(
-                  log.createTime!,
-                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
-                ),
-            ],
-          ),
-          if (log.operatorName.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              '操作人: ${log.operatorName}',
-              style: const TextStyle(fontSize: 13, color: AppColors.text2),
-            ),
-          ],
-          if (log.reason != null && log.reason!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              '备注: ${log.reason}',
-              style: const TextStyle(fontSize: 13, color: AppColors.text2),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }
 
