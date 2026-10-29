@@ -9,8 +9,8 @@ import '../welfare/data/welfare_providers.dart';
 /// AI 创作中心（App 端 E 模块，原「我的剧本」入口）。
 ///
 /// 布局：
-///   顶部资产卡：积分 + AI 机会（与福利中心同一数据源）
-///   功能宫格：AI 大纲 / AI 写作 / AI 润色 / AI 记录 / AI 机会
+///   顶部资产卡：积分（去次数化后不再展示 AI 机会）
+///   功能宫格：AI 大纲 / AI 写作 / AI 润色 / AI 记录
 /// 审核进度由「我的作品」页承载（组员已实现），此处不重复入口。
 class AiCreationPage extends ConsumerWidget {
   const AiCreationPage({super.key});
@@ -37,7 +37,7 @@ class AiCreationPage extends ConsumerWidget {
   }
 }
 
-/// 顶部资产卡：渐变底 + 积分 + AI 机会。
+/// 顶部资产卡：渐变底 + 积分。
 class _AssetCard extends ConsumerWidget {
   const _AssetCard();
 
