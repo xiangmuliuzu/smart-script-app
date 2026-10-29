@@ -212,7 +212,7 @@ void main() {
 
       expect(fake.calls.first, contains('outlineStream:都市青年逆袭'));
       expect(find.textContaining('第一幕：跌落谷底'), findsOneWidget);
-      expect(find.text('消耗 1 次'), findsOneWidget);
+      expect(find.text('消耗 1 token'), findsOneWidget);
 
       // 插入正文回调
       await tester.tap(find.text('插入正文'));

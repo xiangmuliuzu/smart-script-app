@@ -37,7 +37,6 @@ void main() {
 
       expect(find.text('AI 创作'), findsOneWidget);
       expect(find.text('100'), findsOneWidget);
-      expect(find.text('5'), findsWidgets);
       for (final label in const [
         'AI 大纲',
         'AI 写作',
@@ -46,9 +45,9 @@ void main() {
       ]) {
         expect(find.text(label), findsOneWidget, reason: '缺少功能入口：$label');
       }
-      // AI 机会在资产卡标签与宫格入口各出现一次，至少存在即可
-      expect(find.text('AI 机会'), findsAtLeastNWidgets(1),
-          reason: '缺少功能入口：AI 机会');
+      // 【去次数化】AI 机会入口与资产卡已下线
+      expect(find.text('AI 机会'), findsNothing,
+          reason: 'AI 机会已下线，不应再显示入口');
       // 审核进度由「我的作品」页承载，创作中心不再放入口
       expect(find.text('审核进度'), findsNothing);
       expect(find.text('我的剧本'), findsNothing);

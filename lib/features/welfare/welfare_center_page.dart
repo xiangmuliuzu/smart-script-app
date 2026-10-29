@@ -32,11 +32,6 @@ class WelfareCenterPage extends ConsumerWidget {
             icon: const Icon(Icons.receipt_long_outlined, size: 18),
             label: const Text('积分明细'),
           ),
-          TextButton.icon(
-            onPressed: () => context.push(RoutePath.welfareExchange),
-            icon: const Icon(Icons.swap_horiz, size: 18),
-            label: const Text('AI次数兑换'),
-          ),
         ],
       ),
       body: RefreshIndicator(
@@ -96,8 +91,6 @@ class _AssetBar extends ConsumerWidget {
         data: (value) => Row(
           children: [
             _AssetItem(label: '积分', value: '${value.points.balance}'),
-            const SizedBox(width: 32),
-            _AssetItem(label: 'AI 机会', value: '${value.aiAvailable}'),
           ],
         ),
       ),

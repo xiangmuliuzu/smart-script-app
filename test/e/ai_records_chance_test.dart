@@ -56,6 +56,7 @@ const _writeRecords = [
     outputContent: '夜色里，霓虹闪烁，风穿过空荡的街道。',
     wordCount: 20,
     aiModel: 'deepseek-flash',
+    tokensUsed: 500,
     status: 'success',
     createdAt: '2026-10-14 09:30',
   ),
@@ -111,8 +112,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   // ================================================================
-  group('E 阶段3-A AI 机会页', () {
-    testWidgets('余额 / 统计 / 比例 / 流水正负号', (tester) async {
+  group('E 阶段3-A AI 机会页（去次数化后已下线）', () {
+    testWidgets('显示下线提示页，不再展示次数余额/兑换比例', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -127,45 +128,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 可用次数
-      expect(find.text('可用 AI 机会'), findsOneWidget);
-      expect(find.text('7'), findsWidgets);
-      // 累计统计
-      expect(find.text('累计获得'), findsOneWidget);
-      expect(find.text('12'), findsWidgets);
-      expect(find.text('累计消耗'), findsOneWidget);
-      expect(find.text('累计补偿'), findsOneWidget);
-      expect(find.text('2'), findsWidgets);
-      // 兑换比例
-      expect(find.text('10 积分 = 1 次，只能积分换次数'), findsOneWidget);
-      // 流水类型与正负号
-      expect(find.text('消耗'), findsOneWidget);
-      expect(find.text('兑换获得'), findsOneWidget);
-      expect(find.text('失败补偿'), findsOneWidget);
-      expect(find.text('-1'), findsOneWidget);
-      expect(find.text('+5'), findsOneWidget);
-      expect(find.text('+1'), findsOneWidget);
-      expect(find.text('余额 7'), findsWidgets);
-    });
-
-    testWidgets('加载失败显示重试', (tester) async {
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            aiBalanceProvider
-                .overrideWith((ref) async => throw ApiException('失败')),
-          ],
-          child: const MaterialApp(home: AiChancePage()),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('机会数据加载失败'), findsOneWidget);
-      expect(find.text('重试'), findsOneWidget);
+      // 下线提示
+      expect(find.text('该功能已下线'), findsOneWidget);
+      expect(find.textContaining('按实际消耗的 token 直接从积分中扣减'),
+          findsOneWidget);
+      // 不再展示旧次数资产
+      expect(find.text('可用 AI 机会'), findsNothing);
+      expect(find.text('10 积分 = 1 次，只能积分换次数'), findsNothing);
     });
   });
 
@@ -203,6 +172,7 @@ void main() {
       expect(find.text('输出'), findsOneWidget);
       expect(find.text('夜色里，霓虹闪烁，风穿过空荡的街道。'), findsOneWidget);
       expect(find.text('字数 20'), findsOneWidget);
+      expect(find.text('消耗 500 token'), findsOneWidget);
       expect(find.text('模型 deepseek-flash'), findsNothing);
     });
 

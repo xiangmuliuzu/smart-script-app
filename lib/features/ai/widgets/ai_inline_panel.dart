@@ -209,7 +209,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             Row(
               children: [
                 if (_quotaUsed > 0) ...[
-                  Text('消耗 $_quotaUsed 次',
+                  Text('消耗 $_quotaUsed token',
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.text3)),
                   const Spacer(),
