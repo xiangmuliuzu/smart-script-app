@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/services/native_image_picker.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -15,7 +16,7 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 ///
 /// 状态机：NOT_SUBMITTED -> PENDING -> APPROVED；PENDING -> REJECTED -> PENDING。
 /// 审核中不可重复提交，已通过不可自行覆盖；驳回后可重新提交。
-/// 仅提交姓名与 18 位身份证号，认证结果中的身份信息以掩码展示。
+/// 提交姓名、身份证号及正反面照片，认证结果中的身份信息以掩码展示。
 class RealNamePage extends ConsumerWidget {
   const RealNamePage({super.key});
 
@@ -51,6 +52,8 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
   final _nameCtrl = TextEditingController();
   final _idCtrl = TextEditingController();
   bool _submitting = false;
+  PickedImage? _front;
+  PickedImage? _back;
   RealNameStatus? _submittedStatus;
 
   bool get _busy => _submitting;
@@ -77,6 +80,7 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
       _toast('请输入正确的 18 位身份证号，末位可为 X');
       return;
     }
+    if (_front == null || _back == null) { _toast('请上传身份证正反面'); return; }
     final resubmit = widget.status.state == RealNameState.rejected;
     setState(() => _submitting = true);
     try {
@@ -85,6 +89,8 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
                 realName: realName,
                 idNumber: idNumber,
                 resubmit: resubmit,
+                frontBytes: _front!.bytes, frontName: _front!.filename,
+                backBytes: _back!.bytes, backName: _back!.filename,
               );
       if (!mounted) return;
       setState(() {
@@ -98,6 +104,8 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
       if (result.state != RealNameState.rejected) {
         _nameCtrl.clear();
         _idCtrl.clear();
+        _front = null;
+        _back = null;
       }
       // 提交已经成功，身份摘要暂时刷新失败不应误报申请失败。
       try {
@@ -111,6 +119,14 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<void> _pick(bool front) async {
+    try {
+      final image = await NativeImagePicker.pickImage(filenamePrefix: front ? 'id-front' : 'id-back');
+      if (!mounted || image == null) return;
+      setState(() { if (front) { _front = image; } else { _back = image; } });
+    } on NativeImageException catch (e) { _toast(e.message); }
   }
 
   void _toast(String message) {
@@ -196,6 +212,19 @@ class _RealNameBodyState extends ConsumerState<_RealNameBody> {
             ],
           ),
         ),
+        for (final front in [true, false])
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(children: [
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _pick(front),
+                icon: const Icon(Icons.upload_file),
+                label: Text('${front ? '身份证正面（人像面）' : '身份证反面（国徽面）'}${(front ? _front : _back) == null ? ' · 选择图片' : ' · 已选择，点击更换'}'),
+              ),
+              if ((front ? _front : _back) != null)
+                Image.memory(Uint8List.fromList((front ? _front : _back)!.bytes), height: 140, fit: BoxFit.contain),
+            ]),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: ElevatedButton(
