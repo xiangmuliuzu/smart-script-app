@@ -55,6 +55,9 @@ class _RecordingAuthController extends AuthController {
   Object? passwordLoginError;
 
   @override
+  Future<void> refreshMe() async {}
+
+  @override
   Future<void> loginWithSms({
     required String phone,
     required String code,
@@ -191,6 +194,9 @@ void main() {
     _seedIntentViaGuard(harness);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('去登录'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     // 守卫把未登录用户拦到登录页，并保存了结构化意图
     expect(find.byType(LoginPage), findsOneWidget);
@@ -221,6 +227,9 @@ void main() {
     _seedIntentViaGuard(harness);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('去登录'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     harness.container.read(routerProvider).go(RoutePath.passwordLogin);
     await tester.pump();
@@ -248,6 +257,9 @@ void main() {
   testWidgets('验证码登录失败：停留在登录页且不消费回跳意图', (tester) async {
     final harness = await _pumpApp(tester);
     _seedIntentViaGuard(harness);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('去登录'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -280,6 +292,9 @@ void main() {
   testWidgets('账号密码登录失败：同样保留回跳意图', (tester) async {
     final harness = await _pumpApp(tester);
     _seedIntentViaGuard(harness);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('去登录'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -321,6 +336,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
+    expect(find.text('需要登录'), findsNothing);
     expect(find.byType(LoginPage), findsOneWidget);
     expect(harness.container.read(routeIntentStoreProvider).pending?.target,
         RoutePath.profile);

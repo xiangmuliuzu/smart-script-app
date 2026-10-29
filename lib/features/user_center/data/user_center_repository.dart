@@ -116,13 +116,19 @@ class UserCenterRepository {
     required String realName,
     required String idNumber,
     required bool resubmit,
+    required List<int> frontBytes,
+    required String frontName,
+    required List<int> backBytes,
+    required String backName,
   }) async {
-    final data = await _api.post<Map<String, dynamic>>(
+    final data = await _api.upload<Map<String, dynamic>>(
       resubmit ? ApiEndpoints.myRealNameResubmit : ApiEndpoints.myRealName,
-      data: {
+      formData: FormData.fromMap({
         'realName': realName,
         'idNumber': idNumber,
-      },
+        'front': MultipartFile.fromBytes(frontBytes, filename: frontName),
+        'back': MultipartFile.fromBytes(backBytes, filename: backName),
+      }),
       parser: _mapParser,
     );
     return RealNameStatus.fromJson(data ?? const {});

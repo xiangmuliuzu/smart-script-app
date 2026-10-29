@@ -16,6 +16,7 @@
 //   LIVE_ADMIN_USER     管理端账号（已实名 / 有角色路径需要）
 //   LIVE_ADMIN_PASSWORD 管理端口令
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -269,6 +270,8 @@ void main() {
     await userCenter.submitRealName(
       realName: '联调用户',
       idNumber: '110101199001011234',
+      frontBytes: base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), frontName: 'front.png',
+      backBytes: base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), backName: 'back.png',
       resubmit: false,
     );
 
