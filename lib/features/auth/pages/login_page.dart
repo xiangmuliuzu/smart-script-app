@@ -18,8 +18,7 @@ import '../widgets/agreement_checkbox.dart';
 import '../widgets/auth_buttons.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/auth_page_scaffold.dart';
-import '../widgets/phone_input.dart';
-import '../widgets/social_login_area.dart';
+import '../widgets/underlined_input.dart';
 import '../widgets/verify_code_input.dart';
 
 /// 登录首页（主流程：手机号 + 验证码）。
@@ -58,7 +57,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   /// 返回是否发送成功，失败时按钮立即恢复可点（不倒计时）。
   Future<bool> _handleRequestCode() async {
     FocusScope.of(context).unfocus();
-    final phoneError = AuthValidators.phone(_phoneController.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneController.text);
     if (phoneError != null) {
       setState(() => _phoneError = phoneError);
       return false;
@@ -66,14 +65,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     setState(() => _phoneError = null);
 
     try {
-      await ref.read(authRepositoryProvider).sendSms(
-            phone: _phoneController.text.trim(),
-            scene: 'LOGIN',
-          );
+      final identifier = _phoneController.text.trim();
+      if (AuthValidators.isEmail(identifier)) {
+        await ref.read(authRepositoryProvider).sendEmailCode(identifier, scene: 'LOGIN');
+      } else {
+        await ref.read(authRepositoryProvider).sendSms(phone: identifier, scene: 'LOGIN');
+      }
       if (!mounted) {
         return true;
       }
-      showAppToast(context, '验证码已发送，请注意查收短信');
+      showAppToast(context, AuthValidators.isEmail(_phoneController.text) ? '验证码已发送，请查收邮件' : '验证码已发送，请注意查收短信');
       return true;
     } on ApiException catch (e) {
       if (mounted) {
@@ -96,7 +97,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       showAppToast(context, '请先阅读并同意用户协议和隐私政策');
       return;
     }
-    final phoneError = AuthValidators.phone(_phoneController.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneController.text);
     final codeError = AuthValidators.smsCode(_codeController.text);
     setState(() {
       _phoneError = phoneError;
@@ -134,18 +135,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  /// 微信 / QQ 入口：后端 OAuth 当前固定返回「暂未开放」，只提示，不做假登录。
-  void _handleSocialLogin(String providerName) {
-    showAppToast(context, '$providerName登录暂未开放，敬请期待');
-  }
-
   @override
   Widget build(BuildContext context) {
     return AuthPageScaffold(
-      bottom: SocialLoginArea(
-        onWechatTap: () => _handleSocialLogin('微信'),
-        onQqTap: () => _handleSocialLogin('QQ'),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -153,7 +145,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             title: '登录后体验完整功能',
             onBack: () => leaveAuthHome(context),
           ),
-          PhoneInput(
+          UnderlinedInput(
+            label: '账号',
+            hintText: '请输入手机号或邮箱',
+            keyboardType: TextInputType.emailAddress,
             controller: _phoneController,
             errorText: _phoneError,
             onChanged: (_) {

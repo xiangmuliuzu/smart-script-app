@@ -12,6 +12,15 @@ class AuthValidators {
   AuthValidators._();
 
   static final RegExp _phonePattern = RegExp(r'^1\d{10}$');
+  static final RegExp _emailPattern = RegExp(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$");
+
+  static bool isEmail(String value) => value.contains('@');
+
+  static String? registrationIdentifier(String value) {
+    final text = value.trim();
+    if (!isEmail(text)) return phone(text);
+    return text.length <= 50 && _emailPattern.hasMatch(text) ? null : '请输入有效邮箱地址';
+  }
   static final RegExp _smsCodePattern = RegExp(r'^\d{4,8}$');
   static final RegExp _hasLetter = RegExp(r'[A-Za-z]');
   static final RegExp _hasDigit = RegExp(r'\d');

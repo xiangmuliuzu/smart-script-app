@@ -69,6 +69,7 @@ import '../../features/message/pages/notification_preference_page.dart';
 import '../../features/profile/pages/account_security_page.dart';
 import '../../features/profile/pages/password_edit_page.dart';
 import '../../features/profile/pages/phone_change_page.dart';
+import '../../features/profile/pages/email_change_page.dart';
 import '../../features/profile/pages/profile_edit_page.dart';
 import '../../features/profile/pages/real_name_page.dart';
 import '../../features/profile/pages/creator_apply_page.dart';
@@ -461,6 +462,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.phoneChange,
         name: RouteName.phoneChange,
         builder: (_, __) => const PhoneChangePage(),
+      ),
+      GoRoute(
+        path: RoutePath.emailChange,
+        name: RouteName.emailChange,
+        builder: (_, __) => const EmailChangePage(),
       ),
       GoRoute(
         path: RoutePath.passwordEdit,

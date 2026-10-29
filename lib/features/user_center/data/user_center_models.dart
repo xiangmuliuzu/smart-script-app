@@ -13,6 +13,7 @@ class UserProfile {
     this.avatar,
     this.bio,
     this.phoneMasked,
+    this.emailMasked,
     this.realNameStatus = 'NOT_SUBMITTED',
   });
 
@@ -24,6 +25,7 @@ class UserProfile {
   /// 个人简介；null 表示未填写（2026-09-28 契约修订新增）。
   final String? bio;
   final String? phoneMasked;
+  final String? emailMasked;
   final String realNameStatus;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
@@ -33,6 +35,7 @@ class UserProfile {
         avatar: json['avatar'] as String?,
         bio: json['bio'] as String?,
         phoneMasked: json['phoneMasked'] as String?,
+        emailMasked: json['emailMasked'] as String?,
         realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
       );
 }

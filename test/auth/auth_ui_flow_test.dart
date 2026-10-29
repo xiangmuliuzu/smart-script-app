@@ -156,7 +156,9 @@ void main() {
     expect(find.text('未拥有账号？'), findsOneWidget);
     expect(find.text('点击注册'), findsOneWidget);
     expect(find.text('账号密码登录'), findsOneWidget);
-    expect(find.text('其他方式登录'), findsOneWidget);
+    expect(find.text('其他方式登录'), findsNothing);
+    expect(find.bySemanticsLabel('微信登录'), findsNothing);
+    expect(find.bySemanticsLabel('QQ登录'), findsNothing);
 
     // 填好手机号与验证码但**不勾选协议**
     await tester.enterText(find.byType(TextField).at(0), '13800001111');
@@ -236,7 +238,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(PasswordLoginPage), findsOneWidget);
-    expect(find.text('使用手机号与登录密码进入平台'), findsOneWidget);
+    expect(find.text('使用手机号或邮箱与登录密码进入平台'), findsOneWidget);
     expect(find.text('忘记密码？'), findsOneWidget);
     expect(find.text('验证码登录'), findsOneWidget);
 
@@ -350,8 +352,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(ProfilePage), findsOneWidget);
-    expect(tester.widget<HomeShell>(find.byType(HomeShell)).shell.currentIndex, 4,
-        reason: '回跳到「我的」后底部导航必须切到第 5 格（分支 4），'
+    expect(tester.widget<HomeShell>(find.byType(HomeShell)).shell.currentIndex, 3,
+        reason: '回跳到「我的」后底部导航必须切到第 5 格（分支 3），'
             'currentIndex 仍停在 0 就是书城 tab 里显示我的页');
   });
 }

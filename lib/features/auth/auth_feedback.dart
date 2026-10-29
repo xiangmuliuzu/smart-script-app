@@ -42,7 +42,7 @@ class AuthFeedback {
 
   static String passwordLoginError(ApiException e) {
     if (e.code == AppAuthErrorCodes.invalidRequest) {
-      return '手机号或密码错误';
+      return '账号或密码错误';
     }
     return apiMessage(e);
   }

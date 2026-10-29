@@ -69,22 +69,22 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    expectStep(1, '验证当前手机号');
+    expectStep(1, '验证当前账号');
     expect(find.text('填写新手机号'), findsNothing);
     expect(find.text('确认换绑'), findsNothing);
     await submit();
     expect(api.countOf(oldVerify), 0);
-    expectStep(1, '验证当前手机号');
+    expectStep(1, '验证当前账号');
 
     await tester.enterText(find.byType(TextField), '123456');
     await submit();
-    expectStep(1, '验证当前手机号');
+    expectStep(1, '验证当前账号');
     expect(find.text('验证码错误'), findsOneWidget);
     api.reply(oldVerify,
         Envelope.ok({'stepUpToken': 'verified-old-phone', 'expiresIn': 600}));
     await submit();
     expectStep(2, '填写新手机号');
-    expect(find.text('验证当前手机号'), findsNothing);
+    expect(find.text('验证当前账号'), findsNothing);
     expect(find.text('确认换绑'), findsNothing);
 
     await tester.enterText(find.byType(TextField), '123');
@@ -101,7 +101,7 @@ void main() {
     await submit();
     expectStep(3, '确认换绑');
     expect(find.text('填写新手机号'), findsNothing);
-    expect(find.text('验证当前手机号'), findsNothing);
+    expect(find.text('验证当前账号'), findsNothing);
     final resend = find.widgetWithText(TextButton, '60s');
     expect(tester.widget<TextButton>(resend).onPressed, isNull);
     api.reply(confirm, Envelope.fail(40901, '验证码已失效'));

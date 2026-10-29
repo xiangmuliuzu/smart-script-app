@@ -69,7 +69,7 @@ class _WorkDeleteDialogState extends ConsumerState<WorkDeleteDialog> {
     if (_deleting || _sending) return;
     final code = _codeController.text.trim();
     if (!RegExp(r'^\d{4,8}$').hasMatch(code)) {
-      setState(() => _error = '请输入正确格式的短信验证码');
+      setState(() => _error = '请输入正确格式的验证码');
       return;
     }
     setState(() {
@@ -108,7 +108,7 @@ class _WorkDeleteDialogState extends ConsumerState<WorkDeleteDialog> {
                   '删除后作品将下架，并从我的作品中移除，无法自行恢复。有关联订单、合同或付费记录的作品不能删除，请使用下架功能。'),
               const SizedBox(height: 12),
               Text(_phoneMasked == null
-                  ? '请获取绑定手机号的验证码，验证身份后删除。'
+                  ? '请获取绑定手机号或邮箱的验证码，验证身份后删除。'
                   : '验证码已发送至 $_phoneMasked'),
               const SizedBox(height: 8),
               VerifyCodeInput(
