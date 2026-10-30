@@ -14,8 +14,8 @@ import 'ai_skill_selector.dart';
 
 /// 写稿页内嵌 AI 创作面板（E 模块）。
 ///
-/// 在章节写稿页正文编辑区上方展开，提供 AI 剧本 / 写作 / 润色三个功能 tab，
-/// 复用 [AiRepository]（outline / write / polish）生成，结果支持：
+/// 在章节写稿页正文编辑区上方展开，提供 AI 剧本 / 写作 / 润色 / 分镜四个功能 tab，
+/// 复用 [AiRepository]（outline / write / polish / storyboard）生成，结果支持：
 ///   - 复制全文；
 ///   - [onInsert] 回调把生成内容插入当前章节正文（由写稿页追加到正文控制器）。
 /// 生成逻辑与独立 AI 功能页一致：次数不足弹引导弹窗、成功后刷新机会余额；
@@ -30,7 +30,7 @@ class AiInlinePanel extends ConsumerStatefulWidget {
   ConsumerState<AiInlinePanel> createState() => _AiInlinePanelState();
 }
 
-enum _AiTab { outline, write, polish }
+enum _AiTab { outline, write, polish, storyboard }
 
 class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   _AiTab _tab = _AiTab.outline;
@@ -50,6 +50,11 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   static const _polishStyles = ['简洁精炼', '专业正式', '文学优美', '轻松幽默', '情感细腻'];
   String? _selectedStyle;
 
+  // 分镜（与独立 AI 分镜页一致：剧本文本 + 分镜风格）
+  final _script = TextEditingController();
+  static const _scriptStyles = ['电影感', '短剧竖屏', '动漫风'];
+  String? _selectedScriptStyle;
+
   bool _loading = false;
   String _result = '';
   int _quotaUsed = 0;
@@ -62,6 +67,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     _prompt.dispose();
     _type.dispose();
     _content.dispose();
+    _script.dispose();
     super.dispose();
   }
 
@@ -71,12 +77,14 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       _AiTab.outline => _inspiration.text.trim().isEmpty,
       _AiTab.write => _prompt.text.trim().isEmpty,
       _AiTab.polish => _content.text.trim().isEmpty,
+      _AiTab.storyboard => _script.text.trim().isEmpty,
     };
     if (requiredEmpty) {
       final hint = switch (_tab) {
         _AiTab.outline => '请先输入作品主题或灵感',
         _AiTab.write => '请先输入写作提示词',
         _AiTab.polish => '请先填写或粘贴需要润色的内容',
+        _AiTab.storyboard => '请先填写或粘贴剧本文本',
       };
       showAppToast(context, hint);
       return;
@@ -129,6 +137,16 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           );
           text = result.content;
           if (text.trim().isEmpty) emptyHint = '未生成润色结果，请重试';
+          break;
+        case _AiTab.storyboard:
+          final result = await repo.storyboardStream(
+            script: _script.text.trim(),
+            style: _selectedScriptStyle,
+            skillId: _skillId,
+            onDelta: onDelta,
+          );
+          text = result.content;
+          if (text.trim().isEmpty) emptyHint = '未生成分镜，请重试';
           break;
       }
       // 扣减已发生：刷新机会余额缓存（写稿页无次数展示，福利中心/创作页仍监听）。
@@ -234,6 +252,8 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
               _tabChip(_AiTab.write, '写作'),
               const SizedBox(width: 6),
               _tabChip(_AiTab.polish, '润色'),
+              const SizedBox(width: 6),
+              _tabChip(_AiTab.storyboard, '分镜'),
             ],
           ),
           const SizedBox(height: 10),
@@ -371,6 +391,57 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
               children: [
                 for (final style in _polishStyles)
                   _styleChip(style),
+              ],
+            ),
+          ],
+        ),
+      _AiTab.storyboard => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _field(_script, '剧本文本 *', 4, '粘贴 AI 剧本或自写剧本，AI 将拆解为可出售的分镜脚本'),
+            const SizedBox(height: 10),
+            const Text('选择分镜风格',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text1)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final style in _scriptStyles)
+                  InkWell(
+                    onTap: () => setState(() {
+                      _selectedScriptStyle =
+                          (_selectedScriptStyle == style ? null : style);
+                    }),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _selectedScriptStyle == style
+                            ? AppColors.primary
+                            : AppColors.fill,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _selectedScriptStyle == style
+                              ? AppColors.primary
+                              : AppColors.divider,
+                        ),
+                      ),
+                      child: Text(
+                        style,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _selectedScriptStyle == style
+                              ? Colors.white
+                              : AppColors.text2,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ],

@@ -301,6 +301,38 @@ void main() {
       expect(inserted.single, contains('【润色】'));
     });
 
+    testWidgets('分镜 tab：输入剧本后生成分镜并插入', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository();
+      final inserted = <String>[];
+      await tester.pumpWidget(
+          _wrapPanel(fake, onInsert: inserted.add));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('分镜'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('生成'));
+      await tester.pump();
+      expect(find.text('请先填写或粘贴剧本文本'), findsOneWidget);
+
+      await tester.enterText(
+          find.byType(TextField).first, '第一幕：落魄青年意外获得穿越能力');
+      await tester.tap(find.text('短剧竖屏'));
+      await tester.pump();
+      await tester.tap(find.text('生成'));
+      await tester.pumpAndSettle();
+
+      expect(fake.calls.first,
+          startsWith('storyboardStream:第一幕：落魄青年意外获得穿越能力'));
+      expect(fake.calls.first, contains('短剧竖屏'));
+      expect(find.textContaining('【镜1】'), findsOneWidget);
+      await tester.tap(find.text('插入正文'));
+      await tester.pump();
+      expect(inserted.single, contains('【镜1】'));
+    });
+
     testWidgets('生成失败提示且不崩溃', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
