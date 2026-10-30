@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/features/ai/ai_outline_page.dart';
 import 'package:script_app/features/ai/ai_storyboard_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
