@@ -235,6 +235,7 @@ class _InputCard extends StatelessWidget {
             selectedSkillId: selectedSkillId,
             onChanged: onSkillChanged,
             enabled: !loading,
+            skillTypeFilter: 'write',
           ),
           const SizedBox(height: 16),
           const _Label(text: '写作类型（可选）'),

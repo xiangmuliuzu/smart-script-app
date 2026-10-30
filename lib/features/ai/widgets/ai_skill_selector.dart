@@ -15,15 +15,26 @@ class AiSkillSelector extends ConsumerWidget {
     required this.selectedSkillId,
     required this.onChanged,
     this.enabled = true,
+    this.skillTypeFilter,
   });
 
   final int? selectedSkillId;
   final ValueChanged<int?> onChanged;
   final bool enabled;
 
+  /// 按用途过滤：'storyboard' 只列分镜类 skill，'write' 只列剧本/写作/润色类；
+  /// null 表示不过滤（全部展示）。
+  final String? skillTypeFilter;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final skills = ref.watch(aiSkillsProvider).valueOrNull ?? const <AiSkill>[];
+    final all = ref.watch(aiSkillsProvider).valueOrNull ?? const <AiSkill>[];
+    final skills = skillTypeFilter == null
+        ? all
+        : all
+            .where((s) =>
+                s.skillType == skillTypeFilter || s.skillType.isEmpty)
+            .toList();
     final current = skills.firstWhere(
       (skill) => skill.id == selectedSkillId,
       orElse: () => AiSkill(),

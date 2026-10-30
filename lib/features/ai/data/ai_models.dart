@@ -150,15 +150,26 @@ class AiWriteResult {
 
 /// 导演(skill) 配置项（GET /api/v1/content/ai/skills 列表元素）。
 class AiSkill {
-  const AiSkill({this.id = 0, this.skillName = '', this.fileName = ''});
+  const AiSkill({
+    this.id = 0,
+    this.skillName = '',
+    this.skillType = 'write',
+    this.fileName = '',
+  });
 
   final int id;
   final String skillName;
+
+  /// skill 类型：write（剧本/写作/润色） / storyboard（分镜）
+  final String skillType;
   final String fileName;
 
   factory AiSkill.fromJson(Map<String, dynamic> json) => AiSkill(
         id: _int(json['id']),
         skillName: _text(json['skillName'] ?? json['name']),
+        skillType: _text(json['skillType']).isEmpty
+            ? 'write'
+            : _text(json['skillType']),
         fileName: _text(json['fileName']),
       );
 }

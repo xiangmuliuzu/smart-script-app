@@ -234,6 +234,7 @@ class _InputCard extends StatelessWidget {
             selectedSkillId: selectedSkillId,
             onChanged: onSkillChanged,
             enabled: !loading,
+            skillTypeFilter: 'storyboard',
           ),
           const SizedBox(height: 16),
           const _Label(text: '分镜风格'),

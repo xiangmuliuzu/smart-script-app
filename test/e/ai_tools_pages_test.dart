@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/features/ai/ai_outline_page.dart';
 import 'package:script_app/features/ai/ai_polish_page.dart';
+import 'package:script_app/features/ai/ai_storyboard_page.dart';
 import 'package:script_app/features/ai/ai_write_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
@@ -131,8 +132,9 @@ class _FakeAiRepository implements AiRepository {
 
   @override
   Future<List<AiSkill>> listSkills() async => const [
-        AiSkill(id: 1, skillName: '悬疑烧脑导演'),
-        AiSkill(id: 2, skillName: '甜宠爆款导演'),
+        AiSkill(id: 1, skillName: '悬疑烧脑导演', skillType: 'write'),
+        AiSkill(id: 2, skillName: '甜宠爆款导演', skillType: 'write'),
+        AiSkill(id: 8, skillName: '分镜导演（镜头语言）', skillType: 'storyboard'),
       ];
 
   @override
@@ -399,6 +401,41 @@ void main() {
       expect(spend.balanceAfter, 4980);
       expect(earn.isSpend, isFalse);
       expect(earn.signedPoints, '+10');
+    });
+  });
+
+  group('E 阶段2-H 导演(skill)按用途过滤', () {
+    testWidgets('剧本页只列 write 类 skill，不出现分镜类', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository();
+      await tester.pumpWidget(wrap(const AiOutlinePage(), fake));
+      await tester.pumpAndSettle();
+
+      expect(find.text('导演(skill)'), findsOneWidget);
+      // 展开导演下拉后再断言候选项
+      await tester.tap(find.byType(DropdownButton<int?>).first);
+      await tester.pumpAndSettle();
+      expect(find.text('悬疑烧脑导演'), findsOneWidget);
+      expect(find.text('甜宠爆款导演'), findsOneWidget);
+      expect(find.text('分镜导演（镜头语言）'), findsNothing);
+    });
+
+    testWidgets('分镜页只列 storyboard 类 skill', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository();
+      await tester.pumpWidget(wrap(const AiStoryboardPage(), fake));
+      await tester.pumpAndSettle();
+
+      expect(find.text('导演(skill)'), findsOneWidget);
+      await tester.tap(find.byType(DropdownButton<int?>).first);
+      await tester.pumpAndSettle();
+      expect(find.text('分镜导演（镜头语言）'), findsOneWidget);
+      expect(find.text('悬疑烧脑导演'), findsNothing);
+      expect(find.text('甜宠爆款导演'), findsNothing);
     });
   });
 }

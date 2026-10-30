@@ -261,6 +261,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             selectedSkillId: _skillId,
             onChanged: (value) => setState(() => _skillId = value),
             enabled: !_loading,
+            skillTypeFilter: _tab == _AiTab.storyboard ? 'storyboard' : 'write',
           ),
           const SizedBox(height: 10),
           _buildForm(),
