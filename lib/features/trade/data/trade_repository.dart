@@ -343,8 +343,15 @@ class TradeRepository {
   }
 
   /// APP买方付款（paying → delivering）。
-  Future<void> appPayOrder(int orderId) async {
-    await _api.post<void>(ApiEndpoints.appOrderPay(orderId));
+  Future<Map<String, dynamic>> appPayOrder(int orderId) async {
+    final data = await _api.post<Map<String, dynamic>>(ApiEndpoints.appOrderPay(orderId), parser: _mapParser);
+    if (data == null || data['qrCode'] is! String) throw ApiException('获取沙箱支付二维码失败');
+    return data;
+  }
+
+  Future<bool> confirmSandboxPayment(int orderId) async {
+    final data = await _api.post<Map<String, dynamic>>('${ApiEndpoints.appOrderPay(orderId)}/confirm', parser: _mapParser);
+    return data?['paid'] == true;
   }
 
   /// APP买方确认收货（delivering → completed，托管释放+收益入账）。

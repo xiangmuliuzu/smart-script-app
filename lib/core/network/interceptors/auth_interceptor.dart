@@ -16,14 +16,14 @@ class AuthInterceptor extends Interceptor {
           '/auth/captchaImage',
           '/auth/password/login',
           '/auth/sms/send',
+          '/auth/email/send',
           '/auth/sms/login',
           '/auth/register',
           '/auth/password/reset',
           '/auth/agreements',
           '/captchaImage',
           '/ad/splash',
-        ].contains(normalized) ||
-        normalized.startsWith('/auth/oauth/');
+        ].contains(normalized);
   }
 
   @override
