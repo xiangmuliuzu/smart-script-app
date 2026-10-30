@@ -80,7 +80,7 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
       if (!mounted) return;
       setState(() => _oldCooldown = 60);
       _startCooldown(oldPhone: true);
-      _toast('验证码已发送至当前手机号');
+      _toast('验证码已发送至当前手机号或邮箱');
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {
@@ -93,7 +93,7 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
   Future<void> _verifyOldCode() async {
     final code = _oldCodeCtrl.text.trim();
     if (code.isEmpty) {
-      _toast('请输入当前手机号收到的验证码');
+      _toast('请输入收到的验证码');
       return;
     }
     setState(() => _busy = true);
@@ -105,7 +105,7 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
         _stepUpToken = stepUp.stepUpToken;
         _step = 2;
       });
-      _toast('当前手机号验证通过');
+      _toast('账号验证通过');
     } on ApiException catch (e) {
       _toast(e.message);
     } catch (_) {
@@ -144,7 +144,7 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
   Future<void> _confirm() async {
     final token = _stepUpToken;
     if (token == null) {
-      _toast('请先完成当前手机号验证');
+      _toast('请先完成账号验证');
       setState(() => _step = 1);
       return;
     }
@@ -184,7 +184,7 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
     final phoneMasked = ref.watch(authControllerProvider).user?.phoneMasked;
 
     return UserCenterScaffold(
-      title: '更换手机号',
+      title: phoneMasked == null ? '绑定手机号' : '更换手机号',
       actions: null,
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -192,8 +192,8 @@ class _PhoneChangePageState extends ConsumerState<PhoneChangePage> {
           if (_step == 1)
             UserStepCard(
               index: 1,
-              title: '验证当前手机号',
-              subtitle: phoneMasked ?? '当前手机号未获取',
+              title: '验证当前账号',
+              subtitle: '验证码将发送至已绑定邮箱或手机号',
               active: _step == 1,
               done: _step > 1,
               child: Column(

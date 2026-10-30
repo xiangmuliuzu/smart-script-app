@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -642,29 +643,23 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 买方付款（paying → delivering）
+  /// 支付宝沙箱：显示二维码，并由服务端向支付宝查询确认。
   Future<void> _payOrder(BuildContext context, WidgetRef ref, Order order) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: const Text('确认付款'),
-        content: Text('确认支付 ${order.amountYuan}？付款后订单进入交割。'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
-          TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确认付款')),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
+    final id = order.orderId!;
     try {
-      await ref.read(tradeRepositoryProvider).appPayOrder(order.orderId!);
-      if (context.mounted) {
-        showAppToast(context, '付款成功，订单进入交割');
-        ref.invalidate(appOrderDetailProvider(order.orderId!));
-        ref.invalidate(deliveryByOrderProvider(order.orderId!));
+      final data = await ref.read(tradeRepositoryProvider).appPayOrder(id);
+      if (!context.mounted) return;
+      final paid = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: data['qrCode'] as String),
+      );
+      if (paid == true && context.mounted) {
+        showAppToast(context, '沙箱支付已确认，订单进入交割');
+        ref.invalidate(appOrderDetailProvider(id));
+        ref.invalidate(deliveryByOrderProvider(id));
       }
     } catch (e) {
-      if (context.mounted) showAppToast(context, '付款失败：$e');
+      if (context.mounted) showAppToast(context, '发起沙箱支付失败：$e');
     }
   }
 
@@ -816,4 +811,44 @@ class _ContractContentViewState extends State<_ContractContentView> {
       ),
     );
   }
+}
+
+class _SandboxPaymentDialog extends ConsumerStatefulWidget {
+  const _SandboxPaymentDialog({required this.orderId, required this.qrCode});
+  final int orderId;
+  final String qrCode;
+  @override
+  ConsumerState<_SandboxPaymentDialog> createState() => _SandboxPaymentDialogState();
+}
+
+class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
+  bool _checking = false;
+  String? _message;
+  Future<void> _check() async {
+    setState(() { _checking = true; _message = null; });
+    try {
+      final paid = await ref.read(tradeRepositoryProvider).confirmSandboxPayment(widget.orderId);
+      if (!mounted) return;
+      if (paid) { Navigator.of(context).pop(true); return; }
+      setState(() => _message = '尚未查询到支付成功，请完成支付后重试');
+    } catch (e) {
+      if (mounted) setState(() => _message = '查询失败：$e');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('支付宝沙箱支付'),
+    content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Text('测试支付，不会产生真实资金。请使用另一台设备上的支付宝沙箱钱包扫码。'),
+      const SizedBox(height: 12),
+      QrImageView(data: widget.qrCode, size: 200),
+      if (_message != null) Text(_message!),
+    ])),
+    actions: [
+      TextButton(onPressed: _checking ? null : () => Navigator.pop(context, false), child: const Text('关闭')),
+      TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '查询支付结果')),
+    ],
+  );
 }

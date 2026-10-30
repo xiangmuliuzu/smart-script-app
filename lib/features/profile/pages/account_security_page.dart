@@ -53,8 +53,13 @@ class AccountSecurityPage extends ConsumerWidget {
             children: [
               _Row(
                 label: '手机号',
-                value: profile.phoneMasked ?? '-',
+                value: profile.phoneMasked ?? '未绑定，可通过邮箱验证后绑定',
                 onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.phoneChange),
+              ),
+              _Row(
+                label: '邮箱',
+                value: profile.emailMasked ?? '未绑定',
+                onTap: () => AuthGuard.pushProtected(context, ref, target: RoutePath.emailChange),
               ),
               _Row(
                 label: hasPassword ? '登录密码' : '设置密码',
@@ -67,7 +72,7 @@ class AccountSecurityPage extends ConsumerWidget {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            '换绑手机号后需使用新手机号重新登录；修改密码会使其它设备的登录状态失效。',
+            '绑定或更换手机号、邮箱后需重新登录；修改密码会使登录状态失效。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),
@@ -91,7 +96,7 @@ class _Row extends StatelessWidget {
 
   final String label;
   final String value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +112,7 @@ class _Row extends StatelessWidget {
             Expanded(child: Text(label, style: const TextStyle(color: AppColors.text1))),
             Text(value, style: const TextStyle(color: AppColors.text3, fontSize: 13)),
             const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, size: 18, color: AppColors.text3),
+            if (onTap != null) const Icon(Icons.chevron_right, size: 18, color: AppColors.text3),
           ],
         ),
       ),

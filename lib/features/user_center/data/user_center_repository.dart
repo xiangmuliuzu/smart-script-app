@@ -194,7 +194,7 @@ class UserCenterRepository {
     );
     final stepUp = PhoneStepUp.fromJson(data ?? const {});
     if (stepUp.stepUpToken.isEmpty) {
-      throw ApiException('旧手机号验证失败，请重试');
+      throw ApiException('账号验证失败，请重试');
     }
     return stepUp;
   }
@@ -224,6 +224,19 @@ class UserCenterRepository {
       parser: _mapParser,
     );
     return data?['phoneMasked'] as String?;
+  }
+
+  Future<void> sendNewEmailCode(String email) async {
+    await _api.post('/users/me/email/change/new/send',
+        data: {'newEmail': email.trim().toLowerCase(), 'deviceId': _deviceId});
+  }
+
+  Future<void> confirmEmailChange({required String newEmail, required String code,
+      required String stepUpToken}) async {
+    await _api.post('/users/me/email/change/confirm', data: {
+      'newEmail': newEmail.trim().toLowerCase(), 'code': code,
+      'stepUpToken': stepUpToken, 'deviceId': _deviceId,
+    });
   }
 
   /// 与 A3 一致的设备标识来源：当前客户端未接入设备指纹，使用固定值。

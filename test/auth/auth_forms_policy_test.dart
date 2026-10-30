@@ -1,10 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:script_app/core/utils/auth_validators.dart';
 import 'package:script_app/features/auth/pages/login_page.dart';
 import 'package:script_app/features/auth/pages/register_page.dart';
 import 'package:script_app/features/auth/pages/forgot_password_page.dart';
 import 'package:script_app/core/providers/auth_providers.dart';
 
 void main() {
+  test('注册支持有效手机号和邮箱，拒绝无效邮箱', () {
+    expect(AuthValidators.registrationIdentifier('13800001111'), isNull);
+    expect(AuthValidators.registrationIdentifier('Example@163.com'), isNull);
+    expect(AuthValidators.registrationIdentifier('bad@domain'), isNotNull);
+    expect(AuthValidators.registrationIdentifier('${'a' * 45}@example.com'), isNotNull);
+  });
+
   test('APP-09 登录页存在密码/验证码切换且无免登录', () {
     // Widget-level form validation covered by field validators in source contract
     expect(LoginPage, isNotNull);

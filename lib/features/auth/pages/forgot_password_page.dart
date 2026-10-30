@@ -13,7 +13,6 @@ import '../auth_feedback.dart';
 import '../widgets/auth_buttons.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/auth_page_scaffold.dart';
-import '../widgets/phone_input.dart';
 import '../widgets/underlined_input.dart';
 import '../widgets/verify_code_input.dart';
 
@@ -54,7 +53,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   /// 发送验证码：先本地校验手机号，成功返回 true 交给 VerifyCodeInput 倒计时，
   /// 失败时按钮立即恢复可点（不倒计时），与登录页行为一致。
   Future<bool> _sendSms() async {
-    final phoneError = AuthValidators.phone(_phoneCtrl.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneCtrl.text);
     if (phoneError != null) {
       setState(() => _phoneError = phoneError);
       return false;
@@ -62,13 +61,16 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     setState(() => _phoneError = null);
 
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .sendSms(phone: _phoneCtrl.text.trim(), scene: 'RESET_PASSWORD');
+      final identifier = _phoneCtrl.text.trim();
+      if (AuthValidators.isEmail(identifier)) {
+        await ref.read(authRepositoryProvider).sendEmailCode(identifier, scene: 'RESET_PASSWORD');
+      } else {
+        await ref.read(authRepositoryProvider).sendSms(phone: identifier, scene: 'RESET_PASSWORD');
+      }
       if (!mounted) {
         return true;
       }
-      showAppToast(context, '验证码已发送，请注意查收短信');
+      showAppToast(context, AuthValidators.isEmail(_phoneCtrl.text) ? '验证码已发送，请查收邮件' : '验证码已发送，请注意查收短信');
       return true;
     } on ApiException catch (e) {
       if (mounted) {
@@ -85,7 +87,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    final phoneError = AuthValidators.phone(_phoneCtrl.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneCtrl.text);
     final codeError = AuthValidators.smsCode(_codeCtrl.text);
     final pwdError = AuthValidators.password(_pwdCtrl.text);
     final confirmError =
@@ -136,7 +138,10 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             title: '重置密码',
             onBack: () => context.go(RoutePath.login),
           ),
-          PhoneInput(
+          UnderlinedInput(
+            label: '账号',
+            hintText: '请输入手机号或邮箱',
+            keyboardType: TextInputType.emailAddress,
             controller: _phoneCtrl,
             errorText: _phoneError,
             onChanged: (_) {

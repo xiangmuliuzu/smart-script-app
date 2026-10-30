@@ -15,7 +15,6 @@ import '../widgets/agreement_checkbox.dart';
 import '../widgets/auth_buttons.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/auth_page_scaffold.dart';
-import '../widgets/phone_input.dart';
 import '../widgets/underlined_input.dart';
 import '../widgets/verify_code_input.dart';
 
@@ -60,7 +59,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   /// 获取验证码：先本地校验手机号，再请求既有 `/auth/sms/send`（scene=REGISTER）。
   Future<bool> _handleRequestCode() async {
     FocusScope.of(context).unfocus();
-    final phoneError = AuthValidators.phone(_phoneController.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneController.text);
     if (phoneError != null) {
       setState(() => _phoneError = phoneError);
       return false;
@@ -68,14 +67,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     setState(() => _phoneError = null);
 
     try {
-      await ref.read(authRepositoryProvider).sendSms(
-            phone: _phoneController.text.trim(),
-            scene: 'REGISTER',
-          );
+      final identifier = _phoneController.text.trim();
+      if (AuthValidators.isEmail(identifier)) {
+        await ref.read(authRepositoryProvider).sendEmailCode(identifier);
+      } else {
+        await ref.read(authRepositoryProvider).sendSms(phone: identifier, scene: 'REGISTER');
+      }
       if (!mounted) {
         return true;
       }
-      showAppToast(context, '验证码已发送，请注意查收短信');
+      showAppToast(context, AuthValidators.isEmail(identifier) ? '验证码已发送，请查收邮件' : '验证码已发送，请注意查收短信');
       return true;
     } on ApiException catch (e) {
       if (mounted) {
@@ -98,7 +99,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       showAppToast(context, '请先阅读并同意用户协议和隐私政策');
       return;
     }
-    final phoneError = AuthValidators.phone(_phoneController.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneController.text);
     final codeError = AuthValidators.smsCode(_codeController.text);
     final passwordError = AuthValidators.password(_passwordController.text);
     final confirmError = AuthValidators.confirmPassword(
@@ -149,11 +150,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         children: [
           AuthHeader(
             title: '注册新账号',
-            subtitle: '验证手机号后设置登录密码',
+            subtitle: '验证手机号或邮箱后设置登录密码',
             onBack: () => backToLogin(context),
           ),
-          PhoneInput(
+          UnderlinedInput(
             controller: _phoneController,
+            label: '账号',
+            hintText: '请输入手机号或邮箱',
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
             errorText: _phoneError,
             onChanged: (_) {
               if (_phoneError != null) {

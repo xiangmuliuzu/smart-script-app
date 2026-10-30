@@ -8,7 +8,7 @@
          如需上架生产环境请改用 https 并移除此项。 -->
     <application
         android:usesCleartextTraffic="true"
-        android:label="剧本创作"
+        android:label="${appLabel}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

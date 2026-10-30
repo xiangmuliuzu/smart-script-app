@@ -15,7 +15,6 @@ class ApiEndpoints {
   static const String passwordChange = '/auth/password/change';
   static const String passwordReset = '/auth/password/reset';
   static const String agreements = '/auth/agreements';
-  static String oauthLogin(String provider) => '/auth/oauth/$provider/login';
 
   // ===== A5 用户中心契约：个人资料与账号安全 =====
   static const String myProfile = '/users/me/profile';

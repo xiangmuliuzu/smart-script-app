@@ -9,6 +9,10 @@ class AuthRepository {
 
   final ApiClient _api;
 
+  Future<void> sendEmailCode(String email, {String scene = 'REGISTER'}) async {
+    await _api.post('/auth/email/send', data: {'email': email.trim().toLowerCase(), 'scene': scene});
+  }
+
   /// Cached current agreement versions from GET /auth/agreements.
   List<Map<String, String>>? _agreementAcceptances;
 
@@ -59,7 +63,7 @@ class AuthRepository {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.smsLogin,
       data: {
-        'phone': phone,
+        if (phone.contains('@')) 'email': phone.trim().toLowerCase() else 'phone': phone,
         'code': code,
         'deviceId': deviceId,
         if (deviceName != null) 'deviceName': deviceName,
@@ -109,7 +113,7 @@ class AuthRepository {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.register,
       data: {
-        'phone': phone,
+        if (phone.contains('@')) 'email': phone.trim().toLowerCase() else 'phone': phone,
         'code': code,
         'password': password,
         'deviceId': deviceId,
@@ -158,7 +162,7 @@ class AuthRepository {
   }) async {
     await _api.post(
       ApiEndpoints.passwordReset,
-      data: {'phone': phone, 'code': code, 'newPassword': newPassword},
+      data: {if (phone.contains('@')) 'email': phone.trim().toLowerCase() else 'phone': phone, 'code': code, 'newPassword': newPassword},
     );
   }
 

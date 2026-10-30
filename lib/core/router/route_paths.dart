@@ -52,6 +52,7 @@ class RoutePath {
   static const String creatorApply = '/profile/creator-apply';
   static const String accountSecurity = '/profile/security';
   static const String phoneChange = '/profile/security/phone';
+  static const String emailChange = '/profile/security/email';
   static const String passwordEdit = '/profile/security/password';
   static const String notificationPreferences = '/profile/notification-preferences';
 
@@ -332,6 +333,7 @@ class RouteName {
   static const String creatorApply = 'creatorApply';
   static const String accountSecurity = 'accountSecurity';
   static const String phoneChange = 'phoneChange';
+  static const String emailChange = 'emailChange';
   static const String passwordEdit = 'passwordEdit';
   static const String notificationPreferences = 'notificationPreferences';
   static const String bookshelf = 'bookshelf';
@@ -504,6 +506,7 @@ class ProtectedRoutes {
   /// 换绑、修改密码等敏感提交页在会话失效后不应被自动重放。
   static const List<String> noResumePrefixes = <String>[
     RoutePath.phoneChange,
+    RoutePath.emailChange,
     RoutePath.accountSecurity,
     RoutePath.passwordEdit,
   ];

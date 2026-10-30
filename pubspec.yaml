@@ -60,6 +60,7 @@ dependencies:
   path_provider: ^2.1.4
   # 合同签署：手写签名画布
   signature: ^5.5.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -88,11 +89,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # 认证页品牌资源：Logo 与第三方登录入口图标（与参考 Flutter 项目同源）。
+  # 认证页品牌资源。
   assets:
     - assets/images/logo_script.png
-    - assets/images/icon_wechat.png
-    - assets/images/icon_qq.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

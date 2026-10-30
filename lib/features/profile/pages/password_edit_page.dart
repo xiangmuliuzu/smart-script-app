@@ -155,7 +155,7 @@ class _PasswordEditPageState extends ConsumerState<PasswordEditPage> {
             child: Text(
               widget.hasPassword
                   ? '修改密码后，所有设备上的登录状态都会失效，需要用新密码重新登录。'
-                  : '设置密码后可使用手机号 + 密码登录。',
+                  : '设置密码后可使用手机号或邮箱与密码登录。',
               style: const TextStyle(color: Color(0xFF86909C), fontSize: 12),
             ),
           ),

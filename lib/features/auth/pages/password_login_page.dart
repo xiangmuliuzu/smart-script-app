@@ -18,7 +18,6 @@ import '../auth_navigation.dart';
 import '../widgets/auth_buttons.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/auth_page_scaffold.dart';
-import '../widgets/phone_input.dart';
 import '../widgets/underlined_input.dart';
 
 final loginCaptchaProvider = FutureProvider<Map<String, dynamic>>(
@@ -58,7 +57,7 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
   Future<void> _handleLogin() async {
     if (_submitting) return;
     FocusScope.of(context).unfocus();
-    final phoneError = AuthValidators.phone(_phoneController.text);
+    final phoneError = AuthValidators.registrationIdentifier(_phoneController.text);
     final passwordError =
         AuthValidators.loginPassword(_passwordController.text);
     setState(() {
@@ -121,11 +120,15 @@ class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
         children: [
           AuthHeader(
             title: '账号密码登录',
-            subtitle: '使用手机号与登录密码进入平台',
+            subtitle: '使用手机号或邮箱与登录密码进入平台',
             onBack: () => backToLogin(context),
           ),
-          PhoneInput(
+          UnderlinedInput(
             controller: _phoneController,
+            label: '账号',
+            hintText: '请输入手机号或邮箱',
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
             errorText: _phoneError,
             onChanged: (_) {
               if (_phoneError != null) {

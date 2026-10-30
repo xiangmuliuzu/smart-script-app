@@ -64,6 +64,7 @@ void main() {
     });
     await api.get<void>('/users/me/profile');
     await api.post<void>('/auth/login');
+    await api.post<void>('/auth/email/send');
     await api.get<void>('/auth/captchaImage');
     expect(await secure.read(AppConstants.kRefreshToken), isNull);
   });

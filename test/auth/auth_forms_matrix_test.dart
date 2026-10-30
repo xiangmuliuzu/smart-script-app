@@ -49,6 +49,11 @@ class _FakeSecure implements TokenSecureStorage {
 /// 只用于验证码发送的假仓库（注册/登录走被覆写的控制器）。
 class _FakeAuthRepo implements AuthRepository {
   int smsSendCalls = 0;
+  String? sentEmail;
+  String? sentEmailScene;
+
+  @override
+  Future<void> sendEmailCode(String email, {String scene = 'REGISTER'}) async { sentEmail = email; sentEmailScene = scene; }
   Object? smsSendError;
 
   @override
@@ -235,7 +240,18 @@ void main() {
     expect(
         AuthFeedback.passwordLoginError(
             ApiException('invalid request', code: 40000)),
-        '手机号或密码错误');
+        '账号或密码错误');
+  });
+
+  testWidgets('邮箱找回密码发送对应场景验证码', (tester) async {
+    final h = await _pump(tester, () => const ForgotPasswordPage());
+    await tester.enterText(find.byType(TextField).at(0), 'author@example.com');
+    await tester.tap(find.text('获取验证码'));
+    await tester.pump();
+    expect(h.repo.sentEmail, 'author@example.com');
+    expect(h.repo.sentEmailScene, 'RESET_PASSWORD');
+    expect(h.repo.smsSendCalls, 0);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('重置密码要求确认新密码一致才提交', (tester) async {
@@ -359,6 +375,23 @@ void main() {
           reason: '失败后按钮应恢复可点');
     });
 
+    testWidgets('邮箱注册发送邮件验证码并提交邮箱', (tester) async {
+      final h = await pumpRegister(tester);
+      await tester.enterText(find.byType(TextField).at(0), 'author@example.com');
+      await tester.tap(find.text('获取验证码'));
+      await tester.pump();
+      expect(h.repo.sentEmail, 'author@example.com');
+      expect(h.repo.smsSendCalls, 0);
+      await tester.enterText(find.byType(TextField).at(1), '123456');
+      await tester.enterText(find.byType(TextField).at(2), 'Passw0rd1');
+      await tester.enterText(find.byType(TextField).at(3), 'Passw0rd1');
+      await _tapAgreement(tester);
+      await tester.tap(find.text('注册并登录'));
+      await tester.pump();
+      expect(h.controller.registerCalls, 1);
+      await tester.pumpWidget(const SizedBox());
+    });
+
     testWidgets('获取验证码：手机号非法不发请求，合法则调用发送接口', (tester) async {
       final h = await pumpRegister(tester);
 
@@ -444,7 +477,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('手机号或密码错误'), findsOneWidget);
+      expect(find.text('账号或密码错误'), findsOneWidget);
     });
 
     testWidgets('账号禁用（40301）：展示中文禁用提示，不出现英文 account disabled', (tester) async {

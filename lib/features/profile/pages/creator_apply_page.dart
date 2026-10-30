@@ -238,7 +238,7 @@ class _CreatorApplyBodyState extends ConsumerState<_CreatorApplyBody> {
                 controller: _contactCtrl,
                 enabled: !_submitting,
                 maxLength: _contactMax,
-                hint: '手机号/微信，便于审核联系',
+                hint: '手机号、邮箱或微信，便于审核联系',
               ),
             ),
           ],
