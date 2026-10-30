@@ -172,7 +172,8 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     const options = [
       ('all', '全部'),
-      ('outline', 'AI 大纲'),
+      ('outline', 'AI 剧本'),
+      ('storyboard', 'AI 分镜'),
       ('write', 'AI 写作'),
       ('polish', 'AI 润色'),
     ];

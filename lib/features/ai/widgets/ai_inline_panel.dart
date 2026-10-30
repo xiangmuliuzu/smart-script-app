@@ -10,14 +10,16 @@ import '../../../core/widgets/app_toast.dart';
 import '../../welfare/data/welfare_providers.dart';
 import '../ai_quota_dialog.dart';
 import '../data/ai_providers.dart';
+import 'ai_skill_selector.dart';
 
 /// 写稿页内嵌 AI 创作面板（E 模块）。
 ///
-/// 在章节写稿页正文编辑区上方展开，提供 AI 大纲 / 写作 / 润色三个功能 tab，
+/// 在章节写稿页正文编辑区上方展开，提供 AI 剧本 / 写作 / 润色三个功能 tab，
 /// 复用 [AiRepository]（outline / write / polish）生成，结果支持：
 ///   - 复制全文；
 ///   - [onInsert] 回调把生成内容插入当前章节正文（由写稿页追加到正文控制器）。
-/// 生成逻辑与独立 AI 功能页一致：次数不足弹引导弹窗、成功后刷新机会余额。
+/// 生成逻辑与独立 AI 功能页一致：次数不足弹引导弹窗、成功后刷新机会余额；
+/// 可选择「导演(skill)」注入导演风格。
 class AiInlinePanel extends ConsumerStatefulWidget {
   const AiInlinePanel({super.key, required this.onInsert});
 
@@ -32,6 +34,7 @@ enum _AiTab { outline, write, polish }
 
 class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   _AiTab _tab = _AiTab.outline;
+  int? _skillId;
 
   // 大纲
   final _inspiration = TextEditingController();
@@ -100,16 +103,18 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             inspiration: _inspiration.text.trim(),
             genre: _genre.text.trim(),
             style: _style.text.trim(),
+            skillId: _skillId,
             onDelta: onDelta,
           );
           text = result.outlineText;
           _quotaUsed = result.quotaUsed;
-          if (text.trim().isEmpty) emptyHint = '未生成大纲，请重试';
+          if (text.trim().isEmpty) emptyHint = '未生成剧本大纲，请重试';
           break;
         case _AiTab.write:
           final result = await repo.writeStream(
             prompt: _prompt.text.trim(),
             type: _type.text.trim(),
+            skillId: _skillId,
             onDelta: onDelta,
           );
           text = result.content;
@@ -119,6 +124,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           final result = await repo.polishStream(
             content: _content.text.trim(),
             style: _selectedStyle,
+            skillId: _skillId,
             onDelta: onDelta,
           );
           text = result.content;
@@ -223,12 +229,18 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           const SizedBox(height: 8),
           Row(
             children: [
-              _tabChip(_AiTab.outline, '大纲'),
+              _tabChip(_AiTab.outline, '剧本'),
               const SizedBox(width: 6),
               _tabChip(_AiTab.write, '写作'),
               const SizedBox(width: 6),
               _tabChip(_AiTab.polish, '润色'),
             ],
+          ),
+          const SizedBox(height: 10),
+          AiSkillSelector(
+            selectedSkillId: _skillId,
+            onChanged: (value) => setState(() => _skillId = value),
+            enabled: !_loading,
           ),
           const SizedBox(height: 10),
           _buildForm(),

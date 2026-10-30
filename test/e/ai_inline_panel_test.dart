@@ -39,6 +39,7 @@ class _FakeAiRepository implements AiRepository {
     String? inspiration,
     String? genre,
     String? style,
+    int? skillId,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -54,6 +55,7 @@ class _FakeAiRepository implements AiRepository {
     String? inspiration,
     String? genre,
     String? style,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
@@ -71,6 +73,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> write({
     required String prompt,
     String? type,
+    int? skillId,
   }) async {
     calls.add('write:$prompt|$type');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -81,6 +84,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> writeStream({
     required String prompt,
     String? type,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt|$type');
@@ -94,6 +98,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> polish({
     required String content,
     String? style,
+    int? skillId,
   }) async {
     calls.add('polish:$content|$style');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -104,6 +109,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> polishStream({
     required String content,
     String? style,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('polishStream:$content|$style');
@@ -111,6 +117,34 @@ class _FakeAiRepository implements AiRepository {
     onDelta('【润色】夜色如墨，他立于');
     onDelta('窗前，久久无言。');
     return AiWriteResult(content: polishContent, recordId: 2);
+  }
+
+  @override
+  Future<List<AiSkill>> listSkills() async => const [
+        AiSkill(id: 1, skillName: '悬疑烧脑导演'),
+        AiSkill(id: 2, skillName: '甜宠爆款导演'),
+      ];
+
+  @override
+  Future<AiWriteResult> storyboard({
+    required String script,
+    String? style,
+    int? skillId,
+  }) async {
+    calls.add('storyboard:$script|$style|skill=$skillId');
+    return AiWriteResult(content: '【镜1】全景…', recordId: 3);
+  }
+
+  @override
+  Future<AiWriteResult> storyboardStream({
+    required String script,
+    String? style,
+    int? skillId,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('storyboardStream:$script|$style|skill=$skillId');
+    onDelta('【镜1】全景…');
+    return AiWriteResult(content: '【镜1】全景…', recordId: 3);
   }
 
   @override

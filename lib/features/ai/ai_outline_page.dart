@@ -9,11 +9,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_skill_selector.dart';
 
-/// AI 大纲页（E 模块）：输入主题/题材/风格，生成大纲并保存。
+/// AI 剧本页（E 模块）：让完全不懂创作的人也能产出专业级剧本大纲。
 ///
 /// 对接 POST /api/v1/content/ai/outline；生成即落 sys_ai_request 记录，
-/// 「保存结果」提供复制全文。
+/// 「保存结果」提供复制全文。可选「导演(skill)」注入导演风格。
 class AiOutlinePage extends ConsumerStatefulWidget {
   const AiOutlinePage({super.key});
 
@@ -25,6 +26,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   final _inspiration = TextEditingController();
   final _genre = TextEditingController();
   final _style = TextEditingController();
+  int? _skillId;
 
   bool _loading = false;
   AiOutlineResult? _result;
@@ -56,6 +58,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
             inspiration: _inspiration.text.trim(),
             genre: _genre.text.trim(),
             style: _style.text.trim(),
+            skillId: _skillId,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -71,7 +74,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
         _result = result;
       });
       if (!result.hasOutline) {
-        showAppToast(context, '未生成大纲，请重试');
+        showAppToast(context, '未生成剧本大纲，请重试');
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -92,7 +95,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
     final text = _result?.outlineText ?? '';
     if (text.isEmpty) return;
     Clipboard.setData(ClipboardData(text: text));
-    showAppToast(context, '大纲已复制，可粘贴到编辑器');
+    showAppToast(context, '剧本已复制，可粘贴到编辑器');
   }
 
   @override
@@ -100,7 +103,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('AI 大纲'),
+        title: const Text('AI 剧本'),
         backgroundColor: Colors.white,
         elevation: 0.5,
       ),
@@ -112,6 +115,8 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
             genre: _genre,
             style: _style,
             loading: _loading,
+            selectedSkillId: _skillId,
+            onSkillChanged: (value) => setState(() => _skillId = value),
             onGenerate: _generate,
           ),
           const SizedBox(height: 12),
@@ -187,6 +192,8 @@ class _InputCard extends StatelessWidget {
     required this.genre,
     required this.style,
     required this.loading,
+    required this.selectedSkillId,
+    required this.onSkillChanged,
     required this.onGenerate,
   });
 
@@ -194,6 +201,8 @@ class _InputCard extends StatelessWidget {
   final TextEditingController genre;
   final TextEditingController style;
   final bool loading;
+  final int? selectedSkillId;
+  final ValueChanged<int?> onSkillChanged;
   final VoidCallback onGenerate;
 
   @override
@@ -215,6 +224,12 @@ class _InputCard extends StatelessWidget {
             maxLines: 4,
             decoration: _inputDecoration(
                 '例如：落魄青年意外获得穿越能力，改写人生'),
+          ),
+          const SizedBox(height: 16),
+          AiSkillSelector(
+            selectedSkillId: selectedSkillId,
+            onChanged: onSkillChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '题材（可选）'),
@@ -250,7 +265,7 @@ class _InputCard extends StatelessWidget {
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2),
                     )
-                  : const Text('生成大纲',
+                  : const Text('生成剧本大纲',
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600)),
             ),
@@ -282,7 +297,7 @@ class _ResultCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('生成的大纲',
+              const Text('生成的剧本大纲',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

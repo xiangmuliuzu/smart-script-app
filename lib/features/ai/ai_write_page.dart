@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_skill_selector.dart';
 
 /// AI 写作页（E 模块）：输入提示词生成正文，支持复制、保存到草稿。
 ///
@@ -23,6 +24,7 @@ class AiWritePage extends ConsumerStatefulWidget {
 class _AiWritePageState extends ConsumerState<AiWritePage> {
   final _prompt = TextEditingController();
   final _type = TextEditingController();
+  int? _skillId;
 
   bool _loading = false;
   AiWriteResult? _result;
@@ -52,6 +54,7 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
       final result = await ref.read(aiRepositoryProvider).writeStream(
             prompt: _prompt.text.trim(),
             type: _type.text.trim(),
+            skillId: _skillId,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -116,6 +119,8 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
             prompt: _prompt,
             type: _type,
             loading: _loading,
+            selectedSkillId: _skillId,
+            onSkillChanged: (value) => setState(() => _skillId = value),
             onGenerate: _generate,
           ),
           const SizedBox(height: 12),
@@ -193,12 +198,16 @@ class _InputCard extends StatelessWidget {
     required this.prompt,
     required this.type,
     required this.loading,
+    required this.selectedSkillId,
+    required this.onSkillChanged,
     required this.onGenerate,
   });
 
   final TextEditingController prompt;
   final TextEditingController type;
   final bool loading;
+  final int? selectedSkillId;
+  final ValueChanged<int?> onSkillChanged;
   final VoidCallback onGenerate;
 
   @override
@@ -220,6 +229,12 @@ class _InputCard extends StatelessWidget {
             maxLines: 6,
             decoration: _inputDecoration(
                 '例如：写一段男主在公司年会上与前女友重逢的对手戏，台词克制、冲突强烈'),
+          ),
+          const SizedBox(height: 16),
+          AiSkillSelector(
+            selectedSkillId: selectedSkillId,
+            onChanged: onSkillChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '写作类型（可选）'),

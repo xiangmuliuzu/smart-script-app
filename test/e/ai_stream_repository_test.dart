@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/core/network/api_exception.dart';
+import 'package:script_app/features/ai/data/ai_models.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
 import 'package:script_app/features/ai/ai_outline_page.dart';
@@ -25,7 +26,7 @@ class _StreamApi extends ApiClient {
 
 void main() {
   for (final entry in <(Widget, String)>[
-    (const AiOutlinePage(), '生成大纲'),
+    (const AiOutlinePage(), '生成剧本大纲'),
     (const AiWritePage(), '生成内容'),
     (const AiPolishPage(), '开始润色'),
     (
@@ -37,15 +38,22 @@ void main() {
     testWidgets(
         '${entry.$1.runtimeType} shows the first chunk while generation is pending',
         (tester) async {
+      // 加大视口：输入卡加导演选择后更高，流式结果卡需在视口内可见
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       final source = StreamController<Uint8List>();
       await tester.pumpWidget(ProviderScope(
         overrides: [
           aiRepositoryProvider
-              .overrideWithValue(AiRepository(_StreamApi(source.stream)))
+              .overrideWithValue(AiRepository(_StreamApi(source.stream))),
+          // 导演(skill) 列表在测试环境走真实 HTTP 会污染流式时序，这里固定为空
+          aiSkillsProvider.overrideWith((ref) async => const <AiSkill>[]),
         ],
         child: MaterialApp(home: entry.$1),
       ));
       await tester.enterText(find.byType(TextField).first, '故事要求');
+      await tester.pumpAndSettle();
       await tester.tap(find.text(entry.$2));
       await tester.pump();
       source.add(Uint8List.fromList(utf8.encode('data:{"delta":"书名：雨夜"}\n\n')));
@@ -69,7 +77,8 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         aiRepositoryProvider
-            .overrideWithValue(AiRepository(_StreamApi(source.stream)))
+            .overrideWithValue(AiRepository(_StreamApi(source.stream))),
+        aiSkillsProvider.overrideWith((ref) async => const <AiSkill>[]),
       ],
       child: const MaterialApp(home: AiWritePage()),
     ));

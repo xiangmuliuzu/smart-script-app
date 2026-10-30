@@ -102,12 +102,14 @@ class AiRepository {
   Future<AiWriteResult> write({
     required String prompt,
     String? type,
+    int? skillId,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/write',
       data: <String, dynamic>{
         'prompt': prompt,
         if (type != null && type.isNotEmpty) 'type': type,
+        if (skillId != null) 'skillId': skillId,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -123,6 +125,7 @@ class AiRepository {
   Future<AiWriteResult> writeStream({
     required String prompt,
     String? type,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -130,6 +133,7 @@ class AiRepository {
       data: <String, dynamic>{
         'prompt': prompt,
         if (type != null && type.isNotEmpty) 'type': type,
+        if (skillId != null) 'skillId': skillId,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -140,12 +144,14 @@ class AiRepository {
   Future<AiWriteResult> polish({
     required String content,
     String? style,
+    int? skillId,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/polish',
       data: <String, dynamic>{
         'content': content,
         if (style != null && style.isNotEmpty) 'style': style,
+        if (skillId != null) 'skillId': skillId,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -158,6 +164,7 @@ class AiRepository {
   Future<AiWriteResult> polishStream({
     required String content,
     String? style,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -165,6 +172,7 @@ class AiRepository {
       data: <String, dynamic>{
         'content': content,
         if (style != null && style.isNotEmpty) 'style': style,
+        if (skillId != null) 'skillId': skillId,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -176,6 +184,7 @@ class AiRepository {
     String? inspiration,
     String? genre,
     String? style,
+    int? skillId,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/outline',
@@ -184,11 +193,12 @@ class AiRepository {
           'inspiration': inspiration,
         if (genre != null && genre.isNotEmpty) 'genre': genre,
         if (style != null && style.isNotEmpty) 'style': style,
+        if (skillId != null) 'skillId': skillId,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
     );
-    if (data == null) throw ApiException('AI 大纲生成失败');
+    if (data == null) throw ApiException('AI 剧本生成失败');
     return AiOutlineResult.fromJson(data);
   }
 
@@ -199,6 +209,7 @@ class AiRepository {
     String? inspiration,
     String? genre,
     String? style,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -208,6 +219,7 @@ class AiRepository {
           'inspiration': inspiration,
         if (genre != null && genre.isNotEmpty) 'genre': genre,
         if (style != null && style.isNotEmpty) 'style': style,
+        if (skillId != null) 'skillId': skillId,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -233,6 +245,65 @@ class AiRepository {
       requestNo: requestNo,
       quotaUsed: quotaUsed,
     );
+  }
+
+  /// 导演(skill) 列表（管理员端上传配置，App 端选择注入）。
+  Future<List<AiSkill>> listSkills() async {
+    final data = await _api.get<List<dynamic>>(
+      '$_contentPrefix/skills',
+      parser: (raw) {
+        if (raw is List) return raw;
+        if (raw is Map) {
+          final list = raw['list'] ?? raw['rows'];
+          if (list is List) return list;
+        }
+        return const <dynamic>[];
+      },
+    );
+    if (data == null) return const [];
+    return data
+        .map((e) => AiSkill.fromJson(
+            e is Map ? Map<String, dynamic>.from(e) : const {}))
+        .toList();
+  }
+
+  /// AI 分镜：{script, style} → {content, recordId}（完成的分镜可直接出售）。
+  Future<AiWriteResult> storyboard({
+    required String script,
+    String? style,
+    int? skillId,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '$_contentPrefix/storyboard',
+      data: <String, dynamic>{
+        'script': script,
+        if (style != null && style.isNotEmpty) 'style': style,
+        if (skillId != null) 'skillId': skillId,
+      },
+      receiveTimeout: _aiReceiveTimeout,
+      parser: _map,
+    );
+    if (data == null) throw ApiException('AI 分镜生成失败');
+    return AiWriteResult.fromJson(data);
+  }
+
+  /// AI 分镜（流式，SSE 打字机输出）。
+  Future<AiWriteResult> storyboardStream({
+    required String script,
+    String? style,
+    int? skillId,
+    required void Function(String delta) onDelta,
+  }) async {
+    final body = await _api.postStream(
+      '$_contentPrefix/storyboard/stream',
+      data: <String, dynamic>{
+        'script': script,
+        if (style != null && style.isNotEmpty) 'style': style,
+        if (skillId != null) 'skillId': skillId,
+      },
+      receiveTimeout: _aiReceiveTimeout,
+    );
+    return await _consumeSseWrite(body.stream, onDelta);
   }
 
   /// 消费写作/润色 SSE 流：逐块回调 delta，done 后返回 {content, recordId}。

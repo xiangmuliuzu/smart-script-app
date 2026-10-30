@@ -41,6 +41,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> write({
     required String prompt,
     String? type,
+    int? skillId,
   }) async {
     calls.add('write:$prompt');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -52,6 +53,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> writeStream({
     required String prompt,
     String? type,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt');
@@ -66,6 +68,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> polish({
     required String content,
     String? style,
+    int? skillId,
   }) async {
     calls.add('polish:$content|$style');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -77,6 +80,7 @@ class _FakeAiRepository implements AiRepository {
   Future<AiWriteResult> polishStream({
     required String content,
     String? style,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('polishStream:$content|$style');
@@ -92,6 +96,7 @@ class _FakeAiRepository implements AiRepository {
     String? inspiration,
     String? genre,
     String? style,
+    int? skillId,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -108,6 +113,7 @@ class _FakeAiRepository implements AiRepository {
     String? inspiration,
     String? genre,
     String? style,
+    int? skillId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
@@ -121,6 +127,34 @@ class _FakeAiRepository implements AiRepository {
       requestNo: 'AIR20260101',
       quotaUsed: 1,
     );
+  }
+
+  @override
+  Future<List<AiSkill>> listSkills() async => const [
+        AiSkill(id: 1, skillName: '悬疑烧脑导演'),
+        AiSkill(id: 2, skillName: '甜宠爆款导演'),
+      ];
+
+  @override
+  Future<AiWriteResult> storyboard({
+    required String script,
+    String? style,
+    int? skillId,
+  }) async {
+    calls.add('storyboard:$script|$style|skill=$skillId');
+    return AiWriteResult(content: '【镜1】全景…', recordId: 33);
+  }
+
+  @override
+  Future<AiWriteResult> storyboardStream({
+    required String script,
+    String? style,
+    int? skillId,
+    required void Function(String delta) onDelta,
+  }) async {
+    calls.add('storyboardStream:$script|$style|skill=$skillId');
+    onDelta('【镜1】全景…');
+    return AiWriteResult(content: '【镜1】全景…', recordId: 33);
   }
 
   @override
@@ -178,7 +212,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 空输入点击生成
-      await tester.tap(find.text('生成大纲'));
+      await tester.tap(find.text('生成剧本大纲'));
       await tester.pump();
       expect(find.text('请先输入作品主题或灵感'), findsOneWidget);
 
@@ -187,10 +221,10 @@ void main() {
       await tester.enterText(fields.at(0), '都市青年逆袭');
       await tester.enterText(fields.at(1), '都市');
       await tester.enterText(fields.at(2), '爽文');
-      await tester.tap(find.text('生成大纲'));
+      await tester.tap(find.text('生成剧本大纲'));
       await tester.pumpAndSettle();
 
-      expect(find.text('生成的大纲'), findsOneWidget);
+      expect(find.text('生成的剧本大纲'), findsOneWidget);
       expect(find.text('第一幕：跌入谷底\n第二幕：逆袭崛起\n第三幕：登顶巅峰'),
           findsOneWidget);
       expect(find.text('消耗 1 token'), findsOneWidget);

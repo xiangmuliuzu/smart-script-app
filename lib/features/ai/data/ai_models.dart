@@ -148,6 +148,21 @@ class AiWriteResult {
       );
 }
 
+/// 导演(skill) 配置项（GET /api/v1/content/ai/skills 列表元素）。
+class AiSkill {
+  const AiSkill({this.id = 0, this.skillName = '', this.fileName = ''});
+
+  final int id;
+  final String skillName;
+  final String fileName;
+
+  factory AiSkill.fromJson(Map<String, dynamic> json) => AiSkill(
+        id: _int(json['id']),
+        skillName: _text(json['skillName'] ?? json['name']),
+        fileName: _text(json['fileName']),
+      );
+}
+
 /// AI 大纲生成结果（data：{outline, requestNo, quotaUsed}）。
 ///
 /// outline 为 AI 返回的对象（结构因服务商而异），不做二次建模。
@@ -222,7 +237,9 @@ class AiWriteRecord {
       case 'polish':
         return 'AI 润色';
       case 'outline':
-        return 'AI 大纲';
+        return 'AI 剧本';
+      case 'storyboard':
+        return 'AI 分镜';
       default:
         return writeType.isEmpty ? '记录' : writeType;
     }

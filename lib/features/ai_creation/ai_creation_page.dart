@@ -139,13 +139,18 @@ class _FeatureCard extends StatelessWidget {
     return [
       _FeatureCell(
         icon: Icons.auto_stories,
-        label: 'AI 大纲',
+        label: 'AI 剧本',
         onTap: () => context.push(RoutePath.aiOutline),
       ),
       _FeatureCell(
         icon: Icons.border_color,
         label: 'AI 写作',
         onTap: () => context.push(RoutePath.aiWrite),
+      ),
+      _FeatureCell(
+        icon: Icons.movie_creation_outlined,
+        label: 'AI 分镜',
+        onTap: () => context.push(RoutePath.aiStoryboard),
       ),
       _FeatureCell(
         icon: Icons.auto_fix_high,

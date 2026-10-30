@@ -39,6 +39,7 @@ import '../../features/ai_creation/ai_creation_page.dart';
 import '../../features/ai/ai_outline_page.dart';
 import '../../features/ai/ai_write_page.dart';
 import '../../features/ai/ai_polish_page.dart';
+import '../../features/ai/ai_storyboard_page.dart';
 import '../../features/ai/ai_record_page.dart';
 import '../../features/ai/ai_chance_page.dart';
 import '../../features/welfare/welfare_center_page.dart';
@@ -528,6 +529,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.aiPolish,
         name: RouteName.aiPolish,
         builder: (_, __) => const AiPolishPage(),
+      ),
+      GoRoute(
+        path: RoutePath.aiStoryboard,
+        name: RouteName.aiStoryboard,
+        builder: (_, __) => const AiStoryboardPage(),
       ),
       GoRoute(
         path: RoutePath.aiRecords,

@@ -303,6 +303,7 @@ class RoutePath {
   static const String aiOutline = '/ai/outline';
   static const String aiWrite = '/ai/write';
   static const String aiPolish = '/ai/polish';
+  static const String aiStoryboard = '/ai/storyboard';
   static const String aiRecords = '/ai/records';
   static const String aiOpportunity = '/ai/opportunity';
 }
@@ -419,6 +420,7 @@ class RouteName {
   static const String aiOutline = 'aiOutline';
   static const String aiWrite = 'aiWrite';
   static const String aiPolish = 'aiPolish';
+  static const String aiStoryboard = 'aiStoryboard';
   static const String aiRecords = 'aiRecords';
   static const String aiOpportunity = 'aiOpportunity';
 }

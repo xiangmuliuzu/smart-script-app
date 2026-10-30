@@ -160,7 +160,7 @@ void main() {
       expect(find.text('大纲测试主题'), findsOneWidget);
       expect(find.text('都市夜景提示词'), findsOneWidget);
       expect(find.text('润色一段对话'), findsOneWidget);
-      expect(find.text('AI 大纲'), findsWidgets);
+      expect(find.text('AI 剧本'), findsWidgets);
       expect(find.text('AI 写作'), findsWidgets);
       expect(find.text('AI 润色'), findsWidgets);
 
@@ -192,8 +192,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 筛 AI 大纲（.first 为筛选条 chip）
-      await tester.tap(find.text('AI 大纲').first);
+      // 筛 AI 剧本（.first 为筛选条 chip）
+      await tester.tap(find.text('AI 剧本').first);
       await tester.pumpAndSettle();
       expect(find.text('大纲测试主题'), findsOneWidget);
       expect(find.text('都市夜景提示词'), findsNothing);

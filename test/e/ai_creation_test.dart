@@ -38,8 +38,9 @@ void main() {
       expect(find.text('AI 创作'), findsOneWidget);
       expect(find.text('100'), findsOneWidget);
       for (final label in const [
-        'AI 大纲',
+        'AI 剧本',
         'AI 写作',
+        'AI 分镜',
         'AI 润色',
         'AI 记录',
       ]) {

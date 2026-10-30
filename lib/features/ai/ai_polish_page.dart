@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_skill_selector.dart';
 
 /// AI 润色页（E 模块）：选择内容与风格，生成润色结果。
 ///
@@ -26,6 +27,7 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
   /// 预设风格选项。
   static const _styles = ['简洁精炼', '专业正式', '文学优美', '轻松幽默', '情感细腻'];
   String? _selectedStyle;
+  int? _skillId;
 
   bool _loading = false;
   AiWriteResult? _result;
@@ -54,6 +56,7 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
       final result = await ref.read(aiRepositoryProvider).polishStream(
             content: _content.text.trim(),
             style: _selectedStyle,
+            skillId: _skillId,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -110,6 +113,8 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
             styles: _styles,
             selectedStyle: _selectedStyle,
             loading: _loading,
+            selectedSkillId: _skillId,
+            onSkillChanged: (value) => setState(() => _skillId = value),
             onSelectStyle: (style) =>
                 setState(() => _selectedStyle = (_selectedStyle == style ? null : style)),
             onGenerate: _generate,
@@ -186,6 +191,8 @@ class _InputCard extends StatelessWidget {
     required this.styles,
     required this.selectedStyle,
     required this.loading,
+    required this.selectedSkillId,
+    required this.onSkillChanged,
     required this.onSelectStyle,
     required this.onGenerate,
   });
@@ -194,6 +201,8 @@ class _InputCard extends StatelessWidget {
   final List<String> styles;
   final String? selectedStyle;
   final bool loading;
+  final int? selectedSkillId;
+  final ValueChanged<int?> onSkillChanged;
   final ValueChanged<String> onSelectStyle;
   final VoidCallback onGenerate;
 
@@ -215,6 +224,12 @@ class _InputCard extends StatelessWidget {
             controller: content,
             maxLines: 7,
             decoration: _inputDecoration('粘贴需要润色的正文、对话或旁白'),
+          ),
+          const SizedBox(height: 16),
+          AiSkillSelector(
+            selectedSkillId: selectedSkillId,
+            onChanged: onSkillChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '选择风格'),
