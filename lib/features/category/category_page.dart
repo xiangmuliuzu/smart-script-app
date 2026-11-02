@@ -39,19 +39,24 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
   }
 
   void _onScroll() {
-    double maxScroll = _scrollController.position.maxScrollExtent;
-    double offset = _scrollController.offset;
-    if (maxScroll <= 0) return;
-
-    final dimensionsCount = _dimensionKeys.length;
-    if (dimensionsCount == 0) return;
-
-    final progress = offset / maxScroll;
-    final newIndex = (progress * (dimensionsCount - 1)).round();
-    final clamped = newIndex.clamp(0, dimensionsCount - 1);
-
-    if (clamped != _currentDimensionIndex) {
-      setState(() => _currentDimensionIndex = clamped);
+    if (_dimensionKeys.isEmpty) return;
+    final scrollOffset = _scrollController.offset;
+    // 找到当前滚动位置最接近顶部的维度区块
+    int newIndex = 0;
+    double minDistance = double.infinity;
+    for (int i = 0; i < _dimensionKeys.length; i++) {
+      final ctx = _dimensionKeys[i].currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox;
+      final position = box.localToGlobal(Offset.zero).dy - MediaQuery.of(context).padding.top - kToolbarHeight;
+      // 区块顶部在滚动视口上方，且距离视口顶部最近的那个就是当前维度
+      if (position <= 20 && position.abs() < minDistance) {
+        minDistance = position.abs();
+        newIndex = i;
+      }
+    }
+    if (newIndex != _currentDimensionIndex) {
+      setState(() => _currentDimensionIndex = newIndex);
     }
   }
 
