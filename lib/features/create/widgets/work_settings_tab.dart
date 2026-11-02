@@ -452,7 +452,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
   bool _overflow = false;
 
   // 各维度选择限制
-  final _dimConfigs = [
+  final List<Map<String, dynamic>> _dimConfigs = [
     {'type': 'hot', 'title': '主分类（必选，只能选1个）', 'max': 1, 'required': true},
     {'type': 'theme', 'title': '主题（最多选2个）', 'max': 2, 'required': false},
     {'type': 'role', 'title': '角色（最多选2个）', 'max': 2, 'required': false},
