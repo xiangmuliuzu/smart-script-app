@@ -103,6 +103,7 @@ class AiRepository {
     required String prompt,
     String? type,
     int? skillId,
+    String? model,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/write',
@@ -110,6 +111,7 @@ class AiRepository {
         'prompt': prompt,
         if (type != null && type.isNotEmpty) 'type': type,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -126,6 +128,7 @@ class AiRepository {
     required String prompt,
     String? type,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -134,6 +137,7 @@ class AiRepository {
         'prompt': prompt,
         if (type != null && type.isNotEmpty) 'type': type,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -145,6 +149,7 @@ class AiRepository {
     required String content,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/polish',
@@ -152,6 +157,7 @@ class AiRepository {
         'content': content,
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -165,6 +171,7 @@ class AiRepository {
     required String content,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -173,6 +180,7 @@ class AiRepository {
         'content': content,
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -185,6 +193,7 @@ class AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/outline',
@@ -194,6 +203,7 @@ class AiRepository {
         if (genre != null && genre.isNotEmpty) 'genre': genre,
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -210,6 +220,7 @@ class AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -220,6 +231,7 @@ class AiRepository {
         if (genre != null && genre.isNotEmpty) 'genre': genre,
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -272,6 +284,7 @@ class AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/storyboard',
@@ -279,6 +292,7 @@ class AiRepository {
         'script': script,
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -292,6 +306,7 @@ class AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -300,10 +315,31 @@ class AiRepository {
         'script': script,
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
     return await _consumeSseWrite(body.stream, onDelta);
+  }
+
+  /// 渠道模型列表（管理员端配置，App 端「模型选择」下拉数据源）。
+  Future<List<AiChannel>> listModels() async {
+    final data = await _api.get<List<dynamic>>(
+      '$_contentPrefix/models',
+      parser: (raw) {
+        if (raw is List) return raw;
+        if (raw is Map) {
+          final list = raw['list'] ?? raw['rows'];
+          if (list is List) return list;
+        }
+        return const <dynamic>[];
+      },
+    );
+    if (data == null) return const [];
+    return data
+        .map((e) => AiChannel.fromJson(
+            e is Map ? Map<String, dynamic>.from(e) : const {}))
+        .toList();
   }
 
   /// 消费写作/润色 SSE 流：逐块回调 delta，done 后返回 {content, recordId}。

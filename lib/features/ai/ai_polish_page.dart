@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_model_selector.dart';
 import 'widgets/ai_skill_selector.dart';
 
 /// AI 润色页（E 模块）：选择内容与风格，生成润色结果。
@@ -28,6 +29,7 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
   static const _styles = ['简洁精炼', '专业正式', '文学优美', '轻松幽默', '情感细腻'];
   String? _selectedStyle;
   int? _skillId;
+  String? _model;
 
   bool _loading = false;
   AiWriteResult? _result;
@@ -57,6 +59,7 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
             content: _content.text.trim(),
             style: _selectedStyle,
             skillId: _skillId,
+            model: _model,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -115,6 +118,8 @@ class _AiPolishPageState extends ConsumerState<AiPolishPage> {
             loading: _loading,
             selectedSkillId: _skillId,
             onSkillChanged: (value) => setState(() => _skillId = value),
+            selectedModel: _model,
+            onModelChanged: (value) => setState(() => _model = value),
             onSelectStyle: (style) =>
                 setState(() => _selectedStyle = (_selectedStyle == style ? null : style)),
             onGenerate: _generate,
@@ -193,6 +198,8 @@ class _InputCard extends StatelessWidget {
     required this.loading,
     required this.selectedSkillId,
     required this.onSkillChanged,
+    required this.selectedModel,
+    required this.onModelChanged,
     required this.onSelectStyle,
     required this.onGenerate,
   });
@@ -203,6 +210,8 @@ class _InputCard extends StatelessWidget {
   final bool loading;
   final int? selectedSkillId;
   final ValueChanged<int?> onSkillChanged;
+  final String? selectedModel;
+  final ValueChanged<String?> onModelChanged;
   final ValueChanged<String> onSelectStyle;
   final VoidCallback onGenerate;
 
@@ -231,6 +240,12 @@ class _InputCard extends StatelessWidget {
             onChanged: onSkillChanged,
             enabled: !loading,
             skillTypeFilter: 'write',
+          ),
+          const SizedBox(height: 16),
+          AiModelSelector(
+            selectedModel: selectedModel,
+            onChanged: onModelChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '选择风格'),

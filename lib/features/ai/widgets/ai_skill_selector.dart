@@ -8,7 +8,7 @@ import '../data/ai_providers.dart';
 /// 「导演(skill)选择」下拉（App 端 AI 创作页共用）。
 ///
 /// 数据源 GET /api/v1/content/ai/skills（管理员端上传配置）；
-/// 未配置时显示「默认导演」。选中值通过 [onChanged] 回调给页面。
+/// 未选择时显示「请选择导演」占位（不传 skillId 由后端按默认处理）。选中值通过 [onChanged] 回调给页面。
 class AiSkillSelector extends ConsumerWidget {
   const AiSkillSelector({
     super.key,
@@ -58,14 +58,9 @@ class AiSkillSelector extends ConsumerWidget {
             child: DropdownButton<int?>(
               value: selectedSkillId,
               isExpanded: true,
-              hint: const Text('默认导演',
+              hint: const Text('请选择导演',
                   style: TextStyle(fontSize: 14, color: AppColors.text3)),
               items: [
-                DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('默认导演',
-                        style: const TextStyle(
-                            fontSize: 14, color: AppColors.text2))),
                 for (final skill in skills)
                   DropdownMenuItem<int?>(
                       value: skill.id,

@@ -148,6 +148,51 @@ class AiWriteResult {
       );
 }
 
+/// AI 调用渠道（GET /api/v1/content/ai/models 列表元素；接口不返回 apiKey）。
+///
+/// 用户端模型选择数据源：models 为该渠道可用模型名列表，defaultModel 为默认模型。
+class AiChannel {
+  const AiChannel({
+    this.channelId = 0,
+    this.channelName = '',
+    this.provider = '',
+    this.models = const [],
+    this.defaultModel = '',
+  });
+
+  final int channelId;
+  final String channelName;
+
+  /// 服务商标识（deepseek / openai 等，可空）。
+  final String provider;
+
+  /// 渠道可用模型名（逗号分隔串由后端拆为列表）。
+  final List<String> models;
+
+  /// 该渠道默认模型（用户未指定模型时后端使用）。
+  final String defaultModel;
+
+  factory AiChannel.fromJson(Map<String, dynamic> json) {
+    final rawModels = json['models'];
+    final List<String> models;
+    if (rawModels is List) {
+      models = rawModels.map((m) => m.toString()).toList();
+    } else {
+      models = (rawModels?.toString().split(',') ?? const <String>[])
+          .map((m) => m.trim())
+          .where((m) => m.isNotEmpty)
+          .toList();
+    }
+    return AiChannel(
+      channelId: _int(json['channelId']),
+      channelName: _text(json['channelName']),
+      provider: _text(json['provider']),
+      models: models,
+      defaultModel: _text(json['defaultModel']),
+    );
+  }
+}
+
 /// 导演(skill) 配置项（GET /api/v1/content/ai/skills 列表元素）。
 class AiSkill {
   const AiSkill({

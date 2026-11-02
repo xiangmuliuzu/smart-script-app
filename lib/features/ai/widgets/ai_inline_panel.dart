@@ -10,6 +10,7 @@ import '../../../core/widgets/app_toast.dart';
 import '../../welfare/data/welfare_providers.dart';
 import '../ai_quota_dialog.dart';
 import '../data/ai_providers.dart';
+import 'ai_model_selector.dart';
 import 'ai_skill_selector.dart';
 
 /// 写稿页内嵌 AI 创作面板（E 模块）。
@@ -35,6 +36,7 @@ enum _AiTab { outline, write, polish, storyboard }
 class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   _AiTab _tab = _AiTab.outline;
   int? _skillId;
+  String? _model;
 
   // 大纲
   final _inspiration = TextEditingController();
@@ -112,6 +114,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             genre: _genre.text.trim(),
             style: _style.text.trim(),
             skillId: _skillId,
+            model: _model,
             onDelta: onDelta,
           );
           text = result.outlineText;
@@ -123,6 +126,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             prompt: _prompt.text.trim(),
             type: _type.text.trim(),
             skillId: _skillId,
+            model: _model,
             onDelta: onDelta,
           );
           text = result.content;
@@ -133,6 +137,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             content: _content.text.trim(),
             style: _selectedStyle,
             skillId: _skillId,
+            model: _model,
             onDelta: onDelta,
           );
           text = result.content;
@@ -143,6 +148,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             script: _script.text.trim(),
             style: _selectedScriptStyle,
             skillId: _skillId,
+            model: _model,
             onDelta: onDelta,
           );
           text = result.content;
@@ -262,6 +268,12 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             onChanged: (value) => setState(() => _skillId = value),
             enabled: !_loading,
             skillTypeFilter: _tab == _AiTab.storyboard ? 'storyboard' : 'write',
+          ),
+          const SizedBox(height: 10),
+          AiModelSelector(
+            selectedModel: _model,
+            onChanged: (value) => setState(() => _model = value),
+            enabled: !_loading,
           ),
           const SizedBox(height: 10),
           _buildForm(),

@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_model_selector.dart';
 import 'widgets/ai_skill_selector.dart';
 
 /// AI 写作页（E 模块）：输入提示词生成正文，支持复制、保存到草稿。
@@ -25,6 +26,7 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
   final _prompt = TextEditingController();
   final _type = TextEditingController();
   int? _skillId;
+  String? _model;
 
   bool _loading = false;
   AiWriteResult? _result;
@@ -55,6 +57,7 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
             prompt: _prompt.text.trim(),
             type: _type.text.trim(),
             skillId: _skillId,
+            model: _model,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -121,6 +124,8 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
             loading: _loading,
             selectedSkillId: _skillId,
             onSkillChanged: (value) => setState(() => _skillId = value),
+            selectedModel: _model,
+            onModelChanged: (value) => setState(() => _model = value),
             onGenerate: _generate,
           ),
           const SizedBox(height: 12),
@@ -200,6 +205,8 @@ class _InputCard extends StatelessWidget {
     required this.loading,
     required this.selectedSkillId,
     required this.onSkillChanged,
+    required this.selectedModel,
+    required this.onModelChanged,
     required this.onGenerate,
   });
 
@@ -208,6 +215,8 @@ class _InputCard extends StatelessWidget {
   final bool loading;
   final int? selectedSkillId;
   final ValueChanged<int?> onSkillChanged;
+  final String? selectedModel;
+  final ValueChanged<String?> onModelChanged;
   final VoidCallback onGenerate;
 
   @override
@@ -236,6 +245,12 @@ class _InputCard extends StatelessWidget {
             onChanged: onSkillChanged,
             enabled: !loading,
             skillTypeFilter: 'write',
+          ),
+          const SizedBox(height: 16),
+          AiModelSelector(
+            selectedModel: selectedModel,
+            onChanged: onModelChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '写作类型（可选）'),

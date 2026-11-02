@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_model_selector.dart';
 import 'widgets/ai_skill_selector.dart';
 
 /// AI 分镜页（E 模块）：把剧本拆成可直接出售的分镜脚本。
@@ -30,6 +31,7 @@ class _AiStoryboardPageState extends ConsumerState<AiStoryboardPage> {
   static const _styles = ['电影感', '短剧竖屏', '动漫风'];
   String? _selectedStyle;
   int? _skillId;
+  String? _model;
 
   bool _loading = false;
   AiWriteResult? _result;
@@ -59,6 +61,7 @@ class _AiStoryboardPageState extends ConsumerState<AiStoryboardPage> {
             script: _script.text.trim(),
             style: _selectedStyle,
             skillId: _skillId,
+            model: _model,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -117,6 +120,8 @@ class _AiStoryboardPageState extends ConsumerState<AiStoryboardPage> {
             loading: _loading,
             selectedSkillId: _skillId,
             onSkillChanged: (value) => setState(() => _skillId = value),
+            selectedModel: _model,
+            onModelChanged: (value) => setState(() => _model = value),
             onSelectStyle: (style) =>
                 setState(() => _selectedStyle = (_selectedStyle == style ? null : style)),
             onGenerate: _generate,
@@ -196,6 +201,8 @@ class _InputCard extends StatelessWidget {
     required this.loading,
     required this.selectedSkillId,
     required this.onSkillChanged,
+    required this.selectedModel,
+    required this.onModelChanged,
     required this.onSelectStyle,
     required this.onGenerate,
   });
@@ -206,6 +213,8 @@ class _InputCard extends StatelessWidget {
   final bool loading;
   final int? selectedSkillId;
   final ValueChanged<int?> onSkillChanged;
+  final String? selectedModel;
+  final ValueChanged<String?> onModelChanged;
   final ValueChanged<String> onSelectStyle;
   final VoidCallback onGenerate;
 
@@ -235,6 +244,12 @@ class _InputCard extends StatelessWidget {
             onChanged: onSkillChanged,
             enabled: !loading,
             skillTypeFilter: 'storyboard',
+          ),
+          const SizedBox(height: 16),
+          AiModelSelector(
+            selectedModel: selectedModel,
+            onChanged: onModelChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '分镜风格'),

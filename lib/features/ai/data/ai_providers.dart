@@ -29,3 +29,13 @@ final aiSkillsProvider = FutureProvider<List<AiSkill>>((ref) async {
     return const [];
   }
 });
+
+/// AI 渠道模型列表（管理员端配置，App 端「模型选择」下拉数据源）。
+/// 返回 [] 表示未配置渠道，UI 回退为「默认模型」。
+final aiChannelsProvider = FutureProvider<List<AiChannel>>((ref) async {
+  try {
+    return await ref.watch(aiRepositoryProvider).listModels();
+  } catch (_) {
+    return const [];
+  }
+});

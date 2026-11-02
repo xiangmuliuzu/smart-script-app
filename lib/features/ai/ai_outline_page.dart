@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'widgets/ai_model_selector.dart';
 import 'widgets/ai_skill_selector.dart';
 
 /// AI 剧本页（E 模块）：让完全不懂创作的人也能产出专业级剧本大纲。
@@ -27,6 +28,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   final _genre = TextEditingController();
   final _style = TextEditingController();
   int? _skillId;
+  String? _model;
 
   bool _loading = false;
   AiOutlineResult? _result;
@@ -59,6 +61,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
             genre: _genre.text.trim(),
             style: _style.text.trim(),
             skillId: _skillId,
+            model: _model,
             onDelta: (delta) {
               if (!mounted) return;
               setState(() => _streaming += delta);
@@ -117,6 +120,8 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
             loading: _loading,
             selectedSkillId: _skillId,
             onSkillChanged: (value) => setState(() => _skillId = value),
+            selectedModel: _model,
+            onModelChanged: (value) => setState(() => _model = value),
             onGenerate: _generate,
           ),
           const SizedBox(height: 12),
@@ -194,6 +199,8 @@ class _InputCard extends StatelessWidget {
     required this.loading,
     required this.selectedSkillId,
     required this.onSkillChanged,
+    required this.selectedModel,
+    required this.onModelChanged,
     required this.onGenerate,
   });
 
@@ -203,6 +210,8 @@ class _InputCard extends StatelessWidget {
   final bool loading;
   final int? selectedSkillId;
   final ValueChanged<int?> onSkillChanged;
+  final String? selectedModel;
+  final ValueChanged<String?> onModelChanged;
   final VoidCallback onGenerate;
 
   @override
@@ -231,6 +240,12 @@ class _InputCard extends StatelessWidget {
             onChanged: onSkillChanged,
             enabled: !loading,
             skillTypeFilter: 'write',
+          ),
+          const SizedBox(height: 16),
+          AiModelSelector(
+            selectedModel: selectedModel,
+            onChanged: onModelChanged,
+            enabled: !loading,
           ),
           const SizedBox(height: 16),
           const _Label(text: '题材（可选）'),
