@@ -40,8 +40,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
 
   void _onScroll() {
     if (_dimensionKeys.isEmpty) return;
-    // 右侧滚动区域顶部在屏幕上的y坐标（AppBar高度+顶部padding）
-    final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight;
+    // 右侧滚动区域顶部在屏幕上的y坐标：状态栏 + AppBar + 频道Tab栏高度(46)
+    final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight + 46;
     int newIndex = 0;
     for (int i = 0; i < _dimensionKeys.length; i++) {
       final ctx = _dimensionKeys[i].currentContext;
@@ -49,8 +49,8 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
       final box = ctx.findRenderObject() as RenderBox;
       // 区块顶部在屏幕上的y坐标
       final dy = box.localToGlobal(Offset.zero).dy;
-      // 如果区块顶部已经在屏幕可见区域内（没被滚上去），就选它
-      if (dy <= screenTop + 60) {
+      // 如果区块顶部已经滚到滚动区域顶部线以下，就把它设为当前维度
+      if (dy <= screenTop + 10) {
         newIndex = i;
       }
     }
