@@ -42,21 +42,16 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     if (_dimensionKeys.isEmpty) return;
     // 滚动区域顶部的位置
     final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight + 46;
-    final screenBottom = MediaQuery.of(context).size.height;
     int newIndex = 0;
-    double minDy = double.infinity;
-    // 找所有在屏幕可见范围内的区块里，最靠上的那个（和番茄逻辑一致）
+    // 从第一个维度开始遍历，哪个维度的标题滚到顶部线以下就更新，最后一个就是当前高亮
     for (int i = 0; i < _dimensionKeys.length; i++) {
       final ctx = _dimensionKeys[i].currentContext;
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox;
       final dy = box.localToGlobal(Offset.zero).dy;
-      // 只看顶部还在屏幕里的区块（没完全滚出屏幕顶部，也没完全在屏幕下面）
-      if (dy < screenBottom && dy + box.size.height > screenTop) {
-        if (dy < minDy) {
-          minDy = dy;
-          newIndex = i;
-        }
+      // 标题到达顶部线位置，就把它设为当前维度
+      if (dy <= screenTop + 10) {
+        newIndex = i;
       }
     }
     if (newIndex != _currentDimensionIndex) {
