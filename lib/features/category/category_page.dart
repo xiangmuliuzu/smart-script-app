@@ -174,11 +174,23 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     );
   }
 
-  void _scrollToDimension(int index) {
+  void _scrollToDimension(int index) async {
     setState(() => _currentDimensionIndex = index);
     if (index < 0 || index >= _dimensionKeys.length) return;
+    // 如果目标区块还没渲染，先滚动到底部触发渲染，再等一帧定位
     final key = _dimensionKeys[index];
-    final ctx = key.currentContext;
+    var ctx = key.currentContext;
+    if (ctx == null) {
+      // 先快速滚一段距离，让目标区块进入渲染范围
+      await _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent * (index / (_dimensionKeys.length - 1)),
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.linear,
+      );
+      // 等一帧让widget渲染完成
+      await Future.delayed(const Duration(milliseconds: 50));
+      ctx = key.currentContext;
+    }
     if (ctx != null) {
       Scrollable.ensureVisible(
         ctx,
