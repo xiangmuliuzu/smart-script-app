@@ -14,7 +14,7 @@
 // 运行：flutter test test/live/category_contract_test.dart
 //
 // 环境变量：
-//   LIVE_BASE_URL  默认 http://127.0.0.1:8080/api/v1
+//   LIVE_BASE_URL  默认 https://www.eyhereal.site/api/v1（开发服务入口）
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -24,7 +24,7 @@ import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/features/bookstore/data/content_repository.dart';
 
 final String kBase =
-    Platform.environment['LIVE_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1';
 
 /// 无 Token 的裸 Dio 仓库：分类/标签是公开接口，必须允许游客读取。
 ContentRepository _guestRepo() {

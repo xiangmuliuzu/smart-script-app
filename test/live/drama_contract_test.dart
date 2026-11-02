@@ -15,7 +15,7 @@
 // 运行：LIVE_SMS_CODE=<mock码> flutter test test/live/drama_contract_test.dart
 //
 // 环境变量：
-//   LIVE_BASE_URL            默认 http://127.0.0.1:8080/api/v1
+//   LIVE_BASE_URL            默认 https://www.eyhereal.site/api/v1（开发服务入口）
 //   LIVE_SMS_CODE            测试环境 Mock 短信验证码（与后端 APP_SMS_MOCK_CODE 一致）
 //   LIVE_WORK_ID             种子关联作品 ID，默认 3
 //   LIVE_DRAMA_ID            有原著的种子视频 ID，默认 900001
@@ -36,7 +36,7 @@ import 'package:script_app/features/comic/data/drama_models.dart';
 import 'package:script_app/features/comic/data/drama_repository.dart';
 
 final String kBase =
-    Platform.environment['LIVE_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1';
 final String kSmsCode = Platform.environment['LIVE_SMS_CODE'] ?? '';
 final int kWorkId = int.parse(Platform.environment['LIVE_WORK_ID'] ?? '3');
 final int kDramaId = int.parse(Platform.environment['LIVE_DRAMA_ID'] ?? '900001');

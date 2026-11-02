@@ -11,7 +11,7 @@
 //   flutter test test/live
 //
 // 环境变量：
-//   LIVE_BASE_URL       默认 http://127.0.0.1:8080/api/v1
+//   LIVE_BASE_URL       默认 https://www.eyhereal.site/api/v1（开发服务入口）
 //   LIVE_SMS_CODE       测试环境 Mock 短信验证码（与后端 APP_SMS_MOCK_CODE 一致）
 //   LIVE_ADMIN_USER     管理端账号（已实名 / 有角色路径需要）
 //   LIVE_ADMIN_PASSWORD 管理端口令
@@ -33,7 +33,7 @@ import 'package:script_app/features/user_center/data/message_repository.dart';
 import 'package:script_app/features/user_center/data/user_center_repository.dart';
 
 final String kBase =
-    Platform.environment['LIVE_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1';
 final String kSmsCode = Platform.environment['LIVE_SMS_CODE'] ?? '';
 final String kAdminUser = Platform.environment['LIVE_ADMIN_USER'] ?? '';
 final String kAdminPassword = Platform.environment['LIVE_ADMIN_PASSWORD'] ?? '';

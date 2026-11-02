@@ -10,7 +10,7 @@
 // 运行：LIVE_SMS_CODE=123456 flutter test test/live/search_history_contract_test.dart
 //
 // 环境变量：
-//   LIVE_BASE_URL  默认 http://127.0.0.1:8080/api/v1
+//   LIVE_BASE_URL  默认 https://www.eyhereal.site/api/v1（开发服务入口）
 //   LIVE_SMS_CODE  测试环境 Mock 短信验证码（与后端 APP_SMS_MOCK_CODE 一致）
 import 'dart:io';
 
@@ -26,7 +26,7 @@ import 'package:script_app/core/storage/token_storage.dart';
 import 'package:script_app/features/bookstore/data/content_repository.dart';
 
 final String kBase =
-    Platform.environment['LIVE_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1';
 final String kSmsCode = Platform.environment['LIVE_SMS_CODE'] ?? '';
 
 /// 无 Token 的裸 Dio 仓库：用于验证未登录被拒（401）。

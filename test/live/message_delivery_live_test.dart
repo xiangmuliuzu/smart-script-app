@@ -11,7 +11,9 @@ void main() {
       Platform.environment['MESSAGE_DELIVERY_SESSION_FILE'] ?? '';
   test('App真实消息客户端接收管理员通知，PC/App已读共享且其他用户隔离', () async {
     final session = jsonDecode(await File(sessionPath).readAsString()) as Map;
-    expect(session['baseUrl'], 'http://127.0.0.1:8080/api/v1');
+    // 会话必须针对开发服务生成（默认 https://www.eyhereal.site/api/v1）
+    expect(session['baseUrl'],
+        Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1');
     MessageRepository repository(String token) =>
         MessageRepository(ApiClient(Dio(BaseOptions(
             baseUrl: session['baseUrl'] as String,

@@ -13,7 +13,7 @@
 //   flutter test test/live/content_preview_contract_test.dart
 //
 // 环境变量：
-//   LIVE_BASE_URL  默认 http://127.0.0.1:8080/api/v1
+//   LIVE_BASE_URL  默认 https://www.eyhereal.site/api/v1（开发服务入口）
 //   LIVE_WORK_ID   已开启试读的作品 ID，默认 3
 import 'dart:io';
 
@@ -25,7 +25,7 @@ import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/features/bookstore/data/content_repository.dart';
 
 final String kBase =
-    Platform.environment['LIVE_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1';
 final int kWorkId = int.parse(Platform.environment['LIVE_WORK_ID'] ?? '3');
 
 ContentRepository _repo() {

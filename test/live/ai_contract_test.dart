@@ -16,7 +16,7 @@
 //   LIVE_AI_DOWN=true LIVE_SMS_CODE=<mock码> flutter test test/live/ai_contract_test.dart
 //
 // 环境变量：
-//   LIVE_BASE_URL   默认 http://127.0.0.1:8080/api/v1
+//   LIVE_BASE_URL   默认 https://www.eyhereal.site/api/v1（开发服务入口）
 //   LIVE_SMS_CODE   测试环境 Mock 短信验证码（与后端 APP_SMS_MOCK_CODE 一致）
 //   LIVE_AI_DOWN    'true' 时只验证 AI 服务不可用按 503 拒绝
 import 'dart:io';
@@ -32,7 +32,7 @@ import 'package:script_app/core/storage/secure_token_storage.dart';
 import 'package:script_app/core/storage/token_storage.dart';
 
 final String kBase =
-    Platform.environment['LIVE_BASE_URL'] ?? 'http://127.0.0.1:8080/api/v1';
+    Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1';
 final String kSmsCode = Platform.environment['LIVE_SMS_CODE'] ?? '';
 final bool kAiDown = Platform.environment['LIVE_AI_DOWN'] == 'true';
 
