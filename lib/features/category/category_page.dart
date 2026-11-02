@@ -404,10 +404,10 @@ class _DimensionSectionState extends State<_DimensionSection> {
           ],
         ),
         const SizedBox(height: 12),
-        // 标签 chips 网格
+        // 标签 chips 网格：3列，紧凑间距
         Wrap(
           spacing: 10,
-          runSpacing: 12,
+          runSpacing: 10,
           children: [
             for (final item in visibleItems)
               _TagChip(
@@ -418,7 +418,7 @@ class _DimensionSectionState extends State<_DimensionSection> {
               ),
           ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -435,13 +435,13 @@ class _TagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.pageBackground,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Container(
           width: (MediaQuery.of(context).size.width - 88 - 48 - 20) / 3,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           alignment: Alignment.center,
           child: Text(
             label,
