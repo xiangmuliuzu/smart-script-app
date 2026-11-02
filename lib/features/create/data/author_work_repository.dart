@@ -58,12 +58,14 @@ class AuthorWorkRepository {
     String? summary,
     String? cover,
     List<int>? tagIds,
+    int? channelId,
   }) async {
     final body = _compact({
       'title': title,
       'summary': summary,
       'cover': cover,
       'tagIds': tagIds,
+      'channelId': channelId,
     });
     // 重新写回 summary：_compact 会丢弃空串，但后端支持把 summary 置空，
     // 故只要调用方显式传了 summary（含空串）就必须下发；其它字段语义不变。

@@ -42,6 +42,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
 
   /// 已选标签ID（全量覆盖提交，仅变化时下发）。
   late final Set<int> _tagIds;
+  int? _pendingChannelId;
 
   /// 封面上传中标志。
   bool _uploading = false;
@@ -108,13 +109,14 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
 
     setState(() => _saving = true);
     try {
-      // A 套更新基本信息（含封面与标签，仅变化时下发）
+      // A 套更新基本信息（含封面、标签、频道，仅变化时下发）
       await ref.read(authorWorkRepositoryProvider).updateWorkBase(
             workId,
             title: title,
             summary: _summaryCtrl.text.trim(),
             cover: coverChanged ? _pendingCover : null,
             tagIds: tagsChanged ? _tagIds.toList() : null,
+            channelId: _pendingChannelId,
           );
       // B 套更新定价（仅当变化时）。A、B 是两次独立 PUT，非原子：
       // A 已落库后若 B 再失败，不能整体报「保存失败」误导用户，需分别提示。
@@ -194,7 +196,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
       _toast('暂无可用标签');
       return;
     }
-    final picked = await showModalBottomSheet<Set<int>>(
+    final picked = await showModalBottomSheet<_TagPickerResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.card,
@@ -204,6 +206,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
       builder: (_) => _TagPickerSheet(
         tags: tags,
         initial: _tagIds,
+        initialChannelId: _pendingChannelId ?? 146,
         maxCount: _kMaxWorkTags,
       ),
     );
@@ -211,7 +214,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     setState(() {
       _tagIds
         ..clear()
-        ..addAll(picked);
+        ..addAll(picked.tagIds);
+      _pendingChannelId = picked.channelId;
     });
   }
 
@@ -249,6 +253,28 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Widget _buildChannelBtn(String label, int channelId, bool editable) {
+    final isSelected = (_pendingChannelId ?? 146) == channelId;
+    return GestureDetector(
+      onTap: editable ? () => setState(() => _pendingChannelId = channelId) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.fill,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? AppColors.primary : AppColors.text2,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final work = widget.detail.work;
@@ -256,98 +282,185 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     // 标签库全量启用标签（与分类页同一数据源 GET /content/tags）
     final tagsAsync = ref.watch(tagsProvider);
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.all(16),
       children: [
         if (!editable)
           const _Notice(
             icon: Icons.lock_outline,
             text: '作品正在审核中，暂不可修改；请等待审核完成后再编辑。',
           ),
-        Container(
-          color: AppColors.card,
+        // 封面居中
+        Center(
           child: Column(
             children: [
-              _Field(
-                label: '标题',
-                child: TextField(
-                  controller: _titleCtrl,
-                  maxLength: _titleMax,
-                  enabled: editable,
-                  decoration: const InputDecoration(
-                    hintText: '请输入作品标题',
-                    border: InputBorder.none,
-                    counterText: '',
+              GestureDetector(
+                onTap: (editable && !_uploading && !_saving) ? _pickCover : null,
+                child: Container(
+                  width: 120,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.divider, width: 0.5),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _pendingCover != null && _pendingCover!.isNotEmpty
+                        ? WorkCover(url: _pendingCover!, width: 120, height: 160)
+                        : const _CoverPlaceholder(),
                   ),
                 ),
               ),
-              _Field(
-                label: '标签',
-                child: tagsAsync.when(
-                  loading: () => const Text('加载中…',
-                      style: TextStyle(color: AppColors.text3)),
-                  error: (_, __) => const Text('标签加载失败',
-                      style: TextStyle(color: AppColors.text3)),
-                  data: (tags) => _TagSelector(
-                    tags: tags,
-                    selected: _tagIds,
-                    enabled: editable,
-                    onTap: () => _openTagPicker(tags),
-                  ),
+              const SizedBox(height: 8),
+              Text(
+                '选择封面',
+                style: TextStyle(fontSize: 13, color: AppColors.text3),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        // 作品名称卡片
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('作品名称',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _titleCtrl,
+                maxLength: _titleMax,
+                enabled: editable,
+                decoration: const InputDecoration(
+                  hintText: '请输入作品名称',
+                  border: InputBorder.none,
+                  counterText: '',
+                  isDense: true,
                 ),
               ),
-              _Field(
-                label: '简介',
-                child: TextField(
-                  controller: _summaryCtrl,
-                  maxLines: 3,
-                  minLines: 1,
-                  enabled: editable,
-                  decoration: const InputDecoration(
-                    hintText: '作品简介（可留空）',
-                    border: InputBorder.none,
-                  ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 作品简介卡片
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('作品简介',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _summaryCtrl,
+                maxLines: 3,
+                enabled: editable,
+                decoration: const InputDecoration(
+                  hintText: '请输入作品简介',
+                  border: InputBorder.none,
+                  counterText: '',
+                  isDense: true,
                 ),
               ),
-              _Field(
-                label: '封面',
-                child: InkWell(
-                  onTap: (editable && !_uploading && !_saving) ? _pickCover : null,
-                  child: Row(
-                    children: [
-                      if (_pendingCover != null && _pendingCover!.isNotEmpty)
-                        WorkCover(url: _pendingCover!, width: 48, height: 64)
-                      else
-                        const _CoverPlaceholder(),
-                      const SizedBox(width: 12),
-                      if (_uploading)
-                        const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else
-                        Expanded(
-                          child: Text(
-                            editable ? '点击上传 / 更换封面' : '审核中不可修改',
-                            style: const TextStyle(
-                                color: AppColors.text3, fontSize: 13),
-                          ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 设置项列表卡片
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              // 目标读者行
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    const Text('目标读者', style: TextStyle(fontSize: 14)),
+                    const Spacer(),
+                    _buildChannelBtn('男频', 146, editable),
+                    const SizedBox(width: 12),
+                    _buildChannelBtn('女频', 147, editable),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, indent: 16),
+              // 阅读标签行
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    const Text('阅读标签', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: tagsAsync.when(
+                        loading: () => const Text('加载中…',
+                            style: TextStyle(color: AppColors.text3, fontSize: 13)),
+                        error: (_, __) => const Text('标签加载失败',
+                            style: TextStyle(color: AppColors.text3, fontSize: 13)),
+                        data: (tags) {
+                          final selectedTags = tags.where((t) => _tagIds.contains(t.tagId)).toList();
+                          return GestureDetector(
+                            onTap: editable ? () => _openTagPicker(tags) : null,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    selectedTags.isEmpty
+                                        ? '请选择阅读标签'
+                                        : selectedTags.map((t) => t.tagName).join('、'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(
+                                        color: selectedTags.isEmpty ? AppColors.text3 : AppColors.text2,
+                                        fontSize: 13),
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right, size: 18, color: AppColors.text3),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, indent: 16),
+              // 定价行
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    const Text('定价', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: _priceCtrl,
+                        enabled: editable,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          hintText: '0 表示免费',
+                          border: InputBorder.none,
+                          isDense: true,
                         ),
-                    ],
-                  ),
-                ),
-              ),
-              _Field(
-                label: '定价',
-                child: TextField(
-                  controller: _priceCtrl,
-                  enabled: editable,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    hintText: '0 表示免费',
-                    border: InputBorder.none,
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -432,15 +545,23 @@ class _TagSelector extends StatelessWidget {
 /// 标签多选弹窗：全量标签胶囊可多选，最多 [maxCount] 个。
 ///
 /// 内部维护临时集合，点「确定」通过 `Navigator.pop` 返回最终结果。
+class _TagPickerResult {
+  final Set<int> tagIds;
+  final int channelId;
+  _TagPickerResult({required this.tagIds, required this.channelId});
+}
+
 class _TagPickerSheet extends StatefulWidget {
   const _TagPickerSheet({
     required this.tags,
     required this.initial,
+    required this.initialChannelId,
     required this.maxCount,
   });
 
   final List<TagItem> tags;
   final Set<int> initial;
+  final int initialChannelId;
   final int maxCount;
 
   @override
@@ -450,19 +571,22 @@ class _TagPickerSheet extends StatefulWidget {
 class _TagPickerSheetState extends State<_TagPickerSheet> {
   late final Set<int> _selected;
   bool _overflow = false;
+  int _currentDimIndex = 0;
+  int _currentChannelId = 146; // 默认男生频道
 
-  // 各维度选择限制
+  // 维度配置
   final List<Map<String, dynamic>> _dimConfigs = [
-    {'type': 'hot', 'title': '主分类（必选，只能选1个）', 'max': 1, 'required': true},
-    {'type': 'theme', 'title': '主题（最多选2个）', 'max': 2, 'required': false},
-    {'type': 'role', 'title': '角色（最多选2个）', 'max': 2, 'required': false},
-    {'type': 'plot', 'title': '情节（最多选2个）', 'max': 2, 'required': false},
+    {'type': 'hot', 'title': '主分类', 'max': 1, 'required': true},
+    {'type': 'theme', 'title': '主题', 'max': 2, 'required': false},
+    {'type': 'role', 'title': '角色', 'max': 2, 'required': false},
+    {'type': 'plot', 'title': '情节', 'max': 2, 'required': false},
   ];
 
   @override
   void initState() {
     super.initState();
     _selected = {...widget.initial};
+    _currentChannelId = widget.initialChannelId;
   }
 
   void _toggle(TagItem tag) {
@@ -471,7 +595,14 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
         _selected.remove(tag.tagId);
         _overflow = false;
       } else {
-        // 按维度计算已选数量
+        // 主分类是单选，选新的自动替换旧的
+        if (tag.tagType == 'hot') {
+          _selected.removeWhere((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot');
+          _selected.add(tag.tagId);
+          _overflow = false;
+          return;
+        }
+        // 其他维度是多选，按数量限制
         final selectedInType = _selected.where((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == tag.tagType).length;
         final config = _dimConfigs.firstWhere((c) => c['type'] == tag.tagType);
         if (selectedInType >= config['max']) {
@@ -485,113 +616,157 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
   }
 
   bool get _canSubmit {
-    // 主分类必选1个
     final hotSelected = _selected.where((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot').length;
     return hotSelected >= 1;
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentDim = _dimConfigs[_currentDimIndex];
+    final tagsInDim = widget.tags
+        .where((t) => t.tagType == currentDim['type'] && t.channelId == _currentChannelId)
+        .toList();
+    final selectedInDim = _selected.where((id) => tagsInDim.any((t) => t.tagId == id)).length;
+
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            child: Row(
-              children: [
-                const Text('选择标签',
-                    style: TextStyle(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.85,
+        child: Column(
+          children: [
+            // 顶部标题栏
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(),
+                  const Text('阅读标签',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.text1)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _canSubmit ? () => Navigator.of(context).pop(_TagPickerResult(tagIds: _selected, channelId: _currentChannelId)) : null,
+                    child: Text(
+                      '确认',
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text1)),
-                const Spacer(),
-                if (_overflow)
-                  const Text('该分类已选满',
-                      style: TextStyle(fontSize: 12, color: AppColors.warning)),
-              ],
+                        color: _canSubmit ? AppColors.primary : AppColors.text3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1, color: AppColors.divider),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+            // 说明文字
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '主分类必选且只能选一个，主题、角色、情节最多可选两个',
+                  style: TextStyle(fontSize: 12, color: AppColors.text3),
+                ),
+              ),
+            ),
+            if (_overflow)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('该分类已选满',
+                      style: TextStyle(fontSize: 12, color: AppColors.warning)),
+                ),
+              ),
+            const Divider(height: 1, color: AppColors.divider),
+            // 主体：左侧维度导航 + 右侧标签墙
+            Expanded(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final config in _dimConfigs)
-                    Builder(
-                      builder: (context) {
-                        final tagsInType = widget.tags.where((t) => t.tagType == config['type']).toList();
-                        if (tagsInType.isEmpty) return const SizedBox.shrink();
-                        final selectedInType = _selected.where((id) => tagsInType.any((t) => t.tagId == id)).length;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                  // 左侧维度导航
+                  Container(
+                    width: 80,
+                    color: AppColors.pageBackground,
+                    child: ListView.builder(
+                      itemCount: _dimConfigs.length,
+                      itemBuilder: (context, index) {
+                        final dim = _dimConfigs[index];
+                        final isSelected = index == _currentDimIndex;
+                        return GestureDetector(
+                          onTap: () => setState(() => _currentDimIndex = index),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            color: isSelected ? AppColors.card : Colors.transparent,
+                            child: Column(
                               children: [
-                                Text(config['title'],
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.text2)),
-                                const Spacer(),
-                                Text('$selectedInType/${config['max']}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+                                Text(
+                                  dim['title'],
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                    color: isSelected ? AppColors.primary : AppColors.text2,
+                                  ),
+                                ),
+                                if (dim['required'])
+                                  const Text('*', style: TextStyle(fontSize: 12, color: AppColors.warning)),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final tag in tagsInType)
-                                  _TagChip(
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // 右侧标签墙
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text('* ${currentDim['title']}',
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.text1)),
+                              const Spacer(),
+                              Text('$selectedInDim/${currentDim['max']}',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              for (final tag in tagsInDim)
+                                SizedBox(
+                                  width: (MediaQuery.of(context).size.width - 80 - 32 - 20) / 3,
+                                  child: _TagChip(
                                     label: tag.tagName,
                                     selected: _selected.contains(tag.tagId),
                                     onTap: () => _toggle(tag),
                                   ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                        );
-                      },
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
                 ],
               ),
             ),
-          ),
-          const Divider(height: 1, color: AppColors.divider),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(
-              children: [
-                TextButton(
-                  onPressed: _selected.isEmpty
-                      ? null
-                      : () => setState(() {
-                            _selected.clear();
-                            _overflow = false;
-                          }),
-                  child: const Text('清空'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _canSubmit
-                        ? () => Navigator.of(context).pop(_selected)
-                        : null,
-                    child: const Text('确定'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
 }
 
 /// 可选中标签胶囊（样式对齐分类页胶囊，增加选中态）。
