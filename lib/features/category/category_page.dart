@@ -54,6 +54,10 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
         newIndex = i;
       }
     }
+    // 已经滚到最底部，直接高亮最后一个维度（情节）
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 20) {
+      newIndex = _dimensionKeys.length - 1;
+    }
     if (newIndex != _currentDimensionIndex) {
       setState(() => _currentDimensionIndex = newIndex);
     }
