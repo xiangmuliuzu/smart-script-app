@@ -256,7 +256,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
   Widget build(BuildContext context) {
     final work = widget.detail.work;
     final editable = work.editable;
-    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoriesAsync = ref.watch(themeCategoriesProvider);
     // 标签库全量启用标签（与分类页同一数据源 GET /content/tags）
     final tagsAsync = ref.watch(tagsProvider(null));
     return ListView(

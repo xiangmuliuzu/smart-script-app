@@ -33,16 +33,50 @@ class ContentRepository {
     return _items(data, CategoryItem.fromJson);
   }
 
+  /// 分类树（两级）：先取顶级，再并行取各自子级。
+  ///
+  /// 顶级在三级分类迁移后是「频道」，迁移前是「题材」；调用方按子级是否为空
+  /// 自行兼容两种形态。三级细分不在此处拉取（69 条分类逐个请求过重），
+  /// 由页面按选中题材懒加载。
+  Future<List<CategoryNode>> listCategoryTree() async {
+    final top = await listCategories(parentId: 0);
+    final children = await Future.wait(
+      top.map((category) => listCategories(parentId: category.categoryId)),
+    );
+    return [
+      for (var i = 0; i < top.length; i++)
+        CategoryNode(category: top[i], children: children[i]),
+    ];
+  }
+
   /// 标签列表（后端按使用量降序下发）。
   ///
   /// [categoryId] 有值时只返回该分类下已上架作品关联过的标签（接口文档表 2-126）。
-  Future<List<TagItem>> listTags({String? tagType, int? categoryId}) async {
+  /// [channelId] 有值时按频道过滤（分类页新标签体系）。
+  Future<List<TagItem>> listTags({String? tagType, int? categoryId, int? channelId}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentTags,
-      query: _compact({'tagType': tagType, 'categoryId': categoryId}),
+      query: _compact({
+        'tagType': tagType,
+        'categoryId': categoryId,
+        'channelId': channelId,
+      }),
       parser: _mapParser,
     );
     return _items(data, TagItem.fromJson);
+  }
+
+  /// 分类页导航：频道列表 + 四维度（热门标签 / 主题 / 角色 / 情节）分组。
+  ///
+  /// [channelId] 为空时不传参，由后端回落第一个频道。
+  Future<CategoryNav> categoryNav({int? channelId}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentCategoryNav,
+      query: _compact({'channelId': channelId}),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取分类导航失败');
+    return CategoryNav.fromJson(data);
   }
 
   /// 作品列表（分页 + 筛选 + 排序）。

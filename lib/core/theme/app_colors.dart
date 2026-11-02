@@ -15,6 +15,10 @@ class AppColors {
   static const Color cyanTint = Color(0xFFE3F0F2);
   static const Color warmGray = Color(0xFFF7F5F2);
 
+  /// 强调橙（分类页维度选中 / 指示条）。
+  static const Color accent = Color(0xFFFF6B35);
+  static const Color accentSoft = Color(0xFFFFF1EC);
+
   /// 卡片 / 背景。
   static const Color card = Color(0xFFFFFFFF);
   static const Color pageBackground = Color(0xFFF6F8FA);

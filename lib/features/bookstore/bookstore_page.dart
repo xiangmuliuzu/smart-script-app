@@ -68,7 +68,7 @@ class BookstorePage extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(bannersProvider);
-          ref.invalidate(categoriesProvider);
+          ref.invalidate(categoryTreeProvider);
           ref.invalidate(hotWorksProvider);
           ref.invalidate(latestWorksProvider);
         },
@@ -293,13 +293,16 @@ class _BannerSkeleton extends StatelessWidget {
   }
 }
 
-/// 顶级分类入口（parent_id=0）。
+/// 题材入口（分类树二级，扁平展示）。
+///
+/// 一级是频道（男生 / 女生），书城首页只作题材快捷入口，故取扁平题材；
+/// 三级迁移尚未执行时 `themeCategoriesProvider` 会回落到顶级题材。
 class _CategoryEntries extends ConsumerWidget {
   const _CategoryEntries();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoriesAsync = ref.watch(themeCategoriesProvider);
     return categoriesAsync.when(
       // loading 态暂保持不占位（骨架屏后续批次统一）。
       loading: () => const SizedBox.shrink(),
@@ -311,7 +314,7 @@ class _CategoryEntries extends ConsumerWidget {
           const SectionHeader(title: '分类'),
           _SectionError(
             message: error is ApiException ? error.message : '分类加载失败',
-            onRetry: () => ref.invalidate(categoriesProvider),
+            onRetry: () => ref.invalidate(themeCategoriesProvider),
           ),
         ],
       ),

@@ -42,6 +42,15 @@ List<TagItem> _tags(dynamic value) {
       .toList();
 }
 
+/// 分类页导航各级数组解析：非数组或元素非对象时按空集合处理。
+List<T> _navList<T>(dynamic value, T Function(Map<String, dynamic>) parser) {
+  if (value is! List) return <T>[];
+  return value
+      .whereType<Map>()
+      .map((e) => parser(Map<String, dynamic>.from(e)))
+      .toList();
+}
+
 /// 书城作品（列表与详情共用）。
 class BookItem {
   const BookItem({
@@ -223,6 +232,20 @@ class CategoryItem {
       );
 }
 
+/// 分类树节点：频道 / 题材 + 其直接子分类。
+///
+/// 三级分类中本结构承载前两层（频道 → 题材），第三层细分由
+/// `childrenCategoriesProvider` 按选中题材懒加载，避免一次性拉全树。
+class CategoryNode {
+  const CategoryNode({
+    required this.category,
+    this.children = const <CategoryItem>[],
+  });
+
+  final CategoryItem category;
+  final List<CategoryItem> children;
+}
+
 /// 作品标签（sys_tag）。
 class TagItem {
   const TagItem({
@@ -231,6 +254,8 @@ class TagItem {
     this.tagType = '',
     this.useCount = 0,
     this.sort = 0,
+    this.groupName,
+    this.channelId,
   });
 
   final int tagId;
@@ -239,12 +264,109 @@ class TagItem {
   final int useCount;
   final int sort;
 
+  /// 所属分组名（分类页导航下发；其它接口可能为空）。
+  final String? groupName;
+
+  /// 所属频道ID（分类页导航下发；其它接口可能为空）。
+  final int? channelId;
+
   factory TagItem.fromJson(Map<String, dynamic> json) => TagItem(
         tagId: _int(json['tagId']),
         tagName: _text(json['tagName']),
         tagType: _text(json['tagType']),
         useCount: _int(json['useCount']),
         sort: _int(json['sort']),
+        groupName: json['groupName']?.toString(),
+        channelId: _intOrNull(json['channelId']),
+      );
+}
+
+/// 分类页导航（接口 `/content/categories/nav` 的 data）。
+///
+/// 频道列表 + 四维度（热门标签 / 主题 / 角色 / 情节，顺序由后端固定）。
+class CategoryNav {
+  const CategoryNav({
+    this.channelId,
+    this.channels = const <NavChannel>[],
+    this.dimensions = const <NavDimension>[],
+  });
+
+  /// 当前频道ID（入参为空时后端回落第一个频道）。
+  final int? channelId;
+  final List<NavChannel> channels;
+  final List<NavDimension> dimensions;
+
+  factory CategoryNav.fromJson(Map<String, dynamic> json) => CategoryNav(
+        channelId: (json['channelId'] as num?)?.toInt(),
+        channels: _navList(json['channels'], NavChannel.fromJson),
+        dimensions: _navList(json['dimensions'], NavDimension.fromJson),
+      );
+}
+
+/// 频道（男生 / 女生等）。
+class NavChannel {
+  const NavChannel({required this.channelId, this.channelName = ''});
+
+  final int channelId;
+  final String channelName;
+
+  factory NavChannel.fromJson(Map<String, dynamic> json) => NavChannel(
+        channelId: _int(json['channelId']),
+        channelName: _text(json['channelName']),
+      );
+}
+
+/// 维度（hot 热门标签 / theme 主题 / role 角色 / plot 情节）。
+class NavDimension {
+  const NavDimension({
+    required this.key,
+    this.name = '',
+    this.groups = const <NavGroup>[],
+  });
+
+  final String key;
+  final String name;
+  final List<NavGroup> groups;
+
+  factory NavDimension.fromJson(Map<String, dynamic> json) => NavDimension(
+        key: _text(json['key']),
+        name: _text(json['name']),
+        groups: _navList(json['groups'], NavGroup.fromJson),
+      );
+}
+
+/// 分组（同一维度下按题材 / 身份等划分的小块）。
+class NavGroup {
+  const NavGroup({this.groupName = '', this.items = const <NavItem>[]});
+
+  final String groupName;
+  final List<NavItem> items;
+
+  factory NavGroup.fromJson(Map<String, dynamic> json) => NavGroup(
+        groupName: _text(json['groupName']),
+        items: _navList(json['items'], NavItem.fromJson),
+      );
+}
+
+/// 分组内的筛选项：itemType 为 category（分类）或 tag（标签）。
+class NavItem {
+  const NavItem({
+    required this.itemType,
+    required this.itemId,
+    this.itemName = '',
+    this.workCount = 0,
+  });
+
+  final String itemType;
+  final int itemId;
+  final String itemName;
+  final int workCount;
+
+  factory NavItem.fromJson(Map<String, dynamic> json) => NavItem(
+        itemType: _text(json['itemType']),
+        itemId: _int(json['itemId']),
+        itemName: _text(json['itemName']),
+        workCount: _int(json['workCount']),
       );
 }
 

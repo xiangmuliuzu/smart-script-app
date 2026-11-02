@@ -57,6 +57,8 @@ class ApiEndpoints {
   static const String contentCategories = '/content/categories';
   /// 标签列表（可传 tagType）
   static const String contentTags = '/content/tags';
+  /// 分类页导航（频道 + 热门标签/主题/角色/情节四维度分组；可传 channelId）
+  static const String contentCategoryNav = '/content/categories/nav';
   /// 作品列表（分页 {total, list}；可传 categoryId/tagId/keyword/sort/page/pageSize）
   static const String contentWorks = '/content/works';
   /// 作品详情

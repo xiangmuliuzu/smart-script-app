@@ -163,7 +163,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   @override
   Widget build(BuildContext context) {
     final categories =
-        ref.watch(categoriesProvider).valueOrNull ?? const <CategoryItem>[];
+        ref.watch(themeCategoriesProvider).valueOrNull ?? const <CategoryItem>[];
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: Text(_pageTitle(categories))),
@@ -220,6 +220,16 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
               selected: _categoryId == null,
               onTap: () => _applyCategory(null),
             ),
+            // 从分类页三级细分进入时，该分类不在题材列表内，需单独补一项，
+            // 否则下拉里没有与当前筛选对应的选项。
+            if (widget.categoryId != null &&
+                (widget.title?.isNotEmpty ?? false) &&
+                !categories.any((c) => c.categoryId == widget.categoryId))
+              FilterDropdownOption(
+                label: widget.title!,
+                selected: _categoryId == widget.categoryId,
+                onTap: () => _applyCategory(widget.categoryId),
+              ),
             for (final category in categories)
               FilterDropdownOption(
                 label: category.categoryName,
@@ -255,6 +265,12 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   String? _selectedCategoryName(List<CategoryItem> categories) {
     for (final category in categories) {
       if (category.categoryId == _categoryId) return category.categoryName;
+    }
+    // 入口分类为三级细分（不在题材列表里）时用进入页面的标题兜底，
+    // 避免下拉显示「全部类型」而实际已按该细分筛选。
+    if (_categoryId != null && _categoryId == widget.categoryId) {
+      final title = widget.title;
+      if (title != null && title.isNotEmpty) return title;
     }
     return null;
   }

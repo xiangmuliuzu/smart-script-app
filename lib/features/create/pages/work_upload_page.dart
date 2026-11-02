@@ -99,14 +99,14 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
 
   @override
   Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoriesAsync = ref.watch(themeCategoriesProvider);
     return UserCenterScaffold(
       title: '新建作品',
       body: categoriesAsync.when(
         loading: () => const LoadingView(message: '加载中'),
         error: (error, _) => ErrorView(
           message: error is ApiException ? error.message : '分类加载失败，请稍后重试',
-          onRetry: () => ref.invalidate(categoriesProvider),
+          onRetry: () => ref.invalidate(themeCategoriesProvider),
         ),
         data: _buildForm,
       ),
