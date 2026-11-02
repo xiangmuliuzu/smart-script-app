@@ -449,9 +449,15 @@ class _TagPickerSheet extends StatefulWidget {
 
 class _TagPickerSheetState extends State<_TagPickerSheet> {
   late final Set<int> _selected;
-
-  /// 选满后再次点选时置位，标题栏据此显示上限提醒。
   bool _overflow = false;
+
+  // 各维度选择限制
+  final _dimConfigs = [
+    {'type': 'hot', 'title': '主分类（必选，只能选1个）', 'max': 1, 'required': true},
+    {'type': 'theme', 'title': '主题（最多选2个）', 'max': 2, 'required': false},
+    {'type': 'role', 'title': '角色（最多选2个）', 'max': 2, 'required': false},
+    {'type': 'plot', 'title': '情节（最多选2个）', 'max': 2, 'required': false},
+  ];
 
   @override
   void initState() {
@@ -459,18 +465,29 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
     _selected = {...widget.initial};
   }
 
-  void _toggle(int tagId) {
+  void _toggle(TagItem tag) {
     setState(() {
-      if (_selected.contains(tagId)) {
-        _selected.remove(tagId);
+      if (_selected.contains(tag.tagId)) {
+        _selected.remove(tag.tagId);
         _overflow = false;
-      } else if (_selected.length >= widget.maxCount) {
-        _overflow = true;
       } else {
-        _selected.add(tagId);
-        _overflow = false;
+        // 按维度计算已选数量
+        final selectedInType = _selected.where((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == tag.tagType).length;
+        final config = _dimConfigs.firstWhere((c) => c['type'] == tag.tagType);
+        if (selectedInType >= config['max']) {
+          _overflow = true;
+        } else {
+          _selected.add(tag.tagId);
+          _overflow = false;
+        }
       }
     });
+  }
+
+  bool get _canSubmit {
+    // 主分类必选1个
+    final hotSelected = _selected.where((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot').length;
+    return hotSelected >= 1;
   }
 
   @override
@@ -489,15 +506,9 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                         fontWeight: FontWeight.w600,
                         color: AppColors.text1)),
                 const Spacer(),
-                Text(
-                  _overflow
-                      ? '最多选 ${widget.maxCount} 个'
-                      : '已选 ${_selected.length}/${widget.maxCount}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _overflow ? AppColors.warning : AppColors.text3,
-                  ),
-                ),
+                if (_overflow)
+                  const Text('该分类已选满',
+                      style: TextStyle(fontSize: 12, color: AppColors.warning)),
               ],
             ),
           ),
@@ -505,15 +516,47 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
           Flexible(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final tag in widget.tags)
-                    _TagChip(
-                      label: tag.tagName,
-                      selected: _selected.contains(tag.tagId),
-                      onTap: () => _toggle(tag.tagId),
+                  for (final config in _dimConfigs)
+                    Builder(
+                      builder: (context) {
+                        final tagsInType = widget.tags.where((t) => t.tagType == config['type']).toList();
+                        if (tagsInType.isEmpty) return const SizedBox.shrink();
+                        final selectedInType = _selected.where((id) => tagsInType.any((t) => t.tagId == id)).length;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(config['title'],
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.text2)),
+                                const Spacer(),
+                                Text('$selectedInType/${config['max']}',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final tag in tagsInType)
+                                  _TagChip(
+                                    label: tag.tagName,
+                                    selected: _selected.contains(tag.tagId),
+                                    onTap: () => _toggle(tag),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        );
+                      },
                     ),
                 ],
               ),
@@ -536,7 +579,9 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(_selected),
+                    onPressed: _canSubmit
+                        ? () => Navigator.of(context).pop(_selected)
+                        : null,
                     child: const Text('确定'),
                   ),
                 ),
