@@ -355,9 +355,9 @@ class _DimensionSectionState extends State<_DimensionSection> {
       allItems.addAll(group.items);
     }
 
-    // 默认显示前 6 行（18个），展开显示全部
-    final visibleItems = _expanded ? allItems : allItems.take(18).toList();
-    final hasMore = allItems.length > 18;
+    // 默认显示前 10 行（30个），展开显示全部
+    final visibleItems = _expanded ? allItems : allItems.take(30).toList();
+    final hasMore = allItems.length > 30;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
