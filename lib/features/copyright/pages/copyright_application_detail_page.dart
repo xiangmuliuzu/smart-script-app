@@ -1082,7 +1082,7 @@ class _CopyrightApplicationDetailPageState
           ),
           const SizedBox(height: 8),
           const Text(
-            '须至少上传 1 个文件，且必须包含版权证书（cert）',
+            '必须上传作品源文件，其他文件请按实际情况上传。先选类型再选文件，确认无误后提交。',
             style: TextStyle(fontSize: 12, color: AppColors.text3),
           ),
           const SizedBox(height: 12),
@@ -1182,7 +1182,9 @@ class _CopyrightApplicationDetailPageState
               _submitting
                   ? '提交中...'
                   : canUpload
-                      ? '提交交割'
+                      ? (_pendingFiles.any((f) => f.fileType == 'source')
+                          ? '提交交割'
+                          : '请先添加作品源文件')
                       : '确认收货',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
@@ -1221,8 +1223,10 @@ class _CopyrightApplicationDetailPageState
       showAppToast(context, '请至少上传 1 个文件');
       return;
     }
-    if (!_pendingFiles.any((f) => f.fileType == 'cert')) {
-      showAppToast(context, '必须上传版权证书文件');
+    // 硬规则：必须含 fileType=source；仅点「其他/证书/文档」不可提交。
+    final hasSource = _pendingFiles.any((f) => f.fileType == 'source');
+    if (!hasSource) {
+      showAppToast(context, '必须上传作品源文件（请点「+源文件」添加）');
       return;
     }
     setState(() => _submitting = true);

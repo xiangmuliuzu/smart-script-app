@@ -424,7 +424,7 @@ class OrderDetailPage extends ConsumerWidget {
         context,
         ref,
         order,
-        hint: '请上传版权证书等交割材料',
+        hint: '请上传作品源文件等交割材料',
         buttonLabel: '去交割',
       );
     }

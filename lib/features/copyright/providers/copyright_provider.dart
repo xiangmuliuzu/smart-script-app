@@ -378,12 +378,19 @@ class CopyrightProvider extends ChangeNotifier {
     }
   }
 
-  /// 上传交割内容（须含证书文件）
+  /// 上传交割内容（必须含作品源文件 source；版权证书 cert 可选）
   Future<bool> uploadDelivery(
     int deliveryId, {
     required List<Map<String, dynamic>> files,
     String? remark,
   }) async {
+    if (files.isEmpty) {
+      throw Exception('请至少上传 1 个文件');
+    }
+    final hasSource = files.any((f) => f['fileType']?.toString() == 'source');
+    if (!hasSource) {
+      throw Exception('必须上传作品源文件');
+    }
     _currentDelivery = await _apiService.uploadDelivery(
       deliveryId,
       files: files,

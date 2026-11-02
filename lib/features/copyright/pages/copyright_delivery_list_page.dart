@@ -95,7 +95,7 @@ class _CopyrightDeliveryListPageState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '版权交割是指合同签署并付款后，卖方交付版权证书、作品源文件等约定内容，买方确认收货后订单完成。',
+                  '版权交割是指合同签署并付款后，卖方交付作品源文件（必传）及版权证书等约定内容，买方确认收货后订单完成。',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue.shade800,
