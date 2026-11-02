@@ -40,22 +40,17 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
 
   void _onScroll() {
     if (_dimensionKeys.isEmpty) return;
+    // 滚动区域顶部的位置
     final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight + 46;
-    final screenBottom = MediaQuery.of(context).size.height - 80; // 减去底部导航栏高度
     int newIndex = 0;
-    double minDy = double.infinity;
-    // 找当前屏幕里最靠上的那个区块
+    // 所有区块都渲染好了，直接找最后一个顶部已经到达滚动区域顶部线的区块
     for (int i = 0; i < _dimensionKeys.length; i++) {
       final ctx = _dimensionKeys[i].currentContext;
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox;
       final dy = box.localToGlobal(Offset.zero).dy;
-      final height = box.size.height;
-      // 只看和当前屏幕有交集的区块（没完全滚上去，也没完全在屏幕下面）
-      if (dy + height < screenTop || dy > screenBottom) continue;
-      // 找这些区块里最靠上的那个
-      if (dy < minDy) {
-        minDy = dy;
+      // 区块顶部已经滚到顶部线以上，就记录这个索引
+      if (dy <= screenTop) {
         newIndex = i;
       }
     }
@@ -152,20 +147,23 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                             currentIndex: _currentDimensionIndex,
                             onTap: (index) => _scrollToDimension(index),
                           ),
-                          // 右侧标签区块堆叠
+                          // 右侧标签区块堆叠：直接全部渲染，不用懒加载，彻底解决定位问题
                           Expanded(
                             child: Container(
                               color: AppColors.card,
-                              child: ListView.builder(
+                              child: SingleChildScrollView(
                                 controller: _scrollController,
                                 padding: const EdgeInsets.all(16),
-                                itemCount: nav.dimensions.length,
-                                itemBuilder: (context, index) {
-                                  return _DimensionSection(
-                                    key: _dimensionKeys[index],
-                                    dimension: nav.dimensions[index],
-                                  );
-                                },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    for (var i = 0; i < nav.dimensions.length; i++)
+                                      _DimensionSection(
+                                        key: _dimensionKeys[i],
+                                        dimension: nav.dimensions[i],
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
