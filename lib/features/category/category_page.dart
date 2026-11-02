@@ -42,16 +42,21 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     if (_dimensionKeys.isEmpty) return;
     // 滚动区域顶部的位置
     final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight + 46;
+    final screenBottom = MediaQuery.of(context).size.height;
     int newIndex = 0;
-    // 所有区块都渲染好了，直接找最后一个顶部已经到达滚动区域顶部线的区块
+    double minDy = double.infinity;
+    // 找所有在屏幕可见范围内的区块里，最靠上的那个（和番茄逻辑一致）
     for (int i = 0; i < _dimensionKeys.length; i++) {
       final ctx = _dimensionKeys[i].currentContext;
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox;
       final dy = box.localToGlobal(Offset.zero).dy;
-      // 区块顶部已经滚到顶部线以上，就记录这个索引
-      if (dy <= screenTop) {
-        newIndex = i;
+      // 只看顶部还在屏幕里的区块（没完全滚出屏幕顶部，也没完全在屏幕下面）
+      if (dy < screenBottom && dy + box.size.height > screenTop) {
+        if (dy < minDy) {
+          minDy = dy;
+          newIndex = i;
+        }
       }
     }
     if (newIndex != _currentDimensionIndex) {
