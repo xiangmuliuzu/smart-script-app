@@ -1586,26 +1586,6 @@ class _ShelfBook extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            if (work.genreName.isNotEmpty)
-              Positioned(
-                top: 0,
-                left: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    work.genreName,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
             Center(
               child: Text(
                 work.title,

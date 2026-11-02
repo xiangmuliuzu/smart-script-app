@@ -23,42 +23,15 @@ class ContentRepository {
     return _items(data, BannerItem.fromJson);
   }
 
-  /// 分类列表；[parentId] 传 0 取顶级分类，[categoryType] 用于限定分类用途。
-  Future<List<CategoryItem>> listCategories({String? categoryType, int? parentId}) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.contentCategories,
-      query: _compact({'categoryType': categoryType, 'parentId': parentId}),
-      parser: _mapParser,
-    );
-    return _items(data, CategoryItem.fromJson);
-  }
-
-  /// 分类树（两级）：先取顶级，再并行取各自子级。
+  /// 标签列表（后端按位次升序下发）。
   ///
-  /// 顶级在三级分类迁移后是「频道」，迁移前是「题材」；调用方按子级是否为空
-  /// 自行兼容两种形态。三级细分不在此处拉取（69 条分类逐个请求过重），
-  /// 由页面按选中题材懒加载。
-  Future<List<CategoryNode>> listCategoryTree() async {
-    final top = await listCategories(parentId: 0);
-    final children = await Future.wait(
-      top.map((category) => listCategories(parentId: category.categoryId)),
-    );
-    return [
-      for (var i = 0; i < top.length; i++)
-        CategoryNode(category: top[i], children: children[i]),
-    ];
-  }
-
-  /// 标签列表（后端按使用量降序下发）。
-  ///
-  /// [categoryId] 有值时只返回该分类下已上架作品关联过的标签（接口文档表 2-126）。
-  /// [channelId] 有值时按频道过滤（分类页新标签体系）。
-  Future<List<TagItem>> listTags({String? tagType, int? categoryId, int? channelId}) async {
+  /// [tagType] 可限定维度（hot/theme/role/plot）；
+  /// [channelId] 有值时按频道过滤（分类页标签体系）。
+  Future<List<TagItem>> listTags({String? tagType, int? channelId}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentTags,
       query: _compact({
         'tagType': tagType,
-        'categoryId': categoryId,
         'channelId': channelId,
       }),
       parser: _mapParser,
@@ -85,7 +58,6 @@ class ContentRepository {
   /// [recommendStatus] 传入时后端只回该推荐位下未过期的作品，并按推荐权重降序
   /// （配合权重同级回落浏览量）；用于书城首页「热门作品」取推荐位。
   Future<PagedData<BookItem>> pageWorks({
-    int? categoryId,
     int? tagId,
     String? keyword,
     String? sort,
@@ -98,7 +70,6 @@ class ContentRepository {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentWorks,
       query: _compact({
-        'categoryId': categoryId,
         'tagId': tagId,
         'keyword': keyword,
         'sort': sort,

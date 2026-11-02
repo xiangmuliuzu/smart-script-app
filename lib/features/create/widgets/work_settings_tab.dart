@@ -16,8 +16,8 @@ import 'work_delete_dialog.dart';
 
 /// 工作台 Tab2：作品设置。
 ///
-/// 标题 / 分类 / 简介 / 封面 / 标签走 A 套 `PUT /users/me/works/{workId}`（updateWorkBase），
-/// 其中标签为全量覆盖（接口文档 2.3.3，最多 8 个）；
+/// 标题 / 简介 / 封面 / 标签走 A 套 `PUT /users/me/works/{workId}`（updateWorkBase），
+/// 其中标签为全量覆盖（接口文档 2.3.3，最多 8 个）；标签墙体系下作品不再设置分类。
 /// 定价走 B 套 `PUT /content/works/{workId}`（updateWork，2.9.3 仅放行 price）。
 /// 封面从本地选图，先经 2.9.1 上传拿到 url，保存在「保存」时随基本信息提交。
 /// 编辑闸门：仅审核中锁定，其余状态（含已发布）均可保存；已发布改动后需重新提交审核。
@@ -37,7 +37,6 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _summaryCtrl;
   late final TextEditingController _priceCtrl;
-  int? _genreId;
   bool _saving = false;
   bool _deleting = false;
 
@@ -65,7 +64,6 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     _priceCtrl = TextEditingController(
       text: (price != null && price > 0) ? price.toString() : '',
     );
-    _genreId = work.genreId;
     _pendingCover = work.cover;
     _tagIds = widget.detail.tags.map((tag) => tag.tagId).toSet();
   }
@@ -115,7 +113,6 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
             workId,
             title: title,
             summary: _summaryCtrl.text.trim(),
-            genreId: _genreId,
             cover: coverChanged ? _pendingCover : null,
             tagIds: tagsChanged ? _tagIds.toList() : null,
           );
@@ -256,9 +253,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
   Widget build(BuildContext context) {
     final work = widget.detail.work;
     final editable = work.editable;
-    final categoriesAsync = ref.watch(themeCategoriesProvider);
     // 标签库全量启用标签（与分类页同一数据源 GET /content/tags）
-    final tagsAsync = ref.watch(tagsProvider(null));
+    final tagsAsync = ref.watch(tagsProvider);
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
@@ -281,21 +277,6 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                     hintText: '请输入作品标题',
                     border: InputBorder.none,
                     counterText: '',
-                  ),
-                ),
-              ),
-              _Field(
-                label: '分类',
-                child: categoriesAsync.when(
-                  loading: () => const Text('加载中…',
-                      style: TextStyle(color: AppColors.text3)),
-                  error: (_, __) => const Text('分类加载失败',
-                      style: TextStyle(color: AppColors.text3)),
-                  data: (categories) => _CategoryDropdown(
-                    categories: categories,
-                    value: _genreId,
-                    enabled: editable,
-                    onChanged: (value) => setState(() => _genreId = value),
                   ),
                 ),
               ),
@@ -397,43 +378,6 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 分类下拉（顶级分类）。
-class _CategoryDropdown extends StatelessWidget {
-  const _CategoryDropdown({
-    required this.categories,
-    required this.value,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final List<CategoryItem> categories;
-  final int? value;
-  final bool enabled;
-  final ValueChanged<int?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    // 后端可能返回已不在顶级列表中的分类 id，兜底避免 Dropdown 断言失败。
-    final hasValue = categories.any((c) => c.categoryId == value);
-    return DropdownButtonFormField<int>(
-      value: hasValue ? value : null,
-      isExpanded: true,
-      decoration: const InputDecoration(
-        hintText: '请选择分类',
-        border: InputBorder.none,
-      ),
-      items: [
-        for (final category in categories)
-          DropdownMenuItem<int>(
-            value: category.categoryId,
-            child: Text(category.categoryName),
-          ),
-      ],
-      onChanged: enabled ? onChanged : null,
     );
   }
 }

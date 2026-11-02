@@ -7,9 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/widgets/common_views.dart';
-import '../../bookstore/data/bookstore_models.dart';
-import '../../bookstore/data/content_providers.dart';
 import '../../user_center/widgets/user_center_scaffold.dart';
 import '../../welfare/data/welfare_providers.dart';
 import '../data/author_work_providers.dart';
@@ -17,8 +14,9 @@ import '../data/create_providers.dart';
 
 /// 新建作品（写作范式：先建一本书，再写章节）。
 ///
-/// 只需「书名 + 分类 + 简介」即可开书（接口 2.9.2 创建）；封面、定价等资料
-/// 留到作品工作台的「设置」中按需补充，减少开书门槛。创建成功后直接进入工作台。
+/// 只需「书名 + 简介」即可开书（接口 2.9.2 创建）；标签墙体系下作品不再设置分类，
+/// 标签在作品工作台「设置」中选择；封面、定价等资料同样在工作台补充。
+/// 创建成功后直接进入工作台。
 class WorkUploadPage extends ConsumerStatefulWidget {
   const WorkUploadPage({super.key});
 
@@ -30,7 +28,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
 
-  int? _categoryId;
   bool _submitting = false;
 
   /// 与后端标题上限一致的本地预校验上限（sys_work.title=100）。
@@ -53,11 +50,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
       _toast('标题不能超过 $_titleMax 个字符');
       return;
     }
-    final categoryId = _categoryId;
-    if (categoryId == null) {
-      _toast('请选择作品分类');
-      return;
-    }
     final description = _descCtrl.text.trim();
     if (description.isEmpty) {
       _toast('请输入作品简介');
@@ -71,7 +63,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
     try {
       final workId = await ref.read(createRepositoryProvider).createWork(
             title: title,
-            categoryId: categoryId,
             description: description,
           );
       // 上传作品成功：上报上传任务行为进度（fire-and-forget，失败静默）
@@ -99,21 +90,13 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
 
   @override
   Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(themeCategoriesProvider);
     return UserCenterScaffold(
       title: '新建作品',
-      body: categoriesAsync.when(
-        loading: () => const LoadingView(message: '加载中'),
-        error: (error, _) => ErrorView(
-          message: error is ApiException ? error.message : '分类加载失败，请稍后重试',
-          onRetry: () => ref.invalidate(themeCategoriesProvider),
-        ),
-        data: _buildForm,
-      ),
+      body: _buildForm(),
     );
   }
 
-  Widget _buildForm(List<CategoryItem> categories) {
+  Widget _buildForm() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
@@ -135,24 +118,6 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
                     hintText: '请输入作品标题',
                     counterText: '',
                   ),
-                ),
-              ),
-              _Labeled(
-                label: '分类',
-                child: DropdownButtonFormField<int>(
-                  value: _categoryId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    hintText: '请选择分类',
-                  ),
-                  items: [
-                    for (final category in categories)
-                      DropdownMenuItem<int>(
-                        value: category.categoryId,
-                        child: Text(category.categoryName),
-                      ),
-                  ],
-                  onChanged: (value) => setState(() => _categoryId = value),
                 ),
               ),
               _Labeled(
@@ -185,7 +150,7 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 2),
           child: Text(
-            '提示：书名、分类与简介为必填；创建后可在作品工作台补充封面、定价等资料。',
+            '提示：书名与简介为必填；创建后可在作品工作台补充标签、封面、定价等资料。',
             style: TextStyle(color: AppColors.text3, fontSize: 12),
           ),
         ),

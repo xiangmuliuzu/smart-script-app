@@ -17,7 +17,7 @@ import '../widgets/work_settings_tab.dart';
 /// 默认落在「章节」Tab，符合「作品=章节集合」的写作心智。
 ///
 /// 批次边界：本批次完成骨架——章节列表展示（增删改与全屏编辑器在批次 2）、
-/// 设置 Tab 的标题/分类/简介编辑（封面与定价在批次 3）、
+/// 设置 Tab 的标题/标签/简介编辑（标签墙体系，无分类；封面与定价在批次 3）、
 /// 发布 Tab 的状态与审核信息展示（提交审核在批次 3）。
 class WorkWorkspacePage extends ConsumerStatefulWidget {
   const WorkWorkspacePage({super.key, required this.workId, this.title});
@@ -106,7 +106,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
   }
 }
 
-/// 顶部作品卡：封面缩略图 + 标题 + 状态徽标 + 分类 / 字数 / 章节数。
+/// 顶部作品卡：封面缩略图 + 标题 + 状态徽标 + 字数 / 章节数。
 class _WorkHeader extends StatelessWidget {
   const _WorkHeader({required this.work, required this.chapterCount});
 
@@ -116,7 +116,6 @@ class _WorkHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meta = <String>[
-      if (work.genreName != null && work.genreName!.isNotEmpty) work.genreName!,
       '${work.wordCount} 字',
       '$chapterCount 章',
     ].join(' · ');

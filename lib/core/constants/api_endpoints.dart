@@ -53,13 +53,11 @@ class ApiEndpoints {
   // ===== B 模块书城契约（App 公开只读，游客可读）=====
   /// 首页 Banner 轮播（可传 position）
   static const String contentBanners = '/content/banners';
-  /// 分类列表（可传 categoryType / parentId，parentId=0 取顶级）
-  static const String contentCategories = '/content/categories';
   /// 标签列表（可传 tagType）
   static const String contentTags = '/content/tags';
   /// 分类页导航（频道 + 热门标签/主题/角色/情节四维度分组；可传 channelId）
   static const String contentCategoryNav = '/content/categories/nav';
-  /// 作品列表（分页 {total, list}；可传 categoryId/tagId/keyword/sort/page/pageSize）
+  /// 作品列表（分页 {total, list}；可传 tagId/keyword/sort/page/pageSize）
   static const String contentWorks = '/content/works';
   /// 作品详情
   static String contentWorkById(int workId) => '/content/works/$workId';
@@ -255,8 +253,6 @@ class ApiEndpoints {
   static const String aiPolish = '/ai/polish';
   static const String aiWriteRecords = '/ai/write/records';
   static const String aiOutline = '/ai/outline';
-  static const String categories = '/categories';
-  static String categoryById(int id) => '/categories/$id';
   static const String tags = '/tags';
 
   // ===== 印章管理 =====

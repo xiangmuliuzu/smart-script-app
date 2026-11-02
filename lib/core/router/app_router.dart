@@ -270,7 +270,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           final query = state.uri.queryParameters;
           return WorkListPage(
             title: query['title'],
-            categoryId: int.tryParse(query['categoryId'] ?? ''),
             tagId: int.tryParse(query['tagId'] ?? ''),
             keyword: query['keyword'],
             showScope: query['showScope'],

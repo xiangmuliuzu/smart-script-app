@@ -65,12 +65,11 @@ class CreateRepository {
 
   /// 创建作品（接口 2.9.2）；返回新建的 workId。
   ///
-  /// body 字段名对齐契约使用 snake_case（`category_id`），空值字段不下发。
+  /// 标签墙体系下作品不再设置分类，body 不含 category_id；标签创建后在工作台设置。
   /// [scriptUrl]/[scriptName]/[scriptSize] 为 2.9.1 上传剧本文件的返回值，
   /// 随创建一并上送，由后端登记到 sys_work_file（作品创建前无从关联）。
   Future<int> createWork({
     required String title,
-    required int categoryId,
     String? description,
     String? cover,
     double? price,
@@ -82,7 +81,6 @@ class CreateRepository {
       ApiEndpoints.contentWorks,
       data: _compact({
         'title': title,
-        'category_id': categoryId,
         'description': description,
         'cover': cover,
         'price': price,

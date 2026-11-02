@@ -89,27 +89,20 @@ class WorkCover extends StatelessWidget {
   }
 }
 
-/// 分类 + 标签胶囊组（作品卡片、详情页共用）。
+/// 标签胶囊组（作品卡片、详情页共用）。
 ///
-/// [genreName] 为分类（题材），用主色描边突出；[tags] 为标签，用中性填充。
-/// 两者均可在传入对应回调后点击，跳转「按该分类/标签筛选的作品列表」；
-/// 回调为空时仅作展示。分类与标签都为空时整块不占位。
+/// [tags] 为作品标签（sys_work_tag），可在传入 [onTagTap] 后点击，
+/// 跳转「按该标签筛选的作品列表」；回调为空时仅作展示。标签为空时整块不占位。
 class WorkTagChips extends StatelessWidget {
   const WorkTagChips({
     super.key,
-    this.genreName = '',
     this.tags = const <TagItem>[],
-    this.onGenreTap,
     this.onTagTap,
     this.spacing = 6,
     this.fontSize = 11,
   });
 
-  final String genreName;
   final List<TagItem> tags;
-
-  /// 分类点击（传入则分类胶囊可点）。
-  final VoidCallback? onGenreTap;
 
   /// 标签点击（传入则标签胶囊可点）。
   final void Function(TagItem tag)? onTagTap;
@@ -118,19 +111,11 @@ class WorkTagChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (genreName.isEmpty && tags.isEmpty) return const SizedBox.shrink();
+    if (tags.isEmpty) return const SizedBox.shrink();
     return Wrap(
       spacing: spacing,
       runSpacing: spacing,
       children: [
-        if (genreName.isNotEmpty)
-          _WorkChip(
-            label: genreName,
-            color: AppColors.primary,
-            background: AppColors.primaryTint,
-            fontSize: fontSize,
-            onTap: onGenreTap,
-          ),
         for (final tag in tags)
           _WorkChip(
             label: tag.tagName,
@@ -275,7 +260,6 @@ class WorkListTile extends StatelessWidget {
   static String _subtitle(BookItem work) {
     final parts = <String>[
       if (work.authorName.isNotEmpty) work.authorName,
-      if (work.genreName.isNotEmpty) work.genreName,
     ];
     return parts.isEmpty ? '未知作者' : parts.join(' · ');
   }
@@ -356,10 +340,7 @@ class RankingRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    [
-                      if (item.authorName.isNotEmpty) item.authorName,
-                      if (item.genreName.isNotEmpty) item.genreName,
-                    ].join(' · '),
+                    item.authorName.isEmpty ? '未知作者' : item.authorName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: AppColors.text3),

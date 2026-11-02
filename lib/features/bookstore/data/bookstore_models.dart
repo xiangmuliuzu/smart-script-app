@@ -3,9 +3,10 @@
 /// 字段与后端一一对应，不自行拼装：
 ///   - [BookItem]     ← AppWorkDto（sys_work）
 ///   - [BannerItem]   ← sys_banner
-///   - [CategoryItem] ← sys_category
 ///   - [TagItem]      ← sys_tag
 ///   - [RankingItem]  ← AppRankingItem（sys_work 指标列）
+///
+/// 标签墙体系下作品只按标签归属，不再有分类模型；频道仍由 sys_category 顶层记录提供。
 ///
 /// tinyint 列在若依风格下以字符串 "0"/"1" 下发，这里统一转成 bool，
 /// 页面不再接触原始取值。
@@ -58,8 +59,6 @@ class BookItem {
     this.title = '',
     this.cover = '',
     this.authorName = '',
-    this.genreId = 0,
-    this.genreName = '',
     this.tags = const <TagItem>[],
     this.workType = '',
     this.uploadType = '',
@@ -89,10 +88,6 @@ class BookItem {
   final String title;
   final String cover;
   final String authorName;
-
-  /// 题材ID（对应 sys_work.genre_id），用于「按分类筛选」跳转。
-  final int genreId;
-  final String genreName;
 
   /// 作品标签（sys_work_tag 关联 sys_tag，仅启用标签）。
   final List<TagItem> tags;
@@ -145,8 +140,6 @@ class BookItem {
         title: _text(json['title']),
         cover: AppConfig.resolveAssetUrl(_text(json['cover'])),
         authorName: _text(json['authorName']),
-        genreId: _int(json['genreId']),
-        genreName: _text(json['genreName']),
         tags: _tags(json['tags']),
         workType: _text(json['workType']),
         uploadType: _text(json['uploadType']),
@@ -205,45 +198,6 @@ class BannerItem {
         position: _text(json['position']),
         sortOrder: _int(json['sortOrder']),
       );
-}
-
-/// 剧本分类（sys_category）。
-class CategoryItem {
-  const CategoryItem({
-    required this.categoryId,
-    this.categoryName = '',
-    this.categoryType = '',
-    this.parentId,
-    this.sort = 0,
-  });
-
-  final int categoryId;
-  final String categoryName;
-  final String categoryType;
-  final int? parentId;
-  final int sort;
-
-  factory CategoryItem.fromJson(Map<String, dynamic> json) => CategoryItem(
-        categoryId: _int(json['categoryId']),
-        categoryName: _text(json['categoryName']),
-        categoryType: _text(json['categoryType']),
-        parentId: _intOrNull(json['parentId']),
-        sort: _int(json['sort']),
-      );
-}
-
-/// 分类树节点：频道 / 题材 + 其直接子分类。
-///
-/// 三级分类中本结构承载前两层（频道 → 题材），第三层细分由
-/// `childrenCategoriesProvider` 按选中题材懒加载，避免一次性拉全树。
-class CategoryNode {
-  const CategoryNode({
-    required this.category,
-    this.children = const <CategoryItem>[],
-  });
-
-  final CategoryItem category;
-  final List<CategoryItem> children;
 }
 
 /// 作品标签（sys_tag）。
@@ -348,7 +302,7 @@ class NavGroup {
       );
 }
 
-/// 分组内的筛选项：itemType 为 category（分类）或 tag（标签）。
+/// 分组内的筛选项：标签墙体系下 itemType 恒为 tag（标签）。
 class NavItem {
   const NavItem({
     required this.itemType,
@@ -378,7 +332,6 @@ class RankingItem {
     this.title = '',
     this.cover = '',
     this.authorName = '',
-    this.genreName = '',
     this.score = 0,
     this.viewCount = 0,
     this.favoriteCount = 0,
@@ -396,7 +349,6 @@ class RankingItem {
   final String title;
   final String cover;
   final String authorName;
-  final String genreName;
 
   /// 榜单分数：等于当前榜单类型对应的主指标值（累计浏览量 / 近 7 天计数 / 平均评分）。
   final double score;
@@ -420,7 +372,6 @@ class RankingItem {
         title: _text(json['title']),
         cover: AppConfig.resolveAssetUrl(_text(json['cover'])),
         authorName: _text(json['authorName']),
-        genreName: _text(json['genreName']),
         score: _decimal(json['score']),
         viewCount: _int(json['viewCount']),
         favoriteCount: _int(json['favoriteCount']),

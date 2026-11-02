@@ -13,22 +13,19 @@ import '../widgets/bookstore_widgets.dart';
 
 /// 作品列表（B 模块，接口 2.7.1 作品列表）。
 ///
-/// 公开页，游客可浏览。支持排序、分类与标签筛选，分页采用触底追加。
-/// 分类与标签可叠加（如「都市 + 重生」）：切换分类时标签条按其
-/// 联动刷新（只显示该分类下的标签）；关键词由搜索入口固定，页内不改。
+/// 公开页，游客可浏览。支持排序与标签筛选，分页采用触底追加。
+/// 标签墙体系下作品只按标签归属，不再有分类筛选；关键词由搜索入口固定，页内不改。
 class WorkListPage extends ConsumerStatefulWidget {
   const WorkListPage({
     super.key,
     this.title,
-    this.categoryId,
     this.tagId,
     this.keyword,
     this.showScope,
   });
 
-  /// 页面标题（分类名等），仅展示用。
+  /// 页面标题（标签名等），仅展示用。
   final String? title;
-  final int? categoryId;
   final int? tagId;
   final String? keyword;
 
@@ -51,8 +48,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   /// 推荐展示位过滤（如 bookstore=书城推荐）；null 表示不过滤。
   String? _showScope;
 
-  /// 分类/标签筛选：进入时由路由参数给初值，页内可随时叠加切换。
-  int? _categoryId;
+  /// 标签筛选：进入时由路由参数给初值，页内可随时切换。
   int? _tagId;
 
   /// 首屏引导只做一次：didChangeDependencies 里读完路由 sort 后再发首屏请求。
@@ -61,13 +57,11 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
   @override
   void initState() {
     super.initState();
-    _categoryId = widget.categoryId;
     _tagId = widget.tagId;
     _controller = PagedListController<BookItem>(
       pageSize: _pageSize,
       fetchPage: (pageNum, pageSize) =>
           ref.read(contentRepositoryProvider).pageWorks(
-                categoryId: _categoryId,
                 tagId: _tagId,
                 keyword: widget.keyword,
                 sort: _sort,
@@ -131,64 +125,25 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
     _controller.load(refresh: true);
   }
 
-  /// 切换分类：标签选项随之联动刷新（只显示新分类下的标签）。
-  /// 若当前标签不属于新分类，则一并清空，避免「无匹配标签却仍在过滤」的静默空结果。
-  Future<void> _applyCategory(int? categoryId) async {
-    if (_categoryId == categoryId) return;
-    setState(() => _categoryId = categoryId);
-    if (_tagId != null) {
-      List<TagItem> tags;
-      try {
-        tags = await ref.read(tagsProvider(categoryId).future);
-      } catch (_) {
-        tags = const <TagItem>[];
-      }
-      if (!mounted) return;
-      if (!tags.any((tag) => tag.tagId == _tagId)) {
-        setState(() => _tagId = null);
-      }
-    }
-    _controller.load(refresh: true);
-  }
-
-  /// 清空分类/标签筛选并重载（仅「带筛选的空态」入口使用；排序与外部关键词不动）。
+  /// 清空标签筛选并重载（仅「带筛选的空态」入口使用；排序与外部关键词不动）。
   void _resetFilters() {
-    setState(() {
-      _categoryId = null;
-      _tagId = null;
-    });
+    setState(() => _tagId = null);
     _controller.load(refresh: true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final categories =
-        ref.watch(themeCategoriesProvider).valueOrNull ?? const <CategoryItem>[];
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: Text(_pageTitle(categories))),
+      appBar: AppBar(title: Text(widget.title ?? '作品列表')),
       body: Column(
         children: [
           _buildSortBar(),
-          _buildFilterBar(categories),
+          _buildFilterBar(),
           Expanded(child: _buildList()),
         ],
       ),
     );
-  }
-
-  /// 标题跟随页内选中的分类：选中分类时显示分类名；未选（全部分类）时，
-  /// 若进入页面时本就带分类（后被清空）则回落通用标题，否则保留传入标题
-  /// （搜索关键词等入口）。
-  String _pageTitle(List<CategoryItem> categories) {
-    if (_categoryId == null) {
-      return widget.categoryId == null ? (widget.title ?? '作品列表') : '作品列表';
-    }
-    for (final category in categories) {
-      if (category.categoryId == _categoryId) return category.categoryName;
-    }
-    // 分类列表尚未加载完成时，先用进入页面时的标题兜底。
-    return widget.title ?? '作品列表';
   }
 
   Widget _buildSortBar() {
@@ -205,39 +160,11 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
     );
   }
 
-  /// 分类与标签筛选：选项较多时横向滚动难以选全，改用下拉按钮 + 底部弹窗选择。
-  /// 分类或标签为空（或加载失败）时对应下拉隐藏；两者皆空则整行隐藏，不阻塞列表。
-  Widget _buildFilterBar(List<CategoryItem> categories) {
-    final tags = ref.watch(tagsProvider(_categoryId)).valueOrNull ?? const <TagItem>[];
+  /// 标签筛选：选项较多时横向滚动难以选全，改用下拉按钮 + 底部弹窗选择。
+  /// 标签为空（或加载失败）时下拉隐藏，不阻塞列表。
+  Widget _buildFilterBar() {
+    final tags = ref.watch(tagsProvider).valueOrNull ?? const <TagItem>[];
     final filters = <FilterDropdownFilter>[
-      if (categories.isNotEmpty)
-        FilterDropdownFilter(
-          label: '分类',
-          valueText: _selectedCategoryName(categories) ?? '全部类型',
-          options: [
-            FilterDropdownOption(
-              label: '全部类型',
-              selected: _categoryId == null,
-              onTap: () => _applyCategory(null),
-            ),
-            // 从分类页三级细分进入时，该分类不在题材列表内，需单独补一项，
-            // 否则下拉里没有与当前筛选对应的选项。
-            if (widget.categoryId != null &&
-                (widget.title?.isNotEmpty ?? false) &&
-                !categories.any((c) => c.categoryId == widget.categoryId))
-              FilterDropdownOption(
-                label: widget.title!,
-                selected: _categoryId == widget.categoryId,
-                onTap: () => _applyCategory(widget.categoryId),
-              ),
-            for (final category in categories)
-              FilterDropdownOption(
-                label: category.categoryName,
-                selected: category.categoryId == _categoryId,
-                onTap: () => _applyCategory(category.categoryId),
-              ),
-          ],
-        ),
       if (tags.isNotEmpty)
         FilterDropdownFilter(
           label: '标签',
@@ -261,20 +188,6 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
     return FilterDropdownBar(filters: filters);
   }
 
-  /// 当前选中分类名；未选或分类尚未加载完成时返回 null，由调用方回落默认文案。
-  String? _selectedCategoryName(List<CategoryItem> categories) {
-    for (final category in categories) {
-      if (category.categoryId == _categoryId) return category.categoryName;
-    }
-    // 入口分类为三级细分（不在题材列表里）时用进入页面的标题兜底，
-    // 避免下拉显示「全部类型」而实际已按该细分筛选。
-    if (_categoryId != null && _categoryId == widget.categoryId) {
-      final title = widget.title;
-      if (title != null && title.isNotEmpty) return title;
-    }
-    return null;
-  }
-
   /// 当前选中标签名；未选或标签尚未加载完成时返回 null，由调用方回落默认文案。
   String? _selectedTagName(List<TagItem> tags) {
     for (final tag in tags) {
@@ -296,7 +209,7 @@ class _WorkListPageState extends ConsumerState<WorkListPage> {
     }
     if (_controller.isEmpty) {
       // 无筛选条件时保持原空态；带筛选却为空时追加「重置筛选」，引导用户清空条件后重载。
-      final hasFilter = _categoryId != null || _tagId != null;
+      final hasFilter = _tagId != null;
       if (!hasFilter) {
         return const EmptyView(message: '暂无作品', icon: Icons.menu_book_outlined);
       }

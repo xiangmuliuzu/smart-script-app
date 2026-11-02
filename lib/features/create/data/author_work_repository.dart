@@ -41,8 +41,9 @@ class AuthorWorkRepository {
     return AuthorWorkDetail.fromJson(data);
   }
 
-  /// 修改作品基本信息（标题 / 简介 / 分类 / 封面 / 标签）。
+  /// 修改作品基本信息（标题 / 简介 / 封面 / 标签）。
   ///
+  /// 标签墙体系下作品不再设置分类（后端也不再接收 genreId）。
   /// 空值字段不下发（后端按「字段缺失 = 不更新」处理）；仅审核中锁定，
   /// 其余状态（含已发布）可改，否则后端按 400 拒绝并在 message 中说明当前状态。
   ///
@@ -55,14 +56,12 @@ class AuthorWorkRepository {
     int workId, {
     String? title,
     String? summary,
-    int? genreId,
     String? cover,
     List<int>? tagIds,
   }) async {
     final body = _compact({
       'title': title,
       'summary': summary,
-      'genreId': genreId,
       'cover': cover,
       'tagIds': tagIds,
     });

@@ -17,60 +17,11 @@ final bannersProvider = FutureProvider.autoDispose.family<List<BannerItem>, Stri
   (ref, position) => ref.watch(contentRepositoryProvider).listBanners(position: position),
 );
 
-/// 分类树：顶级（迁移后为频道）+ 其题材（二级）。
-///
-/// 分类页、书城分类入口与表单下拉共用；三级细分由
-/// [childrenCategoriesProvider] 按选中题材懒加载。
-final categoryTreeProvider = FutureProvider.autoDispose<List<CategoryNode>>(
-  (ref) => ref.watch(contentRepositoryProvider).listCategoryTree(),
-);
-
-/// 全部题材（二级）扁平表。
-///
-/// 树中有子级时取子级（频道下的题材）；没有子级时回落顶级本身，
-/// 兼容三级分类迁移尚未执行的环境。上传 / 设置 / 列表筛选用它，
-/// 保证下拉里是「题材」而不是「频道」。
-final themeCategoriesProvider = FutureProvider.autoDispose<List<CategoryItem>>(
-  (ref) async {
-    final tree = await ref.watch(categoryTreeProvider.future);
-    final themes = [for (final node in tree) ...node.children];
-    if (themes.isNotEmpty) return themes;
-    return [for (final node in tree) node.category];
-  },
-);
-
-/// 某分类的直接子分类（多级分类浏览：传一级取二级，传二级取三级）。
-final childrenCategoriesProvider =
-    FutureProvider.autoDispose.family<List<CategoryItem>, int>(
-  (ref, parentId) =>
-      ref.watch(contentRepositoryProvider).listCategories(parentId: parentId),
-);
-
-/// 某题材下的作品（分类页「题材精选」用，取前 5 部）。
-final themeWorksProvider =
-    FutureProvider.autoDispose.family<List<BookItem>, int>(
-  (ref, categoryId) async {
-    final page = await ref.watch(contentRepositoryProvider).pageWorks(
-          categoryId: categoryId,
-          pageNum: 1,
-          pageSize: 5,
-        );
-    return page.list;
-  },
-);
-
 /// 标签（作品列表的标签筛选项）。
 ///
-/// 入参为当前选中的分类ID（无则 null）。传分类时后端只返回该分类下的标签，
-/// 用于「分类 × 标签」联动筛选。
-final tagsProvider = FutureProvider.autoDispose.family<List<TagItem>, int?>(
-  (ref, categoryId) => ref.watch(contentRepositoryProvider).listTags(categoryId: categoryId),
-);
-
-/// 某频道下的标签（分类页新标签体系；按频道过滤）。
-final channelTagsProvider = FutureProvider.autoDispose.family<List<TagItem>, int>(
-  (ref, channelId) =>
-      ref.watch(contentRepositoryProvider).listTags(channelId: channelId),
+/// 标签墙体系下作品只按标签归属，筛选项直接取全量启用标签。
+final tagsProvider = FutureProvider.autoDispose<List<TagItem>>(
+  (ref) => ref.watch(contentRepositoryProvider).listTags(),
 );
 
 /// 分类页导航：频道 + 热门标签 / 主题 / 角色 / 情节四维度分组。
@@ -100,32 +51,12 @@ final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
   },
 );
 
-/// 分类页推荐：按「分类页」展示位取未过期的推荐作品（showScope=category_page，按位次升序）。
-final categoryRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
-  (ref) async {
-    final page = await ref
-        .watch(contentRepositoryProvider)
-        .pageWorks(pageNum: 1, pageSize: 6, showScope: 'category_page');
-    return page.list;
-  },
-);
-
 /// 搜索页推荐：按「搜索」展示位取未过期的推荐作品（showScope=search，按位次升序）。
 final searchRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final page = await ref
         .watch(contentRepositoryProvider)
         .pageWorks(pageNum: 1, pageSize: 6, showScope: 'search');
-    return page.list;
-  },
-);
-
-/// 首页最新作品（最新上架前 6 部）。
-final latestWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
-  (ref) async {
-    final page = await ref
-        .watch(contentRepositoryProvider)
-        .pageWorks(pageNum: 1, pageSize: 6, sort: 'latest');
     return page.list;
   },
 );

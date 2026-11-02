@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
@@ -68,9 +67,8 @@ class BookstorePage extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(bannersProvider);
-          ref.invalidate(categoryTreeProvider);
+          ref.invalidate(categoryNavProvider(null));
           ref.invalidate(hotWorksProvider);
-          ref.invalidate(latestWorksProvider);
         },
         child: ListView(
           // 顶部不再留白：搜索栏已在透明 AppBar 内，渐变直接落到 Banner。
@@ -88,7 +86,7 @@ class BookstorePage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _WorkSection(title: '热门精选', provider: hotWorksProvider, showScope: 'bookstore'),
+                  _WorkSection(title: '热门精选', provider: hotWorksProvider),
                 ],
               ),
             ),
@@ -293,81 +291,6 @@ class _BannerSkeleton extends StatelessWidget {
   }
 }
 
-/// 题材入口（分类树二级，扁平展示）。
-///
-/// 一级是频道（男生 / 女生），书城首页只作题材快捷入口，故取扁平题材；
-/// 三级迁移尚未执行时 `themeCategoriesProvider` 会回落到顶级题材。
-class _CategoryEntries extends ConsumerWidget {
-  const _CategoryEntries();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final categoriesAsync = ref.watch(themeCategoriesProvider);
-    return categoriesAsync.when(
-      // loading 态暂保持不占位（骨架屏后续批次统一）。
-      loading: () => const SizedBox.shrink(),
-      // error 态必须可见：否则接口失败时用户以为书城根本没有分类。
-      // 复用本文件 _SectionError，与榜单/作品区块的行内错误风格一致。
-      error: (error, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SectionHeader(title: '分类'),
-          _SectionError(
-            message: error is ApiException ? error.message : '分类加载失败',
-            onRetry: () => ref.invalidate(themeCategoriesProvider),
-          ),
-        ],
-      ),
-      data: (categories) {
-        if (categories.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SectionHeader(title: '分类'),
-            SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                // 已在 AppCard 内，水平留白由卡片承担；两侧各留 2 使胶囊阴影不被裁剪。
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                itemCount: categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final category = categories[index];
-                  // 原胶囊为 GestureDetector + 纯色 Container，点击无任何反馈；
-                  // 改用 Material(承载底色) + InkWell 提供水波纹，圆角/底色/内边距/
-                  // 文字与原胶囊完全一致，横向滑动布局与高度(34)不变。
-                  return Material(
-                    // 胶囊位于白色卡片内，用浅灰底区分，避免白底白字不可见。
-                    color: AppColors.fill,
-                    borderRadius: BorderRadius.circular(17),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(17),
-                      onTap: () => context.push(RoutePath.workListUrl(
-                        categoryId: category.categoryId,
-                        title: category.categoryName,
-                      )),
-                      child: Container(
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        child: Text(
-                          category.categoryName,
-                          style: const TextStyle(fontSize: 13, color: AppColors.text2),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
 /// 榜单预览：切换榜单类型只看前三，完整榜单进榜单页。
 class _RankingPreview extends ConsumerStatefulWidget {
   const _RankingPreview();
@@ -445,19 +368,12 @@ class _RankingPreviewState extends ConsumerState<_RankingPreview> {
   }
 }
 
-/// 首页作品区块（热门 / 最新共用）：按 provider 取前若干部，完整列表进作品列表页。
+/// 首页作品区块：按 provider 取前若干部，完整列表进推荐列表页。
 class _WorkSection extends ConsumerWidget {
-  const _WorkSection({required this.title, required this.provider, this.sort, this.showScope});
+  const _WorkSection({required this.title, required this.provider});
 
   final String title;
   final AutoDisposeFutureProvider<List<BookItem>> provider;
-
-  /// 点「更多」带的初始排序值（与后端 normalizeSort 白名单一致，如 'view'）；
-  /// 不传则列表页默认最新排序。热门区块传 'view'，最新区块不传。
-  final String? sort;
-
-  /// 点「更多」带的推荐展示位过滤（如 'bookstore'）；不传则列表页不过滤。
-  final String? showScope;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

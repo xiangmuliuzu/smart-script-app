@@ -14,7 +14,7 @@ import 'data/author_work_providers.dart';
 
 /// 创作入口（底部导航「创作」tab）。
 ///
-/// 采用写作 App 书架范式：状态筛选 Tab + **三列网格**作品卡（封面 + 标题 + 分类 + 状态），
+/// 采用写作 App 书架范式：状态筛选 Tab + **三列网格**作品卡（封面 + 标题 + 状态），
 /// 三列使同屏作品数更多，封面保持近方形比例，作品多时上下滑动浏览。
 /// 右上角「新建」进入创建表单；点卡片进入作品工作台（章节 / 设置 / 发布）。
 ///
@@ -130,7 +130,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           crossAxisCount: _columns,
           crossAxisSpacing: 8,
           mainAxisSpacing: 10,
-          // 竖向卡片：封面占大头，下方留出标题行 + 「分类 + 状态」行。
+          // 竖向卡片：封面占大头，下方留出标题行 + 状态行。
           childAspectRatio: 0.65,
         ),
         itemCount: works.length,
@@ -201,10 +201,10 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-/// 封面下方文字区预留高度（标题行 + 「分类 + 状态」行 + 内边距）。
+/// 封面下方文字区预留高度（标题行 + 状态行 + 内边距）。
 const double _kCardTextHeight = 56;
 
-/// 网格作品卡：封面上，标题与「分类 + 状态角标」在下。
+/// 网格作品卡：封面上，标题与「状态角标」在下。
 class _WorkCard extends StatelessWidget {
   const _WorkCard({
     required this.work,
@@ -217,9 +217,6 @@ class _WorkCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = work.title.isEmpty ? '未命名作品' : work.title;
-    final genre = (work.genreName != null && work.genreName!.isNotEmpty)
-        ? work.genreName!
-        : '未分类';
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.r),
@@ -263,21 +260,8 @@ class _WorkCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // 三列卡片宽度有限，状态角标与分类同行，避免标题被挤到只剩两三个字。
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                genre,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11, color: AppColors.text3),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            _StatusBadge(status: work.status),
-                          ],
-                        ),
+                        // 标签墙体系下作品不再有分类，此处只展示审核派生状态角标。
+                        _StatusBadge(status: work.status),
                       ],
                     ),
                   ),

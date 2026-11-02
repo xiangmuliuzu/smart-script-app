@@ -360,17 +360,10 @@ class _Header extends StatelessWidget {
                         height: 1.25,
                       ),
                     ),
-                    if (work.genreName.isNotEmpty || work.tags.isNotEmpty) ...[
+                    if (work.tags.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       WorkTagChips(
-                        genreName: work.genreName,
                         tags: work.tags,
-                        onGenreTap: work.genreId > 0
-                            ? () => context.push(RoutePath.workListUrl(
-                                  categoryId: work.genreId,
-                                  title: work.genreName,
-                                ))
-                            : null,
                         onTagTap: (tag) => context.push(RoutePath.workListUrl(
                               tagId: tag.tagId,
                               title: tag.tagName,

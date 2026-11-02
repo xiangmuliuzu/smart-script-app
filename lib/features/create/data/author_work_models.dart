@@ -25,12 +25,6 @@ int _int(dynamic value) {
   return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
-int? _intOrNull(dynamic value) {
-  if (value is num) return value.toInt();
-  if (value is String && value.isNotEmpty) return int.tryParse(value);
-  return null;
-}
-
 double? _doubleOrNull(dynamic value) {
   if (value is num) return value.toDouble();
   if (value is String && value.isNotEmpty) return double.tryParse(value);
@@ -82,8 +76,6 @@ class AuthorWorkItem {
     this.title = '',
     this.cover,
     this.summary,
-    this.genreId,
-    this.genreName,
     this.workType,
     this.wordCount = 0,
     this.price,
@@ -98,8 +90,6 @@ class AuthorWorkItem {
   /// 封面地址：列表接口不下发（恒为 null），详情接口下发。
   final String? cover;
   final String? summary;
-  final int? genreId;
-  final String? genreName;
   final String? workType;
   final int wordCount;
 
@@ -123,8 +113,6 @@ class AuthorWorkItem {
         title: _text(json['title']),
         cover: _textOrNull(json['cover']),
         summary: _textOrNull(json['summary']),
-        genreId: _intOrNull(json['genreId']),
-        genreName: _textOrNull(json['genreName']),
         workType: _textOrNull(json['workType']),
         wordCount: _int(json['wordCount']),
         price: _doubleOrNull(json['price']),
