@@ -144,9 +144,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
           data: (works) {
             final visible = _keyword.isEmpty
                 ? works
-                : works
-                    .where((work) => work.title.contains(_keyword))
-                    .toList();
+                : works.where((work) => work.title.contains(_keyword)).toList();
             if (visible.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
@@ -202,7 +200,8 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
   }
 
   Widget _buildWorkRow(AuthorWorkItem work) {
-    final published = work.status == 'published';
+    final published = work.status == 'published' &&
+        (work.shelfStatus.isEmpty || work.shelfStatus == 'on_shelf');
     final selected = _workId == work.workId;
 
     return Opacity(
@@ -317,7 +316,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
           _buildMaterialCard(),
           const SizedBox(height: 14),
         ],
-        const _SectionTitle('选择坑位（时间冲突的坑位不可选）'),
+        const _SectionTitle('选择坑位（同一时段冲突会在提交时提示）'),
         const SizedBox(height: 8),
         slotsAsync.when(
           loading: () => const _InlineLoading(),
@@ -341,8 +340,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: page.slots.length,
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 9,
                     crossAxisSpacing: 9,
@@ -636,7 +634,9 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
             children: [
               _feeRow(
                 slot == null ? '资源位' : '$_slotTypeLabel · 第${slot.slotNo}位',
-                slot == null ? '—' : '¥${formatPromotionMoney(pricePerDay)} / 天',
+                slot == null
+                    ? '—'
+                    : '¥${formatPromotionMoney(pricePerDay)} / 天',
               ),
               _feeRow('投放时长', '$_days 天'),
               _feeRow('投放时段', _periodText()),
@@ -1074,8 +1074,10 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
         }
         setState(() => _step = 1);
       case 1:
-        final slot =
-            ref.read(promotionSlotsProvider(_slotType)).valueOrNull?.slotByNo(_slotNo);
+        final slot = ref
+            .read(promotionSlotsProvider(_slotType))
+            .valueOrNull
+            ?.slotByNo(_slotNo);
         if (slot == null || !slot.selectable) {
           showAppToast(context, '请选择可预约的推广位次');
           return;

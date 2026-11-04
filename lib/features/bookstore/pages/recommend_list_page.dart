@@ -6,7 +6,7 @@ import '../../../core/router/route_paths.dart';
 import '../data/content_providers.dart';
 import '../widgets/bookstore_widgets.dart';
 
-/// 热门精选推荐列表页（专属页面，最多显示 30 本）。
+/// 热门精选推荐列表页（展示完整热门坑位，最多 20 本）。
 class RecommendListPage extends ConsumerWidget {
   const RecommendListPage({super.key});
 

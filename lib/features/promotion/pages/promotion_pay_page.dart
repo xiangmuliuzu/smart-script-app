@@ -101,11 +101,15 @@ class _PromotionPayPageState extends ConsumerState<PromotionPayPage> {
         showAppToast(context, '尚未查询到支付结果，请完成扫码后再试');
       }
     } catch (error) {
-      if (!silent && mounted) {
-        showAppToast(
-          context,
-          error is ApiException ? error.message : '查询支付结果失败，请稍后重试',
-        );
+      final message = error is ApiException ? error.message : '查询支付结果失败，请稍后重试';
+      // 业务拒绝（如锁坑失效 / 状态不可付款）重试无意义，停止轮询并提示。
+      final fatal =
+          error is ApiException && (error.code == 400 || error.code == 404);
+      if (fatal) {
+        _timer?.cancel();
+        if (mounted) showAppToast(context, message);
+      } else if (!silent && mounted) {
+        showAppToast(context, message);
       }
     } finally {
       _confirming = false;

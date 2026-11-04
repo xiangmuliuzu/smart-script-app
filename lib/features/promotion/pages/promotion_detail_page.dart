@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,14 +16,37 @@ import '../data/promotion_providers.dart';
 import '../widgets/promotion_widgets.dart';
 
 /// 推广详情：状态说明、作品与投放信息、取消 / 去支付。
-class PromotionDetailPage extends ConsumerWidget {
+class PromotionDetailPage extends ConsumerStatefulWidget {
   const PromotionDetailPage({super.key, required this.applyId});
 
   final int applyId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(promotionDetailProvider(applyId));
+  ConsumerState<PromotionDetailPage> createState() =>
+      _PromotionDetailPageState();
+}
+
+class _PromotionDetailPageState extends ConsumerState<PromotionDetailPage> {
+  /// 锁坑倒计时每秒刷新（剩余时间按 lockExpireAt 实时计算）。
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(promotionDetailProvider(widget.applyId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('推广详情')),
@@ -30,7 +55,8 @@ class PromotionDetailPage extends ConsumerWidget {
         loading: () => const LoadingView(message: '加载推广详情…'),
         error: (error, _) => ErrorView(
           message: error is ApiException ? error.message : '加载推广详情失败',
-          onRetry: () => ref.invalidate(promotionDetailProvider(applyId)),
+          onRetry: () =>
+              ref.invalidate(promotionDetailProvider(widget.applyId)),
         ),
         data: (application) => _buildBody(context, ref, application),
       ),
@@ -332,8 +358,8 @@ class PromotionDetailPage extends ConsumerWidget {
   }
 
   Future<void> _pay(BuildContext context, WidgetRef ref) async {
-    await context.push<bool>(RoutePath.promotionPayUrl(applyId));
-    ref.invalidate(promotionDetailProvider(applyId));
+    await context.push<bool>(RoutePath.promotionPayUrl(widget.applyId));
+    ref.invalidate(promotionDetailProvider(widget.applyId));
     ref.invalidate(myPromotionsProvider);
   }
 
@@ -369,7 +395,7 @@ class PromotionDetailPage extends ConsumerWidget {
     try {
       await ref.read(promotionRepositoryProvider).cancel(application.applyId);
       ref.invalidate(myPromotionsProvider);
-      ref.invalidate(promotionDetailProvider(applyId));
+      ref.invalidate(promotionDetailProvider(widget.applyId));
       if (!context.mounted) return;
       showAppToast(context, '已取消推广申请');
     } catch (error) {

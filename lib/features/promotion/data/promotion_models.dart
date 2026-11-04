@@ -185,13 +185,14 @@ class PromotionApplication {
     return '未知状态';
   }
 
-  /// 锁坑剩余秒数：优先用后端下发值，列表缺少时按 lockExpireAt 本地计算。
+  /// 锁坑剩余秒数：优先按 lockExpireAt 实时计算，缺失时用后端下发值兜底。
   int? get lockRemainSecondsValue {
-    if (lockRemainSeconds != null) return lockRemainSeconds;
     final expire = _parseDate(lockExpireAt);
-    if (expire == null) return null;
-    final diff = expire.difference(DateTime.now()).inSeconds;
-    return diff > 0 ? diff : 0;
+    if (expire != null) {
+      final diff = expire.difference(DateTime.now()).inSeconds;
+      return diff > 0 ? diff : 0;
+    }
+    return lockRemainSeconds;
   }
 
   /// 锁坑倒计时文案（不足 1 秒 / 已过期返回 null）。
@@ -225,6 +226,7 @@ class PromotionSlotItem {
     this.remark,
     this.current,
     this.next,
+    this.bannerTitle = '',
   });
 
   final int slotId;
@@ -238,6 +240,9 @@ class PromotionSlotItem {
   final String? remark;
   final PromotionApplication? current;
   final PromotionApplication? next;
+
+  /// 同序位运营素材标题（付费申请未生效时的兜底展示）。
+  final String bannerTitle;
 
   factory PromotionSlotItem.fromJson(Map<String, dynamic> json) =>
       PromotionSlotItem(
@@ -256,6 +261,9 @@ class PromotionSlotItem {
             ? PromotionApplication.fromJson(
                 Map<String, dynamic>.from(json['next'] as Map))
             : null,
+        bannerTitle: json['banner'] is Map
+            ? _toText((json['banner'] as Map)['title'])
+            : '',
       );
 
   String get stateLabel {
@@ -287,6 +295,7 @@ class PromotionSlotItem {
     final title = current?.workTitle ?? '';
     if (title.isNotEmpty) return '当前：$title';
     if (current != null) return current!.displayStatus;
+    if (bannerTitle.isNotEmpty) return '运营素材：$bannerTitle';
     final note = remark ?? '';
     if (note.isNotEmpty) return note;
     return stateLabel;

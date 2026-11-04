@@ -39,29 +39,29 @@ final rankingProvider = FutureProvider.autoDispose.family<RankingPayload, String
   (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
 );
 
-/// 首页热门精选：按「首页热门」展示位取数（recommendStatus=home_hot）。
+/// 首页热门精选：按「首页热门」坑位取数（recommendStatus=home_hot）。
 ///
-/// 后端已改为付费投放优先排序、空位按浏览量自然补位，不再读 ext_json 推荐；
-/// 多取一些用于补位，首页只渲染前 6 本；点"更多"进入完整推荐列表页。
+/// 后端按坑位配置（1~20）合成：付费投放占对应位次、空位按浏览量自然补位，
+/// 返回的就是完整坑位列表；首页只渲染前 6 本，点"更多"进入推荐列表页。
 final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final repo = ref.watch(contentRepositoryProvider);
-    // 拿 30 本回来，留足补位空间；首页只渲染前 6 本
     final page = await repo.pageWorks(
       pageNum: 1,
-      pageSize: 30,
+      pageSize: 20,
       recommendStatus: 'home_hot',
     );
     return page.list;
   },
 );
 
-/// 搜索页推荐：按「搜索」展示位取未过期的推荐作品（showScope=search，按位次升序）。
+/// 搜索页推荐：按「搜索」坑位（共 5 个）合成，付费投放占位、空位自然补位，
+/// 最多返回 5 本。
 final searchRecommendProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final page = await ref
         .watch(contentRepositoryProvider)
-        .pageWorks(pageNum: 1, pageSize: 6, showScope: 'search');
+        .pageWorks(pageNum: 1, pageSize: 5, showScope: 'search');
     return page.list;
   },
 );

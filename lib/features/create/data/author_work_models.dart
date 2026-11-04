@@ -1,4 +1,4 @@
-﻿/// 「我的作品」写作链路页面模型（A 套接口 /api/v1/users/me/works）。
+/// 「我的作品」写作链路页面模型（A 套接口 /api/v1/users/me/works）。
 ///
 /// 字段与后端一一对应，不自行拼装：
 ///   - [AuthorWorkItem]    ← GET /users/me/works 列表元素
@@ -80,6 +80,7 @@ class AuthorWorkItem {
     this.wordCount = 0,
     this.price,
     this.status = 'draft',
+    this.shelfStatus = '',
     this.createTime,
     this.updateTime,
   });
@@ -98,6 +99,10 @@ class AuthorWorkItem {
 
   /// 审核派生状态（见库文档头注释）。
   final String status;
+
+  /// 上架开关（后端 sys_work.status：on_shelf / off_shelf）。
+  /// 列表接口未下发时为空字符串，调用方按审核状态兜底。
+  final String shelfStatus;
   final String? createTime;
   final String? updateTime;
 
@@ -117,6 +122,7 @@ class AuthorWorkItem {
         wordCount: _int(json['wordCount']),
         price: _doubleOrNull(json['price']),
         status: _text(json['status']).isEmpty ? 'draft' : _text(json['status']),
+        shelfStatus: _text(json['shelfStatus']),
         createTime: _textOrNull(json['createTime']),
         updateTime: _textOrNull(json['updateTime']),
       );
@@ -149,7 +155,8 @@ class AuthorChapterItem {
   /// 是否为草稿（未发布）。保留历史命名 isHidden 以减少连带改动。
   bool get isHidden => status == '1';
 
-  factory AuthorChapterItem.fromJson(Map<String, dynamic> json) => AuthorChapterItem(
+  factory AuthorChapterItem.fromJson(Map<String, dynamic> json) =>
+      AuthorChapterItem(
         chapterId: _int(json['chapterId']),
         chapterNo: _int(json['chapterNo']),
         chapterTitle: _text(json['chapterTitle']),
@@ -188,7 +195,8 @@ class ReviewRecordItem {
 
   String get statusLabel => reviewStatusLabel(status);
 
-  factory ReviewRecordItem.fromJson(Map<String, dynamic> json) => ReviewRecordItem(
+  factory ReviewRecordItem.fromJson(Map<String, dynamic> json) =>
+      ReviewRecordItem(
         reviewId: _int(json['reviewId']),
         reviewNo: _text(json['reviewNo']),
         status: _text(json['status']),
@@ -245,7 +253,8 @@ class AuthorWorkDetail {
       chapters: rawChapters is List
           ? rawChapters
               .whereType<Map>()
-              .map((e) => AuthorChapterItem.fromJson(Map<String, dynamic>.from(e)))
+              .map((e) =>
+                  AuthorChapterItem.fromJson(Map<String, dynamic>.from(e)))
               .toList()
           : const [],
       latestReview: rawLatest is Map
@@ -255,4 +264,3 @@ class AuthorWorkDetail {
     );
   }
 }
-
