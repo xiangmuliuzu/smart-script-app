@@ -451,7 +451,7 @@ class TradeRepository {
     return PagedData.parse<DemandTag>(data, DemandTag.fromJson);
   }
 
-  // ==================== 财务域（收益 / 托管 / 发票） ====================
+  // ==================== 财务域（收益 / 托管） ====================
 
   /// 收益总览。
   Future<Map<String, dynamic>> incomeOverview() async {
@@ -541,43 +541,6 @@ class TradeRepository {
     );
     if (data == null || data.isEmpty) throw ApiException('获取托管详情失败');
     return Escrow.fromJson(data);
-  }
-
-  /// 发票列表。
-  Future<PagedData<Invoice>> pageInvoices({
-    String? status,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.appFinanceInvoiceList,
-      query: _compact({
-        'status': status,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取发票列表失败');
-    return PagedData.parse<Invoice>(data, Invoice.fromJson);
-  }
-
-  /// 申请发票。
-  Future<void> applyInvoice(Map<String, dynamic> body) async {
-    await _api.post<void>(
-      ApiEndpoints.appFinanceInvoiceApply,
-      data: body,
-    );
-  }
-
-  /// 可开票订单列表。
-  Future<List<Map<String, dynamic>>> invoiceableOrders() async {
-    final data = await _api.get<List<dynamic>>(
-      ApiEndpoints.appFinanceInvoiceOrders,
-      parser: (raw) => raw is List ? raw : [],
-    );
-    if (data == null) return [];
-    return data.cast<Map<String, dynamic>>();
   }
 
   // ==================== 工具方法 ====================

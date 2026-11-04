@@ -264,7 +264,6 @@ class RoutePath {
   // 财务
   static const String finance = '/trade/finance';
   static const String incomeOverview = '/trade/finance/income';
-  static const String invoiceManage = '/trade/finance/invoice';
   static const String financeOrders = '/trade/finance/orders';
   static const String financeContracts = '/trade/finance/contracts';
   // 询盘
@@ -287,6 +286,18 @@ class RoutePath {
   static const String followUpList = '/trade/follow-up/list';
   // 需求
   static const String demandList = '/trade/demand/list';
+  static const String demandDetail = '/trade/demand/detail';
+  static const String demandPost = '/trade/demand/post';
+  static const String demandMyTasks = '/trade/demand/my-tasks';
+  static const String mySubmissions = '/trade/demand/my-submissions';
+  static const String demandStageDeliver = '/trade/demand/stage-deliver';
+
+  static String demandDetailUrl(int demandId) => '$demandDetail?id=$demandId';
+  /// 编辑已有任务（发布页带 id 进入编辑模式）。
+  static String demandPostEditUrl(int demandId) => '$demandPost?id=$demandId';
+  /// 提交本轮交付物（全屏页：选作品+说明+提交）。
+  static String demandStageDeliverUrl(int demandId, int stageId, int stageOrder) =>
+      '$demandStageDeliver?demandId=$demandId&stageId=$stageId&order=$stageOrder';
   // 线上沟通（聊天，接入 A3）
   static const String tradeChat = '/trade/chat';
   // 聊天会话列表
@@ -390,7 +401,6 @@ class RouteName {
   static const String tradeSessionList = 'tradeSessionList';
   static const String finance = 'finance';
   static const String incomeOverview = 'incomeOverview';
-  static const String invoiceManage = 'invoiceManage';
   static const String financeOrders = 'financeOrders';
   static const String financeContracts = 'financeContracts';
   static const String inquiryCreate = 'inquiryCreate';
@@ -407,6 +417,11 @@ class RouteName {
   static const String cooperationCreate = 'cooperationCreate';
   static const String followUpList = 'followUpList';
   static const String demandList = 'demandList';
+  static const String demandDetail = 'demandDetail';
+  static const String demandPost = 'demandPost';
+  static const String demandMyTasks = 'demandMyTasks';
+  static const String mySubmissions = 'mySubmissions';
+  static const String demandStageDeliver = 'demandStageDeliver';
   static const String tradeChat = 'tradeChat';
   // 聊天
   static const String chatSessionList = 'chatSessionList';
@@ -467,12 +482,16 @@ class ProtectedRoutes {
     RoutePath.cooperationCreate,
     RoutePath.followUpList,
     RoutePath.demandList,
+    RoutePath.demandDetail,
+    RoutePath.demandPost,
+    RoutePath.demandMyTasks,
+    RoutePath.mySubmissions,
+    RoutePath.demandStageDeliver,
     RoutePath.tradeChat,
     // 聊天（需登录）
     RoutePath.chatSessionList,
     // 财务（需登录）
     RoutePath.incomeOverview,
-    RoutePath.invoiceManage,
     // E 模块：福利中心与 AI 创作（需登录）
     RoutePath.welfareCenter,
     RoutePath.aiCenter,

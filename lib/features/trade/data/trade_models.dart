@@ -610,24 +610,6 @@ class EscrowStatus {
   }
 }
 
-/// 发票状态
-class InvoiceStatus {
-  static const String pending = 'pending';
-  static const String approved = 'approved';
-  static const String rejected = 'rejected';
-  static const String issued = 'issued';
-
-  static String label(String? status) {
-    switch (status) {
-      case pending: return '待审核';
-      case approved: return '已审核';
-      case rejected: return '已拒绝';
-      case issued: return '已开具';
-      default: return status ?? '未知';
-    }
-  }
-}
-
 /// 资金托管记录
 class Escrow {
   final int? escrowId;
@@ -681,57 +663,6 @@ class Escrow {
   }
 
   String get amountYuan => amount != null ? '¥${(amount! / 100).toStringAsFixed(2)}' : '-';
-}
-
-/// 发票
-class Invoice {
-  final int? invoiceId;
-  final String? invoiceNo;
-  final int? orderId;
-  final int? applicantId;
-  final String? invoiceType;
-  final String? email;
-  final String? title;
-  final String? taxNo;
-  final int? amount; // 分
-  final String? invoiceUrl;
-  final String? status;
-  final String? rejectReason;
-  final DateTime? invoiceTime;
-  final DateTime? createdAt;
-  final String? orderNo;
-  final String? workTitle;
-
-  Invoice({
-    this.invoiceId, this.invoiceNo, this.orderId, this.applicantId,
-    this.invoiceType, this.email, this.title, this.taxNo, this.amount,
-    this.invoiceUrl, this.status, this.rejectReason, this.invoiceTime,
-    this.createdAt, this.orderNo, this.workTitle,
-  });
-
-  factory Invoice.fromJson(Map<String, dynamic> json) {
-    return Invoice(
-      invoiceId: json['invoiceId'] as int?,
-      invoiceNo: json['invoiceNo'] as String?,
-      orderId: json['orderId'] as int?,
-      applicantId: json['applicantId'] as int?,
-      invoiceType: json['invoiceType'] as String?,
-      email: json['email'] as String?,
-      title: json['title'] as String?,
-      taxNo: json['taxNo'] as String?,
-      amount: (json['amount'] as num?)?.toInt(),
-      invoiceUrl: json['invoiceUrl'] as String?,
-      status: json['status'] as String?,
-      rejectReason: json['rejectReason'] as String?,
-      invoiceTime: _parseDateTime(json['invoiceTime']),
-      createdAt: _parseDateTime(json['createdAt']),
-      orderNo: json['orderNo'] as String?,
-      workTitle: json['workTitle'] as String?,
-    );
-  }
-
-  String get amountYuan => amount != null ? '¥${(amount! / 100).toStringAsFixed(2)}' : '-';
-  String get typeName => invoiceType == 'special' ? '增值税专用发票' : '普通发票';
 }
 
 /// 账单流水
@@ -951,6 +882,243 @@ class ContractTemplate {
   }
 }
 
+// ==================== 任务广场（需求悬赏） ====================
+
+/// 征集状态
+class DemandStatus {
+  static const String open = 'open';
+  static const String inProgress = 'in_progress';
+  static const String completed = 'completed';
+  static const String closed = 'closed';
+  static const String selected = 'selected';
+  static const String failed = 'failed';
+
+  static String label(String? status) {
+    switch (status) {
+      case open: return '待接单';
+      case inProgress: return '进行中';
+      case completed: return '已完成';
+      case closed: return '已关闭';
+      case selected: return '已选定';
+      case failed: return '已失败';
+      default: return status ?? '未知';
+    }
+  }
+}
+
+/// 需求任务托管资金状态（入账走支付宝沙箱，出账记账）
+class DemandEscrowStatus {
+  static const String none = 'none';
+  static const String pendingPayment = 'pending_payment';
+  static const String escrowed = 'escrowed';
+  static const String released = 'released';
+  static const String refundedToPublisher = 'refunded_to_publisher';
+
+  static String label(String? status) {
+    switch (status) {
+      case none: return '无托管';
+      case pendingPayment: return '待付托管';
+      case escrowed: return '已托管';
+      case released: return '已放款';
+      case refundedToPublisher: return '已退回发布者';
+      default: return status ?? '未知';
+    }
+  }
+}
+
+/// 需求任务押金资金状态
+class DemandDepositStatus {
+  static const String none = 'none';
+  static const String held = 'held';
+  static const String refunded = 'refunded';
+  static const String forfeited = 'forfeited';
+
+  static String label(String? status) {
+    switch (status) {
+      case none: return '未缴';
+      case held: return '已托管';
+      case refunded: return '已退还';
+      case forfeited: return '已没收';
+      default: return status ?? '未知';
+    }
+  }
+}
+
+/// 投稿状态
+class SubmissionStatus {
+  static const String submitted = 'submitted';
+  static const String shortlisted = 'shortlisted';
+  static const String accepted = 'accepted';
+  static const String rejected = 'rejected';
+
+  static String label(String? status) {
+    switch (status) {
+      case submitted: return '已投稿';
+      case shortlisted: return '入围';
+      case accepted: return '已选用';
+      case rejected: return '未选用';
+      default: return status ?? '未知';
+    }
+  }
+}
+
+/// 征集任务模型
+class DemandTask {
+  final int? demandId;
+  final String? demandNo;
+  final int? clientId;
+  final String? title;
+  final int? genreId;
+  final String? tags;
+  final int? budget; // 分
+  final DateTime? deadline;
+  final String? requirement;
+  final String? contactInfo;
+  final int? submissionCount;
+  final int? totalEpisodes;
+  final String? status;
+  final DateTime? createdAt;
+  final String? clientName;
+  // 接单制
+  final int? acceptedCreatorId;
+  final DateTime? acceptedAt;
+  final int? durationHours;
+  final DateTime? dueAt;
+  final int? isOverdue;
+  final String? acceptedCreatorName;
+  // 逐轮托管押金（金额均为分）
+  final int? escrowAmount;
+  final String? escrowStatus;
+  final int? depositAmount;
+  final String? depositStatus;
+  final DateTime? depositPaidAt;
+  final DateTime? depositSettledAt;
+  final String? failReason;
+  final DateTime? failAt;
+
+  const DemandTask({
+    this.demandId, this.demandNo, this.clientId, this.title, this.genreId,
+    this.tags, this.budget, this.deadline, this.requirement, this.contactInfo,
+    this.submissionCount, this.totalEpisodes, this.status, this.createdAt, this.clientName,
+    this.acceptedCreatorId, this.acceptedAt, this.durationHours, this.dueAt,
+    this.isOverdue, this.acceptedCreatorName,
+    this.escrowAmount, this.escrowStatus, this.depositAmount, this.depositStatus,
+    this.depositPaidAt, this.depositSettledAt, this.failReason, this.failAt,
+  });
+
+  /// 是否已完成托管付款（广场可抢/可接单前置）。
+  bool get isEscrowed => escrowStatus == DemandEscrowStatus.escrowed;
+  /// 是否待发布者支付托管。
+  bool get isEscrowPending => escrowStatus == DemandEscrowStatus.pendingPayment;
+
+  /// 托管额（元，用于展示）。
+  String get escrowYuanText => _fenToYuanText(escrowAmount);
+  /// 押金（元，用于展示）。
+  String get depositYuanText => _fenToYuanText(depositAmount);
+
+  static String _fenToYuanText(int? fen) {
+    if (fen == null) return '0.00';
+    return (fen / 100).toStringAsFixed(2);
+  }
+
+  /// 接单制状态文案；逾期优先于进行中展示。
+  String get statusLabel {
+    if (isOverdue == 1) return '已逾期';
+    switch (status) {
+      case 'open': return '待接单';
+      case 'in_progress': return '进行中';
+      case 'completed': return '已完成';
+      case 'selected': return '已选定';
+      case 'closed': return '已关闭';
+      case 'failed': return '已失败';
+      default: return status ?? '未知';
+    }
+  }
+
+  factory DemandTask.fromJson(Map<String, dynamic> json) {
+    return DemandTask(
+      demandId: (json['demandId'] as num?)?.toInt(),
+      demandNo: json['demandNo'] as String?,
+      clientId: (json['clientId'] as num?)?.toInt(),
+      title: json['title'] as String?,
+      genreId: (json['genreId'] as num?)?.toInt(),
+      tags: json['tags'] as String?,
+      budget: (json['budget'] as num?)?.toInt(),
+      deadline: _parseDateTime(json['deadline']),
+      requirement: json['requirement'] as String?,
+      contactInfo: json['contactInfo'] as String?,
+      submissionCount: (json['submissionCount'] as num?)?.toInt(),
+      totalEpisodes: (json['totalEpisodes'] as num?)?.toInt(),
+      status: json['status'] as String?,
+      createdAt: _parseDateTime(json['createdAt']),
+      clientName: json['clientName'] as String?,
+      acceptedCreatorId: (json['acceptedCreatorId'] as num?)?.toInt(),
+      acceptedAt: _parseDateTime(json['acceptedAt']),
+      durationHours: (json['durationHours'] as num?)?.toInt(),
+      dueAt: _parseDateTime(json['dueAt']),
+      isOverdue: (json['overdue'] as num?)?.toInt() ?? (json['isOverdue'] as num?)?.toInt(),
+      acceptedCreatorName: json['acceptedCreatorName'] as String?,
+      escrowAmount: (json['escrowAmount'] as num?)?.toInt(),
+      escrowStatus: json['escrowStatus'] as String?,
+      depositAmount: (json['depositAmount'] as num?)?.toInt(),
+      depositStatus: json['depositStatus'] as String?,
+      depositPaidAt: _parseDateTime(json['depositPaidAt']),
+      depositSettledAt: _parseDateTime(json['depositSettledAt']),
+      failReason: json['failReason'] as String?,
+      failAt: _parseDateTime(json['failAt']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'genreId': genreId,
+    'budget': budget,
+    'deadline': deadline != null ? '${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}' : null,
+    'requirement': requirement,
+    'contactInfo': contactInfo,
+    'tags': tags,
+    'totalEpisodes': totalEpisodes,
+    'durationHours': durationHours,
+  };
+}
+
+/// 投稿模型
+class DemandSubmission {
+  final int? submissionId;
+  final int? demandId;
+  final int? workId;
+  final int? submitterId;
+  final String? status;
+  final String? submitMessage;
+  final String? reviewRemark;
+  final DateTime? reviewedAt;
+  final DateTime? createdAt;
+  final String? workTitle;
+  final String? submitterName;
+
+  const DemandSubmission({
+    this.submissionId, this.demandId, this.workId, this.submitterId,
+    this.status, this.submitMessage, this.reviewRemark, this.reviewedAt,
+    this.createdAt, this.workTitle, this.submitterName,
+  });
+
+  factory DemandSubmission.fromJson(Map<String, dynamic> json) {
+    return DemandSubmission(
+      submissionId: (json['submissionId'] as num?)?.toInt(),
+      demandId: (json['demandId'] as num?)?.toInt(),
+      workId: (json['workId'] as num?)?.toInt(),
+      submitterId: (json['submitterId'] as num?)?.toInt(),
+      status: json['status'] as String?,
+      submitMessage: json['submitMessage'] as String?,
+      reviewRemark: json['reviewRemark'] as String?,
+      reviewedAt: _parseDateTime(json['reviewedAt']),
+      createdAt: _parseDateTime(json['createdAt']),
+      workTitle: json['workTitle'] as String?,
+      submitterName: json['submitterName'] as String?,
+    );
+  }
+}
+
 // ==================== 工具函数 ====================
 
 DateTime? _parseDateTime(dynamic value) {
@@ -975,4 +1143,267 @@ String formatDate(DateTime? dt) {
 String formatDateTime(DateTime? dt) {
   if (dt == null) return '-';
   return '${formatDate(dt)} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+}
+
+// ==================== 验收轮次模型 ====================
+
+class DemandStage {
+  final int? stageId;
+  final int? demandId;
+  final int? stageOrder;
+  final int? episodeTo;
+  final int? amount; // 分
+  final String? status; // pending/ai_reviewing/submitted/approved/rejected
+  final String? deliverableDesc;
+  final String? deliverableUrl;
+  final DateTime? submittedAt;
+  final DateTime? reviewedAt;
+  final String? rejectReason;
+  final int? releaseFlag;
+  // 逐轮独立计时
+  final int? durationDays;
+  final int? durationHours;
+  final DateTime? startedAt;
+  final DateTime? dueAt;
+  final int? isOverdue;
+  // 交付作品与延期
+  final int? workId;
+  final String? workTitle;
+  // AI 审核（提交后、人工验收前的自动前置门）
+  final int? aiScore;
+  final String? aiResult;
+  final DateTime? aiReviewedAt;
+  final String? extendStatus; // null=无申请 / pending / approved / rejected（最近一次快照）
+  final int? extendDays;
+  final int? extendHours;
+  final String? extendReason;
+  final DateTime? extendAppliedAt;
+
+  const DemandStage({
+    this.stageId, this.demandId, this.stageOrder, this.episodeTo, this.amount,
+    this.status, this.deliverableDesc, this.deliverableUrl,
+    this.submittedAt, this.reviewedAt, this.rejectReason, this.releaseFlag,
+    this.durationDays, this.durationHours, this.startedAt, this.dueAt, this.isOverdue,
+    this.workId, this.workTitle, this.extendStatus, this.extendDays, this.extendHours,
+    this.extendReason, this.extendAppliedAt,
+    this.aiScore, this.aiResult, this.aiReviewedAt,
+  });
+
+  factory DemandStage.fromJson(Map<String, dynamic> json) {
+    return DemandStage(
+      stageId: (json['stageId'] as num?)?.toInt(),
+      demandId: (json['demandId'] as num?)?.toInt(),
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
+      episodeTo: (json['episodeTo'] as num?)?.toInt(),
+      amount: (json['amount'] as num?)?.toInt(),
+      status: json['status'] as String?,
+      deliverableDesc: json['deliverableDesc'] as String?,
+      deliverableUrl: json['deliverableUrl'] as String?,
+      submittedAt: _parseDateTime(json['submittedAt']),
+      reviewedAt: _parseDateTime(json['reviewedAt']),
+      rejectReason: json['rejectReason'] as String?,
+      releaseFlag: (json['releaseFlag'] as num?)?.toInt(),
+      durationDays: (json['durationDays'] as num?)?.toInt(),
+      durationHours: (json['durationHours'] as num?)?.toInt(),
+      startedAt: _parseDateTime(json['startedAt']),
+      dueAt: _parseDateTime(json['dueAt']),
+      isOverdue: (json['overdue'] as num?)?.toInt() ?? (json['isOverdue'] as num?)?.toInt(),
+      workId: (json['workId'] as num?)?.toInt(),
+      workTitle: json['workTitle'] as String?,
+      aiScore: (json['aiScore'] as num?)?.toInt(),
+      aiResult: json['aiResult'] as String?,
+      aiReviewedAt: _parseDateTime(json['aiReviewedAt']),
+      extendStatus: json['extendStatus'] as String?,
+      extendDays: (json['extendDays'] as num?)?.toInt(),
+      extendHours: (json['extendHours'] as num?)?.toInt(),
+      extendReason: json['extendReason'] as String?,
+      extendAppliedAt: _parseDateTime(json['extendAppliedAt']),
+    );
+  }
+
+  /// 状态标签文本
+  String get statusLabel {
+    switch (status) {
+      case 'pending': return '待交付';
+      case 'ai_reviewing': return 'AI审核中';
+      case 'submitted': return '待审核';
+      case 'approved': return '已通过';
+      case 'rejected': return '已驳回';
+      default: return status ?? '';
+    }
+  }
+
+  /// 本轮时限文案（天+小时）。
+  String get durationText {
+    final d = durationDays ?? 0;
+    final h = durationHours ?? 0;
+    if (d > 0 && h > 0) return '$d 天 $h 小时';
+    if (d > 0) return '$d 天';
+    if (h > 0) return '$h 小时';
+    return '-';
+  }
+
+  /// 绝对截止文案：“X月X日 HH:mm”；未激活返回 null。
+  String? get absoluteDueText {
+    if (dueAt == null) return null;
+    final dt = dueAt!.toLocal();
+    return '${dt.month}月${dt.day}日 '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 本轮是否处于审核暂停计时（AI审核中/待人工验收，审核耗时均不计入时限）。
+  bool get isPausedForReview => status == 'submitted' || status == 'ai_reviewing';
+
+  /// 是否处于 AI 审核中（后台跑完前不可交付/不可验收/不可延期）。
+  bool get isAiReviewing => status == 'ai_reviewing';
+
+  /// AI 审核结论一行文案：分数 + 结果；未审核返回 null。
+  String? get aiVerdictText {
+    if (aiScore == null && aiReviewedAt == null) return null;
+    if (aiScore == null) return 'AI审核：未评分（已转人工验收）';
+    final pass = aiScore! >= 60;
+    return 'AI审核：$aiScore分 · ${pass ? '通过，待发布者验收' : '未通过，已自动打回'}';
+  }
+
+  /// 是否有待处理的延时申请（轮次行上的最近一次快照；完整历史见 DemandExtendApply）。
+  bool get hasPendingExtend => extendStatus == 'pending';
+
+  /// 延时申请量文案（天+小时）。
+  String get extendAskText {
+    final d = extendDays ?? 0;
+    final h = extendHours ?? 0;
+    if (d > 0 && h > 0) return '$d天$h小时';
+    if (d > 0) return '$d天';
+    if (h > 0) return '$h小时';
+    return '-';
+  }
+
+  /// 本轮是否已逾期（活动轮且当前时间超过 dueAt；待审核期间计时暂停不算逾期）。
+  bool get isOverdueNow {
+    if (isPausedForReview) return false;
+    if (isOverdue == 1) return true;
+    if (status == 'approved' || dueAt == null) return false;
+    return DateTime.now().isAfter(dueAt!);
+  }
+}
+
+/// 延时历史记录（一条动作一行，通过/驳回均保留）。
+/// [applyType] 区分来源：request=创作者申请延时（待发布者处理），self=发布者自主延时（写入即生效）。
+class DemandExtendApply {
+  final int? applyId;
+  final int? demandId;
+  final int? stageId;
+  final int? stageOrder;
+  final int? days;
+  final int? hours;
+  final String? reason;
+  final String? status; // pending / approved / rejected
+  final String? applyType; // request / self
+  final DateTime? appliedAt;
+  final DateTime? decidedAt;
+  /// 本次动作生效后的轮次截止时间：自主延时/申请通过时有值，待处理与驳回为空
+  final DateTime? dueAfter;
+
+  const DemandExtendApply({
+    this.applyId, this.demandId, this.stageId, this.stageOrder,
+    this.days, this.hours, this.reason, this.status, this.applyType,
+    this.appliedAt, this.decidedAt, this.dueAfter,
+  });
+
+  factory DemandExtendApply.fromJson(Map<String, dynamic> json) {
+    return DemandExtendApply(
+      applyId: (json['applyId'] as num?)?.toInt(),
+      demandId: (json['demandId'] as num?)?.toInt(),
+      stageId: (json['stageId'] as num?)?.toInt(),
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
+      days: (json['days'] as num?)?.toInt(),
+      hours: (json['hours'] as num?)?.toInt(),
+      reason: json['reason'] as String?,
+      status: json['status'] as String?,
+      applyType: json['applyType'] as String?,
+      appliedAt: _parseDateTime(json['appliedAt']),
+      decidedAt: _parseDateTime(json['decidedAt']),
+      dueAfter: _parseDateTime(json['dueAfter']),
+    );
+  }
+
+  bool get isPending => status == 'pending';
+
+  /// 是否发布者自主延时（无需审核，落记录即已生效）。
+  bool get isSelf => applyType == 'self';
+
+  /// 记录行前缀文案：自主延时 / 申请延时。
+  String get sourceLabel => isSelf ? '自主延时' : '申请延时';
+
+  /// 处理结果文案（自主延时没有审核环节，直接标已生效）。
+  String get statusLabel {
+    if (isSelf) return '已生效';
+    switch (status) {
+      case 'pending': return '待处理';
+      case 'approved': return '已同意';
+      case 'rejected': return '已拒绝';
+      default: return status ?? '';
+    }
+  }
+
+  /// 申请量文案（天+小时）。
+  String get askText {
+    final d = days ?? 0;
+    final h = hours ?? 0;
+    if (d > 0 && h > 0) return '$d天$h小时';
+    if (d > 0) return '$d天';
+    if (h > 0) return '$h小时';
+    return '-';
+  }
+
+  /// 申请时间文案“X月X日 HH:mm”。
+  String get appliedText {
+    final dt = appliedAt?.toLocal();
+    if (dt == null) return '';
+    return '${dt.month}月${dt.day}日 '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 顺延后新截止文案“X月X日 HH:mm”（待处理/驳回无值，返回空串）。
+  String get dueAfterText {
+    final dt = dueAfter?.toLocal();
+    if (dt == null) return '';
+    return '${dt.month}月${dt.day}日 '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+/// 可交付作品（任务交付选择器：本人、非已上架售卖）。
+class DeliverableWork {
+  final int workId;
+  final String? title;
+  final String? status;
+  final DateTime? updateTime;
+
+  const DeliverableWork({
+    required this.workId,
+    this.title,
+    this.status,
+    this.updateTime,
+  });
+
+  factory DeliverableWork.fromJson(Map<String, dynamic> json) {
+    return DeliverableWork(
+      workId: (json['workId'] as num?)?.toInt() ?? 0,
+      title: json['title'] as String?,
+      status: json['status'] as String?,
+      updateTime: _parseDateTime(json['updateTime']),
+    );
+  }
+
+  /// 状态展示文案（交付选择器只展示非 on_shelf 作品）。
+  String get statusLabel {
+    switch (status) {
+      case 'draft': return '草稿';
+      case 'reviewing': return '审核中';
+      case 'rejected': return '审核驳回';
+      case 'off_shelf': return '已下架';
+      default: return status ?? '';
+    }
+  }
 }

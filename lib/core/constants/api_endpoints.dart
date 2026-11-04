@@ -197,7 +197,6 @@ class ApiEndpoints {
   static String orderContract(int orderId) => '/orders/$orderId/contract';
   static String orderContractSign(int orderId) => '/orders/$orderId/contract/sign';
   static String orderEscrow(int orderId) => '/orders/$orderId/escrow';
-  static String orderInvoice(int orderId) => '/orders/$orderId/invoice';
   static String orderPay(int orderId) => '/orders/$orderId/pay';
   static String orderCancel(int orderId) => '/orders/$orderId/cancel';
   static String orderRefund(int orderId) => '/orders/$orderId/refund';
@@ -315,7 +314,7 @@ class ApiEndpoints {
   // 上传 PDF 替换模板（POST multipart）与从上传件切回平台模板（PUT）
   static String appContractSourcePdf(int contractId) => '/trade/contracts/$contractId/source-pdf';
   static String appContractSourcePdfOff(int contractId) => '/trade/contracts/$contractId/source-pdf/off';
-  // 财务（资金托管 / 发票 / 收益 / 待结算 / 提现）
+  // 财务（资金托管 / 收益 / 待结算 / 提现）
   static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
   static const String appFinanceIncomeDetail = '/trade/finance/income/detail';
   static const String appFinanceIncomeStats = '/trade/finance/income/stats';
@@ -332,10 +331,6 @@ class ApiEndpoints {
   static const String appFinanceWithdrawList = '/trade/finance/withdraw/list';
   static const String appFinanceEscrowList = '/trade/finance/escrow/list';
   static String appFinanceEscrowById(int escrowId) => '/trade/finance/escrow/$escrowId';
-  static const String appFinanceInvoiceList = '/trade/finance/invoice/list';
-  static String appFinanceInvoiceById(int invoiceId) => '/trade/finance/invoice/$invoiceId';
-  static const String appFinanceInvoiceApply = '/trade/finance/invoice/apply';
-  static const String appFinanceInvoiceOrders = '/trade/finance/invoice/orders';
   // 合作记录
   static const String adminTradeCooperationList = '/admin/trade/cooperation/list';
   static const String adminTradeCooperation = '/admin/trade/cooperation';
@@ -343,4 +338,43 @@ class ApiEndpoints {
   static const String adminTradeFollowUps = '/admin/trade/partners/follow-ups';
   // 需求标签
   static const String adminTradeDemandTags = '/admin/trade/partners/tags';
+
+  // ===== 任务广场（需求悬赏） =====
+  static const String demandList = '/trade/demand/list';
+  /// 任务广场轻量统计（可接单数 / 奖金池 / 今日新增 / 题材角标）。
+  static const String demandStats = '/trade/demand/stats';
+  static String demandDetail(int demandId) => '/trade/demand/$demandId';
+  static const String demandCreate = '/trade/demand';
+  /// 编辑任务（PUT，仅发布者且未托管未接单可改）。
+  static String demandUpdate(int demandId) => '/trade/demand/$demandId';
+  static String demandClose(int demandId) => '/trade/demand/$demandId/close';
+  static String demandClaim(int demandId) => '/trade/demand/$demandId/claim';
+  /// 任务会话（发布者 ↔ 创作者，POST；发布者发起可带 targetUserId）。
+  static String demandChatSession(int demandId) => '/trade/demand/$demandId/chat/session';
+  static String demandSubmissions(int demandId) => '/trade/demand/$demandId/submissions';
+  static String demandSubmit(int demandId) => '/trade/demand/$demandId/submit';
+  static String demandShortlist(int subId) => '/trade/demand/submission/$subId/shortlist';
+  static String demandAccept(int subId) => '/trade/demand/submission/$subId/accept';
+  static String demandReject(int subId) => '/trade/demand/submission/$subId/reject';
+  static const String demandMySubmissions = '/trade/demand/my-submissions';
+  // 验收轮次
+  static String demandStages(int demandId) => '/trade/demand/$demandId/stages';
+  static String demandStageDeliver(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliver';
+  static String demandStageReview(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/review';
+  // 可交付作品（本人、非已上架售卖）
+  static const String demandDeliverableWorks = '/trade/demand/deliverable-works';
+  // 延时：创作者申请 / 发布者处理 / 发布者自主延时 / 延时记录
+  static String demandStageExtendRequest(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/request';
+  static String demandStageExtendDecision(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/decision';
+  static String demandStageExtend(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend';
+  // 延时记录（申请延时 + 自主延时，每条一行，通过/驳回均保留）
+  static String demandExtendHistory(int demandId) => '/trade/demand/$demandId/extend/history';
+  // 支付宝沙箱入账（托管/押金）
+  static String demandPayEscrow(int demandId) => '/trade/demand/$demandId/pay/escrow';
+  static String demandPayEscrowConfirm(int demandId) => '/trade/demand/$demandId/pay/escrow/confirm';
+  static String demandPayDeposit(int demandId) => '/trade/demand/$demandId/pay/deposit';
+  static String demandPayDepositConfirm(int demandId) => '/trade/demand/$demandId/pay/deposit/confirm';
+  // 开发直通入账（点一下即完成；沙箱密钥未接入时用，正式收款走上面沙箱端点）
+  static String demandEscrowDevPass(int demandId) => '/trade/demand/$demandId/pay/escrow/dev-pass';
+  static String demandPayDepositDevPass(int demandId) => '/trade/demand/$demandId/pay/deposit/dev-pass';
 }

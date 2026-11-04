@@ -391,32 +391,3 @@ final escrowSummaryProvider = FutureProvider.autoDispose
     return data;
   },
 );
-
-/// 发票列表查询参数
-class InvoiceListParams {
-  final String? status;
-  final int pageNum;
-  final int pageSize;
-  const InvoiceListParams({this.status, this.pageNum = 1, this.pageSize = 20});
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is InvoiceListParams &&
-          status == other.status &&
-          pageNum == other.pageNum &&
-          pageSize == other.pageSize;
-
-  @override
-  int get hashCode => Object.hash(status, pageNum, pageSize);
-}
-
-/// 发票列表
-final invoiceListProvider = FutureProvider.autoDispose
-    .family<PagedData<Invoice>, InvoiceListParams>(
-  (ref, params) => ref.watch(tradeRepositoryProvider).pageInvoices(
-        status: params.status,
-        pageNum: params.pageNum,
-        pageSize: params.pageSize,
-      ),
-);

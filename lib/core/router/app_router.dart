@@ -86,6 +86,11 @@ import '../../features/trade/pages/order_contract_page.dart';
 import '../../features/trade/pages/order_detail_page.dart';
 import '../../features/trade/pages/contract_sign_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
+import '../../features/trade/pages/demand_list_page.dart';
+import '../../features/trade/pages/demand_detail_page.dart';
+import '../../features/trade/pages/demand_post_page.dart';
+import '../../features/trade/pages/demand_my_tasks_page.dart';
+import '../../features/trade/pages/demand_stage_deliver_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
@@ -671,6 +676,40 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.contractList,
         name: RouteName.contractList,
         builder: (_, __) => const OrderContractPage(initialIndex: 1),
+      ),
+      // ===== 任务广场 =====
+      GoRoute(
+        path: RoutePath.demandList,
+        name: RouteName.demandList,
+        builder: (_, __) => const DemandListPage(),
+      ),
+      GoRoute(
+        path: RoutePath.demandDetail,
+        name: RouteName.demandDetail,
+        builder: (context, state) => DemandDetailPage(
+          demandId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.demandPost,
+        name: RouteName.demandPost,
+        builder: (context, state) => DemandPostPage(
+          demandId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.demandMyTasks,
+        name: RouteName.demandMyTasks,
+        builder: (_, __) => const DemandMyTasksPage(),
+      ),
+      GoRoute(
+        path: RoutePath.demandStageDeliver,
+        name: RouteName.demandStageDeliver,
+        builder: (context, state) => DemandStageDeliverPage(
+          demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
+          stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
+          stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,
+        ),
       ),
       // ===== 版权模块（受登录守卫保护）=====
       GoRoute(
