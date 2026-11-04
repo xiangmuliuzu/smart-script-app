@@ -819,8 +819,8 @@ class _AuthButton extends StatelessWidget {
 }
 
 /// 创作者专属 Bento 工作台区：
-/// 左侧主卡突出「AI 创作」，右侧上下叠放「我的作品」「询盘管理」与「订单管理」，
-/// 将核心生产力工具从普通宫格中提权，同时解放下方工具栏实现零翻页。
+/// 左侧主卡突出「AI 创作」，右侧上下叠放「我的作品」与「订单管理」，
+/// 将核心生产力工具从普通宫格中提权；询盘管理等次级入口收进下方可横滑工具区。
 class _CreatorBentoSection extends StatelessWidget {
   const _CreatorBentoSection({required this.ref});
 
@@ -831,7 +831,7 @@ class _CreatorBentoSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: SizedBox(
-        height: 176,
+        height: 124,
         child: Row(
           children: [
             // 左主卡：AI 创作
@@ -954,7 +954,7 @@ class _CreatorBentoSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // 右侧三横卡：我的作品 + 询盘管理 + 订单管理
+            // 右侧双横卡：我的作品 + 订单管理
             Expanded(
               flex: 10,
               child: Column(
@@ -971,21 +971,6 @@ class _CreatorBentoSection extends StatelessWidget {
                         context,
                         ref,
                         target: RoutePath.create,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _BentoSubCard(
-                      icon: Icons.headset_mic_outlined,
-                      iconColor: const Color(0xFF1F6E5A),
-                      iconBg: const Color(0xFFE6F4F0),
-                      title: '询盘管理',
-                      subtitle: '查看与处理询盘',
-                      onTap: () => AuthGuard.pushProtected(
-                        context,
-                        ref,
-                        target: RoutePath.inquiryList,
                       ),
                     ),
                   ),
@@ -1178,77 +1163,153 @@ class _BentoSubCard extends StatelessWidget {
   }
 }
 
-/// 常用工具单行直达：5 个高频入口一行排开，采用语义淡彩圆角矩形图标，零翻页隐藏。
+/// 常用工具单行直达：按使用频次排序，首屏展示 6 个，其余入口横向滑动可见。
 class _QuickToolRow extends StatelessWidget {
   const _QuickToolRow({required this.ref, required this.isCreator});
 
   final WidgetRef ref;
   final bool isCreator;
 
+  /// 一屏可见的入口数量，超出部分通过横向滑动露出。
+  static const int _visibleCount = 6;
+
   @override
   Widget build(BuildContext context) {
+    _QuickToolItem item({
+      required IconData icon,
+      required String label,
+      required Color iconColor,
+      required Color bgColor,
+      required String route,
+    }) {
+      return _QuickToolItem(
+        icon: icon,
+        label: label,
+        iconColor: iconColor,
+        bgColor: bgColor,
+        onTap: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: route,
+        ),
+      );
+    }
+
+    // 排序原则：作品运营（确权/推广/收益）→ 交易履约（订单/询盘）→ 工具（印章）
+    // → 浏览向（收藏）→ 权益（福利）。创作者与甲方各自只保留相关入口，无重复。
     final tools = <_QuickToolItem>[
-      _QuickToolItem(
-        icon: Icons.star_outline_rounded,
-        label: '收藏',
-        iconColor: const Color(0xFFD48806),
-        bgColor: const Color(0xFFFDF6EC),
-        onTap: () => AuthGuard.pushProtected(
-          context,
-          ref,
-          target: RoutePath.favorites,
+      if (isCreator)
+        item(
+          icon: Icons.copyright_outlined,
+          label: '版权管理',
+          iconColor: AppColors.primary,
+          bgColor: AppColors.primaryTint,
+          route: RoutePath.copyrightHome,
+        )
+      else
+        item(
+          icon: Icons.shopping_bag_outlined,
+          label: '订单管理',
+          iconColor: const Color(0xFFB76E1D),
+          bgColor: const Color(0xFFFCF3E6),
+          route: RoutePath.orderList,
         ),
+      item(
+        icon: Icons.rocket_launch_outlined,
+        label: '作品推广',
+        iconColor: AppColors.accent,
+        bgColor: AppColors.accentSoft,
+        route: RoutePath.promotionCenter,
       ),
-      _QuickToolItem(
-        icon: isCreator ? Icons.copyright_outlined : Icons.headset_mic_outlined,
-        label: isCreator ? '版权管理' : '询盘管理',
-        iconColor: AppColors.primary,
-        bgColor: AppColors.primaryTint,
-        onTap: () => AuthGuard.pushProtected(
-          context,
-          ref,
-          target: isCreator ? RoutePath.copyrightHome : RoutePath.inquiryList,
-        ),
-      ),
-      _QuickToolItem(
-        icon: isCreator ? Icons.approval_outlined : Icons.shopping_bag_outlined,
-        label: isCreator ? '我的印章' : '订单管理',
-        iconColor: const Color(0xFF1F7A6E),
-        bgColor: const Color(0xFFE7F6F4),
-        onTap: () => AuthGuard.pushProtected(
-          context,
-          ref,
-          target: isCreator ? RoutePath.mySeal : RoutePath.orderList,
-        ),
-      ),
-      _QuickToolItem(
+      item(
         icon: Icons.monetization_on_outlined,
         label: '作者收益',
         iconColor: const Color(0xFF4C4B99),
         bgColor: const Color(0xFFF1F0FC),
-        onTap: () => AuthGuard.pushProtected(
-          context,
-          ref,
-          target: RoutePath.myIncomeOverview,
-        ),
+        route: RoutePath.myIncomeOverview,
       ),
-      _QuickToolItem(
+      item(
+        icon: Icons.headset_mic_outlined,
+        label: '询盘管理',
+        iconColor: const Color(0xFF1F6E5A),
+        bgColor: const Color(0xFFE6F4F0),
+        route: RoutePath.inquiryList,
+      ),
+      if (isCreator)
+        item(
+          icon: Icons.approval_outlined,
+          label: '我的印章',
+          iconColor: const Color(0xFF1F7A6E),
+          bgColor: const Color(0xFFE7F6F4),
+          route: RoutePath.mySeal,
+        )
+      else
+        item(
+          icon: Icons.star_outline_rounded,
+          label: '收藏',
+          iconColor: const Color(0xFFD48806),
+          bgColor: const Color(0xFFFDF6EC),
+          route: RoutePath.favorites,
+        ),
+      if (isCreator)
+        item(
+          icon: Icons.star_outline_rounded,
+          label: '收藏',
+          iconColor: const Color(0xFFD48806),
+          bgColor: const Color(0xFFFDF6EC),
+          route: RoutePath.favorites,
+        ),
+      item(
         icon: Icons.card_giftcard_rounded,
         label: '福利',
         iconColor: const Color(0xFFD54941),
         bgColor: const Color(0xFFFEF0EE),
-        onTap: () => AuthGuard.pushProtected(
-          context,
-          ref,
-          target: RoutePath.welfareCenter,
-        ),
+        route: RoutePath.welfareCenter,
       ),
     ];
 
-    return Row(
-      children: [
-        for (final item in tools) Expanded(child: item),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 每个入口等宽取「一屏 6 个」，多于 6 个时内容总宽溢出，触发横向滑动。
+        final itemWidth = constraints.maxWidth / _visibleCount;
+        final scrollable = tools.length > _visibleCount;
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: scrollable
+                  ? const BouncingScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              child: Row(
+                children: [
+                  for (final tool in tools)
+                    SizedBox(width: itemWidth, child: tool),
+                ],
+              ),
+            ),
+            // 右缘渐隐，提示还有可滑动露出的入口。
+            if (scrollable)
+              Positioned(
+                top: 0,
+                bottom: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 20,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.card.withOpacity(0),
+                          AppColors.card,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

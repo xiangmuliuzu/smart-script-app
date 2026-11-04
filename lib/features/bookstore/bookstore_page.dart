@@ -239,11 +239,18 @@ class _BannerImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (banner.imageUrl.isEmpty) return _placeholder();
+    // 作者上传的素材尺寸不可控，按实际显示宽度解码，避免大图全尺寸解码造成掉帧/卡死。
+    final cacheWidth = ((MediaQuery.sizeOf(context).width - 32) *
+            MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(320, 1440)
+        .toInt();
     return GestureDetector(
       onTap: () => _onTap(context),
       child: Image.network(
         AppConfig.resolveAssetUrl(banner.imageUrl),
         fit: BoxFit.cover,
+        cacheWidth: cacheWidth,
         errorBuilder: (_, __, ___) => _placeholder(),
       ),
     );

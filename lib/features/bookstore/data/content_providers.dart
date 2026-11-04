@@ -39,14 +39,19 @@ final rankingProvider = FutureProvider.autoDispose.family<RankingPayload, String
   (ref, type) => ref.watch(contentRepositoryProvider).listRankings(type: type, limit: 20),
 );
 
-/// 首页热门精选：取「书城首页」展示位推荐（未过期，按位次升序，由后端过滤+排序）。
-/// 推荐多少就显示多少，不做浏览量兜底；点"更多"进入完整推荐列表页。
+/// 首页热门精选：按「首页热门」展示位取数（recommendStatus=home_hot）。
+///
+/// 后端已改为付费投放优先排序、空位按浏览量自然补位，不再读 ext_json 推荐；
+/// 多取一些用于补位，首页只渲染前 6 本；点"更多"进入完整推荐列表页。
 final hotWorksProvider = FutureProvider.autoDispose<List<BookItem>>(
   (ref) async {
     final repo = ref.watch(contentRepositoryProvider);
-    // 拿 20 本回来，足够判断总共有多少推荐作品；首页只渲染前 6 本
-    final page =
-        await repo.pageWorks(pageNum: 1, pageSize: 30, showScope: 'bookstore');
+    // 拿 30 本回来，留足补位空间；首页只渲染前 6 本
+    final page = await repo.pageWorks(
+      pageNum: 1,
+      pageSize: 30,
+      recommendStatus: 'home_hot',
+    );
     return page.list;
   },
 );

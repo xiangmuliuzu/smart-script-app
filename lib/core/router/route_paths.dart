@@ -250,6 +250,19 @@ class RoutePath {
         },
       ).toString();
 
+  // ===== 作品推广（付费推荐，受登录守卫保护）=====
+  /// 推广路径前缀（仅用于登录守卫登记，本身不注册页面）。
+  static const String promotion = '/promotion';
+  static const String promotionCenter = '/promotion/center';
+  static const String promotionCreate = '/promotion/create';
+  static const String promotionDetail = '/promotion/detail';
+  static const String promotionPay = '/promotion/pay';
+
+  static String promotionDetailUrl(int applyId) =>
+      '$promotionDetail?id=$applyId';
+
+  static String promotionPayUrl(int applyId) => '$promotionPay?id=$applyId';
+
   // A5 消息中心（列表与详情用查询参数区分，便于登录回跳时整串还原）
   static const String messages = '/profile/messages';
   static const String messageDetail = '/profile/messages/detail';
@@ -390,6 +403,13 @@ class RouteName {
   static const String chapterWrite = 'chapterWrite';
   static const String workVersions = 'workVersions';
   static const String workVersionDetail = 'workVersionDetail';
+
+  // ===== 作品推广 =====
+  static const String promotionCenter = 'promotionCenter';
+  static const String promotionCreate = 'promotionCreate';
+  static const String promotionDetail = 'promotionDetail';
+  static const String promotionPay = 'promotionPay';
+
   static const String messages = 'messages';
   static const String messageDetail = 'messageDetail';
   static const String feedback = 'feedback';
@@ -510,6 +530,8 @@ class ProtectedRoutes {
     RoutePath.myIncomeSettleList,
     RoutePath.myIncomeSettleDetail,
     RoutePath.myIncomeWithdraw,
+    // 作品推广（需登录）
+    RoutePath.promotion,
   ];
 
   static bool isProtected(String location) {

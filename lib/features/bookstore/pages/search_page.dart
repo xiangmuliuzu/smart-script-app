@@ -49,7 +49,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       pageSize: _pageSize,
       fetchPage: (pageNum, pageSize) => ref
           .read(contentRepositoryProvider)
-          .pageWorks(keyword: _keyword, pageNum: pageNum, pageSize: pageSize),
+          .pageWorks(
+            keyword: _keyword,
+            showScope: 'search',
+            pageNum: pageNum,
+            pageSize: pageSize,
+          ),
     );
     _controller.addListener(_onControllerChanged);
     _scrollController.addListener(_onScroll);

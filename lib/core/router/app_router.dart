@@ -63,6 +63,10 @@ import '../../features/income/pages/income_bill_detail_page.dart';
 import '../../features/income/pages/income_settle_list_page.dart';
 import '../../features/income/pages/income_settle_detail_page.dart';
 import '../../features/income/pages/income_withdraw_page.dart';
+import '../../features/promotion/pages/promotion_center_page.dart';
+import '../../features/promotion/pages/promotion_create_page.dart';
+import '../../features/promotion/pages/promotion_detail_page.dart';
+import '../../features/promotion/pages/promotion_pay_page.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/message/pages/message_detail_page.dart';
 import '../../features/message/pages/message_list_page.dart';
@@ -794,6 +798,31 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.myIncomeWithdraw,
         name: RouteName.myIncomeWithdraw,
         builder: (_, __) => const MyIncomeWithdrawPage(),
+      ),
+      // ===== 作品推广（付费推荐）=====
+      GoRoute(
+        path: RoutePath.promotionCenter,
+        name: RouteName.promotionCenter,
+        builder: (_, __) => const PromotionCenterPage(),
+      ),
+      GoRoute(
+        path: RoutePath.promotionCreate,
+        name: RouteName.promotionCreate,
+        builder: (_, __) => const PromotionCreatePage(),
+      ),
+      GoRoute(
+        path: RoutePath.promotionDetail,
+        name: RouteName.promotionDetail,
+        builder: (context, state) => PromotionDetailPage(
+          applyId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.promotionPay,
+        name: RouteName.promotionPay,
+        builder: (context, state) => PromotionPayPage(
+          applyId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
       ),
       // ===== A3 聊天域 =====
       GoRoute(

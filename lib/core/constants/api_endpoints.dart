@@ -159,6 +159,24 @@ class ApiEndpoints {
   static String contentEpisodeLike(int episodeId) =>
       '/content/episodes/$episodeId/like';
 
+  // ===== B 模块作品推广（付费推荐，需 App Token）=====
+  /// 资源位位次列表（slotType=hot/search/banner）
+  static const String contentPromotionSlots = '/content/promotion/slots';
+  /// 提交推广申请 / 我的推广列表
+  static const String contentPromotionApplications = '/content/promotion/applications';
+  static const String contentPromotionMyApplications =
+      '/content/promotion/applications/my';
+  /// 推广申请详情 / 取消
+  static String contentPromotionApplication(int applyId) =>
+      '/content/promotion/applications/$applyId';
+  static String contentPromotionCancel(int applyId) =>
+      '/content/promotion/applications/$applyId/cancel';
+  /// 创建沙箱支付（返回 qrCode）/ 查询支付结果
+  static String tradePromotionPay(int applyId) =>
+      '/trade/promotion/$applyId/pay';
+  static String tradePromotionConfirm(int applyId) =>
+      '/trade/promotion/$applyId/confirm';
+
   /// App 域头像上传（multipart，字段名 `file`）。
   ///
   /// 不走平台原生的 `/common/upload`：该端点属于 PC 凭证链，App Token 无法通过鉴权，
