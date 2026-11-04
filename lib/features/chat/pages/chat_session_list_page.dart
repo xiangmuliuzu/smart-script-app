@@ -33,7 +33,7 @@ class _ChatSessionListPageState extends ConsumerState<ChatSessionListPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {});
@@ -66,6 +66,7 @@ class _ChatSessionListPageState extends ConsumerState<ChatSessionListPage>
             Tab(text: '全部'),
             Tab(text: '交易会话'),
             Tab(text: '咨询会话'),
+            Tab(text: '任务会话'),
           ],
         ),
       ),
@@ -75,6 +76,7 @@ class _ChatSessionListPageState extends ConsumerState<ChatSessionListPage>
           _buildSessionList(null),
           _buildSessionList(SessionType.trade),
           _buildSessionList(SessionType.admin),
+          _buildSessionList(SessionType.demand),
         ],
       ),
       // 咨询会话 Tab 显示发起咨询按钮

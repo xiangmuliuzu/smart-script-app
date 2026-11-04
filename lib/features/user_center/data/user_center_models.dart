@@ -222,6 +222,8 @@ class MessageItem {
     this.content,
     this.read = false,
     this.createdAt,
+    this.businessType,
+    this.businessId,
   });
 
   final int messageId;
@@ -232,6 +234,10 @@ class MessageItem {
   final String? content;
   final bool read;
   final String? createdAt;
+
+  /// 交易域通知的业务类型与主键（INQUIRY/ORDER/CONTRACT），供详情页跳转；非交易通知为 null。
+  final String? businessType;
+  final String? businessId;
 
   MessageType? get typeEnum => MessageType.fromCode(type);
   String get typeLabel => typeEnum?.label ?? type;
@@ -245,6 +251,8 @@ class MessageItem {
         content: json['content'] as String?,
         read: json['read'] as bool? ?? false,
         createdAt: json['createdAt'] as String?,
+        businessType: json['businessType'] as String?,
+        businessId: json['businessId']?.toString(),
       );
 }
 

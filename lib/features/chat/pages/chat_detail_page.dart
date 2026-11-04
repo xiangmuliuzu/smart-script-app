@@ -5,11 +5,13 @@ import '../../../core/providers/auth_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../trade/data/trade_models.dart';
 import '../../trade/data/trade_providers.dart';
 import '../../user_center/data/paged_data.dart';
 import '../data/chat_models.dart';
 import '../data/chat_providers.dart';
 import '../widgets/negotiation_status_bar.dart';
+import '../widgets/quote_input_card.dart';
 import '../widgets/quote_message_bubble.dart';
 import '../widgets/trade_template_sheet.dart';
 
@@ -30,8 +32,11 @@ class ChatDetailPage extends ConsumerStatefulWidget {
 
 class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   final _inputController = TextEditingController();
+  final _amountController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
+  int? _lastSentAmount; // 上次发送的报价金额（分），用于判断金额是否变化
+  _TradeContext? _tradeContext; // 交易会话上下文
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   @override
   void dispose() {
     _inputController.dispose();
+    _amountController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -64,8 +70,31 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     final content = _inputController.text.trim();
     if (content.isEmpty || _isSending) return;
 
+    // 检查报价金额是否变化（仅 TRADE 会话）
+    final int? newAmountFen = _parseAmountFen(_amountController.text.trim());
+    final bool amountChanged = newAmountFen != null && newAmountFen != _lastSentAmount;
+
     setState(() => _isSending = true);
     try {
+      // 金额变化时先发送报价
+      if (amountChanged && _tradeContext != null) {
+        final ctx = _tradeContext!;
+        final repo = ref.read(tradeRepositoryProvider);
+        final quote = Quote(
+          inquiryId: ctx.inquiryId,
+          amount: newAmountFen,
+          licenseType: ctx.licenseType ?? 'non_exclusive',
+          role: ctx.isSeller ? 'seller' : 'buyer',
+        );
+        if (ctx.isSeller) {
+          await repo.appCreateQuote(quote);
+        } else {
+          await repo.appCounterOffer(quote);
+        }
+        _lastSentAmount = newAmountFen;
+        ref.invalidate(latestQuoteProvider(ctx.inquiryId));
+      }
+
       final chatRepo = ref.read(chatRepositoryProvider);
       await chatRepo.sendMessage(widget.sessionId, content);
       _inputController.clear();
@@ -80,6 +109,13 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
+  }
+
+  int? _parseAmountFen(String text) {
+    if (text.isEmpty) return null;
+    final yuan = double.tryParse(text);
+    if (yuan == null || yuan <= 0) return null;
+    return (yuan * 100).round();
   }
 
   Future<void> _reopenSession() async {
@@ -125,6 +161,13 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           isSeller = inquiry.sellerId == currentUserId;
           budget = inquiry.budget;
           licenseType = inquiry.licenseType;
+          // 缓存交易上下文供发送消息时使用
+          _tradeContext = _TradeContext(
+            inquiryId: inquiryId,
+            isBuyer: isBuyer,
+            isSeller: isSeller,
+            licenseType: licenseType,
+          );
         },
       );
     }
@@ -149,6 +192,13 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             ),
           // 消息列表
           Expanded(child: _buildMessageList(messagesAsync, currentUserId)),
+          // 底部报价输入卡片（仅 TRADE 会话显示）
+          if (isTrade && inquiryId != null)
+            QuoteInputCard(
+              inquiryId: inquiryId,
+              amountController: _amountController,
+              budget: budget,
+            ),
           // 输入区（TRADE 会话用定型文按钮，ADMIN 会话用文本输入）
           _buildInputArea(messagesAsync, isTrade, inquiryId, isBuyer, isSeller, licenseType),
         ],
@@ -331,6 +381,21 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       ],
     );
   }
+}
+
+/// 交易会话上下文（缓存询盘ID和角色信息，供发送消息时判断是否需要更新报价）
+class _TradeContext {
+  final int inquiryId;
+  final bool isBuyer;
+  final bool isSeller;
+  final String? licenseType;
+
+  const _TradeContext({
+    required this.inquiryId,
+    required this.isBuyer,
+    required this.isSeller,
+    this.licenseType,
+  });
 }
 
 /// 消息气泡

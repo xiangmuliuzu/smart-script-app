@@ -269,6 +269,14 @@ class _MessageTile extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                         ),
+                      // 交易通知可直达业务页：列表先行提示
+                      if (item.type == 'TRANSACTION' &&
+                          (item.businessId ?? '').isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 6),
+                          child: Icon(Icons.open_in_new,
+                              size: 14, color: AppColors.primary),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
