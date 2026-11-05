@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../core/network/friendly_error.dart';
 import '../../core/theme/app_colors.dart';
 
 /// 材料预览页面（支持图片、文本；PDF 直链 WebView；Office 引导本地下载）。
@@ -118,7 +119,8 @@ class _MaterialPreviewPageState extends State<MaterialPreviewPage> {
       final response = await http.get(Uri.parse(widget.materialUrl));
       if (response.statusCode != 200) {
         setState(() {
-          _errorMessage = '加载失败: HTTP ${response.statusCode}';
+          _errorMessage = FriendlyError.messageForStatus(response.statusCode)
+              ?? FriendlyError.serverBusy;
           _isLoading = false;
         });
         return;
@@ -127,7 +129,7 @@ class _MaterialPreviewPageState extends State<MaterialPreviewPage> {
       final contentType = response.headers['content-type'] ?? '';
       if (contentType.contains('application/json')) {
         setState(() {
-          _errorMessage = '材料地址无效或无权限，请稍后重试';
+          _errorMessage = '材料暂时无法访问，请稍后重试';
           _isLoading = false;
         });
         return;
@@ -139,7 +141,7 @@ class _MaterialPreviewPageState extends State<MaterialPreviewPage> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = '加载失败: $e';
+        _errorMessage = FriendlyError.message(e);
         _isLoading = false;
       });
     }

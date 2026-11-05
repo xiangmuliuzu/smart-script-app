@@ -57,7 +57,7 @@ void main() {
     await _openSettings(tester, api);
     await tester.tap(find.text('验证并删除'));
     await tester.pumpAndSettle();
-    expect(find.text('请输入正确格式的短信验证码'), findsOneWidget);
+    expect(find.text('请输入正确格式的验证码'), findsOneWidget);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);

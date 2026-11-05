@@ -233,14 +233,14 @@ void main() {
   test('认证错误码显示对应中文提示', () {
     expect(
         AuthFeedback.apiMessage(ApiException('sms code invalid', code: 40001)),
-        '验证码错误');
+        '验证码错误，请重新输入');
     expect(
         AuthFeedback.apiMessage(ApiException('sms code expired', code: 40002)),
-        '验证码已失效，请重新获取');
+        '验证码已过期，请重新获取');
     expect(
         AuthFeedback.passwordLoginError(
             ApiException('invalid request', code: 40000)),
-        '账号或密码错误');
+        '手机号或密码错误，请重试');
   });
 
   testWidgets('邮箱找回密码发送对应场景验证码', (tester) async {
@@ -477,7 +477,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('账号或密码错误'), findsOneWidget);
+      expect(find.text('手机号或密码错误，请重试'), findsOneWidget);
     });
 
     testWidgets('账号禁用（40301）：展示中文禁用提示，不出现英文 account disabled', (tester) async {

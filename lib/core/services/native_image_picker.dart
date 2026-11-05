@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import '../network/friendly_error.dart';
+
 /// 平台原生图片选择（A5 头像上传用）。
 ///
 /// 不引入第三方 picker 插件：Android 侧 [MainActivity] 用系统选择器取图，
@@ -22,7 +24,8 @@ class NativeImagePicker {
     try {
       path = await _channel.invokeMethod<String>('pickImage');
     } on PlatformException catch (e) {
-      throw NativeImageException(e.message ?? '无法打开图片选择器');
+      throw NativeImageException(
+          FriendlyError.sanitizeOrNull(e.message) ?? '暂时无法打开图片选择器，请稍后再试');
     } on MissingPluginException {
       // 非 Android 平台（如桌面调试）未注册该通道
       throw NativeImageException('当前平台不支持图片选择');

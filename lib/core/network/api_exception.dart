@@ -15,5 +15,5 @@ class ApiException implements Exception {
   final dynamic data;
 
   @override
-  String toString() => 'ApiException(code: $code, message: $message)';
+  String toString() => message;
 }

@@ -47,7 +47,7 @@ class AuthRepository {
       }
     }
     if (acceptances.length < 2) {
-      throw ApiException('协议版本获取失败，请稍后重试');
+      throw ApiException('协议加载失败，请稍后重试');
     }
     _agreementAcceptances = acceptances;
     return acceptances;
@@ -191,7 +191,7 @@ class AuthRepository {
     final session = data;
     final access = session == null ? null : session['token'] as String?;
     if (access == null || access.isEmpty || session == null) {
-      throw ApiException('登录失败：响应缺少会话');
+      throw ApiException('登录失败，请稍后重试');
     }
     return AuthSession.fromJson(session);
   }

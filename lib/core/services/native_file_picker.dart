@@ -76,7 +76,7 @@ class NativeFilePicker {
       throw NativeFileException('无法读取文件');
     } catch (e) {
       if (e is NativeFileException) rethrow;
-      throw NativeFileException('选择文件失败: ${e.toString()}');
+      throw NativeFileException('选择文件失败，请重新选择');
     }
   }
 

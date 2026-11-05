@@ -536,7 +536,7 @@ void main() {
       final api = ScriptedApi();
       api.handle('/users/me/profile', (req) {
         if (req.method == 'PUT') {
-          return Envelope.fail(40000, 'bio too long');
+          return Envelope.fail(40000, '个人简介过长，请精简后重试');
         }
         return Envelope.ok({
           'userId': 601, 'userType': '01', 'nickname': '剧本小王',
@@ -551,7 +551,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.textContaining('bio too long'), findsWidgets,
+      expect(find.textContaining('个人简介过长'), findsWidgets,
           reason: '应展示服务端错误信息');
       expect(repo.meCalls, 0, reason: '保存失败不得刷新全局资料');
       expect(find.byType(ProfileEditPage), findsOneWidget, reason: '失败不应退出编辑页');

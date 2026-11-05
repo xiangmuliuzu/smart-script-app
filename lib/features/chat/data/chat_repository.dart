@@ -157,6 +157,6 @@ class ChatRepository {
   Map<String, dynamic> _mapParser(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return Map<String, dynamic>.from(raw);
-    throw ApiException('响应格式错误');
+    throw ApiException('服务暂时不可用，请稍后再试');
   }
 }

@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import 'api_exception.dart';
 import 'api_response.dart';
+import 'friendly_error.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'session_events.dart';
 
@@ -117,11 +118,14 @@ class ApiClient {
       );
       if (resp.statusCode == 401) {
         SessionEvents.instance.sessionExpired();
-        throw ApiException('登录状态已过期，请重新登录', code: 401);
+        throw ApiException(FriendlyError.loginExpired, code: 401);
       }
       final body = resp.data;
       if (body == null) {
-        throw ApiException('响应格式错误', code: resp.statusCode);
+        throw ApiException(
+          FriendlyError.messageForStatus(resp.statusCode) ?? FriendlyError.serverBusy,
+          code: resp.statusCode,
+        );
       }
       return body;
     } on DioException catch (e) {
@@ -187,12 +191,15 @@ class ApiClient {
       // HTTP 层 401：登录态失效
       if (resp.statusCode == 401) {
         SessionEvents.instance.sessionExpired();
-        throw ApiException('登录状态已过期，请重新登录', code: 401);
+        throw ApiException(FriendlyError.loginExpired, code: 401);
       }
 
       final body = resp.data;
       if (body is! Map) {
-        throw ApiException('响应格式错误', code: resp.statusCode);
+        throw ApiException(
+          FriendlyError.messageForStatus(resp.statusCode) ?? FriendlyError.serverBusy,
+          code: resp.statusCode,
+        );
       }
 
       final apiResp = ApiResponse<T>.fromJson(
@@ -214,7 +221,11 @@ class ApiClient {
           SessionEvents.instance.sessionExpired();
         }
         throw ApiException(
-          apiResp.message.isEmpty ? '请求失败' : apiResp.message,
+          FriendlyError.message(
+            ApiException(apiResp.message, code: apiResp.code),
+            status: resp.statusCode,
+            code: apiResp.code,
+          ),
           code: apiResp.code,
           data: apiResp.data,
         );
@@ -234,15 +245,24 @@ class ApiClient {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return '网络超时，请稍后重试';
+        return FriendlyError.timeout;
       case DioExceptionType.connectionError:
-        return '网络连接失败，请检查网络或后端地址';
+        return FriendlyError.network;
       case DioExceptionType.badCertificate:
-        return '安全证书校验失败';
+        return FriendlyError.network;
       case DioExceptionType.cancel:
-        return '请求已取消';
+        return '操作已取消';
+      case DioExceptionType.badResponse:
+        final data = e.response?.data;
+        if (data is Map) {
+          final raw = data['msg'] ?? data['message'];
+          final safe = FriendlyError.sanitizeOrNull(raw?.toString());
+          if (safe != null) return safe;
+        }
+        return FriendlyError.messageForStatus(e.response?.statusCode)
+            ?? FriendlyError.serverBusy;
       default:
-        return '网络异常，请稍后重试';
+        return FriendlyError.network;
     }
   }
 }

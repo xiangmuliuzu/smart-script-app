@@ -392,6 +392,6 @@ class AiRepository {
   static Map<String, dynamic> _map(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return raw.map((key, value) => MapEntry('$key', value));
-    throw ApiException('AI 数据响应无效');
+    throw ApiException('服务暂时不可用，请稍后再试');
   }
 }
