@@ -21,11 +21,19 @@ class _MyIncomeSettleDetailPageState
   bool _busy = false;
 
   Future<void> _confirm() async {
+    // 抽成比例取后端下发值，不写死百分比
+    final rateLabel = ref.read(myIncomeOverviewProvider).maybeWhen(
+          data: (o) => o.splitRateLabel,
+          orElse: () => '-',
+        );
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('确认入账'),
-        content: const Text('确认后将按订单总额扣除 5% 平台抽成，剩余作者实得进入可提现余额，并写入收益明细。'),
+        content: Text(
+          '确认后${rateLabel == '-' ? '' : '（已扣 $rateLabel 平台抽成）'}'
+          '作者实得将进入可提现余额，并写入收益明细。',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确认')),
@@ -141,26 +149,36 @@ class _MyIncomeSettleDetailPageState
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text('作者实得（已扣 5% 平台抽成，确认后到账）',
-                        style: TextStyle(fontSize: 12, color: AppColors.text3)),
+                    Text('作者实得（已扣 ${d.splitRateLabel} 平台抽成，确认后到账）',
+                        style: const TextStyle(fontSize: 12, color: AppColors.text3)),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
-              _card('订单与分成', [
+              _card(d.fromDemandStage ? '任务轮次与分成' : '订单与分成', [
                 _kv('结算单号', d.settleNo ?? '-'),
-                _kv('订单号', d.orderNo ?? '-'),
-                _kv('作品', d.workTitle ?? '-'),
-                _kv('订单总额', d.fenYuan(d.totalAmount)),
+                if (d.fromDemandStage) ...[
+                  _kv('来源', d.sourceLabel),
+                  _kv('任务编号', d.refNo ?? '-'),
+                  _kv('验收轮次', d.roundLabel ?? '-'),
+                ] else ...[
+                  _kv('订单号', d.orderNo ?? '-'),
+                ],
+                _kv(d.fromDemandStage ? '作品/任务' : '作品', d.workTitle ?? '-'),
+                _kv(d.fromDemandStage ? '本轮金额' : '订单总额', d.fenYuan(d.totalAmount)),
                 _kv('平台抽成', d.fenYuan(d.platformFee)),
                 _kv('抽成比例', d.splitRateLabel),
                 _kv('作者实得', d.fenYuan(d.sellerAmount)),
                 _kv('创建时间', d.createdAt ?? '-'),
               ]),
               const SizedBox(height: 12),
-              const Text(
-                '说明：订单完成后先进入待结算。平台按订单总额抽取 5%，作者实得 = 订单总额 − 平台抽成。仅在卖家确认无误后入账。',
-                style: TextStyle(fontSize: 12, color: AppColors.text3, height: 1.4),
+              Text(
+                d.fromDemandStage
+                    ? '说明：任务每轮验收通过后放出本轮款项，先进入待结算。平台按本轮金额抽取 ${d.splitRateLabel}，'
+                        '作者实得 = 本轮金额 − 平台抽成。仅在卖家确认无误后入账。'
+                    : '说明：订单完成后先进入待结算。平台按订单总额抽取 ${d.splitRateLabel}，'
+                        '作者实得 = 订单总额 − 平台抽成。仅在卖家确认无误后入账。',
+                style: const TextStyle(fontSize: 12, color: AppColors.text3, height: 1.4),
               ),
               if (d.status == 'disputed' && d.disputeReason != null) ...[
                 const SizedBox(height: 12),

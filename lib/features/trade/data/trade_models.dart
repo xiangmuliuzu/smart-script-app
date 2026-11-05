@@ -678,11 +678,13 @@ class BillRecord {
   final DateTime? createdAt;
   final String? orderNo;
   final String? workTitle;
+  /// 验收轮次（仅 relatedType=demand_stage 的任务逐轮放款有值）
+  final int? stageOrder;
 
   BillRecord({
     this.billId, this.billNo, this.billType, this.amount, this.balanceAfter,
     this.relatedType, this.relatedId, this.remark, this.createdAt,
-    this.orderNo, this.workTitle,
+    this.orderNo, this.workTitle, this.stageOrder,
   });
 
   factory BillRecord.fromJson(Map<String, dynamic> json) {
@@ -698,6 +700,7 @@ class BillRecord {
       createdAt: _parseDateTime(json['createdAt']),
       orderNo: json['orderNo'] as String?,
       workTitle: json['workTitle'] as String?,
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
     );
   }
 
@@ -709,13 +712,19 @@ class BillRecord {
 
   String get typeLabel {
     switch (billType) {
-      case 'income': return '订单收入';
+      case 'income': return fromDemandStage ? '任务轮次收益' : '订单收入';
       case 'withdraw': return '提现支出';
       case 'freeze': return '冻结';
       case 'settle': return '结算';
       default: return billType ?? '未知';
     }
   }
+
+  /// 该笔收入是否来自征集任务的逐轮放款。
+  bool get fromDemandStage => relatedType == 'demand_stage';
+
+  /// 任务轮次副标题片段，例如「第2轮」。
+  String? get roundLabel => stageOrder != null ? '第$stageOrder轮' : null;
 }
 
 /// 资金托管汇总数据

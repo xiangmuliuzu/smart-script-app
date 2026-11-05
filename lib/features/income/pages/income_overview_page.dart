@@ -7,6 +7,11 @@ import '../../../core/theme/app_colors.dart';
 import '../data/income_models.dart';
 import '../data/income_providers.dart';
 
+/// 待结算入口副标题：抽成比例由后端下发（比例一变文案自动跟随），拿不到时不编造百分比。
+String _settleSubtitle(String rateLabel) => rateLabel == '-'
+    ? '平台按比例抽成，确认无误后收益才会到账'
+    : '平台抽成 $rateLabel，确认无误后收益才会到账';
+
 /// 我的收益 · 总览页。
 class MyIncomeOverviewPage extends ConsumerWidget {
   const MyIncomeOverviewPage({super.key});
@@ -53,7 +58,7 @@ class MyIncomeOverviewPage extends ConsumerWidget {
                 data: (data) => _SubEntryCard(
                   icon: Icons.pending_actions_outlined,
                   title: '待结算',
-                  subtitle: '平台抽成 5%，确认无误后收益才会到账',
+                  subtitle: _settleSubtitle(data.splitRateLabel),
                   color: Colors.orange,
                   badgeCount: data.pendingSettleCount,
                   onTap: () => context.push(RoutePath.myIncomeSettleList),
@@ -61,7 +66,7 @@ class MyIncomeOverviewPage extends ConsumerWidget {
                 orElse: () => _SubEntryCard(
                   icon: Icons.pending_actions_outlined,
                   title: '待结算',
-                  subtitle: '平台抽成 5%，确认无误后收益才会到账',
+                  subtitle: _settleSubtitle('-'),
                   color: Colors.orange,
                   onTap: () => context.push(RoutePath.myIncomeSettleList),
                 ),

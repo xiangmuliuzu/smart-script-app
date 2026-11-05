@@ -23,6 +23,11 @@ class _MyIncomeSettleListPageState extends ConsumerState<MyIncomeSettleListPage>
   Widget build(BuildContext context) {
     final params = SettleListParams(status: _status);
     final asyncData = ref.watch(settleListProvider(params));
+    // 抽成比例单一来源：取后端总览下发的 splitRate，不写死百分比
+    final rateLabel = ref.watch(myIncomeOverviewProvider).maybeWhen(
+          data: (o) => o.splitRateLabel,
+          orElse: () => '-',
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -44,9 +49,10 @@ class _MyIncomeSettleListPageState extends ConsumerState<MyIncomeSettleListPage>
                   color: const Color(0xFFFFF7E6),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  '平台抽成 5%：订单完成后生成待结算记录，按订单总额扣除 5% 平台费用，剩余为作者实得。核对无误并确认后才会入账。',
-                  style: TextStyle(fontSize: 12, color: Color(0xFFAD6800), height: 1.4),
+                child: Text(
+                  '平台抽成 ${rateLabel == '-' ? '按比例' : rateLabel}：'
+                  '任务每轮验收通过或订单完成后生成待结算记录，按金额扣除平台费用，剩余为作者实得。核对无误并确认后才会入账。',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFFAD6800), height: 1.4),
                 ),
               ),
             ),
@@ -159,7 +165,7 @@ class _SettleTile extends StatelessWidget {
                     Text(
                       item.workTitle?.isNotEmpty == true
                           ? item.workTitle!
-                          : (item.orderNo ?? item.settleNo ?? '结算单'),
+                          : (item.refNo ?? item.settleNo ?? '结算单'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.text1,
@@ -167,7 +173,9 @@ class _SettleTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${item.orderNo ?? '-'} · ${item.statusLabel}',
+                      '${item.refNo ?? '-'}'
+                      '${item.roundLabel != null ? ' · ${item.roundLabel}' : ''}'
+                      ' · ${item.statusLabel}',
                       style: const TextStyle(fontSize: 13, color: AppColors.text2),
                     ),
                     if (item.createdAt != null)

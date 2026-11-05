@@ -64,20 +64,26 @@ class _IncomeOverviewPageState extends ConsumerState<IncomeOverviewPage> {
         final monthIncome = _formatYuan(data['monthIncome']);
         final available = _formatYuan(data['availableAmount']);
         final frozen = _formatYuan(data['frozenAmount']);
+        // 任务每轮验收通过后放出的款项先进待结算，作者确认后才进入可提现，
+        // 因此待结算必须在本页可见，否则验收完收益页看不出钱已放出。
+        final pending = _formatYuan(data['pendingSettleAmount']);
+        final pendingCount = (data['pendingSettleCount'] as num?)?.toInt() ?? 0;
         return _OverviewCard(
           totalIncome: totalIncome,
           monthIncome: monthIncome,
           available: available,
           frozen: frozen,
+          pendingSettle: pending,
+          pendingSettleCount: pendingCount,
         );
       },
       loading: () => const _OverviewCard(
         totalIncome: '...', monthIncome: '...',
-        available: '...', frozen: '...',
+        available: '...', frozen: '...', pendingSettle: '...',
       ),
-      error: (e, _) => _OverviewCard(
+      error: (e, _) => const _OverviewCard(
         totalIncome: '--', monthIncome: '--',
-        available: '--', frozen: '--',
+        available: '--', frozen: '--', pendingSettle: '--',
       ),
     );
   }
@@ -132,8 +138,11 @@ class _IncomeOverviewPageState extends ConsumerState<IncomeOverviewPage> {
 
 class _OverviewCard extends StatelessWidget {
   final String totalIncome, monthIncome, available, frozen;
+  final String pendingSettle;
+  final int pendingSettleCount;
   const _OverviewCard({required this.totalIncome, required this.monthIncome,
-    required this.available, required this.frozen});
+    required this.available, required this.frozen, required this.pendingSettle,
+    this.pendingSettleCount = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +170,24 @@ class _OverviewCard extends StatelessWidget {
             children: [
               _StatItem(label: '可提现', value: available),
               _StatItem(label: '冻结金额', value: frozen),
+            ],
+          ),
+          const Divider(color: Colors.white24, height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _StatItem(
+                label: pendingSettleCount > 0
+                    ? '待结算（$pendingSettleCount 笔）'
+                    : '待结算',
+                value: pendingSettle,
+              ),
+              const Text(
+                '验收通过后本轮款项先入待结算\n确认后才计入可提现',
+                textAlign: TextAlign.right,
+                style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+              ),
             ],
           ),
         ],
@@ -208,7 +235,11 @@ class _BillRecordItem extends StatelessWidget {
         ),
         title: Text(record.typeLabel, style: const TextStyle(fontWeight: FontWeight.w500)),
         subtitle: Text(
-          [record.workTitle, record.orderNo].where((s) => s != null && s.isNotEmpty).join(' · '),
+          [
+            record.workTitle,
+            record.roundLabel,
+            record.orderNo,
+          ].where((s) => s != null && s.isNotEmpty).join(' · '),
           style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
         trailing: Column(

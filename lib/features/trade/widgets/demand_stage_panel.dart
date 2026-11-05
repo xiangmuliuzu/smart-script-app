@@ -216,7 +216,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                       if (s.releaseFlag == 1) ...[
                         const SizedBox(width: 6),
                         Flexible(
-                          child: Text('已放款¥${amountYuan.toStringAsFixed(2)}（记账归创作者）',
+                          child: Text('已放款¥${amountYuan.toStringAsFixed(2)}（已入创作者待结算）',
                               style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
                         ),
                       ],

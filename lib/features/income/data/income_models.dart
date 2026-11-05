@@ -13,6 +13,7 @@ class IncomeOverview {
     this.frozenAmount = 0,
     this.monthIncome = 0,
     this.pendingSettleCount = 0,
+    this.splitRate,
   });
 
   final double totalIncome;
@@ -23,6 +24,9 @@ class IncomeOverview {
   final double monthIncome;
   final int pendingSettleCount;
 
+  /// 平台抽成比例（后端 PLATFORM_SPLIT_RATE 单一来源，如 0.05）。旧接口无此字段时为 null。
+  final num? splitRate;
+
   factory IncomeOverview.fromJson(Map<String, dynamic> json) {
     return IncomeOverview(
       totalIncome: _toYuan(json['totalIncome']),
@@ -32,6 +36,7 @@ class IncomeOverview {
       frozenAmount: _toYuan(json['frozenAmount']),
       monthIncome: _toYuan(json['monthIncome']),
       pendingSettleCount: (json['pendingSettleCount'] as num?)?.toInt() ?? 0,
+      splitRate: json['splitRate'] as num?,
     );
   }
 
@@ -40,6 +45,9 @@ class IncomeOverview {
     if (value is num) return value.toDouble();
     return double.tryParse(value.toString()) ?? 0;
   }
+
+  /// 抽成比例文案，比例变动时自动跟随（0.05 → 5%）。
+  String get splitRateLabel => formatSplitRate(splitRate);
 }
 
 /// 收入/提现周期统计。金额单位：元。
@@ -83,6 +91,7 @@ class IncomeDetailItem {
     this.workTitle,
     this.remark,
     this.createdAt,
+    this.stageOrderRaw,
   });
 
   final int? billId;
@@ -96,6 +105,8 @@ class IncomeDetailItem {
   final String? workTitle;
   final String? remark;
   final DateTime? createdAt;
+  /// 后端 stageOrder 原始值（任务逐轮放款才有）
+  final int? stageOrderRaw;
 
   factory IncomeDetailItem.fromJson(Map<String, dynamic> json) {
     return IncomeDetailItem(
@@ -109,6 +120,7 @@ class IncomeDetailItem {
       orderNo: json['orderNo'] as String?,
       workTitle: json['workTitle'] as String?,
       remark: json['remark'] as String?,
+      stageOrderRaw: (json['stageOrder'] as num?)?.toInt(),
       createdAt: _parseDateTime(json['createdAt']),
     );
   }
@@ -119,17 +131,26 @@ class IncomeDetailItem {
     return '$prefix¥${(amount! / 100).toStringAsFixed(2)}';
   }
 
-  String get sourceLabel => incomeSource ?? _fallbackSource(billType);
+  String get sourceLabel => incomeSource ?? (fromDemandStage
+      ? '任务轮次收益'
+      : _fallbackSource(billType));
 
   String get orderSummary {
-    final parts = <String>[
-      if (orderNo != null && orderNo!.isNotEmpty) orderNo!,
-      if (workTitle != null && workTitle!.isNotEmpty) workTitle!,
-    ];
+    final parts = <String>[if (orderNo != null && orderNo!.isNotEmpty) orderNo!];
+    if (workTitle != null && workTitle!.isNotEmpty) {
+      parts.add(fromDemandStage ? '$workTitle（第$stageOrder轮）' : workTitle!);
+    }
     if (parts.isNotEmpty) return parts.join(' · ');
+    if (fromDemandStage) return relatedId != null ? '任务轮次#$relatedId' : '任务轮次收益';
     if (relatedType == 'order' && relatedId != null) return '订单#$relatedId';
     return '无关联订单';
   }
+
+  /// 账单是否来自征集任务的逐轮放款（后端 related_type='demand_stage'）。
+  bool get fromDemandStage => relatedType == 'demand_stage';
+
+  /// 轮次序号，仅任务轮次账单有值。
+  int? get stageOrder => (relatedType == 'demand_stage') ? stageOrderRaw : null;
 
   static String _fallbackSource(String? billType) {
     switch (billType) {
@@ -169,6 +190,7 @@ class IncomeBillDetail {
     this.sellerAmount,
     this.payTime,
     this.completeTime,
+    this.stageOrderRaw,
   });
 
   final int? billId;
@@ -190,6 +212,8 @@ class IncomeBillDetail {
   final int? sellerAmount;
   final String? payTime;
   final String? completeTime;
+  /// 后端 stageOrder 原始值（任务逐轮放款才有）
+  final int? stageOrderRaw;
 
   factory IncomeBillDetail.fromJson(Map<String, dynamic> json) {
     return IncomeBillDetail(
@@ -212,6 +236,7 @@ class IncomeBillDetail {
       sellerAmount: (json['sellerAmount'] as num?)?.toInt(),
       payTime: json['payTime']?.toString(),
       completeTime: json['completeTime']?.toString(),
+      stageOrderRaw: (json['stageOrder'] as num?)?.toInt(),
     );
   }
 
@@ -223,6 +248,14 @@ class IncomeBillDetail {
   String get splitRateLabel => formatSplitRate(splitRate);
 
   bool get hasOrder => orderNo != null && orderNo!.isNotEmpty;
+
+  /// 账单是否来自征集任务的逐轮放款。
+  bool get fromDemandStage => relatedType == 'demand_stage';
+
+  /// 轮次序号，仅任务轮次账单有值。
+  int? get stageOrder => fromDemandStage ? stageOrderRaw : null;
+
+  String? get roundLabel => stageOrder != null ? '第$stageOrder轮' : null;
 }
 
 /// 待结算单。金额单位：分。
@@ -230,8 +263,13 @@ class IncomeSettleItem {
   const IncomeSettleItem({
     this.settleId,
     this.settleNo,
+    this.bizType,
     this.orderId,
     this.orderNo,
+    this.bizNo,
+    this.demandId,
+    this.stageId,
+    this.stageOrder,
     this.workTitle,
     this.totalAmount,
     this.platformFee,
@@ -247,8 +285,17 @@ class IncomeSettleItem {
 
   final int? settleId;
   final String? settleNo;
+
+  /// 结算来源：order=订单成单，demand_stage=任务逐轮放款（后端 biz_type）。
+  final String? bizType;
   final int? orderId;
   final String? orderNo;
+
+  /// 业务单号快照：任务行存征集任务号，订单行为空。
+  final String? bizNo;
+  final int? demandId;
+  final int? stageId;
+  final int? stageOrder;
   final String? workTitle;
   final int? sellerAmount;
   final int? totalAmount;
@@ -265,8 +312,13 @@ class IncomeSettleItem {
     return IncomeSettleItem(
       settleId: (json['settleId'] as num?)?.toInt(),
       settleNo: json['settleNo'] as String?,
+      bizType: json['bizType'] as String?,
       orderId: (json['orderId'] as num?)?.toInt(),
       orderNo: json['orderNo'] as String?,
+      bizNo: json['bizNo'] as String?,
+      demandId: (json['demandId'] as num?)?.toInt(),
+      stageId: (json['stageId'] as num?)?.toInt(),
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
       workTitle: json['workTitle'] as String?,
       totalAmount: (json['totalAmount'] as num?)?.toInt(),
       platformFee: (json['platformFee'] as num?)?.toInt(),
@@ -280,6 +332,20 @@ class IncomeSettleItem {
       createdAt: json['createdAt'] as String?,
     );
   }
+
+  /// 任务逐轮放款单（无关联订单）。
+  bool get fromDemandStage => bizType == 'demand_stage';
+
+  /// 来源文案：让作者一眼分清是订单货款还是任务验收款。
+  String get sourceLabel => fromDemandStage ? '任务逐轮放款' : '订单结算';
+
+  /// 可辨识的单号槽位：订单行走订单号，任务行走征集任务号。
+  String? get refNo => (orderNo != null && orderNo!.isNotEmpty)
+      ? orderNo
+      : (bizNo != null && bizNo!.isNotEmpty ? bizNo : null);
+
+  /// 轮次文案，非任务单为空。
+  String? get roundLabel => stageOrder != null ? '第$stageOrder轮' : null;
 
   String get sellerAmountYuan {
     if (sellerAmount == null) return '-';

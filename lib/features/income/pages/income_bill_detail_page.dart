@@ -44,17 +44,24 @@ class MyIncomeBillDetailPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 _InfoCard(
-                  title: '订单关联',
+                  title: d.fromDemandStage ? '任务轮次关联' : '订单关联',
                   children: d.hasOrder
                       ? [
-                          _kv('订单号', d.orderNo!),
-                          _kv('作品', d.workTitle ?? '-'),
-                          _kv('订单状态', d.orderStatus ?? '-'),
-                          _kv('付款时间', d.payTime ?? '-'),
-                          _kv('完成时间', d.completeTime ?? '-'),
+                          _kv(d.fromDemandStage ? '任务编号' : '订单号', d.orderNo!),
+                          _kv(d.fromDemandStage ? '作品/任务' : '作品', d.workTitle ?? '-'),
+                          if (d.fromDemandStage) ...[
+                            _kv('验收轮次', d.roundLabel ?? '-'),
+                          ] else ...[
+                            _kv('订单状态', d.orderStatus ?? '-'),
+                            _kv('付款时间', d.payTime ?? '-'),
+                            _kv('完成时间', d.completeTime ?? '-'),
+                          ],
                         ]
                       : [
-                          const Text('无关联订单', style: TextStyle(color: AppColors.text3)),
+                          Text(
+                            d.fromDemandStage ? '无关联任务轮次' : '无关联订单',
+                            style: const TextStyle(color: AppColors.text3),
+                          ),
                         ],
                 ),
                 if (d.hasOrder) ...[
@@ -62,14 +69,17 @@ class MyIncomeBillDetailPage extends ConsumerWidget {
                   _InfoCard(
                     title: '分成核算',
                     children: [
-                      _kv('订单总额', d.fenYuan(d.totalAmount)),
+                      _kv(d.fromDemandStage ? '本轮金额' : '订单总额', d.fenYuan(d.totalAmount)),
                       _kv('平台抽成', d.fenYuan(d.platformFee)),
                       _kv('抽成比例', d.splitRateLabel),
                       _kv('作者实得', d.fenYuan(d.sellerAmount ?? d.amount)),
                       const SizedBox(height: 8),
-                      const Text(
-                        '说明：平台按订单总额抽取 5%，作者实得 = 订单总额 − 平台抽成。入账金额为作者实得。',
-                        style: TextStyle(fontSize: 12, color: AppColors.text3),
+                      Text(
+                        d.fromDemandStage
+                            ? '说明：任务每轮验收通过后放出本轮款项，平台按本轮金额抽取 ${d.splitRateLabel}，'
+                                '作者实得 = 本轮金额 − 平台抽成。入账金额为作者实得。'
+                            : '说明：平台按订单总额抽取 ${d.splitRateLabel}，作者实得 = 订单总额 − 平台抽成。入账金额为作者实得。',
+                        style: const TextStyle(fontSize: 12, color: AppColors.text3),
                       ),
                     ],
                   ),
