@@ -78,6 +78,12 @@ class BookstorePage extends ConsumerWidget {
             const _BannerCarousel(position: 'home_top'),
             const AppCard(
               child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: _CategoryEntries(),
+              ),
+            ),
+            const AppCard(
+              child: Padding(
                 padding: EdgeInsets.only(bottom: 12),
                 child: _RankingPreview(),
               ),
@@ -291,6 +297,82 @@ class _BannerSkeleton extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.r),
             child: Container(color: AppColors.primaryTint),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 首页功能入口快捷栏：当前仅「任务广场」一项，后续可继续往 Wrap 里添。
+///
+/// 这是 C 模块（交易域）在首页的固定入口，与 B 模块的分类栏无关：
+/// 分类栏已随分类页改版为标签墙被移除，本入口不随之删除。
+/// 图标风格参考「我的」页快捷宫格（圆形浅底图标 + 下方文字）。
+class _CategoryEntries extends StatelessWidget {
+  const _CategoryEntries();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 与「我的」页宫格同宽基准：一行四格，未满的行留白在右侧。
+        final cellWidth = constraints.maxWidth / 4;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Wrap(
+            children: [
+              _QuickCell(
+                width: cellWidth,
+                icon: Icons.emoji_events_outlined,
+                label: '任务广场',
+                onTap: () => context.push(RoutePath.demandList),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 首页快捷栏的单个宫格单元：圆形浅底图标 + 单行文字，整格可点。
+class _QuickCell extends StatelessWidget {
+  const _QuickCell({required this.width, required this.icon, required this.label, required this.onTap});
+
+  final double width;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryTint,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 20, color: AppColors.primary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: AppColors.text2),
+              ),
+            ],
           ),
         ),
       ),
