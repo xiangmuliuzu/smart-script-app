@@ -350,7 +350,7 @@ class RankingItem {
   final String cover;
   final String authorName;
 
-  /// 榜单分数：等于当前榜单类型对应的主指标值（累计浏览量 / 近 7 天计数 / 平均评分）。
+  /// 榜单分数：等于当前榜单类型对应的主指标值（累计浏览量 / 累计收藏量 / 平均评分）。
   final double score;
   final int viewCount;
   final int favoriteCount;
@@ -408,7 +408,7 @@ class WorkSortOption {
 /// 榜单类型（App 展示四榜；交易热度榜因剧本通常只交易一次已下线，后端仍兼容 sale 参数）。
 ///
 /// 方案 A「时间窗口 + 分级」，type 与主指标强绑定：
-/// view 热门榜=累计浏览量 / favorite 收藏榜=近 7 天收藏数 /
+/// view 热门榜=累计浏览量 / favorite 收藏榜=累计收藏量 /
 /// rating 评分榜=平均评分 / new 新书榜=近 30 天上架，按上架时间倒序（shelfTime）。
 class RankingType {
   const RankingType(this.code, this.label);

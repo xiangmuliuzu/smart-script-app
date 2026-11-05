@@ -12,7 +12,7 @@ import '../widgets/bookstore_widgets.dart';
 
 /// 作品榜单（B 模块，接口 2.7.7 作品榜单）。
 ///
-/// 公开页，游客可读。四个 tab 即后端 type：热门（累计浏览量）/ 收藏（近 7 天收藏）/
+/// 公开页，游客可读。四个 tab 即后端 type：热门（累计浏览量）/ 收藏（累计收藏量）/
 /// 评分（平均评分）/ 新书（近 30 天上架，按上架时间倒序）。
 class RankingPage extends ConsumerStatefulWidget {
   const RankingPage({super.key, this.type});
