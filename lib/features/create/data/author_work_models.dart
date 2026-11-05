@@ -25,6 +25,11 @@ int _int(dynamic value) {
   return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
+int? _intOrNull(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
+}
+
 double? _doubleOrNull(dynamic value) {
   if (value is num) return value.toDouble();
   if (value is String && value.isNotEmpty) return double.tryParse(value);
@@ -81,6 +86,7 @@ class AuthorWorkItem {
     this.price,
     this.status = 'draft',
     this.shelfStatus = '',
+    this.channelId,
     this.createTime,
     this.updateTime,
   });
@@ -103,6 +109,9 @@ class AuthorWorkItem {
   /// 上架开关（后端 sys_work.status：on_shelf / off_shelf）。
   /// 列表接口未下发时为空字符串，调用方按审核状态兜底。
   final String shelfStatus;
+
+  /// 所属频道（146 男频 / 147 女频）；后端未设置时为 null。
+  final int? channelId;
   final String? createTime;
   final String? updateTime;
 
@@ -123,6 +132,7 @@ class AuthorWorkItem {
         price: _doubleOrNull(json['price']),
         status: _text(json['status']).isEmpty ? 'draft' : _text(json['status']),
         shelfStatus: _text(json['shelfStatus']),
+        channelId: _intOrNull(json['channelId']),
         createTime: _textOrNull(json['createTime']),
         updateTime: _textOrNull(json['updateTime']),
       );

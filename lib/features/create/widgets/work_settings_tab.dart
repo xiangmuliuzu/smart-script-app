@@ -17,7 +17,7 @@ import 'work_delete_dialog.dart';
 /// 工作台 Tab2：作品设置。
 ///
 /// 标题 / 简介 / 封面 / 标签走 A 套 `PUT /users/me/works/{workId}`（updateWorkBase），
-/// 其中标签为全量覆盖（接口文档 2.3.3，最多 8 个）；标签墙体系下作品不再设置分类。
+/// 其中标签为全量覆盖（主分类 1 + 主题 2 + 角色 2 + 情节 2，最多 7 个）；标签墙体系下作品不再设置分类。
 /// 定价走 B 套 `PUT /content/works/{workId}`（updateWork，2.9.3 仅放行 price）。
 /// 封面从本地选图，先经 2.9.1 上传拿到 url，保存在「保存」时随基本信息提交。
 /// 编辑闸门：仅审核中锁定，其余状态（含已发布）均可保存；已发布改动后需重新提交审核。
@@ -30,8 +30,8 @@ class WorkSettingsTab extends ConsumerStatefulWidget {
   ConsumerState<WorkSettingsTab> createState() => _WorkSettingsTabState();
 }
 
-/// 作品标签数量上限（接口文档 2.3.3：tagIds 最多 8 个，后端同样按 400 拒绝超限）。
-const int _kMaxWorkTags = 8;
+/// 作品标签数量上限（主分类 1 + 主题 2 + 角色 2 + 情节 2 = 最多 7 个，后端同样按 400 拒绝超限）。
+const int _kMaxWorkTags = 7;
 
 class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
   late final TextEditingController _titleCtrl;
@@ -66,6 +66,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
       text: (price != null && price > 0) ? price.toString() : '',
     );
     _pendingCover = work.cover;
+    _pendingChannelId = work.channelId;
     _tagIds = widget.detail.tags.map((tag) => tag.tagId).toSet();
   }
 
@@ -253,10 +254,24 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _buildChannelBtn(String label, int channelId, bool editable) {
-    final isSelected = (_pendingChannelId ?? 146) == channelId;
+  Widget _buildChannelBtn(
+      String label, int channelId, bool editable, List<TagItem> allTags) {
+    final isSelected = _pendingChannelId == channelId;
     return GestureDetector(
-      onTap: editable ? () => setState(() => _pendingChannelId = channelId) : null,
+      onTap: editable
+          ? () => setState(() {
+                // 切换频道时清掉不属于该频道的已选标签，避免跨频道标签混存
+                if (_pendingChannelId != channelId) {
+                  _tagIds.removeWhere((id) {
+                    final matched = allTags.where((t) => t.tagId == id);
+                    if (matched.isEmpty) return false;
+                    final tag = matched.first;
+                    return tag.channelId != null && tag.channelId != channelId;
+                  });
+                }
+                _pendingChannelId = channelId;
+              })
+          : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
@@ -281,6 +296,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
     final editable = work.editable;
     // 标签库全量启用标签（与分类页同一数据源 GET /content/tags）
     final tagsAsync = ref.watch(tagsProvider);
+    final allTags = tagsAsync.valueOrNull ?? const <TagItem>[];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -390,9 +406,9 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                   children: [
                     const Text('目标读者', style: TextStyle(fontSize: 14)),
                     const Spacer(),
-                    _buildChannelBtn('男频', 146, editable),
+                    _buildChannelBtn('男频', 146, editable, allTags),
                     const SizedBox(width: 12),
-                    _buildChannelBtn('女频', 147, editable),
+                    _buildChannelBtn('女频', 147, editable, allTags),
                   ],
                 ),
               ),
@@ -542,7 +558,7 @@ class _TagSelector extends StatelessWidget {
   }
 }
 
-/// 标签多选弹窗：全量标签胶囊可多选，最多 [maxCount] 个。
+/// 标签多选弹窗：全量标签胶囊可多选，主分类 1 + 主题 2 + 角色 2 + 情节 2。
 ///
 /// 内部维护临时集合，点「确定」通过 `Navigator.pop` 返回最终结果。
 class _TagPickerResult {
@@ -624,7 +640,9 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
   Widget build(BuildContext context) {
     final currentDim = _dimConfigs[_currentDimIndex];
     final tagsInDim = widget.tags
-        .where((t) => t.tagType == currentDim['type'] && t.channelId == _currentChannelId)
+        .where((t) =>
+            t.tagType == currentDim['type'] &&
+            (t.channelId == _currentChannelId || t.channelId == null))
         .toList();
     final selectedInDim = _selected.where((id) => tagsInDim.any((t) => t.tagId == id)).length;
 

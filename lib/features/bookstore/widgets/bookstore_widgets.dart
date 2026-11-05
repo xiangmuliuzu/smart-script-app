@@ -93,6 +93,7 @@ class WorkCover extends StatelessWidget {
 ///
 /// [tags] 为作品标签（sys_work_tag），可在传入 [onTagTap] 后点击，
 /// 跳转「按该标签筛选的作品列表」；回调为空时仅作展示。标签为空时整块不占位。
+/// [maxCount] 限制展示数量，超出部分折叠为「+N」，避免列表卡片被标签撑高。
 class WorkTagChips extends StatelessWidget {
   const WorkTagChips({
     super.key,
@@ -100,6 +101,7 @@ class WorkTagChips extends StatelessWidget {
     this.onTagTap,
     this.spacing = 6,
     this.fontSize = 11,
+    this.maxCount,
   });
 
   final List<TagItem> tags;
@@ -109,20 +111,35 @@ class WorkTagChips extends StatelessWidget {
   final double spacing;
   final double fontSize;
 
+  /// 最多展示的标签数；null 表示不限制（详情页等宽裕场景）。
+  final int? maxCount;
+
   @override
   Widget build(BuildContext context) {
     if (tags.isEmpty) return const SizedBox.shrink();
+    final limit = maxCount;
+    final visibleTags = (limit == null || tags.length <= limit)
+        ? tags
+        : tags.take(limit).toList();
+    final hiddenCount = tags.length - visibleTags.length;
     return Wrap(
       spacing: spacing,
       runSpacing: spacing,
       children: [
-        for (final tag in tags)
+        for (final tag in visibleTags)
           _WorkChip(
             label: tag.tagName,
             color: AppColors.text2,
             background: AppColors.fill,
             fontSize: fontSize,
             onTap: onTagTap == null ? null : () => onTagTap!(tag),
+          ),
+        if (hiddenCount > 0)
+          _WorkChip(
+            label: '+$hiddenCount',
+            color: AppColors.text3,
+            background: AppColors.fill,
+            fontSize: fontSize,
           ),
       ],
     );
@@ -222,7 +239,7 @@ class WorkListTile extends StatelessWidget {
                   ),
                   if (work.tags.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    WorkTagChips(tags: work.tags),
+                    WorkTagChips(tags: work.tags, maxCount: 3),
                   ],
                   const SizedBox(height: 6),
                   Text(
