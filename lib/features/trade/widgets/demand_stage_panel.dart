@@ -197,7 +197,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                       Text('到第${s.episodeTo}集',
                           style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
                       const Spacer(),
-                      Text('¥${amountYuan.toStringAsFixed(0)}',
+                      // 轮次金额与下方「已放款」同一位（两位），同一面板内不能一个 ¥150 一个 ¥150.00
+                      Text('¥${amountYuan.toStringAsFixed(2)}',
                           style: TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w600, color: _statusColor)),
                     ],

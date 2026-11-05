@@ -212,7 +212,9 @@ class _BudgetBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fen = budgetFen ?? 0;
-    final yuan = (fen / 100).toStringAsFixed(fen % 100 == 0 ? 0 : 2);
+    // 金额一律两位小数：与详情页 budgetYuan、轮次面板、PC 端 fenText 同一口径，
+    // 不能因为“整元就省略小数”让同一列里出现 ¥600 与 ¥600.50 两种位数
+    final yuan = (fen / 100).toStringAsFixed(2);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,

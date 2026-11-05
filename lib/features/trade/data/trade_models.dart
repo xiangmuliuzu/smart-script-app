@@ -936,6 +936,8 @@ class DemandEscrowStatus {
 }
 
 /// 需求任务押金资金状态
+/// 押金是创作者缴的履约保证金，不是发布者托管的预算款，
+/// held 不能译作「已托管」（与 DemandEscrowStatus.escrowed 撞词，页面上就分不出两笔钱）
 class DemandDepositStatus {
   static const String none = 'none';
   static const String held = 'held';
@@ -945,7 +947,7 @@ class DemandDepositStatus {
   static String label(String? status) {
     switch (status) {
       case none: return '未缴';
-      case held: return '已托管';
+      case held: return '在押';
       case refunded: return '已退还';
       case forfeited: return '已没收';
       default: return status ?? '未知';
