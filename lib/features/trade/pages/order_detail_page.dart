@@ -644,8 +644,43 @@ class OrderDetailPage extends ConsumerWidget {
   }
 
   /// 支付宝沙箱：显示二维码，并由服务端向支付宝查询确认。
+  ///
+  /// 付款前置提醒：交易付款后不支持退款，需买方确认后再进入扫码付款。
   Future<void> _payOrder(BuildContext context, WidgetRef ref, Order order) async {
     final id = order.orderId!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Text('付款确认'),
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                size: 20, color: AppColors.warning),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '请注意：本订单付款成功后不支持退款，'
+                '请与卖方确认交易内容无误后再谨慎决定是否付款。\n\n'
+                '付款金额：${order.amountYuan}',
+                style: const TextStyle(fontSize: 13, height: 1.5),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dlgCtx, false),
+              child: const Text('再想想')),
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx, true),
+            child: const Text('确认付款',
+                style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     try {
       final data = await ref.read(tradeRepositoryProvider).appPayOrder(id);
       if (!context.mounted) return;

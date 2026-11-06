@@ -77,6 +77,11 @@ final inquiryDetailProvider = FutureProvider.autoDispose.family<Inquiry, int>(
   (ref, inquiryId) => ref.watch(tradeRepositoryProvider).inquiryDetail(inquiryId),
 );
 
+/// 作品确权状态（按 workId）：驱动发起询盘页是否展示授权类型选择器
+final copyrightStatusProvider = FutureProvider.autoDispose.family<bool, int>(
+  (ref, workId) => ref.watch(tradeRepositoryProvider).getCopyrightStatus(workId),
+);
+
 // ==================== 报价/议价 Providers ====================
 
 /// 报价列表查询参数

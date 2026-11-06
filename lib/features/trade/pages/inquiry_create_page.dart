@@ -15,6 +15,9 @@ void _showError(BuildContext context, String msg) => showAppToast(context, msg);
 ///
 /// 从作品详情页进入，携带 workId 和作品基本信息；
 /// 用户填写授权类型、用途、预算、留言后提交。
+/// <p>
+/// 版权分流：有版权作品需选授权类型（现状）；无版权（未确权）作品隐藏授权类型选择，
+/// 提交 licenseType=null，后续接受报价将跳过合同直接进入付款。
 class InquiryCreatePage extends ConsumerStatefulWidget {
   const InquiryCreatePage({super.key, this.workId, this.workTitle});
 
@@ -62,6 +65,11 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
       );
     }
 
+    // 版权状态：加载中/查询失败保守按「有版权」处理（展示并必选授权类型，
+    // 与后端校验一致；若实为无版权，后端会归一忽略误传值）
+    final copyrighted =
+        ref.watch(copyrightStatusProvider(widget.workId!)).valueOrNull ?? true;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Form(
@@ -73,10 +81,13 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
             _buildWorkInfoCard(),
             const SizedBox(height: 24),
 
-            // 授权类型
-            _buildSectionTitle('授权类型 *'),
+            // 授权类型：仅有版权作品展示选择器；无版权改为免签合同直达付款的提示
+            _buildSectionTitle(copyrighted ? '授权类型 *' : '授权类型'),
             const SizedBox(height: 8),
-            _buildLicenseTypeSelector(),
+            if (copyrighted)
+              _buildLicenseTypeSelector()
+            else
+              _buildNoCopyrightNotice(),
             const SizedBox(height: 16),
 
             // 预期用途
@@ -214,6 +225,31 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
     );
   }
 
+  /// 无版权提示：说明本次交易免选授权类型、免签合同，接受报价后直接付款。
+  Widget _buildNoCopyrightNotice() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.fill,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 16, color: AppColors.text3),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '该作品未完成版权登记发证，无需选择授权类型；'
+              '双方达成报价后将跳过合同签署，直接进入付款流程。',
+              style: TextStyle(fontSize: 12, color: AppColors.text3, height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLicenseTypeSelector() {
     final types = [
       (LicenseType.nonExclusive, '非独家授权'),
@@ -243,6 +279,10 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
     setState(() => _submitting = true);
 
     try {
+      final copyrighted = ref
+              .read(copyrightStatusProvider(widget.workId!))
+              .valueOrNull ??
+          true;
       // 预算转为分
       int? budgetFen;
       if (_budgetController.text.isNotEmpty) {
@@ -254,7 +294,10 @@ class _InquiryCreatePageState extends ConsumerState<InquiryCreatePage> {
 
       final inquiry = Inquiry(
         workId: widget.workId,
-        licenseType: _licenseType,
+        // 无版权作品不提交授权类型（与后端归一口径一致）
+        licenseType: copyrighted
+            ? _licenseType
+            : null,
         intendedUse: _intendedUseController.text.trim(),
         budget: budgetFen,
         message: _messageController.text.trim().isEmpty ? null : _messageController.text.trim(),

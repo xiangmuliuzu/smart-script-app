@@ -290,6 +290,8 @@ class ApiEndpoints {
   static String adminTradeInquiryAccept(int id) => '/trade/inquiry/$id/accept';
   static String adminTradeInquiryReject(int id) => '/trade/inquiry/$id/reject';
   static String adminTradeInquiryClose(int id) => '/trade/inquiry/$id/close';
+  // 作品确权状态（无版权作品：发起询盘不选授权类型，成交后跳过合同直达付款）
+  static const String tradeInquiryCopyrightStatus = '/trade/inquiry/copyright-status';
   // 报价/议价（PC管理端）
   static const String adminTradeQuoteList = '/admin/trade/quote/list';
   static const String adminTradeQuote = '/admin/trade/quote';

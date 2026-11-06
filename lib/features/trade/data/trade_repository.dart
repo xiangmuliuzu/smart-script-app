@@ -115,6 +115,19 @@ class TradeRepository {
     );
   }
 
+  /// 作品确权状态：是否已完成版权登记发证。
+  ///
+  /// true=有版权（发起询盘需选授权类型，成交后走合同签署）；
+  /// false=无版权（不选授权类型，接受报价后跳过合同直达付款）。
+  Future<bool> getCopyrightStatus(int workId) async {
+    final copyrighted = await _api.get<bool>(
+      ApiEndpoints.tradeInquiryCopyrightStatus,
+      query: {'workId': workId},
+      parser: (raw) => raw == true,
+    );
+    return copyrighted ?? false;
+  }
+
   // ==================== 报价/议价 ====================
 
   /// 报价列表（分页）。
