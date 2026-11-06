@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -144,6 +146,12 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     final isTrade = sessionAsync.whenOrNull(
       data: (s) => s.session.sessionType == SessionType.trade,
     ) ?? false;
+    final isDemand = sessionAsync.whenOrNull(
+      data: (s) => s.session.sessionType == SessionType.demand,
+    ) ?? false;
+    final demandId = sessionAsync.whenOrNull(
+      data: (s) => s.session.businessId,
+    );
     final inquiryId = sessionAsync.whenOrNull(
       data: (s) => s.session.inquiryId,
     );
@@ -178,6 +186,22 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
+        actions: [
+          // 任务会话：右上角跳转任务详情
+          if (isDemand && demandId != null)
+            IconButton(
+              icon: const Icon(Icons.assignment_outlined),
+              tooltip: '查看任务详情',
+              onPressed: () => context.push(RoutePath.demandDetailUrl(demandId)),
+            ),
+          // 交易会话：右上角跳转询盘详情
+          if (isTrade && inquiryId != null)
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: '查看询盘详情',
+              onPressed: () => context.push('${RoutePath.inquiryDetail}?id=$inquiryId'),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -200,16 +224,47 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
               budget: budget,
             ),
           // 输入区（TRADE 会话用定型文按钮，ADMIN 会话用文本输入）
-          _buildInputArea(messagesAsync, isTrade, inquiryId, isBuyer, isSeller, licenseType),
+          _buildInputArea(sessionAsync, messagesAsync, isTrade, inquiryId, isBuyer, isSeller, licenseType),
         ],
       ),
     );
   }
 
   Widget _buildTitle(AsyncValue<ChatSessionWithPeer> sessionAsync) {
-    // 从会话详情取对方名称
     final peerName = sessionAsync.whenOrNull(data: (s) => s.peerName);
-    return Text(peerName ?? '聊天');
+    final subtitle = sessionAsync.whenOrNull(
+      data: (s) => _sessionSourceLabel(s.session),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(peerName ?? '聊天', style: const TextStyle(fontSize: 17)),
+        if (subtitle != null)
+          Text(subtitle,
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+      ],
+    );
+  }
+
+  /// 根据会话类型与业务名称生成来源描述小字，显示具体是哪个交易/任务。
+  String _sessionSourceLabel(ChatSession session) {
+    final name = session.businessName;
+    switch (session.sessionType) {
+      case SessionType.trade:
+        if (name != null && name.isNotEmpty) return '交易：《$name》';
+        return '交易沟通';
+      case SessionType.demand:
+        if (name != null && name.isNotEmpty) return '任务：《$name》';
+        return '任务沟通';
+      case SessionType.admin:
+      case SessionType.chat:
+        if (name != null && name.isNotEmpty) return name;
+        return '平台客服';
+      default:
+        if (name != null && name.isNotEmpty) return name;
+        return '会话沟通';
+    }
   }
 
   Widget _buildMessageList(
@@ -258,6 +313,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   }
 
   Widget _buildInputArea(
+    AsyncValue<ChatSessionWithPeer> sessionAsync,
     AsyncValue<PagedData<ChatMessage>> messagesAsync,
     bool isTrade,
     int? inquiryId,
@@ -265,14 +321,14 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     bool isSeller,
     String? licenseType,
   ) {
-    // 检查会话是否已结束
-    final isClosed = messagesAsync.whenOrNull(
-      data: (_) => false, // 简化：假设会话未结束
+    // 从会话详情判断是否已结束
+    final isClosed = sessionAsync.whenOrNull(
+      data: (s) => s.session.isClosed,
     ) ?? false;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.card,
         border: Border(top: BorderSide(color: AppColors.divider)),
       ),
