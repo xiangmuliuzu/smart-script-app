@@ -955,24 +955,6 @@ class DemandDepositStatus {
   }
 }
 
-/// 投稿状态
-class SubmissionStatus {
-  static const String submitted = 'submitted';
-  static const String shortlisted = 'shortlisted';
-  static const String accepted = 'accepted';
-  static const String rejected = 'rejected';
-
-  static String label(String? status) {
-    switch (status) {
-      case submitted: return '已投稿';
-      case shortlisted: return '入围';
-      case accepted: return '已选用';
-      case rejected: return '未选用';
-      default: return status ?? '未知';
-    }
-  }
-}
-
 /// 征集任务模型
 class DemandTask {
   final int? demandId;
@@ -985,7 +967,6 @@ class DemandTask {
   final DateTime? deadline;
   final String? requirement;
   final String? contactInfo;
-  final int? submissionCount;
   final int? totalEpisodes;
   final String? status;
   final DateTime? createdAt;
@@ -1010,7 +991,7 @@ class DemandTask {
   const DemandTask({
     this.demandId, this.demandNo, this.clientId, this.title, this.genreId,
     this.tags, this.budget, this.deadline, this.requirement, this.contactInfo,
-    this.submissionCount, this.totalEpisodes, this.status, this.createdAt, this.clientName,
+    this.totalEpisodes, this.status, this.createdAt, this.clientName,
     this.acceptedCreatorId, this.acceptedAt, this.durationHours, this.dueAt,
     this.isOverdue, this.acceptedCreatorName,
     this.escrowAmount, this.escrowStatus, this.depositAmount, this.depositStatus,
@@ -1058,7 +1039,6 @@ class DemandTask {
       deadline: _parseDateTime(json['deadline']),
       requirement: json['requirement'] as String?,
       contactInfo: json['contactInfo'] as String?,
-      submissionCount: (json['submissionCount'] as num?)?.toInt(),
       totalEpisodes: (json['totalEpisodes'] as num?)?.toInt(),
       status: json['status'] as String?,
       createdAt: _parseDateTime(json['createdAt']),
@@ -1091,43 +1071,6 @@ class DemandTask {
     'totalEpisodes': totalEpisodes,
     'durationHours': durationHours,
   };
-}
-
-/// 投稿模型
-class DemandSubmission {
-  final int? submissionId;
-  final int? demandId;
-  final int? workId;
-  final int? submitterId;
-  final String? status;
-  final String? submitMessage;
-  final String? reviewRemark;
-  final DateTime? reviewedAt;
-  final DateTime? createdAt;
-  final String? workTitle;
-  final String? submitterName;
-
-  const DemandSubmission({
-    this.submissionId, this.demandId, this.workId, this.submitterId,
-    this.status, this.submitMessage, this.reviewRemark, this.reviewedAt,
-    this.createdAt, this.workTitle, this.submitterName,
-  });
-
-  factory DemandSubmission.fromJson(Map<String, dynamic> json) {
-    return DemandSubmission(
-      submissionId: (json['submissionId'] as num?)?.toInt(),
-      demandId: (json['demandId'] as num?)?.toInt(),
-      workId: (json['workId'] as num?)?.toInt(),
-      submitterId: (json['submitterId'] as num?)?.toInt(),
-      status: json['status'] as String?,
-      submitMessage: json['submitMessage'] as String?,
-      reviewRemark: json['reviewRemark'] as String?,
-      reviewedAt: _parseDateTime(json['reviewedAt']),
-      createdAt: _parseDateTime(json['createdAt']),
-      workTitle: json['workTitle'] as String?,
-      submitterName: json['submitterName'] as String?,
-    );
-  }
 }
 
 // ==================== 工具函数 ====================
@@ -1417,4 +1360,102 @@ class DeliverableWork {
       default: return status ?? '';
     }
   }
+}
+
+/// 验收查阅：某轮交付作品的一集（一章即一集，后端 episode_count 就是本表行数）。
+///
+/// readable=false 表示该集超出本轮 episodeTo、还没交上来，后端不下发正文；
+/// 保留标题是为了让发布者知道后面还剩几集。
+class DeliverableChapter {
+  final int chapterId;
+  final int? chapterNo;
+  final String? chapterTitle;
+  final int? wordCount;
+  final bool readable;
+  final String? content;
+
+  const DeliverableChapter({
+    required this.chapterId,
+    this.chapterNo,
+    this.chapterTitle,
+    this.wordCount,
+    required this.readable,
+    this.content,
+  });
+
+  factory DeliverableChapter.fromJson(Map<String, dynamic> json) {
+    final raw = json['readable'];
+    return DeliverableChapter(
+      chapterId: (json['chapterId'] as num?)?.toInt() ?? 0,
+      chapterNo: (json['chapterNo'] as num?)?.toInt(),
+      chapterTitle: json['chapterTitle'] as String?,
+      wordCount: (json['wordCount'] as num?)?.toInt(),
+      // 后端下发布尔，这里同时兼容网关把 true 变成 1/'1'/'true' 的情况
+      readable: raw == true || raw == 1 || raw == '1' || raw == 'true',
+      content: json['content'] as String?,
+    );
+  }
+
+  String get displayTitle =>
+      (chapterTitle?.isNotEmpty ?? false) ? chapterTitle! : '第${chapterNo ?? '?'}集';
+}
+
+/// 验收查阅：某轮交付的作品（仅发布者可取，正文只到本轮 episodeTo）。
+class StageDeliverableView {
+  final int workId;
+  final String? title;
+  final String? authorName;
+  final int? episodeCount;
+  final int? wordCount;
+  final String? summary;
+  final int? stageOrder;
+  final int? episodeTo;
+  final String? stageStatus;
+  final String? deliverableDesc;
+  final String? deliverableUrl;
+  final int? aiScore;
+  final List<DeliverableChapter> chapters;
+
+  const StageDeliverableView({
+    required this.workId,
+    this.title,
+    this.authorName,
+    this.episodeCount,
+    this.wordCount,
+    this.summary,
+    this.stageOrder,
+    this.episodeTo,
+    this.stageStatus,
+    this.deliverableDesc,
+    this.deliverableUrl,
+    this.aiScore,
+    this.chapters = const [],
+  });
+
+  factory StageDeliverableView.fromJson(Map<String, dynamic> json) {
+    final raw = json['chapters'];
+    return StageDeliverableView(
+      workId: (json['workId'] as num?)?.toInt() ?? 0,
+      title: json['title'] as String?,
+      authorName: json['authorName'] as String?,
+      episodeCount: (json['episodeCount'] as num?)?.toInt(),
+      wordCount: (json['wordCount'] as num?)?.toInt(),
+      summary: json['summary'] as String?,
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
+      episodeTo: (json['episodeTo'] as num?)?.toInt(),
+      stageStatus: json['stageStatus'] as String?,
+      deliverableDesc: json['deliverableDesc'] as String?,
+      deliverableUrl: json['deliverableUrl'] as String?,
+      aiScore: (json['aiScore'] as num?)?.toInt(),
+      chapters: raw is List
+          ? raw
+              .whereType<Map>()
+              .map((e) => DeliverableChapter.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+    );
+  }
+
+  /// 本轮可见（已下发正文）的集数。
+  int get readableCount => chapters.where((c) => c.readable).length;
 }

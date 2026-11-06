@@ -95,6 +95,7 @@ import '../../features/trade/pages/demand_detail_page.dart';
 import '../../features/trade/pages/demand_post_page.dart';
 import '../../features/trade/pages/demand_my_tasks_page.dart';
 import '../../features/trade/pages/demand_stage_deliver_page.dart';
+import '../../features/trade/pages/demand_deliverable_work_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
@@ -710,6 +711,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.demandStageDeliver,
         name: RouteName.demandStageDeliver,
         builder: (context, state) => DemandStageDeliverPage(
+          demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
+          stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
+          stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,
+        ),
+      ),
+      // 验收查阅：发布者看本轮交付作品的正文（只到 episodeTo）
+      GoRoute(
+        path: RoutePath.demandDeliverableWork,
+        name: RouteName.demandDeliverableWork,
+        builder: (context, state) => DemandDeliverableWorkPage(
           demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
           stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
           stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,

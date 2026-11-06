@@ -47,7 +47,7 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
       case 'CONTRACT':
         return (label: '去处理：查看合同', path: RoutePath.contractList);
       case 'DEMAND':
-        // 任务类通知（接单/投稿/延时/超时终止）businessId 即 demandId
+        // 任务类通知（接单/延时/超时终止）businessId 即 demandId
         return (label: '去处理：查看任务', path: RoutePath.demandDetail);
       default:
         return null;

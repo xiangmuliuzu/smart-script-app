@@ -20,18 +20,6 @@ final demandDetailProvider = FutureProvider.autoDispose.family<DemandTask, int>(
   (ref, demandId) => ref.watch(demandRepositoryProvider).demandDetail(demandId),
 );
 
-// ==================== 投稿 ====================
-
-/// 某任务的投稿列表
-final demandSubmissionsProvider = FutureProvider.autoDispose.family<List<DemandSubmission>, int>(
-  (ref, demandId) => ref.watch(demandRepositoryProvider).demandSubmissions(demandId),
-);
-
-/// 我的投稿记录
-final mySubmissionsProvider = FutureProvider.autoDispose<List<DemandSubmission>>(
-  (ref) => ref.watch(demandRepositoryProvider).mySubmissions(),
-);
-
 // ==================== Hero 统计 ====================
 
 /// Hero 横幅统计：可接单数 / 奖金池(分) / 今日新增 / 各题材待接单数（供 chip 角标）。

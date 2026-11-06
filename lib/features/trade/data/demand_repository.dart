@@ -219,60 +219,6 @@ class DemandRepository {
     return data ?? const <String, dynamic>{'paid': false};
   }
 
-  // ==================== 投稿 ====================
-
-  /// 查看投稿列表（发布者）。
-  Future<List<DemandSubmission>> demandSubmissions(int demandId) async {
-    final data = await _api.get<List<dynamic>>(
-      ApiEndpoints.demandSubmissions(demandId),
-      parser: (raw) => raw is List ? raw : <dynamic>[],
-    );
-    if (data == null) return [];
-    return data
-        .whereType<Map>()
-        .map((e) => DemandSubmission.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-  }
-
-  /// 投稿。
-  Future<void> submitWork(int demandId, {required int workId, String? message}) async {
-    await _api.post<dynamic>(
-      ApiEndpoints.demandSubmit(demandId),
-      data: {'workId': workId, 'message': message},
-    );
-  }
-
-  /// 入围。
-  Future<void> shortlistSubmission(int submissionId) async {
-    await _api.put<dynamic>(ApiEndpoints.demandShortlist(submissionId));
-  }
-
-  /// 选标。
-  Future<void> acceptSubmission(int submissionId) async {
-    await _api.put<dynamic>(ApiEndpoints.demandAccept(submissionId));
-  }
-
-  /// 拒绝投稿。
-  Future<void> rejectSubmission(int submissionId, {String? remark}) async {
-    await _api.put<dynamic>(
-      ApiEndpoints.demandReject(submissionId),
-      data: remark != null ? {'remark': remark} : null,
-    );
-  }
-
-  /// 我的投稿记录。
-  Future<List<DemandSubmission>> mySubmissions() async {
-    final data = await _api.get<List<dynamic>>(
-      ApiEndpoints.demandMySubmissions,
-      parser: (raw) => raw is List ? raw : <dynamic>[],
-    );
-    if (data == null) return [];
-    return data
-        .whereType<Map>()
-        .map((e) => DemandSubmission.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-  }
-
   // ==================== 验收轮次 ====================
 
   /// 获取任务验收轮次列表。
@@ -299,6 +245,19 @@ class DemandRepository {
         .whereType<Map>()
         .map((e) => DeliverableWork.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+  /// 验收查阅：发布者查看某轮交付的作品。
+  ///
+  /// 交付作品一定未上架，读者接口（content 域）取不到；正文只下发本轮 episodeTo 内的集，
+  /// 之后的章节只有标题、readable=false。仅该任务发布者可调，非发布者后端会拒。
+  Future<StageDeliverableView> stageDeliverableView(int demandId, int stageId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.demandStageDeliverableWork(demandId, stageId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('交付内容加载失败');
+    return StageDeliverableView.fromJson(data);
   }
 
   /// 创作者提交本轮交付物（必须选定本人作品 workId）。

@@ -262,6 +262,25 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                     const SizedBox(height: 6),
                     Text('交付作品：${s.workTitle ?? '作品${s.workId}'}',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                    // 验收前得能读到正文，否则只能凭一句交付说明拍板（仅发布者可取，后端鉴权）。
+                    // 待审核态的入口移到下方与「确认验收」同一行，这里只给非审核态（如已通过）保留。
+                    if (widget.isBuyer && s.stageId != null && s.status != 'submitted') ...[
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _acting ? null : _viewDeliveredWork,
+                          icon: const Icon(Icons.visibility_outlined, size: 16),
+                          label: const Text('查看交付内容',
+                              style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                   // 交付说明
                   if (s.deliverableDesc != null && s.deliverableDesc!.isNotEmpty) ...[
@@ -405,23 +424,27 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     // 买方：审核 + 处理延时申请
     if (_canReview) {
       actions.add(const SizedBox(height: 10));
+      // 查看交付内容与验收操作同一行：验收前先把正文读一遍，再点「确认验收」选通过/驳回
       actions.add(Row(
         children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _acting ? null : () => _review(context, true),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green, foregroundColor: Colors.white),
-              child: const Text('通过'),
+          if (widget.stage.stageId != null)
+            TextButton.icon(
+              onPressed: _acting ? null : _viewDeliveredWork,
+              icon: const Icon(Icons.visibility_outlined, size: 16),
+              label: const Text('查看交付内容', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                visualDensity: VisualDensity.compact,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _acting ? null : () => _review(context, false),
-              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('驳回'),
-            ),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: _acting ? null : () => _confirmReview(context),
+            icon: const Icon(Icons.fact_check_outlined, size: 18),
+            label: const Text('确认验收'),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary, foregroundColor: Colors.white),
           ),
         ],
       ));
@@ -565,6 +588,15 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
   /// 提取可读错误文案：业务异常取后端 message，其余回退默认。
   String _errText(Object e) =>
       e is ApiException && e.message.isNotEmpty ? e.message : '请稍后重试';
+
+  /// 查看本轮交付正文（仅发布者）：跳全屏页，后端只下发本轮 episodeTo 内的集。
+  void _viewDeliveredWork() {
+    final s = widget.stage;
+    final stageId = s.stageId;
+    if (stageId == null) return;
+    context.push(RoutePath.demandDeliverableWorkUrl(
+        widget.demandId, stageId, s.stageOrder ?? 0));
+  }
 
   /// 提交本轮交付：跳转全屏提交页（选作品+交付说明），提交后先进入 AI 审核。
   Future<void> _deliver(BuildContext context) async {
@@ -728,6 +760,39 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
       hours: int.tryParse(hoursCtrl.text.trim()) ?? 0,
       reason: reasonCtrl.text.trim(),
     );
+  }
+
+  /// 确认验收：把通过/驳回合并成一个入口，点击后在弹窗里二选一，避免误触直接放款。
+  Future<void> _confirmReview(BuildContext context) async {
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('第${widget.stage.stageOrder}轮 · 确认验收'),
+        content: const Text(
+          '建议先「查看交付内容」读一遍本轮正文再决定。\n'
+          '通过：按本轮金额放款给创作者；驳回：退回创作者修改后重新提交。',
+          style: TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('驳回',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('通过',
+                style: TextStyle(
+                    color: Colors.green, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    if (!context.mounted) return;
+    await _review(context, choice);
   }
 
   Future<void> _review(BuildContext context, bool approved) async {

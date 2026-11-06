@@ -369,16 +369,12 @@ class ApiEndpoints {
   static String demandClaim(int demandId) => '/trade/demand/$demandId/claim';
   /// 任务会话（发布者 ↔ 创作者，POST；发布者发起可带 targetUserId）。
   static String demandChatSession(int demandId) => '/trade/demand/$demandId/chat/session';
-  static String demandSubmissions(int demandId) => '/trade/demand/$demandId/submissions';
-  static String demandSubmit(int demandId) => '/trade/demand/$demandId/submit';
-  static String demandShortlist(int subId) => '/trade/demand/submission/$subId/shortlist';
-  static String demandAccept(int subId) => '/trade/demand/submission/$subId/accept';
-  static String demandReject(int subId) => '/trade/demand/submission/$subId/reject';
-  static const String demandMySubmissions = '/trade/demand/my-submissions';
   // 验收轮次
   static String demandStages(int demandId) => '/trade/demand/$demandId/stages';
   static String demandStageDeliver(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliver';
   static String demandStageReview(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/review';
+  /// 验收查阅：发布者看该轮交付的作品（正文只含本轮集数）。
+  static String demandStageDeliverableWork(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliverable-work';
   // 可交付作品（本人、非已上架售卖）
   static const String demandDeliverableWorks = '/trade/demand/deliverable-works';
   // 延时：创作者申请 / 发布者处理 / 发布者自主延时 / 延时记录
