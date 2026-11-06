@@ -85,7 +85,8 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         final quote = Quote(
           inquiryId: ctx.inquiryId,
           amount: newAmountFen,
-          licenseType: ctx.licenseType ?? 'non_exclusive',
+          // 无版权询盘不带授权类型：直接透传空值，后端沿用询盘口径，不注入默认脏数据
+          licenseType: ctx.licenseType,
           role: ctx.isSeller ? 'seller' : 'buyer',
         );
         if (ctx.isSeller) {

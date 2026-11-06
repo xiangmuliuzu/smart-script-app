@@ -598,7 +598,8 @@ extension LicenseTypeExtension on String {
       case 'non_exclusive':
         return '非独家授权';
       default:
-        return this;
+        // 无版权交易交割单不带授权类型：空串统一显示「未指定」（与 LicenseType.label 同口径）
+        return isEmpty ? '未指定' : this;
     }
   }
 }

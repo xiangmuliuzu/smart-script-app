@@ -451,7 +451,8 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
           final quote = Quote(
             inquiryId: widget.inquiryId,
             amount: amountFen,
-            licenseType: widget.licenseType ?? 'non_exclusive',
+            // 无版权询盘不带授权类型：直接透传空值，后端沿用询盘口径，不注入默认脏数据
+            licenseType: widget.licenseType,
             role: widget.isSeller ? 'seller' : 'buyer',
           );
           if (widget.isSeller) {

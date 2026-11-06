@@ -96,7 +96,8 @@ class OrderDetailPage extends ConsumerWidget {
         currentStep = 0;
       case OrderStatus.paying:
         color = AppColors.warning;
-        desc = '合同已签署，等待买方付款';
+        // 无版权单成单即 paying 且无合同（contractId 为空），文案不能假设已签署
+        desc = order.contractId == null ? '订单已达成，等待买方付款（本交易未签合同）' : '合同已签署，等待买方付款';
         currentStep = 1;
       case OrderStatus.delivering:
         color = AppColors.warning;
@@ -382,10 +383,11 @@ class OrderDetailPage extends ConsumerWidget {
       return _buildContractSignBar(context, ref, order);
     }
 
-    // 付款中：买方付款，卖方等待
+    // 付款中：买方付款，卖方等待（无版权单无合同，文案分流）
     if (status == OrderStatus.paying) {
       if (isBuyer) return _buildPayBar(context, ref, order);
-      return _buildContactBar(context, ref, order, isBuyer, '合同已签署，等待买方付款');
+      return _buildContactBar(context, ref, order, isBuyer,
+          order.contractId == null ? '订单已达成，等待买方付款（本交易未签合同）' : '合同已签署，等待买方付款');
     }
 
     // 交割中：按交割单状态区分上传 / 待确认
@@ -518,8 +520,13 @@ class OrderDetailPage extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('合同已签署完成，请买方付款，付款后订单进入交割',
-                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            Text(
+              // 无版权单成单即 paying：未经合同签署，不能误示「合同已签署完成」
+              order.contractId == null
+                  ? '本作品未确权，交易免签合同；买方付款后订单进入交割'
+                  : '合同已签署完成，请买方付款，付款后订单进入交割',
+              style: const TextStyle(fontSize: 12, color: AppColors.text3),
+            ),
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
