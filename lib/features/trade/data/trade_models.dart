@@ -96,8 +96,8 @@ class LicenseType {
   static const String adaptation = 'adaptation';         // 改编授权
 
   static String label(String? type) {
-    // 无版权作品询盘/订单不带授权类型，null 统一显示「未指定」
-    if (type == null) return '未指定';
+    // 无版权作品询盘/订单不带授权类型，null 与空串统一显示「未指定」
+    if (type == null || type.isEmpty) return '未指定';
     switch (type) {
       case exclusive: return '独家授权';
       case nonExclusive: return '非独家授权';

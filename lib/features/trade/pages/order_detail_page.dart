@@ -383,11 +383,12 @@ class OrderDetailPage extends ConsumerWidget {
       return _buildContractSignBar(context, ref, order);
     }
 
-    // 付款中：买方付款，卖方等待（无版权单无合同，文案分流）
+    // 付款中：买方付款，卖方等待（无版权单无合同，文案分流）；未付款前双方均可取消
     if (status == OrderStatus.paying) {
       if (isBuyer) return _buildPayBar(context, ref, order);
       return _buildContactBar(context, ref, order, isBuyer,
-          order.contractId == null ? '订单已达成，等待买方付款（本交易未签合同）' : '合同已签署，等待买方付款');
+          order.contractId == null ? '订单已达成，等待买方付款（本交易未签合同）' : '合同已签署，等待买方付款',
+          extra: _cancelButton(context, ref, order));
     }
 
     // 交割中：按交割单状态区分上传 / 待确认
@@ -455,6 +456,24 @@ class OrderDetailPage extends ConsumerWidget {
     return const SizedBox.shrink();
   }
 
+  /// 取消订单入口按钮（confirmed 与未付款 paying 均可发起，买卖双方任一方）
+  Widget _cancelButton(BuildContext context, WidgetRef ref, Order order) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _cancelOrder(context, ref, order),
+        icon: const Icon(Icons.cancel_outlined, size: 18),
+        label: const Text('取消订单', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.danger,
+          side: const BorderSide(color: AppColors.danger),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+    );
+  }
+
   /// 合同签署栏：查看并签署合同
   Widget _buildContractSignBar(BuildContext context, WidgetRef ref, Order order) {
     return Container(
@@ -487,21 +506,8 @@ class OrderDetailPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // 取消订单：仅合同双签完成前（confirmed）可取消，买卖双方任一方均可发起
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _cancelOrder(context, ref, order),
-                icon: const Icon(Icons.cancel_outlined, size: 18),
-                label: const Text('取消订单', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.danger,
-                  side: const BorderSide(color: AppColors.danger),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
+            // 取消订单：签署完成前与付款前均可发起，买卖双方任一方
+            _cancelButton(context, ref, order),
           ],
         ),
       ),
@@ -542,6 +548,9 @@ class OrderDetailPage extends ConsumerWidget {
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ),
+            const SizedBox(height: 8),
+            // 尚未付款，买方也可取消（付款后不可取消且不退款）
+            _cancelButton(context, ref, order),
           ],
         ),
       ),
@@ -600,8 +609,8 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 联系对方底部栏
-  Widget _buildContactBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, String hint) {
+  /// 联系对方底部栏（可附额外操作按钮，如未付款时的取消入口）
+  Widget _buildContactBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer, String hint, {Widget? extra}) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: const BoxDecoration(
@@ -644,6 +653,10 @@ class OrderDetailPage extends ConsumerWidget {
                 ),
               ),
             ),
+            if (extra != null) ...[
+              const SizedBox(height: 8),
+              extra,
+            ],
           ],
         ),
       ),
@@ -727,13 +740,13 @@ class OrderDetailPage extends ConsumerWidget {
     }
   }
 
-  /// 取消订单（仅 confirmed，双方签署完成前；买卖双方任一方）
+  /// 取消订单（签署完成前与未付款 paying 均可发起；买卖双方任一方）
   Future<void> _cancelOrder(BuildContext context, WidgetRef ref, Order order) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dlgCtx) => AlertDialog(
         title: const Text('取消订单'),
-        content: const Text('确定取消该订单吗？合同双方签署完成后将不可取消。'),
+        content: const Text('确定取消该订单吗？付款前可取消；买方一旦付款即不可取消且不支持退款。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
           TextButton(onPressed: () => Navigator.pop(dlgCtx, true), child: const Text('确定取消', style: TextStyle(color: AppColors.danger))),
