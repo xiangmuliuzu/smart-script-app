@@ -525,6 +525,7 @@ class ChapterListPayload {
     this.accessScope = 'preview',
     this.unlocked = false,
     this.total = 0,
+    this.publishedTotal = 0,
     this.chapters = const <ChapterSummary>[],
   });
 
@@ -537,11 +538,22 @@ class ChapterListPayload {
 
   /// 是否已获版权授权；等价于 [accessScope] == 'full'。
   final bool unlocked;
+
+  /// 当前身份可见的章节数（未获授权时仅试读章节）。
   final int total;
+
+  /// 已发布章节总数（含未开放试读、当前身份不可见的章节）。
+  final int publishedTotal;
+
+  /// 展示「共 N 章」时使用的章节总数。
+  int get publishedCount => publishedTotal > 0 ? publishedTotal : total;
+
   final List<ChapterSummary> chapters;
 
   factory ChapterListPayload.fromJson(Map<String, dynamic> json) {
     final raw = json['list'];
+    final int visibleTotal = _int(json['total']);
+    final int publishedTotal = _int(json['publishedTotal']);
     return ChapterListPayload(
       workId: _int(json['workId']),
       previewEnabled: _flag(json['previewEnabled']),
@@ -550,7 +562,8 @@ class ChapterListPayload {
           ? 'preview'
           : _text(json['accessScope']),
       unlocked: _flag(json['unlocked']),
-      total: _int(json['total']),
+      total: visibleTotal,
+      publishedTotal: publishedTotal > 0 ? publishedTotal : visibleTotal,
       chapters: raw is List
           ? raw
               .whereType<Map>()

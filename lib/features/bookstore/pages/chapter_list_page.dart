@@ -36,7 +36,10 @@ class ChapterListPage extends ConsumerWidget {
         ),
         data: (payload) {
           if (payload.chapters.isEmpty) {
-            return const EmptyView(message: '暂无章节', icon: Icons.menu_book_outlined);
+            return EmptyView(
+              message: payload.unlocked ? '暂无章节' : '本作品暂未开放试读，购买版权后可阅读全部章节',
+              icon: Icons.menu_book_outlined,
+            );
           }
           return RefreshIndicator(
             onRefresh: () async {
@@ -104,7 +107,7 @@ class _PreviewBanner extends StatelessWidget {
             ? '已开启试读：前 ${payload.previewEpisodes} 集可免费阅读'
             : (hasReadableChapter
                 ? '已开启试读：$readableCount 章可免费阅读'
-                : '本作品未开启试读，仅可查看章节目录'));
+                : '本作品暂未开放试读，购买版权后可阅读全部章节'));
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -130,7 +133,7 @@ class _PreviewBanner extends StatelessWidget {
             ),
           ),
           Text(
-            '共 ${payload.total} 章',
+            '共 ${payload.publishedCount} 章',
             style: const TextStyle(fontSize: 12, color: AppColors.text3),
           ),
         ],
