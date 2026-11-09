@@ -38,6 +38,8 @@ class ApiEndpoints {
   static String userFollow(int userId) => '/users/$userId/follow';
   /// 拉黑 / 解除拉黑（POST / DELETE，幂等）。
   static String userBlock(int userId) => '/users/$userId/block';
+  /// 我拉黑的用户列表（GET）。
+  static const String myBlocks = '/users/me/blocks';
   /// 作者获赞统计（内容域）；作品列表复用书城 /content/works?authorId=。
   static String userProfileStats(int userId) => '/content/users/$userId/stats';
 

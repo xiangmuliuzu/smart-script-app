@@ -45,6 +45,8 @@ class RoutePath {
   static const String userProfile = '/profile/home';
   /// 关注 / 粉丝列表；following=true 关注列表，false 粉丝列表。
   static const String userFollowList = '/profile/follow-list';
+  /// 黑名单列表（我拉黑的用户）。
+  static const String blockedUsers = '/profile/blocks';
   static String userProfileUrl(int userId) => '$userProfile?userId=$userId';
   static String userFollowListUrl(int userId, {required bool following}) =>
       '$userFollowList?userId=$userId&following=${following ? 1 : 0}';
@@ -361,6 +363,7 @@ class RouteName {
   static const String profileEdit = 'profileEdit';
   static const String userProfile = 'userProfile';
   static const String userFollowList = 'userFollowList';
+  static const String blockedUsers = 'blockedUsers';
   static const String realName = 'realName';
   static const String creatorApply = 'creatorApply';
   static const String accountSecurity = 'accountSecurity';

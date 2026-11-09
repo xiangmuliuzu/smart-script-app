@@ -82,6 +82,7 @@ import '../../features/profile/pages/real_name_page.dart';
 import '../../features/profile/pages/creator_apply_page.dart';
 import '../../features/profile/pages/user_profile_page.dart';
 import '../../features/profile/pages/user_follow_list_page.dart';
+import '../../features/profile/pages/blocked_users_page.dart';
 import '../../features/profile/profile_page.dart';
 import '../../features/splash/splash_page.dart';
 import '../../features/trade/pages/inquiry_create_page.dart';
@@ -464,6 +465,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           userId: int.tryParse(state.uri.queryParameters['userId'] ?? '') ?? 0,
           showFollowing: state.uri.queryParameters['following'] == '1',
         ),
+      ),
+      GoRoute(
+        path: RoutePath.blockedUsers,
+        name: RouteName.blockedUsers,
+        builder: (_, __) => const BlockedUsersPage(),
       ),
       GoRoute(
         path: RoutePath.accountSecurity,

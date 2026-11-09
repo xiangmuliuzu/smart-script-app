@@ -59,6 +59,8 @@ class BookItem {
     this.title = '',
     this.cover = '',
     this.authorName = '',
+    this.authorId = 0,
+    this.authorAvatar = '',
     this.tags = const <TagItem>[],
     this.workType = '',
     this.uploadType = '',
@@ -88,6 +90,12 @@ class BookItem {
   final String title;
   final String cover;
   final String authorName;
+
+  /// 作者用户 ID（个人主页跳转用）；0 表示后端未下发。
+  final int authorId;
+
+  /// 作者头像地址；未设置时为空，前端回退到昵称首字。
+  final String authorAvatar;
 
   /// 作品标签（sys_work_tag 关联 sys_tag，仅启用标签）。
   final List<TagItem> tags;
@@ -140,6 +148,8 @@ class BookItem {
         title: _text(json['title']),
         cover: AppConfig.resolveAssetUrl(_text(json['cover'])),
         authorName: _text(json['authorName']),
+        authorId: _int(json['authorId']),
+        authorAvatar: _text(json['authorAvatar']),
         tags: _tags(json['tags']),
         workType: _text(json['workType']),
         uploadType: _text(json['uploadType']),

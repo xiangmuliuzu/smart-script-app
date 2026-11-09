@@ -34,6 +34,11 @@ final userFollowersProvider =
   (ref, userId) => ref.watch(userSocialRepositoryProvider).followers(userId),
 );
 
+/// 我拉黑的用户列表；解除拉黑后 invalidate。
+final blockedUsersProvider = FutureProvider.autoDispose<List<UserSummary>>(
+  (ref) => ref.watch(userSocialRepositoryProvider).blockedUsers(),
+);
+
 final messageRepositoryProvider = Provider<MessageRepository>(
   (ref) => MessageRepository(ref.watch(apiClientProvider)),
 );

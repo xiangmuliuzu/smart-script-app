@@ -7,8 +7,10 @@ import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/storage/reading_progress_store.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/avatar_url.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../../user_center/data/user_center_providers.dart';
 import '../data/bookstore_models.dart';
 import '../data/content_providers.dart';
 import '../widgets/bookstore_widgets.dart';
@@ -44,8 +46,8 @@ class WorkDetailPage extends ConsumerWidget {
               _Header(work: work),
               _RatingBar(workId: work.workId),
               _ChapterEntry(work: work),
-              if (work.summary.isNotEmpty)
-                _Block(title: '作品简介', content: work.summary),
+              if (work.summary.isNotEmpty || work.tags.isNotEmpty)
+                _Block(title: '作品简介', content: work.summary, tags: work.tags),
               _InfoBlock(work: work),
             ],
           ),
@@ -348,7 +350,7 @@ class _Header extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 作品名：加大加粗，作为头部唯一主视觉（作者名已降级到信息区）
+                    // 作品名：加大加粗，作为头部唯一主视觉
                     Text(
                       work.title.isEmpty ? '未命名作品' : work.title,
                       maxLines: 2,
@@ -360,17 +362,7 @@ class _Header extends StatelessWidget {
                         height: 1.25,
                       ),
                     ),
-                    if (work.tags.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      WorkTagChips(
-                        tags: work.tags,
-                        onTagTap: (tag) => context.push(RoutePath.workListUrl(
-                              tagId: tag.tagId,
-                              title: tag.tagName,
-                            )),
-                      ),
-                    ],
-                    // 价格紧邻标签自然排布，卡片行高由封面主导
+                    // 价格居中承接标题与作者行；标签已移入下方「作品简介」。
                     const SizedBox(height: 14),
                     Text(
                       work.priceLabel,
@@ -380,6 +372,8 @@ class _Header extends StatelessWidget {
                         color: work.isFree ? AppColors.success : AppColors.warning,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _AuthorLine(work: work),
                   ],
                 ),
               ),
@@ -402,6 +396,78 @@ class _Header extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 作者行：头像 + 昵称，点击进入作者个人主页。
+///
+/// 头像优先取详情下发的 authorAvatar；旧后端未下发时，登录态下补查一次
+/// 公开资料（未登录公开页不发必然 401 的请求），仍无则回退昵称首字。
+class _AuthorLine extends ConsumerWidget {
+  const _AuthorLine({required this.work});
+
+  final BookItem work;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nickname = work.authorName.isEmpty ? '匿名作者' : work.authorName;
+    final profileAvatar = work.authorId > 0 && AuthGuard.isLoggedIn(ref)
+        ? ref.watch(userProfileViewProvider(work.authorId)).valueOrNull?.avatar
+        : null;
+    final url = avatarUrl(
+      work.authorAvatar.isNotEmpty ? work.authorAvatar : profileAvatar,
+    );
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipOval(
+          child: Container(
+            width: 28,
+            height: 28,
+            color: AppColors.primaryTint,
+            child: url.isEmpty
+                ? Center(
+                    child: Text(
+                      nickname.substring(0, 1),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  )
+                : Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.person, size: 16, color: AppColors.text3),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            nickname,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, color: AppColors.text2),
+          ),
+        ),
+        if (work.authorId > 0) ...[
+          const SizedBox(width: 2),
+          const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.text3),
+        ],
+      ],
+    );
+    if (work.authorId <= 0) return row;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => context.push(RoutePath.userProfileUrl(work.authorId)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: row,
       ),
     );
   }
@@ -804,12 +870,17 @@ class _Stat extends StatelessWidget {
   }
 }
 
-/// 长文本区块（简介）。
+/// 长文本区块（简介）；标签随简介一起展示。
 class _Block extends StatelessWidget {
-  const _Block({required this.title, required this.content});
+  const _Block({
+    required this.title,
+    required this.content,
+    this.tags = const <TagItem>[],
+  });
 
   final String title;
   final String content;
+  final List<TagItem> tags;
 
   @override
   Widget build(BuildContext context) {
@@ -833,10 +904,21 @@ class _Block extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            content,
-            style: const TextStyle(fontSize: 13, height: 1.6, color: AppColors.text2),
-          ),
+          if (content.isNotEmpty)
+            Text(
+              content,
+              style: const TextStyle(fontSize: 13, height: 1.6, color: AppColors.text2),
+            ),
+          if (tags.isNotEmpty) ...[
+            if (content.isNotEmpty) const SizedBox(height: 12),
+            WorkTagChips(
+              tags: tags,
+              onTagTap: (tag) => context.push(RoutePath.workListUrl(
+                    tagId: tag.tagId,
+                    title: tag.tagName,
+                  )),
+            ),
+          ],
         ],
       ),
     );
@@ -870,8 +952,7 @@ class _InfoBlock extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // 作者名从头部降级至此，作为作品信息第一项
-          _InfoRow(label: '作者', value: work.authorName),
+          // 作者已上移到头部作者行（可点击进个人主页），信息区不再重复。
           _InfoRow(label: '字数', value: '${work.wordCount}'),
           _InfoRow(label: '集数', value: '${work.episodeCount}'),
           _InfoRow(

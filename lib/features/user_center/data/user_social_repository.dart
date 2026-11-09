@@ -53,6 +53,9 @@ class UserSocialRepository {
   /// 解除拉黑（幂等）。
   Future<bool> unblock(int userId) => _toggleBlock(userId, block: false);
 
+  /// 我拉黑的用户列表（公开字段）。
+  Future<List<UserSummary>> blockedUsers() => _list(ApiEndpoints.myBlocks);
+
   Future<bool> _toggleBlock(int userId, {required bool block}) async {
     final path = ApiEndpoints.userBlock(userId);
     final data = block

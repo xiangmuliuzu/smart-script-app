@@ -390,6 +390,11 @@ class _ProfileDrawer extends StatelessWidget {
               onTap: () => _push(context, RoutePath.realName),
             ),
             _DrawerItem(
+              icon: Icons.block,
+              label: '黑名单',
+              onTap: () => _push(context, RoutePath.blockedUsers),
+            ),
+            _DrawerItem(
               icon: Icons.tune,
               label: '通知偏好',
               onTap: () => _push(context, RoutePath.notificationPreferences),
