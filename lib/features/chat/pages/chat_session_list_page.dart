@@ -255,19 +255,24 @@ class _PeerGroupTile extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                // 头像
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  backgroundImage: (group.peerAvatar != null && group.peerAvatar!.isNotEmpty)
-                      ? NetworkImage(group.peerAvatar!)
+                // 头像：点击进入对方个人主页
+                GestureDetector(
+                  onTap: group.peerId > 0
+                      ? () => context.push(RoutePath.userProfileUrl(group.peerId))
                       : null,
-                  child: (group.peerAvatar == null || group.peerAvatar!.isEmpty)
-                      ? Text(
-                          group.peerName.characters.first,
-                          style: const TextStyle(fontSize: 18, color: AppColors.primary),
-                        )
-                      : null,
+                  child: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    backgroundImage: (group.peerAvatar != null && group.peerAvatar!.isNotEmpty)
+                        ? NetworkImage(group.peerAvatar!)
+                        : null,
+                    child: (group.peerAvatar == null || group.peerAvatar!.isEmpty)
+                        ? Text(
+                            group.peerName.characters.first,
+                            style: const TextStyle(fontSize: 18, color: AppColors.primary),
+                          )
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 // 名称和最新消息

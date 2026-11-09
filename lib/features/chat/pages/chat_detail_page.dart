@@ -470,7 +470,7 @@ class _MessageBubble extends StatelessWidget {
     if (message.isSystem) {
       return _buildSystemMessage();
     }
-    return _buildChatBubble();
+    return _buildChatBubble(context);
   }
 
   Widget _buildSystemMessage() {
@@ -492,14 +492,14 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildChatBubble() {
+  Widget _buildChatBubble(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isMine) _buildAvatar(),
+          if (!isMine) _buildAvatar(context),
           const SizedBox(width: 8),
           Flexible(
             child: Container(
@@ -523,14 +523,14 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          if (isMine) _buildAvatar(),
+          if (isMine) _buildAvatar(context),
         ],
       ),
     );
   }
 
-  Widget _buildAvatar() {
-    return CircleAvatar(
+  Widget _buildAvatar(BuildContext context) {
+    final avatar = CircleAvatar(
       radius: 16,
       backgroundColor: AppColors.primary.withOpacity(0.1),
       backgroundImage: message.senderAvatar != null
@@ -542,6 +542,12 @@ class _MessageBubble extends StatelessWidget {
               style: const TextStyle(fontSize: 12, color: AppColors.primary),
             )
           : null,
+    );
+    if (message.senderId <= 0) return avatar;
+    // 点击头像进入发送者个人主页（自己则进入自己的主页）
+    return GestureDetector(
+      onTap: () => context.push(RoutePath.userProfileUrl(message.senderId)),
+      child: avatar,
     );
   }
 }
