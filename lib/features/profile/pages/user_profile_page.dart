@@ -529,19 +529,24 @@ class _ProfileActionsSheet extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 64,
-                      height: 64,
+                      width: 48,
+                      height: 48,
                       decoration: const BoxDecoration(
                         color: AppColors.fill,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(icon, size: 28, color: AppColors.text1),
+                      child: Icon(icon, size: 22, color: AppColors.text1),
                     ),
-                    const SizedBox(height: 12),
-                    Text(label, style: const TextStyle(fontSize: 14, color: AppColors.text1)),
+                    const SizedBox(height: 10),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13, color: AppColors.text1),
+                    ),
                   ],
                 ),
               ),
