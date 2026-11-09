@@ -78,11 +78,11 @@ class ApiEndpoints {
   static String contentChapter(int chapterId) => '/content/chapters/$chapterId';
   /// 作品榜单（可传 type=view/favorite/sale/rating 与 limit）
   static const String contentRankings = '/content/rankings';
-  /// 我的书架列表（需 App Token，分页 {total, list}，接口 2.7.12）
+  /// 我的书架列表（已购 / 已授权作品，需 App Token，分页 {total, list}，接口 2.7.12）
   static const String contentShelf = '/content/shelf';
-  /// 加入 / 移出书架、书架态（需 App Token，接口 2.7.12）
+  /// 作品授权态（需 App Token，返回 {authorized}，接口 2.7.12）
   static String contentShelfByWorkId(int workId) => '/content/shelf/$workId';
-  /// 记录阅读进度（需 App Token，PUT，body {chapterId}；不在书架按 404 拒绝）
+  /// 记录阅读进度（需 App Token，PUT，body {chapterId}；首次阅读自动建进度行）
   static String contentShelfProgress(int workId) => '/content/shelf/$workId/progress';
   /// 搜索历史列表/记录（需 App Token；GET 列表、POST 记录，见接口 2.7.4）
   static const String contentSearchHistory = '/content/search/history';

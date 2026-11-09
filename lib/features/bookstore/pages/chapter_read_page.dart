@@ -68,7 +68,7 @@ class _ChapterReadPageState extends ConsumerState<ChapterReadPage> {
     try {
       await ref.read(contentRepositoryProvider).saveShelfProgress(workId, chapterId);
     } catch (_) {
-      // 忽略：未加入书架（404）或网络异常都不影响正文展示。
+      // 忽略：网络异常不影响正文展示（进度行由服务端首次阅读自动创建）。
     }
   }
 

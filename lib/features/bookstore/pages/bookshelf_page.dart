@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -16,10 +15,11 @@ import '../data/content_providers.dart';
 import '../data/content_repository.dart';
 import '../widgets/bookstore_widgets.dart';
 
-/// 我的书架（B 模块，接口 2.7.12 书架管理）。
+/// 我的书架（B 模块，接口 2.7.12）。
 ///
-/// 受登录守卫保护（见 [ProtectedRoutes]）。列表为真实分页数据（只含服务端判定的
-/// 上架未删除作品，按加入书架时间倒序）；移出书架为物理删除，归属由服务端身份决定。
+/// 受登录守卫保护（见 [ProtectedRoutes]）。书架 = 「已购买 / 已获授权」的作品库，
+/// 由服务端按订单完成态与生效授权派生，按最近成交时间倒序；不再支持把普通作品加入书架，
+/// 因此页面没有移出操作，退款或授权到期后作品会自动从列表消失。
 ///
 /// 每行展示本书架阅读进度（读到第 X 章 · 时间，来自服务端 last_read_* 列），
 /// 「继续阅读」按进度回章节正文，无进度时回章节目录。
@@ -77,33 +77,6 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _remove(BookItem work) async {
-    try {
-      await ref.read(contentRepositoryProvider).removeShelf(work.workId);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      return;
-    }
-    // 书架态与个人中心预览区块一并失效，避免详情页/个人中心回显旧的「已在书架」。
-    ref.invalidate(shelfStatusProvider(work.workId));
-    ref.invalidate(shelfProvider);
-    // 本地移除该行并同步总数：不清空列表、不重置分页游标，用户停留在原滚动位置，
-    // 不再 load(refresh:true) 整页刷新导致深页操作后跳回第 1 页。
-    _controller.items.removeWhere((item) => item.workId == work.workId);
-    if (_controller.total > 0) _controller.total -= 1;
-    if (!mounted) return;
-    if (_controller.items.isEmpty) {
-      // 移除后已加载列表被清空：补一次首屏刷新，让空态/加载态与服务端一致。
-      await _controller.load(refresh: true);
-    } else {
-      setState(() {});
-    }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('已移出书架')));
   }
 
   /// 继续阅读：有进度回章节正文，否则回章节目录（未读过时无从续读）。
@@ -166,30 +139,16 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
             onTap: () => context.push(RoutePath.workDetailUrl(work.workId)),
             progressText: work.readingProgressLabel,
             // trailing 为 Row 中的非 flex 子项，先于 Expanded 标题区分配宽度；
-            // 收紧「继续阅读」按钮与移出图标的默认 padding / 最小点击区，
+            // 收紧「继续阅读」按钮的默认 padding / 最小点击区，
             // 避免小屏上把标题挤成一两个字（标题 ellipsis 由共享 WorkListTile 保证）。
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: () => _continueRead(work),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('继续阅读', style: TextStyle(fontSize: 13)),
-                ),
-                IconButton(
-                  onPressed: () => _remove(work),
-                  padding: const EdgeInsets.all(4),
-                  constraints:
-                      const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(Icons.bookmark_remove_outlined,
-                      size: 20, color: AppColors.text3),
-                  tooltip: '移出书架',
-                ),
-              ],
+            trailing: TextButton(
+              onPressed: () => _continueRead(work),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('继续阅读', style: TextStyle(fontSize: 13)),
             ),
           );
         },
@@ -210,7 +169,7 @@ class _EmptyShelf extends StatelessWidget {
         children: [
           Icon(Icons.menu_book_outlined, size: 40, color: AppColors.text3),
           SizedBox(height: 10),
-          Text('书架暂无作品，去首页添加吧',
+          Text('暂无已购作品，去书城看看',
               style: TextStyle(fontSize: 13, color: AppColors.text3)),
         ],
       ),

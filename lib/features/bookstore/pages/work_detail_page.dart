@@ -30,7 +30,7 @@ class WorkDetailPage extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('作品详情'),
-        actions: [_ShelfButton(workId: workId), _FavoriteButton(workId: workId)],
+        actions: [_AccessBadge(workId: workId), _FavoriteButton(workId: workId)],
       ),
       body: detailAsync.when(
         loading: () => const LoadingView(message: '加载中'),
@@ -167,73 +167,36 @@ class _RatingBarState extends ConsumerState<_RatingBar> {
   }
 }
 
-/// 加入/移出书架按钮（接口 2.7.12）。
+/// 阅读权限状态标识（接口 2.7.12）。
 ///
-/// 与收藏按钮同为公开页上的登录态动作：游客点击时先经 [AuthGuard.pushProtected]
-/// 引导登录并回跳，不为必然 401 的请求往返；登录态下按服务端下发的书架态切换。
-class _ShelfButton extends ConsumerStatefulWidget {
-  const _ShelfButton({required this.workId});
+/// 书架已改为「已购买 / 已获授权作品」派生，详情页不再提供加入/移出书架的动作，
+/// 此处只按服务端下发的授权态回显：「已获授权 · 可读全文」或「试读」。
+/// 游客不请求授权态（必然为否），直接按试读展示。
+class _AccessBadge extends ConsumerWidget {
+  const _AccessBadge({required this.workId});
 
   final int workId;
 
   @override
-  ConsumerState<_ShelfButton> createState() => _ShelfButtonState();
-}
-
-class _ShelfButtonState extends ConsumerState<_ShelfButton> {
-  bool _busy = false;
-
-  Future<void> _toggle(BuildContext context) async {
-    if (!AuthGuard.isLoggedIn(ref)) {
-      AuthGuard.pushProtected(
-        context,
-        ref,
-        target: RoutePath.workDetailUrl(widget.workId),
-      );
-      return;
-    }
-    if (_busy) return;
-    // 双保险：接口未返回有效值（加载中/失败）时不做任何反向操作，
-    // 避免把未知态误判为「未加入」而重复加入并弹出与事实相反的提示。
-    final onShelf =
-        ref.read(shelfStatusProvider(widget.workId)).valueOrNull?.onShelf;
-    if (onShelf == null) return;
-    setState(() => _busy = true);
-    try {
-      final repo = ref.read(contentRepositoryProvider);
-      if (onShelf) {
-        await repo.removeShelf(widget.workId);
-      } else {
-        await repo.addShelf(widget.workId);
-      }
-      ref.invalidate(shelfStatusProvider(widget.workId));
-      // 书架页与个人中心书架预览同步失效，避免回显过期列表。
-      ref.invalidate(shelfProvider);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(onShelf ? '已移出书架' : '已加入书架')),
-      );
-    } on ApiException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final loggedIn = AuthGuard.isLoggedIn(ref);
-    final shelfStatus =
-        loggedIn ? ref.watch(shelfStatusProvider(widget.workId)) : null;
-    final onShelf = shelfStatus?.valueOrNull?.onShelf ?? false;
-    // 登录态下接口尚未返回有效值（加载中/失败）时禁用按钮，未知态不可操作；
-    // 游客保持可点，点击走登录引导。
-    final enabled = loggedIn ? shelfStatus?.valueOrNull != null : true;
-    return IconButton(
-      onPressed: (_busy || !enabled) ? null : () => _toggle(context),
-      icon: Icon(onShelf ? Icons.bookmark : Icons.bookmark_add_outlined),
-      tooltip: onShelf ? '移出书架' : '加入书架',
+    final authorized =
+        loggedIn && (ref.watch(authorizedProvider(workId)).valueOrNull ?? false);
+    final label = authorized ? '已获授权' : '试读';
+    final color = authorized ? AppColors.primary : AppColors.text3;
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 11, color: color),
+        ),
+      ),
     );
   }
 }

@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 本地阅读进度：按作品ID记录「最后阅读到的章节」。
 ///
 /// 与服务端书架进度（PUT /content/shelf/{workId}/progress）互补：
-/// 服务端进度仅在作品已加入书架时对续读可用（未加书架返回 404 被静默忽略），
-/// 本存储对游客与未加书架用户同样生效，确保作品详情页「试读」按钮
+/// 服务端进度用于书架页「继续阅读」与跨端同步（首次阅读自动建立进度行），
+/// 本存储对游客同样生效，确保作品详情页「试读」按钮
 /// 「读过就能续上、首次进第一章」的口径在任何身份下都成立。
 class ReadProgress {
   const ReadProgress({

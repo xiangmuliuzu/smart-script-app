@@ -151,8 +151,9 @@ class ContentRepository {
 
   /// 我的书架列表（需 App Token，接口 2.7.12，分页 {total, list}）。
   ///
-  /// 响应同时携带身份摘要块（identity / downloadable / realNameRequired），
-  /// 书架页一次请求即可渲染身份卡片与列表；只回上架未删除作品，按加入时间倒序。
+  /// 书架语义：只包含已购买 / 已授权作品（由订单完成态与生效授权派生，按最近成交时间倒序），
+  /// 不再支持把普通作品加入书架。响应同时携带身份摘要块（identity / downloadable /
+  /// realNameRequired），书架页一次请求即可渲染身份卡片与列表。
   Future<ShelfPayload> shelf({int pageNum = 1, int pageSize = 20}) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentShelf,
@@ -163,37 +164,18 @@ class ContentRepository {
     return ShelfPayload.fromJson(data);
   }
 
-  /// 加入书架（需 App Token，接口 2.7.12，幂等：重复加入不产生重复记录）。
-  ///
-  /// 作品不存在或未上架时后端按 404 拒绝。
-  Future<void> addShelf(int workId) async {
-    await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.contentShelfByWorkId(workId),
-      parser: _mapParser,
-    );
-  }
-
-  /// 移出书架（需 App Token，接口 2.7.12，物理删除）；不在书架时为幂等成功。
-  Future<void> removeShelf(int workId) async {
-    await _api.delete<Map<String, dynamic>>(
-      ApiEndpoints.contentShelfByWorkId(workId),
-      parser: _mapParser,
-    );
-  }
-
-  /// 查询当前身份是否已在书架（需 App Token）。
-  Future<ShelfState> shelfStatus(int workId) async {
+  /// 当前身份是否已获该作品授权（已购或授权生效中），供详情页回显状态标识。
+  Future<bool> isWorkAuthorized(int workId) async {
     final data = await _api.get<Map<String, dynamic>>(
       ApiEndpoints.contentShelfByWorkId(workId),
       parser: _mapParser,
     );
-    if (data == null || data.isEmpty) throw ApiException('获取书架状态失败');
-    return ShelfState.fromJson(data);
+    return data != null && data['authorized'] == true;
   }
 
   /// 记录阅读进度（需 App Token，接口 2.7.12 补充写入）。
   ///
-  /// 只更新已加入书架的作品：不在书架时后端按 404 拒绝（阅读页忽略该错误）。
+  /// 首次阅读由服务端自动建立进度行（upsert），不再要求作品预先在书架中。
   Future<void> saveShelfProgress(int workId, int chapterId) async {
     await _api.put<Map<String, dynamic>>(
       ApiEndpoints.contentShelfProgress(workId),

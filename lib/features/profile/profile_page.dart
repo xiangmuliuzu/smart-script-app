@@ -1483,7 +1483,7 @@ class _ShelfSection extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        '书架暂无作品，去首页添加吧',
+                        '暂无已购作品，去书城看看',
                         style: TextStyle(fontSize: 12, color: AppColors.text3),
                       ),
                     ],
