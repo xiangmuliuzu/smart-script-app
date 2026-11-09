@@ -36,6 +36,8 @@ class ApiEndpoints {
   static String userFollowers(int userId) => '/users/$userId/followers';
   /// 关注 / 取消关注（POST / DELETE，幂等）。
   static String userFollow(int userId) => '/users/$userId/follow';
+  /// 拉黑 / 解除拉黑（POST / DELETE，幂等）。
+  static String userBlock(int userId) => '/users/$userId/block';
   /// 作者获赞统计（内容域）；作品列表复用书城 /content/works?authorId=。
   static String userProfileStats(int userId) => '/content/users/$userId/stats';
 

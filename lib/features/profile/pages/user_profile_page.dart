@@ -37,6 +37,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
   bool? _following;
   int? _followerCount;
 
+  /// 乐观拉黑态：操作成功后用本地值渲染，同时刷新公开资料。
+  bool? _blocked;
+
   int get _targetUserId {
     if (widget.userId > 0) return widget.userId;
     return ref.read(authControllerProvider).user?.userId ?? 0;
@@ -77,25 +80,58 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
     ref.read(authControllerProvider.notifier).refreshMe();
   }
 
+  /// 右上角「···」：底部操作面板（编辑资料 / 拉黑 / 解除拉黑）。
+  Future<void> _openActions(UserProfileView profile) async {
+    final blocked = _blocked ?? profile.isBlocked;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProfileActionsSheet(isSelf: profile.isSelf, blocked: blocked),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'edit':
+        await _openEdit();
+      case 'block':
+        await _toggleBlock(profile, block: true);
+      case 'unblock':
+        await _toggleBlock(profile, block: false);
+    }
+  }
+
+  Future<void> _toggleBlock(UserProfileView profile, {required bool block}) async {
+    if (_busy) return;
+    final repo = ref.read(userSocialRepositoryProvider);
+    setState(() => _busy = true);
+    try {
+      final blocked = block ? await repo.block(profile.userId) : await repo.unblock(profile.userId);
+      if (!mounted) return;
+      setState(() => _blocked = blocked);
+      ref.invalidate(userProfileViewProvider(_targetUserId));
+      _toast(blocked ? '已加入黑名单' : '已解除黑名单');
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } catch (_) {
+      _toast('操作失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final targetId = _targetUserId;
     final profileAsync = ref.watch(userProfileViewProvider(targetId));
-    final isSelf = targetId == 0 || profileAsync.valueOrNull?.isSelf == true;
+    final profile = profileAsync.valueOrNull;
 
     return UserCenterScaffold(
       title: '个人主页',
       actions: [
-        if (isSelf)
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'edit') _openEdit();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'edit', child: Text('编辑个人资料')),
-            ],
-          ),
+        IconButton(
+          icon: const Icon(Icons.more_horiz),
+          tooltip: '更多',
+          onPressed: profile == null ? null : () => _openActions(profile),
+        ),
       ],
       body: profileAsync.when(
         loading: () => const LoadingView(message: '加载中'),
@@ -111,6 +147,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
   Widget _buildBody(UserProfileView profile) {
     final following = _following ?? profile.isFollowing;
     final followerCount = _followerCount ?? profile.followerCount;
+    final blocked = _blocked ?? profile.isBlocked;
     return ListView(
       padding: EdgeInsets.zero,
       children: [
@@ -119,6 +156,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage> {
           followerCount: followerCount,
           onFollow: () => _toggleFollow(profile),
           following: following,
+          blocked: blocked,
           busy: _busy,
           onTapFollowing: () => _openFollowList(profile.userId, following: true),
           onTapFollowers: () => _openFollowList(profile.userId, following: false),
@@ -146,6 +184,7 @@ class _Header extends StatelessWidget {
     required this.profile,
     required this.followerCount,
     required this.following,
+    required this.blocked,
     required this.busy,
     required this.onFollow,
     required this.onTapFollowing,
@@ -155,6 +194,7 @@ class _Header extends StatelessWidget {
   final UserProfileView profile;
   final int followerCount;
   final bool following;
+  final bool blocked;
   final bool busy;
   final VoidCallback onFollow;
   final VoidCallback onTapFollowing;
@@ -217,7 +257,8 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               // 自己的主页不显示任何按钮：编辑资料在右上角「···」菜单里。
-              if (!profile.isSelf)
+              // 已拉黑对方时也不显示关注按钮（服务端会拒绝关注）。
+              if (!profile.isSelf && !blocked)
                 _FollowButton(following: following, busy: busy, onTap: onFollow),
             ],
           ),
@@ -438,4 +479,84 @@ class _Avatar extends StatelessWidget {
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.primary),
         ),
       );
+}
+
+/// 个人主页右上角「···」底部操作面板。
+///
+/// 结构与参考交互一致：左侧圆形图标 + 文案作为主操作，底部「取消」。
+/// 自己：编辑个人资料；他人：加入黑名单 / 解除拉黑。
+class _ProfileActionsSheet extends StatelessWidget {
+  const _ProfileActionsSheet({required this.isSelf, required this.blocked});
+
+  final bool isSelf;
+  final bool blocked;
+
+  @override
+  Widget build(BuildContext context) {
+    final String action;
+    final IconData icon;
+    final String label;
+    if (isSelf) {
+      action = 'edit';
+      icon = Icons.edit_outlined;
+      label = '编辑个人资料';
+    } else if (blocked) {
+      action = 'unblock';
+      icon = Icons.lock_open;
+      label = '解除拉黑';
+    } else {
+      action = 'block';
+      icon = Icons.block;
+      label = '加入黑名单';
+    }
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => Navigator.of(context).pop(action),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: const BoxDecoration(
+                        color: AppColors.fill,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 28, color: AppColors.text1),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(label, style: const TextStyle(fontSize: 14, color: AppColors.text1)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消', style: TextStyle(fontSize: 16, color: AppColors.text1)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

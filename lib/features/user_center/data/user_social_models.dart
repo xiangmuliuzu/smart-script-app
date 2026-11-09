@@ -18,6 +18,7 @@ class UserProfileView {
     this.likeCount = 0,
     this.isFollowing = false,
     this.isSelf = false,
+    this.isBlocked = false,
   });
 
   final int userId;
@@ -39,6 +40,9 @@ class UserProfileView {
   /// 被查看的是否就是当前登录用户本人。
   final bool isSelf;
 
+  /// 当前登录用户是否已将该用户加入黑名单。
+  final bool isBlocked;
+
   /// 是否创作者（影响标签展示）。
   bool get isCreator => userType == '02';
 
@@ -54,6 +58,7 @@ class UserProfileView {
         likeCount: _int(json['likeCount']),
         isFollowing: json['isFollowing'] as bool? ?? false,
         isSelf: json['isSelf'] as bool? ?? false,
+        isBlocked: json['isBlocked'] as bool? ?? false,
       );
 
   UserProfileView copyWith({
@@ -61,6 +66,7 @@ class UserProfileView {
     int? followerCount,
     int? likeCount,
     bool? isFollowing,
+    bool? isBlocked,
   }) =>
       UserProfileView(
         userId: userId,
@@ -74,6 +80,7 @@ class UserProfileView {
         likeCount: likeCount ?? this.likeCount,
         isFollowing: isFollowing ?? this.isFollowing,
         isSelf: isSelf,
+        isBlocked: isBlocked ?? this.isBlocked,
       );
 }
 

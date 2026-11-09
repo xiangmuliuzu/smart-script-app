@@ -47,6 +47,20 @@ class UserSocialRepository {
   /// 取消关注（幂等）。
   Future<FollowResult> unfollow(int userId) => _toggle(userId, follow: false);
 
+  /// 拉黑（幂等）；被拉黑方无法再发起询盘、会话、消息与关注。
+  Future<bool> block(int userId) => _toggleBlock(userId, block: true);
+
+  /// 解除拉黑（幂等）。
+  Future<bool> unblock(int userId) => _toggleBlock(userId, block: false);
+
+  Future<bool> _toggleBlock(int userId, {required bool block}) async {
+    final path = ApiEndpoints.userBlock(userId);
+    final data = block
+        ? await _api.post<Map<String, dynamic>>(path, parser: _mapParser)
+        : await _api.delete<Map<String, dynamic>>(path, parser: _mapParser);
+    return data?['blocked'] as bool? ?? block;
+  }
+
   Future<FollowResult> _toggle(int userId, {required bool follow}) async {
     final path = ApiEndpoints.userFollow(userId);
     final data = follow
