@@ -4,6 +4,18 @@
 /// SysDemandTag / SysBusinessFollow。
 /// 金额单位：分（后端 BigDecimal 序列化后为 double，前端展示时 /100）。
 
+// ==================== 时长展示 ====================
+
+/// 时长统一按小时存储/填写，展示时自动折算为「X 天 Y 小时」（兼容历史天+小时数据）。
+String formatDurationHours(int totalHours) {
+  if (totalHours <= 0) return '-';
+  final days = totalHours ~/ 24;
+  final hours = totalHours % 24;
+  if (days > 0 && hours > 0) return '$days 天 $hours 小时';
+  if (days > 0) return '$days 天';
+  return '$hours 小时';
+}
+
 // ==================== 枚举常量 ====================
 
 /// 询盘状态（对齐后端 TradeInquiryService：accepted 已于 2026-09-29 并入 quoted）
@@ -1189,14 +1201,10 @@ class DemandStage {
     }
   }
 
-  /// 本轮时限文案（天+小时）。
+  /// 本轮时限文案：按总小时数自动折算天数后展示。
   String get durationText {
-    final d = durationDays ?? 0;
-    final h = durationHours ?? 0;
-    if (d > 0 && h > 0) return '$d 天 $h 小时';
-    if (d > 0) return '$d 天';
-    if (h > 0) return '$h 小时';
-    return '-';
+    final total = (durationDays ?? 0) * 24 + (durationHours ?? 0);
+    return formatDurationHours(total);
   }
 
   /// 绝对截止文案：“X月X日 HH:mm”；未激活返回 null。
@@ -1224,15 +1232,9 @@ class DemandStage {
   /// 是否有待处理的延时申请（轮次行上的最近一次快照；完整历史见 DemandExtendApply）。
   bool get hasPendingExtend => extendStatus == 'pending';
 
-  /// 延时申请量文案（天+小时）。
-  String get extendAskText {
-    final d = extendDays ?? 0;
-    final h = extendHours ?? 0;
-    if (d > 0 && h > 0) return '$d天$h小时';
-    if (d > 0) return '$d天';
-    if (h > 0) return '$h小时';
-    return '-';
-  }
+  /// 延时申请量文案：统一按总小时数折算展示（兼容历史天+小时数据）。
+  String get extendAskText =>
+      formatDurationHours((extendDays ?? 0) * 24 + (extendHours ?? 0));
 
   /// 本轮是否已逾期（活动轮且当前时间超过 dueAt；待审核期间计时暂停不算逾期）。
   bool get isOverdueNow {
@@ -1302,15 +1304,8 @@ class DemandExtendApply {
     }
   }
 
-  /// 申请量文案（天+小时）。
-  String get askText {
-    final d = days ?? 0;
-    final h = hours ?? 0;
-    if (d > 0 && h > 0) return '$d天$h小时';
-    if (d > 0) return '$d天';
-    if (h > 0) return '$h小时';
-    return '-';
-  }
+  /// 申请量文案：统一按总小时数折算展示（兼容历史天+小时数据）。
+  String get askText => formatDurationHours((days ?? 0) * 24 + (hours ?? 0));
 
   /// 申请时间文案“X月X日 HH:mm”。
   String get appliedText {

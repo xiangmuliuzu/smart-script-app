@@ -30,23 +30,27 @@ class DemandTaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = DemandGenre.colorOf(task.genreId);
-    return Material(
-      color: AppColors.card,
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.06),
-      borderRadius: BorderRadius.circular(14),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
+      ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap ??
-              (task.demandId == null
-                  ? null
-                  : () => context.push(RoutePath.demandDetailUrl(task.demandId!))),
-          child: Ink(
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: accent, width: 4)),
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap ??
+                (task.demandId == null
+                    ? null
+                    : () => context.push(RoutePath.demandDetailUrl(task.demandId!))),
+            child: Ink(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: accent.withOpacity(0.85), width: 3)),
+              ),
+              child: _buildBody(context),
             ),
-            child: _buildBody(context),
           ),
         ),
       ),
@@ -56,7 +60,7 @@ class DemandTaskCard extends StatelessWidget {
   Widget _buildBody(BuildContext context) {
     final tags = _parseTags(task.tags);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(13, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -67,10 +71,10 @@ class DemandTaskCard extends StatelessWidget {
                 child: Text(
                   task.title ?? '未命名任务',
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.text1,
-                    height: 1.3,
+                    height: 1.35,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -115,7 +119,9 @@ class DemandTaskCard extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 11),
+          Container(height: 0.6, color: AppColors.divider),
+          const SizedBox(height: 9),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -150,19 +156,19 @@ class _StatusChip extends StatelessWidget {
   final DemandTask task;
 
   static Color _color(DemandTask t) {
-    if (t.isOverdue == 1) return const Color(0xFFDC2626);
+    if (t.isOverdue == 1) return AppColors.danger;
     switch (t.status) {
       case DemandStatus.open:
-        return const Color(0xFF22C55E);
+        return AppColors.success;
       case DemandStatus.inProgress:
-        return const Color(0xFF3B82F6);
+        return const Color(0xFF3B6BB5);
       case DemandStatus.completed:
       case DemandStatus.selected:
         return AppColors.primary;
       case DemandStatus.failed:
-        return const Color(0xFFDC2626);
+        return AppColors.danger;
       default:
-        return const Color(0xFF9CA3AF);
+        return AppColors.text3;
     }
   }
 
@@ -170,15 +176,15 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = _color(task);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: c.withOpacity(0.28), width: 0.6),
+        color: c.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: c.withOpacity(0.35), width: 0.8),
       ),
       child: Text(
         task.statusLabel,
-        style: TextStyle(fontSize: 11, color: c, fontWeight: FontWeight.w600),
+        style: TextStyle(fontSize: 10.5, color: c, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -192,14 +198,14 @@ class _TagPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withOpacity(0.07),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
+        style: TextStyle(fontSize: 10.5, color: color, fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -321,23 +327,23 @@ class _DeadlineBadgeState extends State<_DeadlineBadge> {
   Widget build(BuildContext context) {
     final info = _info;
     final (Color bg, Color fg) = switch (info.tone) {
-      _DeadlineTone.overdue => (const Color(0xFFFDE8E8), const Color(0xFFDC2626)),
-      _DeadlineTone.urgent => (const Color(0xFFFEF3C7), const Color(0xFFD97706)),
-      _DeadlineTone.closed => (const Color(0xFFF3F4F6), const Color(0xFF6B7280)),
+      _DeadlineTone.overdue => (AppColors.danger.withOpacity(0.08), AppColors.danger),
+      _DeadlineTone.urgent => (AppColors.warning.withOpacity(0.10), AppColors.warning),
+      _DeadlineTone.closed => (AppColors.fill, AppColors.text3),
       _DeadlineTone.selected => (AppColors.primaryTint, AppColors.primary),
-      _DeadlineTone.neutral => (const Color(0xFFF3F4F6), const Color(0xFF4B5563)),
+      _DeadlineTone.neutral => (AppColors.fill, AppColors.text2),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(task.status == DemandStatus.inProgress ? Icons.timer_outlined : Icons.schedule,
-              size: 12, color: fg),
-          const SizedBox(width: 4),
+              size: 11, color: fg),
+          const SizedBox(width: 3),
           Text(info.label,
-              style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+              style: TextStyle(fontSize: 10.5, color: fg, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -368,14 +374,14 @@ class _PublisherBlock extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
-          radius: 10,
+          radius: 9,
           backgroundColor: AppColors.primaryTint,
           child: Text(
             name.isEmpty ? '·' : name.substring(0, 1),
-            style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 9.5, color: AppColors.primary, fontWeight: FontWeight.w600),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
@@ -383,19 +389,19 @@ class _PublisherBlock extends StatelessWidget {
             Text(
               statusText,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 color: AppColors.text2,
                 fontWeight: FontWeight.w600,
               ),
             ),
             if (name.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.only(top: 1),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 96),
+                  constraints: const BoxConstraints(maxWidth: 92),
                   child: Text(
                     name,
-                    style: const TextStyle(fontSize: 10, color: AppColors.text3),
+                    style: const TextStyle(fontSize: 9.5, color: AppColors.text3),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
@@ -425,35 +431,41 @@ class DemandCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 108,
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      height: 112,
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 13),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider, width: 0.8),
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _bar(w: 150, h: 14),
+              _bar(w: 150, h: 13),
               const Spacer(),
-              _bar(w: 52, h: 18, radius: 9),
+              _bar(w: 46, h: 16, radius: 4),
             ],
           ),
-          const SizedBox(height: 12),
-          _bar(w: 230, h: 10),
-          const SizedBox(height: 8),
-          _bar(w: 120, h: 10),
+          const SizedBox(height: 10),
+          _bar(w: 240, h: 9),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              _bar(w: 40, h: 14, radius: 3),
+              const SizedBox(width: 6),
+              _bar(w: 52, h: 14, radius: 3),
+            ],
+          ),
           const Spacer(),
           Row(
             children: [
-              _bar(w: 72, h: 16),
-              const SizedBox(width: 12),
-              _bar(w: 56, h: 12),
+              _bar(w: 70, h: 15),
+              const SizedBox(width: 10),
+              _bar(w: 52, h: 11),
               const Spacer(),
-              _bar(w: 44, h: 12),
+              _bar(w: 44, h: 11),
             ],
           ),
         ],
@@ -466,7 +478,7 @@ class DemandCardSkeleton extends StatelessWidget {
       width: w,
       height: h,
       decoration: BoxDecoration(
-        color: AppColors.placeholder.withOpacity(0.35),
+        color: AppColors.placeholder.withOpacity(0.32),
         borderRadius: BorderRadius.circular(radius),
       ),
     );

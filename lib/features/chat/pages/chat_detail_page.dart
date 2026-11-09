@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -39,18 +40,38 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   bool _isSending = false;
   int? _lastSentAmount; // 上次发送的报价金额（分），用于判断金额是否变化
   _TradeContext? _tradeContext; // 交易会话上下文
+  Quote? _latestQuote; // 最新报价（顶部议价栏展示的金额来源）
 
   @override
   void initState() {
     super.initState();
+    // 输入文字或修改金额后立即刷新发送按钮可用态
+    _inputController.addListener(_onInputChanged);
+    _amountController.addListener(_onInputChanged);
     // 进入页面时标记已读
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _markAsRead();
     });
   }
 
+  void _onInputChanged() {
+    if (!mounted) return;
+    // QuoteInputCard 会在自身 build 中回填最新报价金额，同步触发的监听不能直接 setState
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+      return;
+    }
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _inputController.removeListener(_onInputChanged);
+    _amountController.removeListener(_onInputChanged);
     _inputController.dispose();
     _amountController.dispose();
     _scrollController.dispose();
@@ -68,19 +89,43 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     }
   }
 
-  Future<void> _sendMessage() async {
-    final content = _inputController.text.trim();
-    if (content.isEmpty || _isSending) return;
+  /// 发送按钮可用条件：有文字，或（TRADE 会话）金额与顶部价格不同可单独发起报价/议价。
+  bool get _canSendMessage {
+    if (_isSending) return false;
+    if (_inputController.text.trim().isNotEmpty) return true;
+    final ctx = _tradeContext;
+    if (ctx == null) return false;
+    // 已成交后不再允许改价
+    if (_latestQuote?.status == 'accepted') return false;
+    final int? amountFen = _parseAmountFen(_amountController.text.trim());
+    if (amountFen == null) return false;
+    return amountFen != _quoteBaseline(ctx);
+  }
 
-    // 检查报价金额是否变化（仅 TRADE 会话）
+  /// 金额变化基准：优先取顶部议价栏的最新报价，无报价时取询盘预算。
+  int? _quoteBaseline(_TradeContext ctx) =>
+      _latestQuote?.amount ?? _lastSentAmount ?? ctx.budget;
+
+  Future<void> _sendMessage() async {
+    if (_isSending) return;
+    final ctx = _tradeContext;
+    final content = _inputController.text.trim();
     final int? newAmountFen = _parseAmountFen(_amountController.text.trim());
-    final bool amountChanged = newAmountFen != null && newAmountFen != _lastSentAmount;
+    final bool amountChanged = ctx != null &&
+        _latestQuote?.status != 'accepted' &&
+        newAmountFen != null &&
+        newAmountFen != _quoteBaseline(ctx);
+
+    // 既没有文字、金额也没变化：无可发送内容
+    if (content.isEmpty && !amountChanged) {
+      showAppToast(context, '请输入消息内容，或修改上方金额后发送议价');
+      return;
+    }
 
     setState(() => _isSending = true);
     try {
-      // 金额变化时先发送报价
-      if (amountChanged && _tradeContext != null) {
-        final ctx = _tradeContext!;
+      // 金额变化时先发送报价/议价；此时即使没有文字，也单独完成一次议价
+      if (amountChanged) {
         final repo = ref.read(tradeRepositoryProvider);
         final quote = Quote(
           inquiryId: ctx.inquiryId,
@@ -96,15 +141,21 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         }
         _lastSentAmount = newAmountFen;
         ref.invalidate(latestQuoteProvider(ctx.inquiryId));
+        // 报价接口会生成 [报价]/[议价] 系统消息卡片，刷新列表
+        ref.invalidate(messagesProvider(widget.sessionId));
       }
 
-      final chatRepo = ref.read(chatRepositoryProvider);
-      await chatRepo.sendMessage(widget.sessionId, content);
-      _inputController.clear();
-      // 刷新消息列表
-      ref.invalidate(messagesProvider(widget.sessionId));
-      // 标记已读
-      await _markAsRead();
+      if (content.isNotEmpty) {
+        final chatRepo = ref.read(chatRepositoryProvider);
+        await chatRepo.sendMessage(widget.sessionId, content);
+        _inputController.clear();
+        // 刷新消息列表
+        ref.invalidate(messagesProvider(widget.sessionId));
+        // 标记已读
+        await _markAsRead();
+      } else if (ctx != null && mounted) {
+        showAppToast(context, ctx.isSeller ? '报价已发送' : '议价已发送');
+      }
     } catch (e) {
       if (mounted) {
         showAppToast(context, '发送失败：$e');
@@ -157,6 +208,13 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       data: (s) => s.session.inquiryId,
     );
 
+    // 顶部议价栏展示的金额来源：最新报价，无报价时回退询盘预算
+    Quote? latestQuote;
+    if (isTrade && inquiryId != null) {
+      latestQuote = ref.watch(latestQuoteProvider(inquiryId)).valueOrNull;
+    }
+    _latestQuote = latestQuote;
+
     // 对 TRADE 会话，加载询盘以确定买卖角色 + 预算/授权类型
     bool isBuyer = false;
     bool isSeller = false;
@@ -176,6 +234,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             isBuyer: isBuyer,
             isSeller: isSeller,
             licenseType: licenseType,
+            budget: budget,
           );
         },
       );
@@ -426,14 +485,19 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         ),
         const SizedBox(width: 8),
         IconButton(
-          onPressed: _isSending ? null : _sendMessage,
+          // 有文字可发消息；无文字但金额与顶部价格不同则单独发议价
+          onPressed: _canSendMessage ? _sendMessage : null,
+          tooltip: _canSendMessage ? '发送' : '输入消息，或修改上方金额后发送议价',
           icon: _isSending
               ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.send, color: AppColors.primary),
+              : Icon(
+                  Icons.send,
+                  color: _canSendMessage ? AppColors.primary : AppColors.text3,
+                ),
         ),
       ],
     );
@@ -446,12 +510,14 @@ class _TradeContext {
   final bool isBuyer;
   final bool isSeller;
   final String? licenseType;
+  final int? budget; // 分，无报价时作为顶栏展示金额与议价基准
 
   const _TradeContext({
     required this.inquiryId,
     required this.isBuyer,
     required this.isSeller,
     this.licenseType,
+    this.budget,
   });
 }
 
