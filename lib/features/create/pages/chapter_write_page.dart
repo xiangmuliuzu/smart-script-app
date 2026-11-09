@@ -436,7 +436,11 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                             color: AppColors.text2)),
                     const Spacer(),
                     GestureDetector(
-                      onTap: () => setState(() => _aiPanelOpen = !_aiPanelOpen),
+                      onTap: () {
+                        // 收起时先收起键盘，避免残留焦点。
+                        if (_aiPanelOpen) FocusScope.of(context).unfocus();
+                        setState(() => _aiPanelOpen = !_aiPanelOpen);
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
@@ -462,16 +466,17 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                 ),
               ),
               const Divider(height: 0.5, color: AppColors.divider),
-              if (_aiPanelOpen) ...[
-                // 键盘弹起时面板随剩余空间压缩并可滚动，避免底部溢出（黄黑警戒条）。
-                Flexible(
+              // 收起时只隐藏、不销毁面板 State：再次展开仍保留上次输入与生成结果。
+              Flexible(
+                child: Offstage(
+                  offstage: !_aiPanelOpen,
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                     child: AiInlinePanel(onInsert: _insertAiText),
                   ),
                 ),
-                const SizedBox(height: 4),
-              ],
+              ),
+              if (_aiPanelOpen) const SizedBox(height: 4),
             ],
             // 正文输入
             Expanded(

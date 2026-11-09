@@ -43,6 +43,7 @@ import '../../features/ai/ai_storyboard_page.dart';
 import '../../features/ai/ai_record_page.dart';
 import '../../features/ai/ai_chance_page.dart';
 import '../../features/welfare/welfare_center_page.dart';
+import '../../features/welfare/recharge_page.dart';
 import '../../features/welfare/welfare_exchange_page.dart';
 import '../../features/welfare/welfare_exchange_records_page.dart';
 import '../../features/welfare/welfare_points_detail_page.dart';
@@ -570,6 +571,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.welfareExchange,
         name: RouteName.welfareExchange,
         builder: (_, __) => const WelfareExchangePage(),
+      ),
+      // ===== E 模块：积分充值（受登录守卫保护）=====
+      GoRoute(
+        path: RoutePath.welfareRecharge,
+        name: RouteName.welfareRecharge,
+        builder: (_, __) => const RechargePage(),
       ),
       GoRoute(
         path: RoutePath.welfarePointsDetail,

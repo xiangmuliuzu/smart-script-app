@@ -26,7 +26,7 @@ class AiOutlinePage extends ConsumerStatefulWidget {
 class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   final _inspiration = TextEditingController();
   final _genre = TextEditingController();
-  final _style = TextEditingController();
+  final _episodes = TextEditingController(text: '12');
   int? _skillId;
   String? _model;
 
@@ -40,13 +40,19 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   void dispose() {
     _inspiration.dispose();
     _genre.dispose();
-    _style.dispose();
+    _episodes.dispose();
     super.dispose();
   }
 
   Future<void> _generate() async {
     if (_inspiration.text.trim().isEmpty) {
-      showAppToast(context, '请先输入作品主题或灵感');
+      showAppToast(context, '请先输入你的要求');
+      return;
+    }
+    // 集数口径与 PC 用户端一致：1–200 的整数，默认 12。
+    final episodes = int.tryParse(_episodes.text.trim()) ?? 0;
+    if (episodes < 1 || episodes > 200) {
+      showAppToast(context, '集数需为 1–200 的整数');
       return;
     }
     setState(() {
@@ -57,9 +63,11 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
     try {
       final container = ProviderScope.containerOf(context, listen: false);
       final result = await ref.read(aiRepositoryProvider).outlineStream(
-            inspiration: _inspiration.text.trim(),
+            inspiration: '${_inspiration.text.trim()}\n'
+                '请提供 $episodes 个分集，每集单独一行标题，格式为“第1集：章节名称”，'
+                '下一行写该集剧情概要。',
             genre: _genre.text.trim(),
-            style: _style.text.trim(),
+            style: '共 $episodes 集',
             skillId: _skillId,
             model: _model,
             onDelta: (delta) {
@@ -116,7 +124,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
           _InputCard(
             inspiration: _inspiration,
             genre: _genre,
-            style: _style,
+            episodes: _episodes,
             loading: _loading,
             selectedSkillId: _skillId,
             onSkillChanged: (value) => setState(() => _skillId = value),
@@ -195,7 +203,7 @@ class _InputCard extends StatelessWidget {
   const _InputCard({
     required this.inspiration,
     required this.genre,
-    required this.style,
+    required this.episodes,
     required this.loading,
     required this.selectedSkillId,
     required this.onSkillChanged,
@@ -206,7 +214,7 @@ class _InputCard extends StatelessWidget {
 
   final TextEditingController inspiration;
   final TextEditingController genre;
-  final TextEditingController style;
+  final TextEditingController episodes;
   final bool loading;
   final int? selectedSkillId;
   final ValueChanged<int?> onSkillChanged;
@@ -226,13 +234,12 @@ class _InputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _Label(text: '主题 / 灵感', required: true),
+          const _Label(text: '你的要求', required: true),
           const SizedBox(height: 8),
           TextField(
             controller: inspiration,
             maxLines: 4,
-            decoration: _inputDecoration(
-                '例如：落魄青年意外获得穿越能力，改写人生'),
+            decoration: _inputDecoration('人物、故事线、希望埋下的反转…'),
           ),
           const SizedBox(height: 16),
           AiSkillSelector(
@@ -248,18 +255,39 @@ class _InputCard extends StatelessWidget {
             enabled: !loading,
           ),
           const SizedBox(height: 16),
-          const _Label(text: '题材（可选）'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: genre,
-            decoration: _inputDecoration('例如：都市、玄幻、悬疑'),
-          ),
-          const SizedBox(height: 16),
-          const _Label(text: '风格（可选）'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: style,
-            decoration: _inputDecoration('例如：爽文、正剧、轻松搞笑'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _Label(text: '题材（可选）'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: genre,
+                      decoration: _inputDecoration('例如：都市情感'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 88,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _Label(text: '集数'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: episodes,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputDecoration('12'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           SizedBox(

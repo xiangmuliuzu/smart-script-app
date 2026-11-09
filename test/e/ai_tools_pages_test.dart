@@ -43,6 +43,7 @@ class _FakeAiRepository implements AiRepository {
     required String prompt,
     String? type,
     int? skillId,
+    String? model,
   }) async {
     calls.add('write:$prompt');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -55,6 +56,7 @@ class _FakeAiRepository implements AiRepository {
     required String prompt,
     String? type,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt');
@@ -70,6 +72,7 @@ class _FakeAiRepository implements AiRepository {
     required String content,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     calls.add('polish:$content|$style');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -82,6 +85,7 @@ class _FakeAiRepository implements AiRepository {
     required String content,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('polishStream:$content|$style');
@@ -98,6 +102,7 @@ class _FakeAiRepository implements AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -115,6 +120,7 @@ class _FakeAiRepository implements AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
@@ -131,6 +137,9 @@ class _FakeAiRepository implements AiRepository {
   }
 
   @override
+  Future<List<AiChannel>> listModels() async => const [];
+
+  @override
   Future<List<AiSkill>> listSkills() async => const [
         AiSkill(id: 1, skillName: '悬疑烧脑导演', skillType: 'write'),
         AiSkill(id: 2, skillName: '甜宠爆款导演', skillType: 'write'),
@@ -142,6 +151,7 @@ class _FakeAiRepository implements AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     calls.add('storyboard:$script|$style|skill=$skillId');
     return AiWriteResult(content: '【镜1】全景…', recordId: 33);
@@ -152,6 +162,7 @@ class _FakeAiRepository implements AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('storyboardStream:$script|$style|skill=$skillId');
@@ -216,7 +227,7 @@ void main() {
       // 空输入点击生成
       await tester.tap(find.text('生成剧本大纲'));
       await tester.pump();
-      expect(find.text('请先输入作品主题或灵感'), findsOneWidget);
+      expect(find.text('请先输入你的要求'), findsOneWidget);
 
       // 填入主题/题材/风格
       final fields = find.byType(TextField);

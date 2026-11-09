@@ -33,6 +33,7 @@ class _FakeAiRepository implements AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream|skill=$skillId');
@@ -49,6 +50,7 @@ class _FakeAiRepository implements AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('storyboardStream:$script|$style|skill=$skillId');
@@ -56,6 +58,9 @@ class _FakeAiRepository implements AiRepository {
     onDelta('【镜2】中景 男主抬头 时长4s');
     return AiWriteResult(content: storyboardText, recordId: 7);
   }
+
+  @override
+  Future<List<AiChannel>> listModels() async => const [];
 
   @override
   Future<List<AiSkill>> listSkills() async => const [
@@ -95,9 +100,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('导演(skill)'), findsOneWidget);
-      expect(find.text('默认导演'), findsOneWidget);
+      expect(find.text('请选择导演'), findsOneWidget);
 
-      await tester.tap(find.text('默认导演'));
+      await tester.tap(find.text('请选择导演'));
       await tester.pumpAndSettle();
       expect(find.text('悬疑烧脑导演'), findsOneWidget);
       expect(find.text('甜宠爆款导演'), findsOneWidget);
@@ -153,7 +158,7 @@ void main() {
       // 填写剧本并选择导演后生成
       await tester.enterText(
           find.byType(TextField).first, '男主深夜在小巷偶遇旧友，对峙。');
-      await tester.tap(find.text('默认导演'));
+      await tester.tap(find.text('请选择导演'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('悬疑烧脑导演'));
       await tester.pumpAndSettle();

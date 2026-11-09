@@ -324,6 +324,7 @@ class RoutePath {
   /// App 端 E 模块：福利中心与 AI 创作。
   static const String welfareCenter = '/welfare';
   static const String welfareExchange = '/welfare/exchange';
+  static const String welfareRecharge = '/welfare/recharge';
   static const String welfarePointsDetail = '/welfare/points-detail';
   static const String welfareExchangeRecords = '/welfare/exchange-records';
   static const String aiCenter = '/ai';
@@ -453,6 +454,7 @@ class RouteName {
   // ===== E 模块：福利中心与 AI 创作 =====
   static const String welfareCenter = 'welfareCenter';
   static const String welfareExchange = 'welfareExchange';
+  static const String welfareRecharge = 'welfareRecharge';
   static const String welfarePointsDetail = 'welfarePointsDetail';
   static const String welfareExchangeRecords = 'welfareExchangeRecords';
   static const String aiCenter = 'aiCenter';
@@ -517,6 +519,7 @@ class ProtectedRoutes {
     RoutePath.incomeOverview,
     // E 模块：福利中心与 AI 创作（需登录）
     RoutePath.welfareCenter,
+    RoutePath.welfareRecharge,
     RoutePath.aiCenter,
     // 印章管理（需登录）
     RoutePath.mySeal,

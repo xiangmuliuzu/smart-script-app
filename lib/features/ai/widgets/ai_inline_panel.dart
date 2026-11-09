@@ -38,10 +38,10 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   int? _skillId;
   String? _model;
 
-  // 大纲
+  // 大纲（与 PC 用户端一致：题材 + 集数 + 你的要求）
   final _inspiration = TextEditingController();
   final _genre = TextEditingController();
-  final _style = TextEditingController();
+  final _episodes = TextEditingController(text: '12');
 
   // 写作
   final _prompt = TextEditingController();
@@ -65,7 +65,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   void dispose() {
     _inspiration.dispose();
     _genre.dispose();
-    _style.dispose();
+    _episodes.dispose();
     _prompt.dispose();
     _type.dispose();
     _content.dispose();
@@ -91,6 +91,12 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       showAppToast(context, hint);
       return;
     }
+    // 集数口径与 PC 用户端一致：1–200 的整数，默认 12。
+    final episodes = int.tryParse(_episodes.text.trim()) ?? 0;
+    if (_tab == _AiTab.outline && (episodes < 1 || episodes > 200)) {
+      showAppToast(context, '集数需为 1–200 的整数');
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -110,9 +116,11 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       switch (_tab) {
         case _AiTab.outline:
           final result = await repo.outlineStream(
-            inspiration: _inspiration.text.trim(),
+            inspiration: '${_inspiration.text.trim()}\n'
+                '请提供 $episodes 个分集，每集单独一行标题，格式为“第1集：章节名称”，'
+                '下一行写该集剧情概要。',
             genre: _genre.text.trim(),
-            style: _style.text.trim(),
+            style: '共 $episodes 集',
             skillId: _skillId,
             model: _model,
             onDelta: onDelta,
@@ -372,11 +380,27 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       _AiTab.outline => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _field(_inspiration, '主题 / 灵感 *', 3, '例如：落魄青年意外获得穿越能力'),
+            _field(_inspiration, '你的要求 *', 4, '人物、故事线、希望埋下的反转…'),
             const SizedBox(height: 10),
-            _field(_genre, '题材（可选）', 1, '例如：都市、玄幻、悬疑'),
-            const SizedBox(height: 10),
-            _field(_style, '风格（可选）', 1, '例如：爽文、正剧、轻松搞笑'),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _field(_genre, '题材（可选）', 1, '例如：都市情感'),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 84,
+                  child: _field(
+                    _episodes,
+                    '集数',
+                    1,
+                    '12',
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       _AiTab.write => Column(
@@ -497,8 +521,9 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     TextEditingController controller,
     String label,
     int maxLines,
-    String hint,
-  ) {
+    String hint, {
+    TextInputType? keyboardType,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -511,6 +536,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
         TextField(
           controller: controller,
           maxLines: maxLines,
+          keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: AppColors.text3, fontSize: 12),

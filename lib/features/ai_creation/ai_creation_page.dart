@@ -68,9 +68,67 @@ class _AssetCard extends ConsumerWidget {
           ),
         ),
         data: (value) => Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             _AssetItem(label: '积分', value: '${value.points.balance}'),
+            const Spacer(),
+            // 获取积分 → 福利中心（做任务/看广告赚积分）
+            _AssetAction(
+              label: '获取积分',
+              filled: false,
+              onTap: () => context.push(RoutePath.welfareCenter),
+            ),
+            const SizedBox(width: 8),
+            // 充值 → 积分充值页
+            _AssetAction(
+              label: '充值',
+              filled: true,
+              onTap: () => context.push(RoutePath.welfareRecharge),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 资产卡上的操作按钮（获取积分 / 充值）。
+class _AssetAction extends StatelessWidget {
+  const _AssetAction({
+    required this.label,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: filled ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: filled ? Colors.white : Colors.white70,
+              width: 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: filled ? AppColors.primary : Colors.white,
+            ),
+          ),
         ),
       ),
     );

@@ -40,6 +40,7 @@ class _FakeAiRepository implements AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -56,6 +57,7 @@ class _FakeAiRepository implements AiRepository {
     String? genre,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
@@ -74,6 +76,7 @@ class _FakeAiRepository implements AiRepository {
     required String prompt,
     String? type,
     int? skillId,
+    String? model,
   }) async {
     calls.add('write:$prompt|$type');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -85,6 +88,7 @@ class _FakeAiRepository implements AiRepository {
     required String prompt,
     String? type,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt|$type');
@@ -99,6 +103,7 @@ class _FakeAiRepository implements AiRepository {
     required String content,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     calls.add('polish:$content|$style');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -110,6 +115,7 @@ class _FakeAiRepository implements AiRepository {
     required String content,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('polishStream:$content|$style');
@@ -118,6 +124,9 @@ class _FakeAiRepository implements AiRepository {
     onDelta('窗前，久久无言。');
     return AiWriteResult(content: polishContent, recordId: 2);
   }
+
+  @override
+  Future<List<AiChannel>> listModels() async => const [];
 
   @override
   Future<List<AiSkill>> listSkills() async => const [
@@ -130,6 +139,7 @@ class _FakeAiRepository implements AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
   }) async {
     calls.add('storyboard:$script|$style|skill=$skillId');
     return AiWriteResult(content: '【镜1】全景…', recordId: 3);
@@ -140,6 +150,7 @@ class _FakeAiRepository implements AiRepository {
     required String script,
     String? style,
     int? skillId,
+    String? model,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('storyboardStream:$script|$style|skill=$skillId');

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../ai/data/ai_providers.dart';
+import 'recharge_models.dart';
 import 'welfare_models.dart';
 import 'welfare_repository.dart';
 
@@ -55,6 +56,20 @@ final welfareAssetProvider =
   final points = await repo.pointsBalance(userId);
   final ai = await aiRepo.balance(userId);
   return (points: points, aiAvailable: ai.available);
+});
+
+/// 充值页配置（换算比例 / 档位 / 支付渠道 / 当前余额）。
+final rechargeConfigProvider = FutureProvider<RechargeConfig>((ref) {
+  final userId = currentUserId(ref);
+  if (userId == 0) throw StateError('未登录');
+  return ref.watch(welfareRepositoryProvider).rechargeConfig(userId);
+});
+
+/// 充值记录。
+final rechargeRecordsProvider = FutureProvider<List<RechargeRecord>>((ref) {
+  final userId = currentUserId(ref);
+  if (userId == 0) throw StateError('未登录');
+  return ref.watch(welfareRepositoryProvider).rechargeRecords(userId);
 });
 
 /// 上报指定类型任务的行为进度（真实行为埋点，如登录/上传/阅读）。

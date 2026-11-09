@@ -1,5 +1,6 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import 'recharge_models.dart';
 import 'welfare_models.dart';
 
 /// 福利中心仓库（App 端 E 模块）。
@@ -56,6 +57,57 @@ class WelfareRepository {
       parser: _map,
     );
     return _parseList(data, 'records', ExchangeRecord.fromJson);
+  }
+
+  /// 充值页配置（换算比例 / 档位 / 支付渠道 / 当前余额）。
+  Future<RechargeConfig> rechargeConfig(int userId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '/welfare/recharge/config',
+      query: {'userId': userId},
+      parser: _map,
+    );
+    return RechargeConfig.fromJson(data ?? const {});
+  }
+
+  /// 创建充值订单（待支付）。
+  Future<RechargePayResult> createRechargeOrder({
+    required int userId,
+    required int yuan,
+    required String channel,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/welfare/recharge/order',
+      data: <String, dynamic>{
+        'userId': userId,
+        'yuan': yuan,
+        'channel': channel,
+      },
+      parser: _map,
+    );
+    return RechargePayResult.fromJson(data ?? const {});
+  }
+
+  /// 模拟支付成功（真实微信/支付宝对接由支付组替换此调用）。
+  Future<RechargePayResult> payRecharge({
+    required int userId,
+    required String orderNo,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/welfare/recharge/mock-pay',
+      data: <String, dynamic>{'userId': userId, 'orderNo': orderNo},
+      parser: _map,
+    );
+    return RechargePayResult.fromJson(data ?? const {});
+  }
+
+  /// 充值记录（按时间倒序）。
+  Future<List<RechargeRecord>> rechargeRecords(int userId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '/welfare/recharge/orders',
+      query: {'userId': userId, 'limit': 20},
+      parser: _map,
+    );
+    return _parseList(data, 'orders', RechargeRecord.fromJson);
   }
 
   /// 领取任务奖励（幂等；返回领取后积分余额）。
