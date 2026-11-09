@@ -84,6 +84,7 @@ class RoutePath {
   static const String copyrightForm = '/copyright/form';
   static const String copyrightCertificateList = '/copyright/certificate/list';
   static const String copyrightCertificateDetail = '/copyright/certificate/detail';
+  static const String buyerCopyrightDetail = '/copyright/certificate/purchased';
 
   /// 版权首页 URL
   static String copyrightHomeUrl() => copyrightHome;
@@ -110,6 +111,10 @@ class RoutePath {
   /// 版权证书详情 URL
   static String copyrightCertificateDetailUrl(int certId) =>
       '$copyrightCertificateDetail?id=$certId';
+
+  /// 购买获得的版权材料详情 URL
+  static String buyerCopyrightDetailUrl(int fileId) =>
+      '$buyerCopyrightDetail?id=$fileId';
 
   // ===== 我的收益（独立于交易管理「作者收益」）=====
   static const String myIncomeOverview = '/income/overview';
@@ -380,6 +385,7 @@ class RouteName {
   static const String copyrightForm = 'copyrightForm';
   static const String copyrightCertificateList = 'copyrightCertificateList';
   static const String copyrightCertificateDetail = 'copyrightCertificateDetail';
+  static const String buyerCopyrightDetail = 'buyerCopyrightDetail';
 
   // ===== 我的收益 =====
   static const String myIncomeOverview = 'myIncomeOverview';
@@ -529,6 +535,7 @@ class ProtectedRoutes {
     RoutePath.copyrightDeliveryList,
     RoutePath.copyrightForm,
     RoutePath.copyrightCertificateList,
+    RoutePath.buyerCopyrightDetail,
     // 我的收益（需登录）
     RoutePath.myIncomeOverview,
     RoutePath.myIncomeDetail,

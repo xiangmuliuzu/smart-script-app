@@ -58,6 +58,7 @@ import '../../features/copyright/pages/copyright_application_detail_page.dart';
 import '../../features/copyright/pages/copyright_form_page.dart';
 import '../../features/copyright/pages/copyright_certificate_list_page.dart';
 import '../../features/copyright/pages/copyright_certificate_detail_page.dart';
+import '../../features/copyright/pages/buyer_copyright_detail_page.dart';
 import '../../features/income/pages/income_overview_page.dart';
 import '../../features/income/pages/income_detail_page.dart';
 import '../../features/income/pages/income_bill_detail_page.dart';
@@ -780,6 +781,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.copyrightCertificateDetail,
         builder: (context, state) => CopyrightCertificateDetailPage(
           certId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.buyerCopyrightDetail,
+        name: RouteName.buyerCopyrightDetail,
+        builder: (context, state) => BuyerCopyrightDetailPage(
+          fileId: int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
         ),
       ),
       // ===== 我的收益（总览 + 待结算/明细/提现）=====

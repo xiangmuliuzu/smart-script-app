@@ -324,6 +324,9 @@ class ApiEndpoints {
   static String appDeliveryByOrder(int orderId) => '/trade/delivery/by-order/$orderId';
   static String appDeliveryUpload(int deliveryId) => '/trade/delivery/$deliveryId/upload';
   static String appDeliveryConfirm(int deliveryId) => '/trade/delivery/$deliveryId/confirm';
+  /// 买方购买获得的版权材料（交割 cert，确认收货后可见）
+  static const String appTradeCopyrightList = '/trade/copyright/list';
+  static String appTradeCopyrightById(int fileId) => '/trade/copyright/$fileId';
   // 合同
   static const String appContractList = '/trade/contracts/list';
   static String appContractByOrder(int orderId) => '/trade/contracts/$orderId';

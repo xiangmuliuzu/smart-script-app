@@ -306,6 +306,11 @@ class CopyrightProvider extends ChangeNotifier {
     _certificateTotal = 0;
     _certificateError = null;
     _currentCertificate = null;
+    _purchasedMaterials = [];
+    _purchasedTotal = 0;
+    _purchasedError = null;
+    _currentPurchased = null;
+    _purchasedDetailError = null;
     _centers = [];
     _myWorks = [];
     _worksError = null;
@@ -423,5 +428,76 @@ class CopyrightProvider extends ChangeNotifier {
   /// 刷新交割列表
   Future<void> refreshDeliveries() async {
     await loadDeliveries();
+  }
+
+  // ==================== 购买获得的版权材料 ====================
+
+  bool _purchasedLoading = false;
+  bool get purchasedLoading => _purchasedLoading;
+
+  List<BuyerCopyrightMaterial> _purchasedMaterials = [];
+  List<BuyerCopyrightMaterial> get purchasedMaterials => _purchasedMaterials;
+
+  int _purchasedTotal = 0;
+  int get purchasedTotal => _purchasedTotal;
+
+  String? _purchasedError;
+  String? get purchasedError => _purchasedError;
+
+  BuyerCopyrightMaterial? _currentPurchased;
+  BuyerCopyrightMaterial? get currentPurchased => _currentPurchased;
+
+  bool _purchasedDetailLoading = false;
+  bool get purchasedDetailLoading => _purchasedDetailLoading;
+
+  String? _purchasedDetailError;
+  String? get purchasedDetailError => _purchasedDetailError;
+
+  /// 加载购买获得的版权材料列表
+  Future<void> loadPurchasedCopyrights({
+    int pageNum = 1,
+    int pageSize = 10,
+    String? keyword,
+  }) async {
+    _purchasedLoading = true;
+    _purchasedError = null;
+    notifyListeners();
+
+    try {
+      final result = await _apiService.getPurchasedCopyrights(
+        pageNum: pageNum,
+        pageSize: pageSize,
+        keyword: keyword,
+      );
+      _purchasedMaterials = result['rows'] as List<BuyerCopyrightMaterial>;
+      _purchasedTotal = result['total'] as int;
+      _purchasedError = null;
+    } catch (e) {
+      _purchasedError = e.toString();
+      _purchasedMaterials = [];
+      _purchasedTotal = 0;
+    } finally {
+      _purchasedLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// 加载购买获得的版权材料详情
+  Future<void> loadPurchasedCopyrightDetail(int fileId) async {
+    _purchasedDetailLoading = true;
+    _purchasedDetailError = null;
+    notifyListeners();
+
+    try {
+      _currentPurchased =
+          await _apiService.getPurchasedCopyrightDetail(fileId);
+      _purchasedDetailError = null;
+    } catch (e) {
+      _purchasedDetailError = e.toString();
+      _currentPurchased = null;
+    } finally {
+      _purchasedDetailLoading = false;
+      notifyListeners();
+    }
   }
 }

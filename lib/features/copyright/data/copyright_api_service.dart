@@ -314,4 +314,46 @@ class CopyrightApiService {
     final data = await _client.post(ApiEndpoints.appDeliveryConfirm(deliveryId));
     return CopyrightDelivery.fromJson(data as Map<String, dynamic>);
   }
+
+  // ==================== 购买获得的版权材料（交易域 /trade/copyright） ====================
+
+  /// 买方购买获得的版权材料列表（确认收货后的交割 cert）
+  ///
+  /// GET /trade/copyright/list
+  Future<Map<String, dynamic>> getPurchasedCopyrights({
+    int pageNum = 1,
+    int pageSize = 10,
+    String? keyword,
+  }) async {
+    final params = <String, dynamic>{
+      'pageNum': pageNum,
+      'pageSize': pageSize,
+    };
+    if (keyword != null && keyword.isNotEmpty) {
+      params['keyword'] = keyword;
+    }
+
+    final data = await _client.get(
+      ApiEndpoints.appTradeCopyrightList,
+      query: params,
+    );
+
+    final rawList = (data['list'] as List?) ?? (data['rows'] as List?) ?? [];
+    return {
+      'total': data['total'] ?? 0,
+      'rows': rawList
+          .whereType<Map>()
+          .map((e) =>
+              BuyerCopyrightMaterial.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    };
+  }
+
+  /// 买方购买获得的版权材料详情
+  ///
+  /// GET /trade/copyright/{fileId}
+  Future<BuyerCopyrightMaterial> getPurchasedCopyrightDetail(int fileId) async {
+    final data = await _client.get(ApiEndpoints.appTradeCopyrightById(fileId));
+    return BuyerCopyrightMaterial.fromJson(data as Map<String, dynamic>);
+  }
 }

@@ -7,10 +7,14 @@
 ///     POST /api/v1/app/content/copyright/application/apply  → 提交申请
 ///     POST /api/v1/app/content/copyright/application/resubmit → 重新提交
 ///   
-///   版权证书：
+///   版权证书（我申请的）：
 ///     GET  /api/v1/app/content/copyright/cert/list          → 我的证书列表
 ///     GET  /api/v1/app/content/copyright/cert/{id}          → 证书详情
 ///     GET  /api/v1/app/content/copyright/cert/{id}/download → 下载证书PDF
+///
+///   购买获得的版权材料（交易域，确认收货后的交割 cert）：
+///     GET  /api/v1/trade/copyright/list                     → 买方版权材料列表
+///     GET  /api/v1/trade/copyright/{fileId}                 → 材料详情（预览/下载）
 ///   
 ///   版权中心配置：
 ///     GET  /api/v1/app/content/copyright/config/active      → 获取可用版权中心
@@ -569,6 +573,65 @@ class DeliveryListResponse {
           .toList(),
     );
   }
+}
+
+/// 买方「购买获得」的版权材料（确认收货后的交割 cert 文件）。
+class BuyerCopyrightMaterial {
+  const BuyerCopyrightMaterial({
+    required this.fileId,
+    this.fileName = '',
+    this.fileUrl = '',
+    this.fileSize = 0,
+    this.workId = 0,
+    this.workTitle = '',
+    this.workCover = '',
+    this.sellerId = 0,
+    this.sellerName = '',
+    this.deliveryId = 0,
+    this.deliveryNo = '',
+    this.orderId = 0,
+    this.orderNo = '',
+    this.deliveryTime = '',
+    this.previewKind = 'other',
+  });
+
+  final int fileId;
+  final String fileName;
+  final String fileUrl;
+  final int fileSize;
+  final int workId;
+  final String workTitle;
+  final String workCover;
+  final int sellerId;
+  final String sellerName;
+  final int deliveryId;
+  final String deliveryNo;
+  final int orderId;
+  final String orderNo;
+  final String deliveryTime;
+  /// pdf / image / other（后端 TradeCopyrightService 口径）
+  final String previewKind;
+
+  factory BuyerCopyrightMaterial.fromJson(Map<String, dynamic> json) =>
+      BuyerCopyrightMaterial(
+        fileId: _int(json['fileId']),
+        fileName: _text(json['fileName']),
+        fileUrl: _text(json['fileUrl']),
+        fileSize: _int(json['fileSize']),
+        workId: _int(json['workId']),
+        workTitle: _text(json['workTitle']),
+        workCover: _text(json['workCover']),
+        sellerId: _int(json['sellerId']),
+        sellerName: _text(json['sellerName']),
+        deliveryId: _int(json['deliveryId']),
+        deliveryNo: _text(json['deliveryNo']),
+        orderId: _int(json['orderId']),
+        orderNo: _text(json['orderNo']),
+        deliveryTime: _text(json['deliveryTime']),
+        previewKind: _text(json['previewKind']).isEmpty
+            ? 'other'
+            : _text(json['previewKind']),
+      );
 }
 
 // ==================== 扩展方法 ====================

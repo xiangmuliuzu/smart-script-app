@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -65,8 +64,9 @@ class CertificateDownloadHelper {
     final safeName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
 
     // 单测强制目录：不走原生通道。
-    if (_documentsDirectory != null) {
-      final dir = await _documentsDirectory!();
+    final docsGetter = _documentsDirectory;
+    if (docsGetter != null) {
+      final dir = await docsGetter();
       final file = File('${dir.path}/$safeName');
       await file.writeAsBytes(bytes, flush: true);
       savedToPublicDownloads = false;
@@ -129,6 +129,69 @@ class CertificateDownloadHelper {
       },
     );
     return result;
+  }
+
+  /// 下载任意远端材料并落盘（购买获得版权材料用；失败直接抛错，不做 Mock 证书回退）。
+  Future<File> saveRemoteFile({
+    required String url,
+    required String fileName,
+    String mimeType = 'application/octet-stream',
+  }) async {
+    final resp = await _dio.get<List<int>>(
+      url,
+      options: Options(
+        responseType: ResponseType.bytes,
+        followRedirects: true,
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+    final data = resp.data;
+    if (resp.statusCode != 200 || data == null || data.isEmpty) {
+      throw Exception('文件下载失败');
+    }
+    final bytes = Uint8List.fromList(data);
+    final safeName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+
+    final docsGetter = _documentsDirectory;
+    if (docsGetter != null) {
+      final dir = await docsGetter();
+      final file = File('${dir.path}/$safeName');
+      await file.writeAsBytes(bytes, flush: true);
+      savedToPublicDownloads = false;
+      savedPath = file.path;
+      return file;
+    }
+
+    if (Platform.isAndroid) {
+      try {
+        final path = await _fileChannel.invokeMethod<String>(
+          'saveToPublicDownloads',
+          <String, dynamic>{
+            'fileName': safeName,
+            'bytes': bytes,
+            'mimeType': mimeType,
+          },
+        );
+        if (path != null && path.isNotEmpty) {
+          savedToPublicDownloads = true;
+          savedPath = path;
+          if (path.startsWith('content:')) {
+            final cache = await getTemporaryDirectory();
+            final mirror = File('${cache.path}/$safeName');
+            await mirror.writeAsBytes(bytes, flush: true);
+            return mirror;
+          }
+          return File(path);
+        }
+      } catch (_) {}
+    }
+
+    final fallback = await _resolvePrivateDirectory();
+    final file = File('${fallback.path}/$safeName');
+    await file.writeAsBytes(bytes, flush: true);
+    savedToPublicDownloads = false;
+    savedPath = file.path;
+    return file;
   }
 
   Future<Uint8List> resolvePdfBytes({
