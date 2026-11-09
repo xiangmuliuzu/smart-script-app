@@ -155,18 +155,22 @@ void main() {
       expect(find.text('剧本文本'), findsOneWidget);
       expect(find.text('导演(skill)'), findsOneWidget);
 
-      // 填写剧本并选择导演后生成
+      // 填写剧本并选择分镜导演后生成（该页 skillTypeFilter='storyboard'，只列分镜类导演）
       await tester.enterText(
           find.byType(TextField).first, '男主深夜在小巷偶遇旧友，对峙。');
-      await tester.tap(find.text('请选择导演'));
+      final skillDropdown = find.byType(DropdownButton<int?>).first;
+      await tester.ensureVisible(skillDropdown);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('悬疑烧脑导演'));
+      // 该页路由存在过渡动画（IgnorePointer 会吞掉点击），此处直接触发 onChanged：
+      // 打开菜单的选择交互已由上方 AiSkillSelector 独立用例覆盖。
+      tester.widget<DropdownButton<int?>>(skillDropdown).onChanged!(8);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('生成分镜'));
       await tester.pumpAndSettle();
 
-      expect(fake.calls, contains('storyboardStream:男主深夜在小巷偶遇旧友，对峙。|null|skill=1'));
+      expect(fake.calls,
+          contains('storyboardStream:男主深夜在小巷偶遇旧友，对峙。|null|skill=8'));
       expect(find.textContaining('【镜1】全景'), findsOneWidget);
       expect(find.textContaining('【镜2】中景'), findsOneWidget);
       expect(find.text('复制分镜（可直接出售）'), findsOneWidget);

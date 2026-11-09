@@ -83,11 +83,20 @@ void main() {
       child: const MaterialApp(home: AiWritePage()),
     ));
     await tester.enterText(find.byType(TextField).first, '故事要求');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('生成内容'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('生成内容'));
     await tester.pump();
     source.add(Uint8List.fromList(utf8.encode('data:{"delta":"保留下来的正文"}\n\n')));
-    await source.close();
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // 关流不能在 fake async 区内 await：close() 要等监听方（同样挂在 fake 区的
+    // await for）消费完事件，双方互等就会挂到 10 分钟超时。这里 fire-and-forget，
+    // 由后续 pump 推进微任务。
+    source.close().ignore();
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(find.text('保留下来的正文'), findsOneWidget);
     expect(find.text('生成已中断，已保留内容'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
