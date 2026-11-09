@@ -244,6 +244,9 @@ class AiRepository {
         completed = true;
         quotaUsed = event.intValue('quotaUsed');
         requestNo = event.text('requestNo');
+        // 大纲分批生成后以 done 下发的规整全文为准（delta 可能在集号处缺换行）。
+        final full = event.text('content');
+        if (full.isNotEmpty) { buffer.clear(); buffer.write(full); }
       } else {
         final delta = event.text('delta');
         if (delta.isNotEmpty) { buffer.write(delta); onDelta(delta); }

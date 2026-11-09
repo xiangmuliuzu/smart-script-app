@@ -7,9 +7,13 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../create/data/author_work_models.dart';
+import '../../create/data/author_work_providers.dart';
 import '../../welfare/data/welfare_providers.dart';
 import '../ai_quota_dialog.dart';
 import '../data/ai_providers.dart';
+import '../data/ai_repository.dart';
+import '../data/script_outline.dart';
 import 'ai_model_selector.dart';
 import 'ai_skill_selector.dart';
 
@@ -18,14 +22,20 @@ import 'ai_skill_selector.dart';
 /// 在章节写稿页正文编辑区上方展开，提供 AI 剧本 / 写作 / 润色 / 分镜四个功能 tab，
 /// 复用 [AiRepository]（outline / write / polish / storyboard）生成，结果支持：
 ///   - 复制全文；
-///   - [onInsert] 回调把生成内容插入当前章节正文（由写稿页追加到正文控制器）。
+///   - [onInsert] 回调把生成内容插入当前章节正文（写作 / 润色 / 分镜 tab）；
+///   - AI 剧本 tab 用「创建剧本大纲」把事件卡存进作品级剧本大纲（本机存档、可编辑），
+///     再用「按大纲生成各章」按事件卡逐章生成正文写回章节；
+///   - 「重新生成」两选一：完整重写，或提意见带着当前结果再生成。
 /// 生成逻辑与独立 AI 功能页一致：次数不足弹引导弹窗、成功后刷新机会余额；
 /// 可选择「导演(skill)」注入导演风格。
 class AiInlinePanel extends ConsumerStatefulWidget {
-  const AiInlinePanel({super.key, required this.onInsert});
+  const AiInlinePanel({super.key, required this.onInsert, this.workId = 0});
 
   /// 把生成文本插入当前章节正文。
   final ValueChanged<String> onInsert;
+
+  /// 当前作品 id（剧本大纲按作品存档、按大纲生成各章需要写回章节）。
+  final int workId;
 
   @override
   ConsumerState<AiInlinePanel> createState() => _AiInlinePanelState();
@@ -61,6 +71,21 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   String _result = '';
   int _quotaUsed = 0;
 
+  /// 作品级剧本大纲（本机存档，可在「创建剧本大纲」后编辑）。
+  String _scriptOutline = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOutline();
+  }
+
+  Future<void> _loadOutline() async {
+    final text = await loadScriptOutline(widget.workId);
+    if (!mounted || text.isEmpty) return;
+    setState(() => _scriptOutline = text);
+  }
+
   @override
   void dispose() {
     _inspiration.dispose();
@@ -74,14 +99,23 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   }
 
   /// 校验当前 tab 输入并生成（流式：逐块追加显示）。
-  Future<void> _generate() async {
+  ///
+  /// [feedback] 非空表示「提意见重新生成」：上一版结果与修改意见一起提交，
+  /// 此时放宽必填校验（允许只给意见、不改原输入）。
+  Future<void> _generate({String feedback = ''}) async {
+    final feedbackMode = feedback.trim().isNotEmpty;
+    final previous = _result.trim();
+    if (feedbackMode && previous.isEmpty) {
+      showAppToast(context, '当前没有可修改的生成结果，请先完整生成一次');
+      return;
+    }
     final requiredEmpty = switch (_tab) {
       _AiTab.outline => _inspiration.text.trim().isEmpty,
       _AiTab.write => _prompt.text.trim().isEmpty,
       _AiTab.polish => _content.text.trim().isEmpty,
       _AiTab.storyboard => _script.text.trim().isEmpty,
     };
-    if (requiredEmpty) {
+    if (!feedbackMode && requiredEmpty) {
       final hint = switch (_tab) {
         _AiTab.outline => '请先输入作品主题或灵感',
         _AiTab.write => '请先输入写作提示词',
@@ -93,10 +127,13 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     }
     // 集数口径与 PC 用户端一致：1–200 的整数，默认 12。
     final episodes = int.tryParse(_episodes.text.trim()) ?? 0;
-    if (_tab == _AiTab.outline && (episodes < 1 || episodes > 200)) {
+    if (!feedbackMode &&
+        _tab == _AiTab.outline &&
+        (episodes < 1 || episodes > 200)) {
       showAppToast(context, '集数需为 1–200 的整数');
       return;
     }
+    final episodeCount = (episodes >= 1 && episodes <= 200) ? episodes : 12;
 
     setState(() {
       _loading = true;
@@ -115,12 +152,20 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       String? emptyHint;
       switch (_tab) {
         case _AiTab.outline:
+          final core = feedbackMode
+              ? '上一版大纲（大体满意，请在保留整体结构与事件走向的前提下按修改意见调整）：\n'
+                  '${previous.length > 12000 ? previous.substring(0, 12000) : previous}\n'
+                  '修改意见：${feedback.trim()}'
+              : _inspiration.text.trim();
           final result = await repo.outlineStream(
-            inspiration: '${_inspiration.text.trim()}\n'
-                '请提供 $episodes 个分集，每集单独一行标题，格式为“第1集：章节名称”，'
-                '下一行写该集剧情概要。',
+            inspiration: '$core\n'
+                '请按下面格式写 $episodeCount 集分集事件卡，从第1集起连续编号：\n'
+                '第1集：事件名\n本集事件：……\n冲突与推进：……\n'
+                '结果或反转：……\n结尾钩子：……\n'
+                '每集是一件完整的事（有开场、交锋、结果），结尾钩子要具体；'
+                '不要写场景头、镜号、景别、运镜。',
             genre: _genre.text.trim(),
-            style: '共 $episodes 集',
+            style: '共 $episodeCount 集',
             skillId: _skillId,
             model: _model,
             onDelta: onDelta,
@@ -130,8 +175,12 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           if (text.trim().isEmpty) emptyHint = '未生成剧本大纲，请重试';
           break;
         case _AiTab.write:
+          final promptText = feedbackMode
+              ? '上一版正文：\n$previous\n修改意见：${feedback.trim()}\n'
+                  '请按修改意见重写这一集：700-900 字，只写这一集，结尾留具体钩子。'
+              : _prompt.text.trim();
           final result = await repo.writeStream(
-            prompt: _prompt.text.trim(),
+            prompt: promptText,
             type: _type.text.trim(),
             skillId: _skillId,
             model: _model,
@@ -141,8 +190,12 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           if (text.trim().isEmpty) emptyHint = '未生成内容，请重试';
           break;
         case _AiTab.polish:
+          final contentText = feedbackMode
+              ? '原文：\n${_content.text.trim()}\n上一版润色结果：\n$previous\n'
+                  '修改意见：${feedback.trim()}\n请输出修改后的完整文本。'
+              : _content.text.trim();
           final result = await repo.polishStream(
-            content: _content.text.trim(),
+            content: contentText,
             style: _selectedStyle,
             skillId: _skillId,
             model: _model,
@@ -152,8 +205,12 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           if (text.trim().isEmpty) emptyHint = '未生成润色结果，请重试';
           break;
         case _AiTab.storyboard:
+          final scriptText = feedbackMode
+              ? '剧本文本：\n${_script.text.trim()}\n上一版分镜：\n$previous\n'
+                  '修改意见：${feedback.trim()}\n请保持场次与镜号结构重写分镜。'
+              : _script.text.trim();
           final result = await repo.storyboardStream(
-            script: _script.text.trim(),
+            script: scriptText,
             style: _selectedScriptStyle,
             skillId: _skillId,
             model: _model,
@@ -194,6 +251,317 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     if (_result.trim().isEmpty) return;
     widget.onInsert(_result);
     showAppToast(context, '已插入章节正文');
+  }
+
+  /// 重新生成：两选一（完整重写 / 提意见带着当前结果再生成）。
+  Future<void> _regenerate() async {
+    if (_result.trim().isEmpty) {
+      showAppToast(context, '还没有生成结果，请先完整生成一次');
+      return;
+    }
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('重新生成会覆盖当前结果，选择生成方式：',
+                    style: TextStyle(fontSize: 12, color: AppColors.text3)),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh, color: AppColors.primary),
+              title: const Text('完整重新生成'),
+              subtitle: const Text('忽略当前结果，按上面的要求重新写一版'),
+              onTap: () => Navigator.pop(sheetContext, 'full'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_note, color: AppColors.primary),
+              title: const Text('提意见重新生成'),
+              subtitle: const Text('大体满意，写清要改哪里，AI 带着当前结果改'),
+              onTap: () => Navigator.pop(sheetContext, 'feedback'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'full') {
+      await _generate();
+      return;
+    }
+    if (action != 'feedback') return;
+    final feedback = await _askFeedback();
+    if (!mounted || feedback == null || feedback.trim().isEmpty) return;
+    await _generate(feedback: feedback);
+  }
+
+  /// 弹出修改意见输入框，返回用户填写的意见。
+  Future<String?> _askFeedback() async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('提意见重新生成', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('写下修改意见，会和当前生成结果一起提交给 AI：',
+                style: TextStyle(fontSize: 12, color: AppColors.text3)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: '例如：第 3 集冲突不够，人物动机要更明确',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('按意见重新生成'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return text;
+  }
+
+  /// 把当前 AI 剧本结果存进作品级剧本大纲（已有不同内容时先确认覆盖）。
+  Future<void> _createOutline() async {
+    final text = _result.trim();
+    if (text.isEmpty) {
+      showAppToast(context, '还没有生成结果，请先完整生成一次');
+      return;
+    }
+    if (widget.workId <= 0) {
+      showAppToast(context, '未识别作品，无法保存剧本大纲');
+      return;
+    }
+    final saved = _scriptOutline.trim();
+    if (saved.isNotEmpty && saved != text) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('覆盖剧本大纲'),
+          content: const Text('剧本大纲里已有内容，覆盖后原内容不再保留。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('覆盖'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || replace != true) return;
+    }
+    await saveScriptOutline(widget.workId, text);
+    if (!mounted) return;
+    setState(() => _scriptOutline = text);
+    await _editOutline();
+  }
+
+  /// 编辑并保存本机剧本大纲（存好即可直接按它生成各章）。
+  Future<void> _editOutline() async {
+    final controller = TextEditingController(text: _scriptOutline);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('剧本大纲', style: TextStyle(fontSize: 16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: controller,
+            minLines: 8,
+            maxLines: 14,
+            decoration: const InputDecoration(
+              hintText: '第1集：事件名\n本集事件：……\n冲突与推进：……\n结果或反转：……\n结尾钩子：……',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('保存大纲'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || text == null) return;
+    await saveScriptOutline(widget.workId, text);
+    if (!mounted) return;
+    setState(() => _scriptOutline = text.trim());
+    showAppToast(context, '剧本大纲已保存');
+  }
+
+  /// 按大纲生成各章：来源二选一（当前输出 / 已保存的剧本大纲），只补空章节。
+  Future<void> _fillOutline() async {
+    var source = _result.trim();
+    if (_scriptOutline.trim().isNotEmpty) {
+      final useSaved = await showModalBottomSheet<bool>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('用哪一份大纲生成各章？「剧本大纲」是可保存、可修改的版本。',
+                      style: TextStyle(fontSize: 12, color: AppColors.text3)),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.notes, color: AppColors.primary),
+                title: const Text('用当前输出'),
+                subtitle: const Text('本次 AI 生成的结果'),
+                onTap: () => Navigator.pop(sheetContext, false),
+              ),
+              ListTile(
+                leading: const Icon(Icons.bookmark, color: AppColors.primary),
+                title: const Text('用剧本大纲'),
+                subtitle: const Text('已保存、可修改的剧本大纲'),
+                onTap: () => Navigator.pop(sheetContext, true),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || useSaved == null) return;
+      if (useSaved) source = _scriptOutline.trim();
+    }
+    if (source.isEmpty) {
+      showAppToast(context, '还没有可用的大纲，请先生成剧本大纲');
+      return;
+    }
+    if (widget.workId <= 0) {
+      showAppToast(context, '未识别作品，无法生成各章');
+      return;
+    }
+    final episodes = parseScriptOutline(source);
+    if (episodes.isEmpty) {
+      showAppToast(context, '没识别出分集标题，请确认大纲里有「第1集：事件名」这样的标题行');
+      return;
+    }
+    final chapters = ref
+            .read(authorWorkDetailProvider(widget.workId))
+            .valueOrNull
+            ?.chapters ??
+        const <AuthorChapterItem>[];
+    final byNo = <int, AuthorChapterItem>{};
+    for (final chapter in chapters) {
+      byNo[chapter.chapterNo] = chapter;
+    }
+    final targets = <ScriptOutlineEpisode>[];
+    for (final ep in episodes) {
+      final chapter = byNo[ep.no];
+      if (chapter == null || chapter.content.trim().isEmpty) targets.add(ep);
+    }
+    if (targets.isEmpty) {
+      showAppToast(context, '这些集都已有正文，没有需要生成的空章节');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('按大纲生成各章'),
+        content: Text(
+          '将生成 ${targets.length} 章：'
+          '${targets.map((ep) => '第${ep.no}集').join('、')}。'
+          '仅补空正文章节，每章按实际 token 扣除积分。',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('开始生成'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+
+    setState(() => _loading = true);
+    var done = 0;
+    var failed = 0;
+    try {
+      final repo = ref.read(aiRepositoryProvider);
+      final workRepo = ref.read(authorWorkRepositoryProvider);
+      for (final ep in targets) {
+        if (!mounted) return;
+        try {
+          final prompt = '${ep.label}\n${ep.body}\n'
+              '请据此事件卡写这一集的正文：700-900 字，开头一句自然交代地点时间，'
+              '动作与对白推进，对白用「角色：台词」，只写这一集，结尾留具体钩子，'
+              '不写场景头、镜号、景别、运镜。';
+          final result = await repo.writeStream(
+            prompt: prompt,
+            skillId: _skillId,
+            model: _model,
+            onDelta: (_) {},
+          );
+          final body = result.content.trim();
+          if (body.isEmpty) {
+            failed++;
+            continue;
+          }
+          final chapter = byNo[ep.no];
+          if (chapter != null) {
+            await workRepo.updateChapter(chapter.chapterId, content: body);
+          } else {
+            await workRepo.addChapter(
+              widget.workId,
+              chapterNo: ep.no,
+              chapterTitle: ep.title,
+              content: body,
+            );
+          }
+          done++;
+        } catch (_) {
+          failed++;
+        }
+      }
+      ref.invalidate(authorWorkDetailProvider(widget.workId));
+      if (!mounted) return;
+      showAppToast(
+          context, '已生成 $done 章${failed > 0 ? '，$failed 章失败' : ''}');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -304,42 +672,87 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                if (_quotaUsed > 0) ...[
+                if (_quotaUsed > 0)
                   Text('消耗 $_quotaUsed token',
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.text3)),
-                  const Spacer(),
+                if (_tab == _AiTab.outline) ...[
+                  _actionButton(
+                    label: '按大纲生成各章',
+                    icon: Icons.auto_fix_high,
+                    onPressed: _fillOutline,
+                  ),
+                  _actionButton(
+                    label: '创建剧本大纲',
+                    icon: Icons.bookmark_add_outlined,
+                    onPressed: _createOutline,
+                  ),
                 ] else
-                  const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _copy,
-                  icon: const Icon(Icons.copy, size: 16),
-                  label: const Text('复制'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  _actionButton(
+                    label: '插入正文',
+                    icon: Icons.south_west,
+                    onPressed: _insert,
                   ),
+                _outlineButton(
+                  label: '重新生成',
+                  icon: Icons.refresh,
+                  onPressed: _regenerate,
                 ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: _insert,
-                  icon: const Icon(Icons.south_west, size: 16),
-                  label: const Text('插入正文'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                  ),
+                _outlineButton(
+                  label: '复制',
+                  icon: Icons.copy,
+                  onPressed: _copy,
                 ),
               ],
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// 结果区主按钮（实心），统一禁用态与尺寸。
+  Widget _actionButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: _loading ? null : onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: const TextStyle(fontSize: 12),
+      ),
+    );
+  }
+
+  /// 结果区次按钮（描边）。
+  Widget _outlineButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: _loading ? null : onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        side: const BorderSide(color: AppColors.primary),
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: const TextStyle(fontSize: 12),
       ),
     );
   }
@@ -401,6 +814,17 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                 ),
               ],
             ),
+            if (_scriptOutline.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _outlineButton(
+                  label: '按当前剧本大纲生成各章',
+                  icon: Icons.list_alt,
+                  onPressed: _fillOutline,
+                ),
+              ),
+            ],
           ],
         ),
       _AiTab.write => Column(

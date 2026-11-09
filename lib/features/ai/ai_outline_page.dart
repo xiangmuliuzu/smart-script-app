@@ -64,8 +64,11 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
       final container = ProviderScope.containerOf(context, listen: false);
       final result = await ref.read(aiRepositoryProvider).outlineStream(
             inspiration: '${_inspiration.text.trim()}\n'
-                '请提供 $episodes 个分集，每集单独一行标题，格式为“第1集：章节名称”，'
-                '下一行写该集剧情概要。',
+                '请按下面格式写 $episodes 集分集事件卡，从第1集起连续编号：\n'
+                '第1集：事件名\n本集事件：……\n冲突与推进：……\n'
+                '结果或反转：……\n结尾钩子：……\n'
+                '每集是一件完整的事（有开场、交锋、结果），结尾钩子要具体；'
+                '不要写场景头、镜号、景别、运镜。',
             genre: _genre.text.trim(),
             style: '共 $episodes 集',
             skillId: _skillId,

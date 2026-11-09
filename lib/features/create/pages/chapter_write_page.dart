@@ -472,7 +472,10 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                   offstage: !_aiPanelOpen,
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                    child: AiInlinePanel(onInsert: _insertAiText),
+                    child: AiInlinePanel(
+                      onInsert: _insertAiText,
+                      workId: widget.workId,
+                    ),
                   ),
                 ),
               ),
