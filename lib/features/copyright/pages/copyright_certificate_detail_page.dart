@@ -4,8 +4,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../../core/theme/app_colors.dart';
+import '../data/certificate_download_helper.dart';
 import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
 
@@ -47,13 +49,44 @@ class _CopyrightCertificateDetailPageState
 
     try {
       final provider = ref.read(copyrightProvider);
+      final certificate = provider.currentCertificate;
       final url = await provider.downloadCertificatePdf(widget.certId);
+      if (url.trim().isEmpty) {
+        throw Exception('证书文件不存在');
+      }
+
+      final fileName = '证书_${certificate?.certNo ?? widget.certId}.pdf';
+      final helper = CertificateDownloadHelper.create();
+      final file = await helper.saveCertificatePdf(
+        url: url,
+        fileName: fileName,
+        certNo: certificate?.certNo,
+        workName: certificate?.workName,
+      );
+
+      var opened = false;
+      try {
+        final open = CertificateDownloadHelper.debugOpenFile ??
+            ((uri) => launchUrl(uri, mode: LaunchMode.externalApplication));
+        opened = await open(Uri.file(file.path));
+      } catch (_) {
+        // 模拟器/无 PDF 阅读器时仍视为下载成功。
+      }
 
       if (mounted) {
+        final where = helper.savedToPublicDownloads
+            ? '系统「下载」'
+            : '应用私有目录（文件管理器默认不可见）';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('证书下载链接：$url')),
+          SnackBar(
+            content: Text(
+              opened
+                  ? '证书已下载并打开'
+                  : '证书已保存到$where：$fileName',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
         );
-        // 这里可以集成下载管理器或打开浏览器
       }
     } catch (e) {
       if (mounted) {
@@ -133,13 +166,8 @@ class _CopyrightCertificateDetailPageState
         actions: [
           if (certificate.isIssued)
             IconButton(
-              icon: _downloading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download),
+              // 下载中用静态图标，避免无限转动动画卡住测试 pumpAndSettle。
+              icon: Icon(_downloading ? Icons.downloading : Icons.download),
               onPressed: _downloading ? null : _downloadCertificate,
               tooltip: '下载证书',
             ),

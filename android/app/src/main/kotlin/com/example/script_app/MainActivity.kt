@@ -6,10 +6,13 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -54,6 +57,67 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        // 证书等文件写入系统「下载」目录（MediaStore），文件管理器可见。
+        MethodChannel(messenger, CHANNEL_FILE)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "saveToPublicDownloads" -> saveToPublicDownloads(call, result)
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    /**
+     * 将字节写入公共 Download 目录。
+     * 入参：fileName(String)、bytes(ByteArray)、mimeType(String?)。
+     * 成功返回绝对路径或 content Uri 字符串；失败走 result.error。
+     */
+    private fun saveToPublicDownloads(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
+        Thread {
+            try {
+                val fileName = call.argument<String>("fileName")
+                    ?: throw IllegalArgumentException("fileName required")
+                val bytes = call.argument<ByteArray>("bytes")
+                    ?: throw IllegalArgumentException("bytes required")
+                val mimeType = call.argument<String>("mimeType") ?: "application/pdf"
+                val saved = writePublicDownload(fileName, bytes, mimeType)
+                runOnUiThread { result.success(saved) }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    result.error("save_failed", e.message ?: "保存到下载目录失败", null)
+                }
+            }
+        }.start()
+    }
+
+    private fun writePublicDownload(fileName: String, bytes: ByteArray, mimeType: String): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val resolver = contentResolver
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("无法创建下载项")
+            resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: throw IllegalStateException("无法写入下载项")
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return uri.toString()
+        }
+
+        @Suppress("DEPRECATION")
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw IllegalStateException("无法创建下载目录")
+        }
+        val target = File(dir, fileName)
+        FileOutputStream(target).use { it.write(bytes) }
+        // 通知媒体库扫描，文件管理器立刻可见。
+        sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(target)))
+        return target.absolutePath
     }
 
     /** 创建通知渠道（Android 8+，幂等）。 */
@@ -269,6 +333,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_PICK = 4101
         private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024L
         private const val CHANNEL_NOTIFY = "smartscript/native_notify"
+        private const val CHANNEL_FILE = "smartscript/native_file"
         private const val REQUEST_NOTIFICATION_PERMISSION = 4102
         private const val NOTIFICATION_CHANNEL_ID = "smartscript_messages"
     }
