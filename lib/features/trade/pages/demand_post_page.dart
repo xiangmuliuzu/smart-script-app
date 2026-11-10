@@ -325,8 +325,8 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           Expanded(
             child: Text(
               budget > 0
-                  ? '发布后需在详情页完成托管付款 ¥${budget.toStringAsFixed(2)}（全额进入平台第三方托管账户），托管完成前任务不在广场曝光、不可被接单。（当前为开发直通：详情页点一下即可完成；正式支付宝沙箱扫码接口已保留。）'
-                  : '发布后需先完成托管付款（全额进入平台第三方托管账户），托管完成前任务不可被接单。（当前为开发直通：详情页点一下即可完成。）',
+                  ? '发布后需在详情页扫码完成托管付款 ¥${budget.toStringAsFixed(2)}（全额进入平台第三方托管账户），托管完成前任务不在广场曝光、不可被接单。（支付宝沙箱收款，扫码后自动确认到账。）'
+                  : '发布后需先在详情页扫码完成托管付款（全额进入平台第三方托管账户），托管完成前任务不可被接单。（支付宝沙箱收款，扫码后自动确认到账。）',
               style: const TextStyle(fontSize: 12.5, height: 1.5),
             ),
           ),
@@ -589,8 +589,8 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           stages: stagesPayload,
         );
         if (mounted) {
-          showAppToast(context, '发布成功，请在详情页完成托管付款');
-          // 跳详情页（详情页发布者可见“点一下完成托管”）
+          showAppToast(context, '发布成功，请在详情页扫码完成托管付款');
+          // 跳详情页（详情页发布者可见“支付宝扫码付托管款”）
           final id = created.demandId;
           if (id != null) {
             context.pushReplacement(RoutePath.demandDetailUrl(id));

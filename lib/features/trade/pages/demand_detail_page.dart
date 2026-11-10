@@ -138,19 +138,19 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
         if (task.status == 'open') ...[
           if (isBuyer && task.isEscrowPending) ...[
             _primaryActionButton(
-              icon: Icons.check_circle_outline,
-              label: '点一下完成托管 ¥${task.escrowYuanText}',
-              loadingLabel: '处理中...',
+              icon: Icons.qr_code_2,
+              label: '支付宝扫码付托管款 ¥${task.escrowYuanText}',
+              loadingLabel: '获取收款码...',
               onSubmitting: _submitting,
-              onTap: () => _devPassEscrow(task),
+              onTap: () => _payEscrow(task),
             ),
             const SizedBox(height: 2),
-            // 正式扫码收款接口（保留给队友接入支付宝沙箱）
+            // 沙箱未配置（缺密钥或当前库未授权）时的备用通路，与后端同一开关
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: _submitting ? null : () => _payEscrow(task),
-                child: const Text('改用支付宝沙箱扫码付款',
+                onPressed: _submitting ? null : () => _devPassEscrow(task),
+                child: const Text('开发环境一键直通托管',
                     style: TextStyle(color: AppColors.text3, fontSize: 12)),
               ),
             ),
@@ -180,20 +180,19 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
             ),
           ] else if (task.isEscrowed) ...[
             _primaryActionButton(
-              icon: Icons.check_circle_outline,
-              // 与发布者“点一下完成托管”同口径：直通付款接单；未接单前库里 deposit_amount 默认 0，固定按总价 10% 预览
-              label: '支付押金 ¥${_depositYuanPreview(task)}',
-              loadingLabel: '处理中...',
+              icon: Icons.qr_code_2,
+              // 未接单前库里 deposit_amount 默认 0，固定按总价 10% 预览，实际金额以收款码返回为准
+              label: '支付宝扫码付押金 ¥${_depositYuanPreview(task)}',
+              loadingLabel: '获取收款码...',
               onSubmitting: _submitting,
-              onTap: () => _devPassDeposit(task),
+              onTap: () => _payDeposit(task),
             ),
             const SizedBox(height: 2),
-            // 正式扫码收款接口（保留给队友接入支付宝沙箱）
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: _submitting ? null : () => _payDeposit(task),
-                child: const Text('改用支付宝沙箱扫码付款',
+                onPressed: _submitting ? null : () => _devPassDeposit(task),
+                child: const Text('开发环境一键直通接单',
                     style: TextStyle(color: AppColors.text3, fontSize: 12)),
               ),
             ),
@@ -211,7 +210,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     );
   }
 
-  /// 发布者一键直通完成托管（沙箱未接入时的开发放行）。
+  /// 备用通路：一键直通完成托管（沙箱未配置时使用，与后端 APP_DEMAND_ESCROW_MOCK_PASS 同开关）。
   Future<void> _devPassEscrow(DemandTask task) async {
     setState(() => _submitting = true);
     try {
@@ -226,25 +225,30 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     }
   }
 
-  /// 发布者发起托管付款：拿二维码 → 弹窗扫码 → 查单确认（支付宝沙箱，保留给队友接入）。
+  /// 发布者付托管款（主路径）：拿二维码 → 弹窗扫码 → 服务端查单确认（支付宝沙箱）。
   Future<void> _payEscrow(DemandTask task) async {
     setState(() => _submitting = true);
     try {
       final data = await ref.read(demandRepositoryProvider).payEscrow(task.demandId!);
       if (!mounted) return;
-      final paid = await showDialog<bool>(
-        context: context,
-        builder: (_) => DemandSandboxPayDialog(
-          title: '支付托管款',
-          qrCode: data['qrCode'] as String,
-          amountYuanText: task.escrowYuanText,
-          hint: '将预算全额付入平台第三方托管账户（沙箱收款，不产生真实资金）。托管完成后任务才对外可接单。',
-          confirm: () async => <String, dynamic>{
-              'paid': await ref.read(demandRepositoryProvider).confirmEscrow(task.demandId!),
-            },
-        ),
-      );
-      if (paid == true) {
+      // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
+      var paid = data['paid'] == true;
+      if (!paid) {
+        paid = await showDialog<bool>(
+          context: context,
+          builder: (_) => DemandSandboxPayDialog(
+            title: '支付托管款',
+            qrCode: data['qrCode'] as String,
+            amountYuanText: task.escrowYuanText,
+            hint: '将预算全额付入平台第三方托管账户（沙箱收款，不产生真实资金）。托管完成后任务才对外可接单。',
+            confirm: () => ref.read(demandRepositoryProvider).confirmEscrow(task.demandId!),
+            onRefresh: () =>
+                ref.read(demandRepositoryProvider).payEscrow(task.demandId!, refresh: true),
+          ),
+        ) ??
+            false;
+      }
+      if (paid) {
         ref.invalidate(demandDetailProvider(widget.demandId));
         ref.invalidate(demandStatsProvider); // 托管到账后任务对外可接单
         if (mounted) showAppToast(context, '托管已到账，任务已发布');
@@ -256,7 +260,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     }
   }
 
-  /// 创作者点一下完成押金付款并接单（开发直通，与发布者托管直通同开关同口径）。
+  /// 备用通路：一键直通押金付款并接单（与托管直通同开关同口径）。
   Future<void> _devPassDeposit(DemandTask task) async {
     setState(() => _submitting = true);
     try {
@@ -272,7 +276,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     }
   }
 
-  /// 创作者付押金即接单：拿押金二维码 → 扫码 → 查单确认（服务端自动接单）。
+  /// 创作者付押金即接单（主路径）：拿押金二维码 → 扫码 → 查单确认（服务端自动接单）。
   Future<void> _payDeposit(DemandTask task) async {
     setState(() => _submitting = true);
     try {
@@ -280,17 +284,24 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
       if (!mounted) return;
       final amountFen = (data['amount'] as num?)?.toInt();
       final amountYuan = amountFen != null ? (amountFen / 100).toStringAsFixed(2) : _depositYuanPreview(task);
-      final paid = await showDialog<bool>(
-        context: context,
-        builder: (_) => DemandSandboxPayDialog(
-          title: '支付押金',
-          qrCode: data['qrCode'] as String,
-          amountYuanText: amountYuan,
-          hint: '支付押金即视为接单成功（沙箱收款）。逾期未验收通过，押金将被没收。',
-          confirm: () => ref.read(demandRepositoryProvider).confirmDeposit(task.demandId!),
-        ),
-      );
-      if (paid == true) {
+      // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
+      var paid = data['paid'] == true;
+      if (!paid) {
+        paid = await showDialog<bool>(
+          context: context,
+          builder: (_) => DemandSandboxPayDialog(
+            title: '支付押金',
+            qrCode: data['qrCode'] as String,
+            amountYuanText: amountYuan,
+            hint: '支付押金即视为接单成功（沙箱收款）。逾期未验收通过，押金将被没收。',
+            confirm: () => ref.read(demandRepositoryProvider).confirmDeposit(task.demandId!),
+            onRefresh: () =>
+                ref.read(demandRepositoryProvider).payDeposit(task.demandId!, refresh: true),
+          ),
+        ) ??
+            false;
+      }
+      if (paid) {
         ref.invalidate(demandDetailProvider(widget.demandId));
         ref.invalidate(demandStagesProvider(widget.demandId));
         ref.invalidate(demandStatsProvider); // 接单后任务脱离可接单集合

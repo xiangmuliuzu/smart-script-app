@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -704,11 +706,16 @@ class OrderDetailPage extends ConsumerWidget {
     try {
       final data = await ref.read(tradeRepositoryProvider).appPayOrder(id);
       if (!context.mounted) return;
-      final paid = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: data['qrCode'] as String),
-      );
-      if (paid == true && context.mounted) {
+      // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
+      bool paid = data['paid'] == true;
+      if (!paid) {
+        paid = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: data['qrCode'] as String),
+        ) ??
+            false;
+      }
+      if (paid && context.mounted) {
         showAppToast(context, '沙箱支付已确认，订单进入交割');
         ref.invalidate(appOrderDetailProvider(id));
         ref.invalidate(deliveryByOrderProvider(id));
@@ -877,19 +884,81 @@ class _SandboxPaymentDialog extends ConsumerStatefulWidget {
 }
 
 class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
+  Timer? _pollTimer;
+  Timer? _rotateTimer;
   bool _checking = false;
+  bool _busy = false;
+  bool _refreshing = false;
   String? _message;
-  Future<void> _check() async {
-    setState(() { _checking = true; _message = null; });
+  late String _qrCode = widget.qrCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _check(silent: true),
+    );
+    // 收款码在支付宝侧会过期，弹窗停留超过 5 分钟自动换一张新码
+    _rotateTimer = Timer.periodic(const Duration(minutes: 5), (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _rotateTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _check({bool silent = false}) async {
+    if (_busy) return;
+    _busy = true;
+    if (!silent) {
+      setState(() { _checking = true; _message = null; });
+    }
+    var needRefresh = false;
     try {
-      final paid = await ref.read(tradeRepositoryProvider).confirmSandboxPayment(widget.orderId);
+      final result = await ref.read(tradeRepositoryProvider).confirmSandboxPayment(widget.orderId);
       if (!mounted) return;
-      if (paid) { Navigator.of(context).pop(true); return; }
-      setState(() => _message = '尚未查询到支付成功，请完成支付后重试');
+      if (result['paid'] == true) {
+        Navigator.of(context).pop(true);
+      } else if (result['closed'] == true) {
+        // 旧单在支付宝侧已关闭，再怎么扫也不会到账，得换一张新码
+        needRefresh = true;
+      } else if (!silent) {
+        setState(() => _message = '尚未查询到支付成功，请完成支付后重试');
+      }
     } catch (e) {
-      if (mounted) setState(() => _message = '查询失败：$e');
+      if (mounted && !silent) setState(() => _message = '查询失败：$e');
     } finally {
-      if (mounted) setState(() => _checking = false);
+      _busy = false;
+      if (mounted && !silent) setState(() => _checking = false);
+    }
+    if (needRefresh && mounted) await _refresh();
+  }
+
+  Future<void> _refresh() async {
+    if (_busy || _refreshing) return;
+    _refreshing = true;
+    setState(() => _message = '正在生成新的收款码…');
+    try {
+      final result = await ref.read(tradeRepositoryProvider).appPayOrder(widget.orderId, refresh: true);
+      if (!mounted) return;
+      if (result['paid'] == true) {
+        // 服务端查明旧码其实已付款并就地结算，直接按成功收尾
+        Navigator.of(context).pop(true);
+        return;
+      }
+      final qr = result['qrCode'];
+      if (qr is String && qr.isNotEmpty) {
+        setState(() { _qrCode = qr; _message = null; });
+      } else {
+        setState(() => _message = '暂时取不到新的收款码，请稍后重试');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _message = '刷新失败：$e');
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
     }
   }
   @override
@@ -898,12 +967,36 @@ class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text('测试支付，不会产生真实资金。请使用另一台设备上的支付宝沙箱钱包扫码。'),
       const SizedBox(height: 12),
-      QrImageView(data: widget.qrCode, size: 200),
-      if (_message != null) Text(_message!),
+      // QrImageView 内部用 LayoutBuilder，AlertDialog 量固有宽度时会抛异常导致弹窗不显示，
+      // 这里直接用 QrPainter 绘制固定尺寸。
+      Container(
+        width: 200,
+        height: 200,
+        color: Colors.white,
+        child: CustomPaint(
+          painter: QrPainter(
+            data: _qrCode,
+            version: QrVersions.auto,
+            gapless: true,
+          ),
+        ),
+      ),
+      TextButton.icon(
+        onPressed: (_busy || _refreshing) ? null : _refresh,
+        icon: const Icon(Icons.refresh, size: 16),
+        label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+      Text(_message ?? '等待支付结果…扫码完成后会自动确认',
+          style: TextStyle(fontSize: 12, color: _message == null ? Colors.grey.shade600 : Colors.red.shade600)),
     ])),
     actions: [
       TextButton(onPressed: _checking ? null : () => Navigator.pop(context, false), child: const Text('关闭')),
-      TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '查询支付结果')),
+      TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '我已完成支付')),
     ],
   );
 }

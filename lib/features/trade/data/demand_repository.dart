@@ -164,22 +164,28 @@ class DemandRepository {
   // ==================== 支付宝沙箱入账（托管/押金） ====================
 
   /// 发起托管付款（发布者）：返回 {qrCode, amount(分), ...}。
-  Future<Map<String, dynamic>> payEscrow(int demandId) async {
+  /// [refresh] 为 true 时服务端换新商户单号重新预下单，用于收款码失效后手动换码。
+  Future<Map<String, dynamic>> payEscrow(int demandId, {bool refresh = false}) async {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.demandPayEscrow(demandId),
+      query: <String, dynamic>{'refresh': refresh},
       parser: _mapParser,
     );
-    if (data == null || data['qrCode'] is! String) throw ApiException('获取托管支付二维码失败');
+    if (data == null) throw ApiException('获取托管支付二维码失败');
+    // 旧码其实已被扫付时，服务端就地结算并直接返回结果，此时没有 qrCode
+    if (data['paid'] == true) return data;
+    if (data['qrCode'] is! String) throw ApiException('获取托管支付二维码失败');
     return data;
   }
 
   /// 确认托管付款：服务端向支付宝查单，成功则置 escrowed。
-  Future<bool> confirmEscrow(int demandId) async {
+  /// 返回 {paid, closed?}，closed 为 true 表示支付宝侧该单已关闭、当前收款码失效。
+  Future<Map<String, dynamic>> confirmEscrow(int demandId) async {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.demandPayEscrowConfirm(demandId),
       parser: _mapParser,
     );
-    return data?['paid'] == true;
+    return data ?? const <String, dynamic>{'paid': false};
   }
 
   /// 开发直通托管（点一下即完成）：不走沙箱查单，服务端直接把托管置为 escrowed。
@@ -201,16 +207,20 @@ class DemandRepository {
   }
 
   /// 发起押金付款（创作者）：返回 {qrCode, amount(分), ...}。
-  Future<Map<String, dynamic>> payDeposit(int demandId) async {
+  /// [refresh] 为 true 且当前用户就是该收款记录的付款人时，服务端换新单号重出码。
+  Future<Map<String, dynamic>> payDeposit(int demandId, {bool refresh = false}) async {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.demandPayDeposit(demandId),
+      query: <String, dynamic>{'refresh': refresh},
       parser: _mapParser,
     );
-    if (data == null || data['qrCode'] is! String) throw ApiException('获取押金支付二维码失败');
+    if (data == null) throw ApiException('获取押金支付二维码失败');
+    if (data['paid'] == true) return data;
+    if (data['qrCode'] is! String) throw ApiException('获取押金支付二维码失败');
     return data;
   }
 
-  /// 确认押金付款：查单成功后服务端自动接单，返回 {paid, claimed, reason?}（抢单落败时带 reason）。
+  /// 确认押金付款：查单成功后服务端自动接单，返回 {paid, claimed, closed?, reason?}（抢单落败时带 reason）。
   Future<Map<String, dynamic>> confirmDeposit(int demandId) async {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.demandPayDepositConfirm(demandId),

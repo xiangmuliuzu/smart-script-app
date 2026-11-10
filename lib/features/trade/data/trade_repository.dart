@@ -356,15 +356,24 @@ class TradeRepository {
   }
 
   /// APP买方付款（paying → delivering）。
-  Future<Map<String, dynamic>> appPayOrder(int orderId) async {
-    final data = await _api.post<Map<String, dynamic>>(ApiEndpoints.appOrderPay(orderId), parser: _mapParser);
-    if (data == null || data['qrCode'] is! String) throw ApiException('获取沙箱支付二维码失败');
+  /// [refresh] 为 true 时服务端换新商户单号重新预下单，用于收款码失效后换码。
+  Future<Map<String, dynamic>> appPayOrder(int orderId, {bool refresh = false}) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.appOrderPay(orderId),
+      query: <String, dynamic>{'refresh': refresh},
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取沙箱支付二维码失败');
+    // 旧码其实已被扫付时服务端直接结算并返回 paid，此时没有 qrCode
+    if (data['paid'] == true) return data;
+    if (data['qrCode'] is! String) throw ApiException('获取沙箱支付二维码失败');
     return data;
   }
 
-  Future<bool> confirmSandboxPayment(int orderId) async {
+  /// 查单确认沙箱支付，返回 {paid, closed?}；closed 为 true 表示支付宝侧该单已关闭、当前码失效。
+  Future<Map<String, dynamic>> confirmSandboxPayment(int orderId) async {
     final data = await _api.post<Map<String, dynamic>>('${ApiEndpoints.appOrderPay(orderId)}/confirm', parser: _mapParser);
-    return data?['paid'] == true;
+    return data ?? const <String, dynamic>{'paid': false};
   }
 
   /// APP买方确认收货（delivering → completed，托管释放+收益入账）。
