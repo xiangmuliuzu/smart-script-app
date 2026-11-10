@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
 import 'package:script_app/features/create/ai_create_page.dart';
 import 'package:script_app/features/create/data/ai_create_session.dart';
+import 'package:script_app/features/welfare/data/welfare_models.dart';
+import 'package:script_app/features/welfare/data/welfare_providers.dart';
 
 AiWriteRecord _record(
   int id,
@@ -113,6 +115,24 @@ void main() {
   });
 
   group('AI 创作页', () {
+    testWidgets('设定页显示剩余积分与整宽主按钮', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            welfareAssetProvider.overrideWith((ref) async =>
+                (points: const PointsBalance(balance: 76), aiAvailable: 0)),
+          ],
+          child: const MaterialApp(home: AiCreatePage()),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('剩余 76 积分'), findsOneWidget);
+      expect(find.text('下一步：生成大纲'), findsOneWidget);
+    });
+
     testWidgets('从记录恢复：设定与章节带回，直接停在章节步骤', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;

@@ -121,7 +121,8 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
 
   double get _progress => _chapters.isEmpty ? 0 : _generatedCount / _chapters.length;
 
-  int get _quota => ref.watch(welfareAssetProvider).valueOrNull?.points.balance ?? 0;
+  /// 剩余积分：未加载 / 加载失败时返回 null，避免短暂显示成 0 误导用户。
+  int? get _quota => ref.watch(welfareAssetProvider).valueOrNull?.points.balance;
 
   Future<void> _generateOutline() async {
     if (_titleCtrl.text.trim().isEmpty) {
@@ -482,11 +483,25 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
           const SizedBox(height: 12),
           AiModelSelector(selectedModel: _model, onChanged: (v) => setState(() => _model = v)),
           const SizedBox(height: 18),
+          // 积分与主按钮各占一行：窄屏下按钮文字不会挤压积分文本。
           Row(
             children: [
-              Expanded(child: Text('剩余 $_quota 积分', style: const TextStyle(fontSize: 12, color: AppColors.text3))),
-              FilledButton(onPressed: _generateOutline, child: const Text('下一步：生成大纲')),
+              const Icon(Icons.stars_rounded, size: 14, color: AppColors.text3),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _quota == null ? '积分加载中…' : '剩余 $_quota 积分',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(onPressed: _generateOutline, child: const Text('下一步：生成大纲')),
           ),
         ],
       ),

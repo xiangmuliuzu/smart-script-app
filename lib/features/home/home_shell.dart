@@ -5,12 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/providers/auth_providers.dart';
+import '../create/widgets/create_start_sheet.dart';
 import '../../core/theme/app_colors.dart';
 
 /// 主框架的底部导航容器（对应 UI 原型 `.tabbar` 五格平铺 + 中间圆形凸起）。
 ///
 /// 四个 tab 分支（书城 / 视频 / 分类 / 我的）由 [StatefulNavigationShell] 管理，
-/// 切 tab 会保留各自导航栈；中间「创作」是新建作品的快捷入口，不占用分支。
+/// 切 tab 会保留各自导航栈；中间「创作」是新建作品入口，先选 AI 创作或自己编辑，不占用分支。
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
 
@@ -24,10 +25,18 @@ class HomeShell extends ConsumerWidget {
     _TabItem('我的', Icons.person_outline, Icons.person),
   ];
 
+  /// 从底部导航进入新建作品：与「我的作品」右上角「新建」一致，先选方式。
+  Future<void> _startCreate(BuildContext context, WidgetRef ref) async {
+    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.workUpload)) return;
+    final choice = await showCreateChoice(context);
+    if (choice == null || !context.mounted) return;
+    context.push(choice == 'ai' ? RoutePath.aiCreate : RoutePath.workUpload);
+  }
+
   void _onTap(BuildContext context, WidgetRef ref, int index) {
-    // 中间「创作」是新建作品的快捷入口：直接进入新建表单，不占用/切换 tab 分支。
+    // 中间「创作」是新建作品入口：先选 AI 创作或自己编辑，不占用/切换 tab 分支。
     if (index == 2) {
-      AuthGuard.pushProtected(context, ref, target: RoutePath.workUpload);
+      _startCreate(context, ref);
       return;
     }
     if (index == 4 && !AuthGuard.isLoggedIn(ref)) {

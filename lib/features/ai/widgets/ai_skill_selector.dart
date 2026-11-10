@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../data/ai_models.dart';
 import '../data/ai_providers.dart';
+import 'ai_option_field.dart';
 
 /// 「导演(skill)选择」下拉（App 端 AI 创作页共用）。
 ///
@@ -39,50 +39,28 @@ class AiSkillSelector extends ConsumerWidget {
       (skill) => skill.id == selectedSkillId,
       orElse: () => AiSkill(),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('导演(skill)',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.text1)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.fill,
-            borderRadius: BorderRadius.circular(AppRadius.rSmall),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<int?>(
-              value: selectedSkillId,
-              isExpanded: true,
-              hint: const Text('请选择导演',
-                  style: TextStyle(fontSize: 14, color: AppColors.text3)),
-              items: [
-                for (final skill in skills)
-                  DropdownMenuItem<int?>(
-                      value: skill.id,
-                      child: Text(skill.skillName,
-                          style: const TextStyle(
-                              fontSize: 14, color: AppColors.text2))),
-              ],
-              onChanged: enabled ? onChanged : null,
-              style: const TextStyle(fontSize: 14, color: AppColors.text2),
-              icon: const Icon(Icons.arrow_drop_down,
-                  color: AppColors.text3),
-            ),
-          ),
-        ),
-        if (current.id != 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text('当前导演：${current.skillName}',
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.text3)),
-          ),
-      ],
+    final selectedLabel = selectedSkillId == null
+        ? null
+        : current.skillName.isEmpty
+            ? null
+            : current.skillName;
+    return AiOptionField(
+      label: '导演(skill)',
+      placeholder: '请选择导演',
+      selectedLabel: selectedLabel,
+      enabled: enabled,
+      onTap: () async {
+        final pick = await showAiOptionPicker<int>(
+          context,
+          title: '选择导演 (skill)',
+          selected: selectedSkillId,
+          options: [
+            for (final skill in skills)
+              AiOption<int>(value: skill.id, label: skill.skillName),
+          ],
+        );
+        if (pick != null) onChanged(pick.value);
+      },
     );
   }
 }

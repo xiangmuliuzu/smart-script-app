@@ -11,6 +11,7 @@ import '../../shared/widgets/common_views.dart';
 import '../bookstore/widgets/bookstore_widgets.dart';
 import 'data/author_work_models.dart';
 import 'data/author_work_providers.dart';
+import 'widgets/create_start_sheet.dart';
 
 /// 创作入口（底部导航「创作」tab）。
 ///
@@ -44,37 +45,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   /// 新建入口：AI 创作走独立流程，自己编辑进入原来的新建作品表单。
   Future<void> _showStartChoice(BuildContext context) async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('开始创作', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
-              title: const Text('AI 创作'),
-              subtitle: const Text('描述灵感，先生成大纲；确认后逐章成文，插入作品继续改。'),
-              onTap: () => Navigator.of(sheetContext).pop('ai'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined, color: AppColors.text2),
-              title: const Text('自己编辑'),
-              subtitle: const Text('直接新建作品，自己写或导入已完成的剧本文件。'),
-              onTap: () => Navigator.of(sheetContext).pop('editor'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
+    final choice = await showCreateChoice(context);
     if (!context.mounted || choice == null) return;
     context.push(choice == 'ai' ? RoutePath.aiCreate : RoutePath.workUpload);
   }

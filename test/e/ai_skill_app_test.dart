@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:script_app/features/ai/ai_outline_page.dart';
 import 'package:script_app/features/ai/ai_storyboard_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
+import 'package:script_app/features/ai/widgets/ai_option_field.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
 import 'package:script_app/features/ai/widgets/ai_skill_selector.dart';
@@ -65,8 +66,9 @@ class _FakeAiRepository implements AiRepository {
 
   @override
   Future<List<AiSkill>> listSkills() async => const [
-        AiSkill(id: 1, skillName: '悬疑烧脑导演'),
-        AiSkill(id: 2, skillName: '甜宠爆款导演'),
+        AiSkill(id: 1, skillName: '悬疑烧脑导演', skillType: 'write'),
+        AiSkill(id: 2, skillName: '甜宠爆款导演', skillType: 'write'),
+        AiSkill(id: 8, skillName: '分镜导演（镜头语言）', skillType: 'storyboard'),
       ];
 
   @override
@@ -159,12 +161,11 @@ void main() {
       // 填写剧本并选择分镜导演后生成（该页 skillTypeFilter='storyboard'，只列分镜类导演）
       await tester.enterText(
           find.byType(TextField).first, '男主深夜在小巷偶遇旧友，对峙。');
-      final skillDropdown = find.byType(DropdownButton<int?>).first;
-      await tester.ensureVisible(skillDropdown);
+      // 导演选择改为底部选项面板；该页路由有过渡动画（IgnorePointer 会吞点击），
+      // 直接触发字段的 onTap 打开面板。
+      await tester.tap(find.byType(AiOptionField).first);
       await tester.pumpAndSettle();
-      // 该页路由存在过渡动画（IgnorePointer 会吞掉点击），此处直接触发 onChanged：
-      // 打开菜单的选择交互已由上方 AiSkillSelector 独立用例覆盖。
-      tester.widget<DropdownButton<int?>>(skillDropdown).onChanged!(8);
+      await tester.tap(find.text('分镜导演（镜头语言）').last);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('生成分镜'));

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../data/ai_models.dart';
 import '../data/ai_providers.dart';
+import 'ai_option_field.dart';
 
 /// 「模型选择」下拉（App 端 AI 创作页共用）。
 ///
@@ -42,50 +42,28 @@ class AiModelSelector extends ConsumerWidget {
     final selectedValid =
         selectedModel == null || options.any((o) => o.value == selectedModel);
     final displayValue = selectedValid ? selectedModel : null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('模型',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.text1)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.fill,
-            borderRadius: BorderRadius.circular(AppRadius.rSmall),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String?>(
-              value: displayValue,
-              isExpanded: true,
-              hint: const Text('请选择模型',
-                  style: TextStyle(fontSize: 14, color: AppColors.text3)),
-              items: [
-                for (final option in options)
-                  DropdownMenuItem<String?>(
-                      value: option.value,
-                      child: Text(option.label,
-                          style: const TextStyle(
-                              fontSize: 14, color: AppColors.text2))),
-              ],
-              onChanged: enabled ? onChanged : null,
-              style: const TextStyle(fontSize: 14, color: AppColors.text2),
-              icon: const Icon(Icons.arrow_drop_down,
-                  color: AppColors.text3),
-            ),
-          ),
-        ),
-        if (selectedModel != null && selectedModel!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text('当前模型：$selectedModel',
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.text3)),
-          ),
-      ],
+    final selectedLabel = displayValue == null
+        ? null
+        : options
+            .firstWhere((o) => o.value == displayValue,
+                orElse: () => _ModelOption(value: '', label: ''))
+            .label;
+    return AiOptionField(
+      label: '模型',
+      placeholder: '请选择模型',
+      selectedLabel: selectedLabel,
+      enabled: enabled,
+      onTap: () async {
+        final pick = await showAiOptionPicker<String>(
+          context,
+          title: '选择模型',
+          selected: displayValue,
+          options: [
+            for (final option in options) AiOption<String>(value: option.value, label: option.label),
+          ],
+        );
+        if (pick != null) onChanged(pick.value);
+      },
     );
   }
 }

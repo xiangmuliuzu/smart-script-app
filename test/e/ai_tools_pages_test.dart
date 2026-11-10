@@ -435,8 +435,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('导演(skill)'), findsOneWidget);
-      // 展开导演下拉后再断言候选项
-      await tester.tap(find.byType(DropdownButton<int?>).first);
+      // 导演选择改为底部选项面板：点开后再断言候选项。
+      await tester.tap(find.text('请选择导演').first);
       await tester.pumpAndSettle();
       expect(find.text('悬疑烧脑导演'), findsOneWidget);
       expect(find.text('甜宠爆款导演'), findsOneWidget);
@@ -452,7 +452,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('导演(skill)'), findsOneWidget);
-      await tester.tap(find.byType(DropdownButton<int?>).first);
+      await tester.tap(find.text('请选择导演').first);
       await tester.pumpAndSettle();
       expect(find.text('分镜导演（镜头语言）'), findsOneWidget);
       expect(find.text('悬疑烧脑导演'), findsNothing);
