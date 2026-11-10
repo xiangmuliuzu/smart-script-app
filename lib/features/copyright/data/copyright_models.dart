@@ -38,6 +38,7 @@ String? _textOrNull(dynamic value) => value?.toString();
 
 /// 版权申请状态枚举
 class CopyrightApplicationStatus {
+  static const String unpaid = 'unpaid'; // 待付款（支付单，尚未创建申请）
   static const String pending = 'pending'; // 待审核
   static const String approved = 'approved'; // 待提交
   static const String submitted = 'submitted'; // 待提交到第三方
@@ -81,6 +82,9 @@ class CopyrightApplication {
     this.centerName = '',
     this.externalApplyNo,
     this.status = '',
+    this.payOrderId,
+    this.feeAmount,
+    this.wordCount,
     this.certNo,
     this.certId,
     this.certUrl,
@@ -116,6 +120,9 @@ class CopyrightApplication {
   final String centerName;
   final String? externalApplyNo;
   final String status;
+  final int? payOrderId;
+  final double? feeAmount;
+  final int? wordCount;
   final String? certNo;
   final int? certId;
   final String? certUrl;
@@ -125,15 +132,14 @@ class CopyrightApplication {
   final String? certTime;
   final String? remark;
 
-  /// 状态中文标签
+  /// 状态中文标签（历史 pending/approved/submitted 统一展示为审核中）
   String get statusLabel {
     switch (status) {
+      case CopyrightApplicationStatus.unpaid:
+        return '待付款';
       case CopyrightApplicationStatus.pending:
-        return '待审核';
       case CopyrightApplicationStatus.approved:
-        return '待提交';
       case CopyrightApplicationStatus.submitted:
-        return '待提交到第三方';
       case CopyrightApplicationStatus.reviewing:
         return '审核中';
       case CopyrightApplicationStatus.certificated:
@@ -148,22 +154,29 @@ class CopyrightApplication {
   /// 状态描述
   String get statusDescription {
     switch (status) {
+      case CopyrightApplicationStatus.unpaid:
+        return feeAmount != null
+            ? '待支付登记费 ¥${feeAmount!.toStringAsFixed(2)}，付款后提交版权中心'
+            : '待支付登记费，付款后提交版权中心';
       case CopyrightApplicationStatus.pending:
-        return '平台正在审核您的申请，请耐心等待';
       case CopyrightApplicationStatus.approved:
-        return '审核通过，等待提交到版权中心';
       case CopyrightApplicationStatus.submitted:
-        return '等待提交到版权中心';
       case CopyrightApplicationStatus.reviewing:
         return '已提交到${centerName.isNotEmpty ? centerName : '版权中心'}，正在审核中';
       case CopyrightApplicationStatus.certificated:
         return '恭喜！版权证书已签发';
       case CopyrightApplicationStatus.rejected:
-        return rejectReason ?? '申请被驳回';
+        return rejectReason ?? '申请被驳回，费用不退，可重新缴费申请';
       default:
         return '';
     }
   }
+
+  /// 是否待付款
+  bool get isUnpaid => status == CopyrightApplicationStatus.unpaid;
+
+  /// 是否可去付款
+  bool get canPay => isUnpaid && payOrderId != null && payOrderId! > 0;
 
   /// 是否可重新提交
   bool get canResubmit => status == CopyrightApplicationStatus.rejected;
@@ -197,7 +210,14 @@ class CopyrightApplication {
         copyrightCenter: _text(json['copyrightCenter']),
         centerName: _text(json['centerName']),
         externalApplyNo: _textOrNull(json['externalApplyNo']),
-        status: _text(json['status']),
+        status: _text(
+          json['displayStatus'] ?? json['status'],
+        ),
+        payOrderId:
+            json['payOrderId'] == null ? null : _int(json['payOrderId']),
+        feeAmount: json['feeAmount'] == null ? null : _double(json['feeAmount']),
+        wordCount:
+            json['wordCount'] == null ? null : _int(json['wordCount']),
         certNo: _textOrNull(json['certNo']),
         certId: json['certId'] != null ? _int(json['certId']) : null,
         certUrl: _textOrNull(json['certUrl']),
@@ -332,6 +352,107 @@ class CopyrightApplyDTO {
         if (otherProof != null) 'otherProofUrls': otherProof,
         if (remark != null) 'remark': remark,
       };
+}
+
+/// 版权登记费询价
+class CopyrightFeeQuote {
+  const CopyrightFeeQuote({
+    required this.workId,
+    required this.copyrightCenter,
+    this.centerName = '',
+    this.wordCount = 0,
+    this.feeAmount = 0,
+    this.feeType = '',
+  });
+
+  final int workId;
+  final String copyrightCenter;
+  final String centerName;
+  final int wordCount;
+  final double feeAmount;
+  final String feeType;
+
+  factory CopyrightFeeQuote.fromJson(Map<String, dynamic> json) =>
+      CopyrightFeeQuote(
+        workId: _int(json['workId']),
+        copyrightCenter: _text(json['copyrightCenter']),
+        centerName: _text(json['centerName']),
+        wordCount: _int(json['wordCount']),
+        feeAmount: _double(json['feeAmount']),
+        feeType: _text(json['feeType']),
+      );
+}
+
+/// 版权申请待支付单
+class CopyrightPayOrder {
+  const CopyrightPayOrder({
+    required this.payOrderId,
+    this.payNo = '',
+    this.workId = 0,
+    this.workName = '',
+    this.feeAmount = 0,
+    this.wordCount = 0,
+    this.status = '',
+    this.expireTime,
+    this.applyId,
+  });
+
+  final int payOrderId;
+  final String payNo;
+  final int workId;
+  final String workName;
+  final double feeAmount;
+  final int wordCount;
+  final String status;
+  final String? expireTime;
+  final int? applyId;
+
+  factory CopyrightPayOrder.fromJson(Map<String, dynamic> json) =>
+      CopyrightPayOrder(
+        payOrderId: _int(json['payOrderId']),
+        payNo: _text(json['payNo']),
+        workId: _int(json['workId']),
+        workName: _text(json['workName']),
+        feeAmount: _double(json['feeAmount']),
+        wordCount: _int(json['wordCount']),
+        status: _text(json['status']),
+        expireTime: _textOrNull(json['expireTime']),
+        applyId: json['applyId'] == null ? null : _int(json['applyId']),
+      );
+}
+
+/// 版权沙箱支付下单结果
+class CopyrightPaymentQr {
+  const CopyrightPaymentQr({required this.qrCode, this.sandbox = true});
+
+  final String qrCode;
+  final bool sandbox;
+
+  factory CopyrightPaymentQr.fromJson(Map<String, dynamic> json) =>
+      CopyrightPaymentQr(
+        qrCode: _text(json['qrCode']),
+        sandbox: json['sandbox'] == true,
+      );
+}
+
+/// 版权沙箱支付确认结果
+class CopyrightPaymentConfirm {
+  const CopyrightPaymentConfirm({
+    required this.paid,
+    this.closed = false,
+    this.applyId,
+  });
+
+  final bool paid;
+  final bool closed;
+  final int? applyId;
+
+  factory CopyrightPaymentConfirm.fromJson(Map<String, dynamic> json) =>
+      CopyrightPaymentConfirm(
+        paid: json['paid'] == true,
+        closed: json['closed'] == true,
+        applyId: json['applyId'] == null ? null : _int(json['applyId']),
+      );
 }
 
 /// 版权申请重新提交DTO
@@ -688,12 +809,11 @@ extension FileTypeExtension on String {
 extension CopyrightApplicationStatusExtension on String {
   String get statusName {
     switch (this) {
+      case CopyrightApplicationStatus.unpaid:
+        return '待付款';
       case CopyrightApplicationStatus.pending:
-        return '待审核';
       case CopyrightApplicationStatus.approved:
-        return '待提交';
       case CopyrightApplicationStatus.submitted:
-        return '待提交';
       case CopyrightApplicationStatus.reviewing:
         return '审核中';
       case CopyrightApplicationStatus.certificated:

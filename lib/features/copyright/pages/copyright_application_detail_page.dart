@@ -178,6 +178,11 @@ class _CopyrightApplicationDetailPageState
               _buildMaterialsCard(application),
             if (_hasMaterials(application))
               const SizedBox(height: 16),
+            // 缴费信息
+            if (_hasFeeInfo(application)) ...[
+              _buildFeeCard(application),
+              const SizedBox(height: 16),
+            ],
             // 申请信息
             _buildInfoCard(application),
             const SizedBox(height: 16),
@@ -533,6 +538,92 @@ class _CopyrightApplicationDetailPageState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  bool _hasFeeInfo(CopyrightApplication application) {
+    return application.feeAmount != null ||
+        application.wordCount != null ||
+        application.payOrderId != null ||
+        application.isUnpaid;
+  }
+
+  Widget _buildFeeCard(CopyrightApplication application) {
+    final unpaid = application.isUnpaid;
+    final feeText = application.feeAmount != null
+        ? '¥${application.feeAmount!.toStringAsFixed(2)}'
+        : '-';
+    final payStatus = unpaid ? '待付款' : '已缴费';
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '缴费信息',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text1,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildDetailRow(
+              '登记费用',
+              feeText,
+              valueColor: AppColors.primary,
+            ),
+            if (application.wordCount != null) ...[
+              _buildDivider(),
+              _buildDetailRow('计价字数', '${application.wordCount} 字'),
+            ],
+            _buildDivider(),
+            _buildDetailRow(
+              '缴费状态',
+              payStatus,
+              valueColor: unpaid
+                  ? const Color(0xFFFA8C16)
+                  : const Color(0xFF52C41A),
+            ),
+            _buildDivider(),
+            _buildDetailRow(
+              '费用说明',
+              '费用交给版权登记中心，平台不另收服务费',
+              maxLines: 2,
+            ),
+            if (application.canPay) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => context.push(
+                    RoutePath.copyrightPayUrl(
+                      application.payOrderId!,
+                      feeAmount: application.feeAmount,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    application.feeAmount != null
+                        ? '去付款 ¥${application.feeAmount!.toStringAsFixed(2)}'
+                        : '去付款',
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

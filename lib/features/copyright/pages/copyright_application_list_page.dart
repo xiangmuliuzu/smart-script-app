@@ -132,7 +132,7 @@ class _CopyrightApplicationListPageState
         children: [
           _buildFilterChip('全部', null),
           const SizedBox(width: 8),
-          _buildFilterChip('待审核', CopyrightApplicationStatus.pending),
+          _buildFilterChip('待付款', CopyrightApplicationStatus.unpaid),
           const SizedBox(width: 8),
           _buildFilterChip('审核中', CopyrightApplicationStatus.reviewing),
           const SizedBox(width: 8),
@@ -207,9 +207,22 @@ class _CopyrightApplicationListPageState
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => context.push(
-            RoutePath.copyrightApplicationDetailUrl(app.applyId),
-          ),
+          onTap: () {
+            if (app.canPay) {
+              context.push(
+                RoutePath.copyrightPayUrl(
+                  app.payOrderId!,
+                  feeAmount: app.feeAmount,
+                ),
+              );
+              return;
+            }
+            if (app.applyId > 0) {
+              context.push(
+                RoutePath.copyrightApplicationDetailUrl(app.applyId),
+              );
+            }
+          },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -278,6 +291,23 @@ class _CopyrightApplicationListPageState
                     ),
                   ],
                 ),
+                if (app.isUnpaid && app.feeAmount != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.payments_outlined,
+                          size: 14, color: AppColors.text3),
+                      const SizedBox(width: 4),
+                      Text(
+                        '应付 ¥${app.feeAmount!.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.text2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -311,7 +341,27 @@ class _CopyrightApplicationListPageState
                         ),
                       ],
                     ),
-                    if (app.status == CopyrightApplicationStatus.pending)
+                    if (app.canPay)
+                      TextButton(
+                        onPressed: () => context.push(
+                          RoutePath.copyrightPayUrl(
+                            app.payOrderId!,
+                            feeAmount: app.feeAmount,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child:
+                            const Text('去付款', style: TextStyle(fontSize: 13)),
+                      )
+                    else if (app.status == CopyrightApplicationStatus.pending)
                       TextButton(
                         onPressed: () => _confirmDelete(app),
                         style: TextButton.styleFrom(
@@ -385,13 +435,13 @@ class _CopyrightApplicationListPageState
 
   Color _getStatusColor(String status) {
     switch (status) {
+      case CopyrightApplicationStatus.unpaid:
+        return const Color(0xFFFA8C16);
       case CopyrightApplicationStatus.pending:
-        return const Color(0xFFFFA940);
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
-        return const Color(0xFF1890FF);
       case CopyrightApplicationStatus.reviewing:
-        return const Color(0xFF722ED1);
+        return const Color(0xFF1890FF);
       case CopyrightApplicationStatus.certificated:
         return const Color(0xFF52C41A);
       case CopyrightApplicationStatus.rejected:
@@ -407,11 +457,11 @@ class _CopyrightApplicationListPageState
 
   IconData _getStatusIcon(String status) {
     switch (status) {
+      case CopyrightApplicationStatus.unpaid:
+        return Icons.payment;
       case CopyrightApplicationStatus.pending:
-        return Icons.schedule;
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
-        return Icons.upload;
       case CopyrightApplicationStatus.reviewing:
         return Icons.hourglass_empty;
       case CopyrightApplicationStatus.certificated:

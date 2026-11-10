@@ -98,16 +98,16 @@ class CopyrightProvider extends ChangeNotifier {
   bool _submitting = false;
   bool get submitting => _submitting;
 
-  /// 提交版权申请
-  Future<bool> submitApplication(CopyrightApplyDTO dto) async {
+  /// 创建待支付单（付完后再创建申请）
+  Future<CopyrightPayOrder> createPayOrder(CopyrightApplyDTO dto) async {
     _submitting = true;
     notifyListeners();
 
     try {
-      await _apiService.submitApplication(dto);
+      final order = await _apiService.createPayOrder(dto);
       _submitting = false;
       notifyListeners();
-      return true;
+      return order;
     } catch (e) {
       _submitting = false;
       notifyListeners();
@@ -115,21 +115,50 @@ class CopyrightProvider extends ChangeNotifier {
     }
   }
 
-  /// 重新提交版权申请
-  Future<bool> resubmitApplication(CopyrightResubmitDTO dto) async {
+  /// 兼容旧调用
+  Future<CopyrightPayOrder> submitApplication(CopyrightApplyDTO dto) =>
+      createPayOrder(dto);
+
+  /// 驳回后重新缴费下单
+  Future<CopyrightPayOrder> createResubmitPayOrder(
+      CopyrightResubmitDTO dto) async {
     _submitting = true;
     notifyListeners();
 
     try {
-      await _apiService.resubmitApplication(dto);
+      final order = await _apiService.createResubmitPayOrder(dto);
       _submitting = false;
       notifyListeners();
-      return true;
+      return order;
     } catch (e) {
       _submitting = false;
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// 兼容旧调用
+  Future<CopyrightPayOrder> resubmitApplication(CopyrightResubmitDTO dto) =>
+      createResubmitPayOrder(dto);
+
+  /// 登记费询价
+  Future<CopyrightFeeQuote> feeQuote({
+    required int workId,
+    required String copyrightCenter,
+  }) {
+    return _apiService.feeQuote(
+      workId: workId,
+      copyrightCenter: copyrightCenter,
+    );
+  }
+
+  /// 临时直付：跳过支付宝沙箱，履约并提交第三方
+  Future<CopyrightPaymentConfirm> directPay(int payOrderId) async {
+    final result = await _apiService.directPay(payOrderId);
+    if (result.paid) {
+      await refreshApplications();
+    }
+    return result;
   }
 
   /// 删除版权申请（仅限pending状态）

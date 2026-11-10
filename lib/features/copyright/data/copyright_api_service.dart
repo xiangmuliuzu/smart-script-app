@@ -58,29 +58,75 @@ class CopyrightApiService {
     return CopyrightApplication.fromJson(data);
   }
 
-  /// 提交版权申请
+  /// 登记费询价
   ///
-  /// POST /content/copyright/application/apply
-  Future<bool> submitApplication(CopyrightApplyDTO dto) async {
-    await _client.post(
-      '/content/copyright/application/apply',
-      data: dto.toJson(),
+  /// GET /content/copyright/application/fee-quote
+  Future<CopyrightFeeQuote> feeQuote({
+    required int workId,
+    required String copyrightCenter,
+  }) async {
+    final data = await _client.get(
+      '/content/copyright/application/fee-quote',
+      query: {
+        'workId': workId,
+        'copyrightCenter': copyrightCenter,
+      },
     );
-
-    return true;
+    return CopyrightFeeQuote.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
-  /// 重新提交版权申请（驳回后）
+  /// 创建待支付单（付完后再创建申请）
   ///
-  /// POST /content/copyright/application/resubmit
-  Future<bool> resubmitApplication(CopyrightResubmitDTO dto) async {
-    await _client.post(
-      '/content/copyright/application/resubmit',
+  /// POST /content/copyright/application/pay-order
+  Future<CopyrightPayOrder> createPayOrder(CopyrightApplyDTO dto) async {
+    final data = await _client.post(
+      '/content/copyright/application/pay-order',
       data: dto.toJson(),
     );
-
-    return true;
+    return CopyrightPayOrder.fromJson(Map<String, dynamic>.from(data as Map));
   }
+
+  /// 兼容旧调用：内部转 createPayOrder
+  Future<CopyrightPayOrder> submitApplication(CopyrightApplyDTO dto) =>
+      createPayOrder(dto);
+
+  /// 驳回后重新缴费下单
+  ///
+  /// POST /content/copyright/application/pay-order/resubmit
+  Future<CopyrightPayOrder> createResubmitPayOrder(
+      CopyrightResubmitDTO dto) async {
+    final data = await _client.post(
+      '/content/copyright/application/pay-order/resubmit',
+      data: dto.toJson(),
+    );
+    return CopyrightPayOrder.fromJson(Map<String, dynamic>.from(data as Map));
+  }
+
+  /// 兼容旧调用
+  Future<CopyrightPayOrder> resubmitApplication(CopyrightResubmitDTO dto) =>
+      createResubmitPayOrder(dto);
+
+  /// 临时直付：跳过支付宝沙箱，直接履约并提交第三方
+  ///
+  /// POST /content/copyright/application/pay-order/{id}/direct-pay
+  Future<CopyrightPaymentConfirm> directPay(int payOrderId) async {
+    final data = await _client.post(
+      '/content/copyright/application/pay-order/$payOrderId/direct-pay',
+      data: const <String, dynamic>{},
+    );
+    return CopyrightPaymentConfirm.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
+  }
+
+  /// @deprecated 沙箱支付已停用，请用 [directPay]
+  Future<CopyrightPaymentQr> createPayment(int payOrderId) async {
+    throw UnsupportedError('支付宝沙箱已停用，请使用 directPay');
+  }
+
+  /// @deprecated 沙箱支付已停用，请用 [directPay]
+  Future<CopyrightPaymentConfirm> confirmPayment(int payOrderId) =>
+      directPay(payOrderId);
 
   /// 删除版权申请（仅限pending状态）
   ///

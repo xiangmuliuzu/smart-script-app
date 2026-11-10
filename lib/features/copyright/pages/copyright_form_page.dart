@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/native_file_picker.dart';
 import '../data/copyright_models.dart';
@@ -66,6 +67,9 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
 
   bool _loading = false;
   CopyrightApplication? _originalApplication;
+  CopyrightFeeQuote? _feeQuote;
+  bool _feeLoading = false;
+  String? _feeError;
 
   @override
   void initState() {
@@ -101,6 +105,7 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
             setState(() {
               _originalApplication = provider.currentApplication;
             });
+            await _refreshFeeQuote();
           }
         }
         break;
@@ -183,26 +188,32 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
 
     try {
       final provider = ref.read(copyrightProvider);
-
+      final CopyrightPayOrder payOrder;
       switch (widget.mode) {
         case CopyrightFormMode.create:
-          await _submitNewApplication(provider);
+          payOrder = await _submitNewApplication(provider);
           break;
         case CopyrightFormMode.resubmit:
-          await _submitResubmitApplication(provider);
+          payOrder = await _submitResubmitApplication(provider);
           break;
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_getSuccessMessage())),
+        context.push(
+          RoutePath.copyrightPayUrl(
+            payOrder.payOrderId,
+            feeAmount: payOrder.feeAmount,
+          ),
         );
-        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${_getErrorPrefix()}失败：$e')),
+          SnackBar(
+            content: Text(
+              '${_getErrorPrefix()}失败：${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
         );
       }
     } finally {
@@ -214,7 +225,8 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
     }
   }
 
-  Future<void> _submitNewApplication(CopyrightProvider provider) async {
+  Future<CopyrightPayOrder> _submitNewApplication(
+      CopyrightProvider provider) async {
     final dto = CopyrightApplyDTO(
       workId: _selectedWork!.workId,
       workType: _workType,
@@ -231,26 +243,29 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
           : _remarkController.text.trim(),
     );
 
-    await provider.submitApplication(dto);
+    return provider.createPayOrder(dto);
   }
 
-  Future<void> _submitResubmitApplication(CopyrightProvider provider) async {
+  Future<CopyrightPayOrder> _submitResubmitApplication(
+      CopyrightProvider provider) async {
+    final materials = _applicationMaterials.isNotEmpty
+        ? materialFilesToJson(_applicationMaterials)
+        : null;
     final dto = CopyrightResubmitDTO(
       originalApplyId: widget.originalApplyId!,
       workType: _workType,
       completeTime: _formatDate(_completeTime!),
-      originalityProof: _applicationMaterials.isNotEmpty
-          ? materialFilesToJson(_applicationMaterials)
-          : null,
+      fileUrl: materials,
+      originalityProof: materials,
       authorIdentityDoc: null,
       creationProcess: null,
       otherProof: null,
       remark: _remarkController.text.trim().isEmpty
-          ? null
+          ? '驳回后重新申请'
           : _remarkController.text.trim(),
     );
 
-    await provider.resubmitApplication(dto);
+    return provider.createResubmitPayOrder(dto);
   }
 
   String _formatDate(DateTime date) {
@@ -266,21 +281,12 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
     }
   }
 
-  String _getSuccessMessage() {
-    switch (widget.mode) {
-      case CopyrightFormMode.create:
-        return '申请提交成功';
-      case CopyrightFormMode.resubmit:
-        return '重新提交成功';
-    }
-  }
-
   String _getErrorPrefix() {
     switch (widget.mode) {
       case CopyrightFormMode.create:
-        return '提交';
+        return '下单';
       case CopyrightFormMode.resubmit:
-        return '重新提交';
+        return '重新下单';
     }
   }
 
@@ -324,6 +330,10 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
 
               // 分类材料上传
               _buildMaterialsUploader(),
+              const SizedBox(height: 16),
+
+              // 登记费用
+              _buildFeeCard(),
               const SizedBox(height: 16),
 
               // 备注
@@ -420,6 +430,7 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
                   setState(() {
                     _selectedWork = work;
                   });
+                  _refreshFeeQuote();
                 },
               ),
           ],
@@ -478,10 +489,205 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
                 setState(() {
                   _selectedCenter = center;
                 });
+                _refreshFeeQuote();
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _refreshFeeQuote() async {
+    if (widget.mode == CopyrightFormMode.resubmit) {
+      final app = _originalApplication;
+      if (app == null || app.workId <= 0 || app.copyrightCenter.isEmpty) {
+        return;
+      }
+      await _loadFeeQuote(workId: app.workId, centerCode: app.copyrightCenter);
+      return;
+    }
+    if (_selectedWork == null || _selectedCenter == null) {
+      setState(() {
+        _feeQuote = null;
+        _feeError = null;
+      });
+      return;
+    }
+    await _loadFeeQuote(
+      workId: _selectedWork!.workId,
+      centerCode: _selectedCenter!.centerCode,
+    );
+  }
+
+  Future<void> _loadFeeQuote({
+    required int workId,
+    required String centerCode,
+  }) async {
+    setState(() {
+      _feeLoading = true;
+      _feeError = null;
+    });
+    try {
+      final quote = await ref.read(copyrightProvider).feeQuote(
+            workId: workId,
+            copyrightCenter: centerCode,
+          );
+      if (!mounted) return;
+      setState(() {
+        _feeQuote = quote;
+        _feeLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _feeQuote = null;
+        _feeLoading = false;
+        _feeError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Widget _buildFeeCard() {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.payments_outlined, color: AppColors.primary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    '登记费用',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _showFeeExplanation,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    '费用说明',
+                    style: TextStyle(fontSize: 13, color: AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_feeLoading)
+              const Text('费用计算中…', style: TextStyle(color: AppColors.text3))
+            else if (_feeError != null)
+              Text(_feeError!, style: const TextStyle(color: Colors.red))
+            else if (_feeQuote == null)
+              const Text(
+                '请先选择作品和版权中心',
+                style: TextStyle(color: AppColors.text3),
+              )
+            else ...[
+              Text(
+                '¥${_feeQuote!.feeAmount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '正文字数 ${_feeQuote!.wordCount} 字 · 费用交给版权登记中心，平台不另收服务费',
+                style: const TextStyle(fontSize: 12, color: AppColors.text3),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFeeExplanation() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.divider,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '费用说明',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text1,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _buildFeeRuleItem('费用交给所选版权登记中心，平台不另收服务费。'),
+                _buildFeeRuleItem('国版中心：按作品正文字数分档计价。'),
+                _buildFeeRuleItem('地方中心：按中心一口价计费。'),
+                _buildFeeRuleItem('选完作品和版权中心后显示应付金额。'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('知道了'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFeeRuleItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(Icons.circle, size: 6, color: AppColors.text3),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                color: AppColors.text2,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -766,9 +972,13 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
   String _getSubmitButtonText() {
     switch (widget.mode) {
       case CopyrightFormMode.create:
-        return '提交申请';
+        return _feeQuote == null
+            ? '去支付'
+            : '去支付 ¥${_feeQuote!.feeAmount.toStringAsFixed(2)}';
       case CopyrightFormMode.resubmit:
-        return '重新提交';
+        return _feeQuote == null
+            ? '重新缴费'
+            : '重新缴费 ¥${_feeQuote!.feeAmount.toStringAsFixed(2)}';
     }
   }
 }

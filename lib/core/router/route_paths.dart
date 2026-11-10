@@ -84,6 +84,7 @@ class RoutePath {
   static const String copyrightDeliveryList = '/copyright/delivery/list';
   static const String copyrightApplicationDetail = '/copyright/application/detail';
   static const String copyrightForm = '/copyright/form';
+  static const String copyrightPay = '/copyright/pay';
   static const String copyrightCertificateList = '/copyright/certificate/list';
   static const String copyrightCertificateDetail = '/copyright/certificate/detail';
   static const String buyerCopyrightDetail = '/copyright/certificate/purchased';
@@ -105,6 +106,15 @@ class RoutePath {
   static String copyrightFormUrl({int? applyId}) => Uri(
         path: copyrightForm,
         queryParameters: applyId != null ? {'applyId': '$applyId'} : null,
+      ).toString();
+
+  /// 版权登记费支付 URL
+  static String copyrightPayUrl(int payOrderId, {double? feeAmount}) => Uri(
+        path: copyrightPay,
+        queryParameters: {
+          'id': '$payOrderId',
+          if (feeAmount != null) 'amount': feeAmount.toStringAsFixed(2),
+        },
       ).toString();
 
   /// 版权证书列表 URL
@@ -389,6 +399,7 @@ class RouteName {
   static const String copyrightDeliveryList = 'copyrightDeliveryList';
   static const String copyrightApplicationDetail = 'copyrightApplicationDetail';
   static const String copyrightForm = 'copyrightForm';
+  static const String copyrightPay = 'copyrightPay';
   static const String copyrightCertificateList = 'copyrightCertificateList';
   static const String copyrightCertificateDetail = 'copyrightCertificateDetail';
   static const String buyerCopyrightDetail = 'buyerCopyrightDetail';
@@ -542,6 +553,7 @@ class ProtectedRoutes {
     RoutePath.copyrightApplicationList,
     RoutePath.copyrightDeliveryList,
     RoutePath.copyrightForm,
+    RoutePath.copyrightPay,
     RoutePath.copyrightCertificateList,
     RoutePath.buyerCopyrightDetail,
     // 我的收益（需登录）

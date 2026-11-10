@@ -57,6 +57,7 @@ import '../../features/copyright/pages/copyright_application_list_page.dart';
 import '../../features/copyright/pages/copyright_delivery_list_page.dart';
 import '../../features/copyright/pages/copyright_application_detail_page.dart';
 import '../../features/copyright/pages/copyright_form_page.dart';
+import '../../features/copyright/pages/copyright_pay_page.dart';
 import '../../features/copyright/pages/copyright_certificate_list_page.dart';
 import '../../features/copyright/pages/copyright_certificate_detail_page.dart';
 import '../../features/copyright/pages/buyer_copyright_detail_page.dart';
@@ -781,6 +782,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.copyrightForm,
         builder: (context, state) => CopyrightFormPage(
           applyId: int.tryParse(state.uri.queryParameters['applyId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        path: RoutePath.copyrightPay,
+        name: RouteName.copyrightPay,
+        builder: (context, state) => CopyrightPayPage(
+          payOrderId:
+              int.tryParse(state.uri.queryParameters['id'] ?? '') ?? 0,
+          feeAmount: double.tryParse(
+            state.uri.queryParameters['amount'] ?? '',
+          ),
         ),
       ),
       GoRoute(
