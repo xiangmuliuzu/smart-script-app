@@ -27,22 +27,26 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
   final _requirementCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
   final _episodesCtrl = TextEditingController();
-  // 最后一轮验收（固定存在）：集数=总集数、金额=剩余均自动计算不可改，仅时限可填写
-  final _lastDaysCtrl = TextEditingController();
+  // 最后一轮验收（固定存在）：集数=总集数、金额=剩余均自动计算不可改，仅小时时限可填写
   final _lastHoursCtrl = TextEditingController();
   int? _genreId;
   DateTime? _deadline;
   bool _submitting = false;
-  bool _showStageSection = false;
   bool _loading = false;
 
   bool get _isEdit => widget.demandId != null;
 
+  int? get _totalEpisodes => int.tryParse(_episodesCtrl.text.trim());
+
+  /// 总集数填好后最后一轮验收卡片直接出现，无需先添加中间轮次。
+  bool get _hasValidTotalEpisodes => (_totalEpisodes ?? 0) > 0;
+
   @override
   void initState() {
     super.initState();
-    // 预算变化动态刷新最后一轮的剩余金额展示
+    // 预算/总集数变化动态刷新最后一轮的剩余金额展示与显隐
     _budgetCtrl.addListener(_onAmountsChanged);
+    _episodesCtrl.addListener(_onAmountsChanged);
     if (_isEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadForEdit());
     }
@@ -81,8 +85,11 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
         final editable = stages.isEmpty ? <DemandStage>[] : stages.sublist(0, stages.length - 1);
         if (stages.isNotEmpty) {
           final lastStage = stages.last;
-          _lastDaysCtrl.text = '${lastStage.durationDays ?? 0}';
-          _lastHoursCtrl.text = '${lastStage.durationHours ?? 0}';
+          _lastHoursCtrl.text =
+              '${((lastStage.durationDays ?? 0) * 24) + (lastStage.durationHours ?? 0)}';
+        } else if ((task.durationHours ?? 0) > 0) {
+          // 历史整单任务无轮次数据时，用整单时限回填最后一轮，避免编辑时必须重填
+          _lastHoursCtrl.text = '${task.durationHours}';
         }
         for (final s in editable) {
           final row = _StageRow(order: _stageRows.length + 1, onChanged: _onAmountsChanged);
@@ -90,11 +97,10 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           row.amountCtrl.text = s.amount == null
               ? ''
               : (s.amount! / 100).toStringAsFixed(s.amount! % 100 == 0 ? 0 : 2);
-          row.daysCtrl.text = '${s.durationDays ?? 0}';
-          row.hoursCtrl.text = '${s.durationHours ?? 0}';
+          row.hoursCtrl.text =
+              '${((s.durationDays ?? 0) * 24) + (s.durationHours ?? 0)}';
           _stageRows.add(row);
         }
-        _showStageSection = _stageRows.isNotEmpty;
         _loading = false;
       });
     } catch (e) {
@@ -114,7 +120,6 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
     _requirementCtrl.dispose();
     _tagsCtrl.dispose();
     _episodesCtrl.dispose();
-    _lastDaysCtrl.dispose();
     _lastHoursCtrl.dispose();
     for (final r in _stageRows) { r.dispose(); }
     super.dispose();
@@ -193,42 +198,42 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: () => setState(() => _showStageSection = !_showStageSection),
-          child: Row(
-            children: [
-              Icon(_showStageSection ? Icons.expand_less : Icons.expand_more,
-                  color: AppColors.primary),
-              const SizedBox(width: 4),
-              Text('验收设置',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text1)),
-              const SizedBox(width: 8),
-              Text('（可选，配置分阶段交付与放款）',
+        Row(
+          children: [
+            Icon(Icons.fact_check_outlined, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text('验收设置',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text1)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('（总集数必填，最后一轮验收自动生成）',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            ],
-          ),
-        ),
-        if (_showStageSection) ...[
-          const SizedBox(height: 12),
-          _field('总集数', _episodesCtrl, keyboardType: TextInputType.number),
-          const SizedBox(height: 12),
-          // 轮次列表
-          ..._stageRows.asMap().entries.map((entry) => _buildStageRow(entry.key, entry.value)),
-          const SizedBox(height: 8),
-          // 添加按钮
-          OutlinedButton.icon(
-            onPressed: _addStageRow,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('添加验收轮次'),
-            style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
-          ),
-          // 固定最后一轮验收：集数/金额锁定动态展示，时限可填
-          if (_stageRows.isNotEmpty) _buildLastStageCard(),
-          // 分配对比
-          if (_stageRows.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _buildAmountSummary(),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _field('总集数 *', _episodesCtrl,
+            keyboardType: TextInputType.number,
+            validator: (v) => (int.tryParse(v?.trim() ?? '') ?? 0) <= 0 ? '请输入总集数' : null),
+        const SizedBox(height: 12),
+        // 中间轮次（可选）
+        ..._stageRows.asMap().entries.map((entry) => _buildStageRow(entry.key, entry.value)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _addStageRow,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('添加验收轮次'),
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
+        const SizedBox(height: 4),
+        Text('可不添加中间轮次，最后一轮验收会自动生成并验收到总集数。',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        // 固定最后一轮验收：填好总集数后直接出现，集数/金额锁定，仅小时时限可填
+        if (_hasValidTotalEpisodes) _buildLastStageCard(),
+        // 分配对比
+        if (_stageRows.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _buildAmountSummary(),
         ],
       ],
     );
@@ -287,32 +292,14 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: row.daysCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '本轮时限(天)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: row.hoursCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '本轮时限(小时)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-              ],
+            TextFormField(
+              controller: row.hoursCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '本轮时限（小时）',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
             ),
           ],
         ),
@@ -415,37 +402,19 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           const SizedBox(height: 6),
           Text(
             '截止集数：第 ${totalEp != null && totalEp > 0 ? '$totalEp' : '？'} 集（=总集数） · '
-            '金额：¥${(remainFen > 0 ? remainFen : 0) / 100.0}'
+            '金额：¥${((remainFen > 0 ? remainFen : 0) / 100).toStringAsFixed(2)}'
             '（=预算减已填写轮次，为 0 时本轮不另行放款）',
             style: const TextStyle(fontSize: 12.5, height: 1.5),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _lastDaysCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '最后一轮时限(天)',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _lastHoursCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '最后一轮时限(小时)',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ],
+          TextFormField(
+            controller: _lastHoursCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: '最后一轮验收时限（小时）',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
           ),
         ],
       ),
@@ -525,71 +494,65 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
       return;
     }
 
-    // 验收轮次校验
-    List<Map<String, dynamic>>? stagesPayload;
-    int? totalEpisodes;
-    if (_stageRows.isNotEmpty) {
-      totalEpisodes = int.tryParse(_episodesCtrl.text.trim());
-      if (totalEpisodes == null || totalEpisodes <= 0) {
-        showAppToast(context, '设置验收轮次时请填写总集数');
+    // 总集数必填；无论是否添加中间轮次，都固定生成最后一轮验收
+    final totalEpisodes = int.tryParse(_episodesCtrl.text.trim());
+    if (totalEpisodes == null || totalEpisodes <= 0) {
+      showAppToast(context, '请填写总集数');
+      return;
+    }
+    int sumAmountFen = 0;
+    int prevEp = 0;
+    final stagesPayload = <Map<String, dynamic>>[];
+    for (var i = 0; i < _stageRows.length; i++) {
+      final row = _stageRows[i];
+      final ep = int.tryParse(row.episodeCtrl.text.trim()) ?? 0;
+      final amtFen = ((double.tryParse(row.amountCtrl.text.trim()) ?? 0) * 100).round();
+      final hours = int.tryParse(row.hoursCtrl.text.trim()) ?? 0;
+      if (ep <= prevEp) {
+        showAppToast(context, '第${i + 1}轮集数必须大于上一轮');
         return;
       }
-      int sumAmountFen = 0;
-      int prevEp = 0;
-      stagesPayload = [];
-      for (var i = 0; i < _stageRows.length; i++) {
-        final row = _stageRows[i];
-        final ep = int.tryParse(row.episodeCtrl.text.trim()) ?? 0;
-        final amtFen = ((double.tryParse(row.amountCtrl.text.trim()) ?? 0) * 100).round();
-        final days = int.tryParse(row.daysCtrl.text.trim()) ?? 0;
-        final hours = int.tryParse(row.hoursCtrl.text.trim()) ?? 0;
-        if (ep <= prevEp) {
-          showAppToast(context, '第${i + 1}轮集数必须大于上一轮');
-          return;
-        }
-        if (ep >= totalEpisodes) {
-          showAppToast(context, '第${i + 1}轮集数必须小于总集数（最后一轮验收固定验收到总集数）');
-          return;
-        }
-        if (amtFen <= 0) {
-          showAppToast(context, '第${i + 1}轮金额必须大于0');
-          return;
-        }
-        if (days < 0 || hours < 0 || (days + hours) <= 0) {
-          showAppToast(context, '第${i + 1}轮验收时限(天+小时)必须大于0');
-          return;
-        }
-        prevEp = ep;
-        sumAmountFen += amtFen;
-        stagesPayload.add({
-          'stageOrder': i + 1,
-          'episodeTo': ep,
-          'amount': amtFen / 100.0,
-          'durationDays': days,
-          'durationHours': hours,
-        });
-      }
-      // 填写轮金额之和允许小于预算（剩余归最后一轮），但不允许超过
-      final budgetFen = (budgetYuan * 100).round();
-      if (sumAmountFen > budgetFen) {
-        showAppToast(context, '各轮金额之和不能超过预算');
+      if (ep >= totalEpisodes) {
+        showAppToast(context, '第${i + 1}轮集数必须小于总集数（最后一轮验收固定验收到总集数）');
         return;
       }
-      // 固定追加最后一轮验收：集数=总集数、金额=剩余，时限由发布者填写
-      final lastDays = int.tryParse(_lastDaysCtrl.text.trim()) ?? 0;
-      final lastHours = int.tryParse(_lastHoursCtrl.text.trim()) ?? 0;
-      if (lastDays < 0 || lastHours < 0 || (lastDays + lastHours) <= 0) {
-        showAppToast(context, '请填写最后一轮验收时限(天+小时大于0)');
+      if (amtFen <= 0) {
+        showAppToast(context, '第${i + 1}轮金额必须大于0');
         return;
       }
+      if (hours <= 0) {
+        showAppToast(context, '第${i + 1}轮验收时限（小时）必须大于0');
+        return;
+      }
+      prevEp = ep;
+      sumAmountFen += amtFen;
       stagesPayload.add({
-        'stageOrder': _stageRows.length + 1,
-        'episodeTo': totalEpisodes,
-        'amount': (budgetFen - sumAmountFen) / 100.0,
-        'durationDays': lastDays,
-        'durationHours': lastHours,
+        'stageOrder': i + 1,
+        'episodeTo': ep,
+        'amount': amtFen / 100.0,
+        'durationDays': 0,
+        'durationHours': hours,
       });
     }
+    // 中间轮金额之和允许小于预算（剩余归最后一轮），但不允许超过
+    final budgetFen = (budgetYuan * 100).round();
+    if (sumAmountFen > budgetFen) {
+      showAppToast(context, '各轮金额之和不能超过预算');
+      return;
+    }
+    // 固定追加最后一轮验收：集数=总集数、金额=剩余，时限由发布者填写
+    final lastHours = int.tryParse(_lastHoursCtrl.text.trim()) ?? 0;
+    if (lastHours <= 0) {
+      showAppToast(context, '请填写最后一轮验收时限（小时）');
+      return;
+    }
+    stagesPayload.add({
+      'stageOrder': _stageRows.length + 1,
+      'episodeTo': totalEpisodes,
+      'amount': (budgetFen - sumAmountFen) / 100.0,
+      'durationDays': 0,
+      'durationHours': lastHours,
+    });
 
     setState(() => _submitting = true);
     try {
@@ -597,7 +560,6 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
       final deadlineStr =
           '${_deadline!.year}-${_deadline!.month.toString().padLeft(2, '0')}-${_deadline!.day.toString().padLeft(2, '0')}';
       final tags = _tagsCtrl.text.trim();
-      final budgetFen = (budgetYuan * 100).round();
       if (_isEdit) {
         await repo.updateDemand(
           demandId: widget.demandId!,
@@ -651,7 +613,6 @@ class _StageRow {
   final VoidCallback? onChanged;
   final TextEditingController episodeCtrl = TextEditingController();
   final TextEditingController amountCtrl = TextEditingController();
-  final TextEditingController daysCtrl = TextEditingController();
   final TextEditingController hoursCtrl = TextEditingController();
 
   _StageRow({required this.order, this.onChanged}) {
@@ -663,7 +624,6 @@ class _StageRow {
   void dispose() {
     episodeCtrl.dispose();
     amountCtrl.dispose();
-    daysCtrl.dispose();
     hoursCtrl.dispose();
   }
 }

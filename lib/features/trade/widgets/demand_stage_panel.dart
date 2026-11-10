@@ -12,7 +12,7 @@ import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
 
 /// 验收轮次面板：竖向时间线展示，支持创作者提交交付 / 买方审核操作。
-class DemandStagePanel extends ConsumerWidget {
+class DemandStagePanel extends ConsumerStatefulWidget {
   final int demandId;
   /// 当前用户角色：true=买方(发布者)，false=创作者
   final bool isBuyer;
@@ -24,8 +24,34 @@ class DemandStagePanel extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stagesAsync = ref.watch(demandStagesProvider(demandId));
+  ConsumerState<DemandStagePanel> createState() => _DemandStagePanelState();
+}
+
+class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // 延时审批与下一轮激活可能发生在对方端：定时重拉，截止时间/剩余时长自动同步
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      ref.invalidate(demandStagesProvider(widget.demandId));
+      ref.invalidate(demandExtendHistoryProvider(widget.demandId));
+      // 整单截止跟随轮次同步，避免详情页顶部还停在顺延前的时间
+      ref.invalidate(demandDetailProvider(widget.demandId));
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stagesAsync = ref.watch(demandStagesProvider(widget.demandId));
 
     return stagesAsync.when(
       loading: () => const Padding(
@@ -47,7 +73,7 @@ class DemandStagePanel extends ConsumerWidget {
         }
         // 延时记录（申请延时 + 自主延时）：整单取一次，按轮分发到各条目（每条一行，不互相覆盖）
         final history =
-            ref.watch(demandExtendHistoryProvider(demandId)).valueOrNull ??
+            ref.watch(demandExtendHistoryProvider(widget.demandId)).valueOrNull ??
                 const <DemandExtendApply>[];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -59,8 +85,8 @@ class DemandStagePanel extends ConsumerWidget {
               const SizedBox(height: 12),
               ...stages.map((s) => _StageTimelineItem(
                     stage: s,
-                    demandId: demandId,
-                    isBuyer: isBuyer,
+                    demandId: widget.demandId,
+                    isBuyer: widget.isBuyer,
                     extendApplies: history
                         .where((a) => a.stageId != null && a.stageId == s.stageId)
                         .toList(),
@@ -159,6 +185,10 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
   Widget build(BuildContext context) {
     final s = widget.stage;
     final amountYuan = (s.amount ?? 0) / 100.0;
+    // 已生效延时累计（申请通过 + 自主延时）：时限本身不变，这里直接标明已顺延多少
+    final extendedHours = widget.extendApplies
+        .where((a) => a.status == 'approved')
+        .fold<int>(0, (sum, a) => sum + (a.days ?? 0) * 24 + (a.hours ?? 0));
 
     return IntrinsicHeight(
       child: Row(
@@ -235,6 +265,12 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                         ),
                       ),
+                      if (extendedHours > 0) ...[
+                        const SizedBox(width: 10),
+                        Text('已延时 ${formatDurationHours(extendedHours)}',
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.green.shade700)),
+                      ],
                       if (s.startedAt != null) ...[
                         const SizedBox(width: 10),
                         if (s.absoluteDueText != null)
@@ -609,13 +645,13 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     }
   }
 
-  /// 创作者发起延时申请。
+  /// 创作者发起延时申请（按小时填写）。
   Future<void> _requestExtend(BuildContext context) async {
     final input = await _promptExtend(context,
         title: '申请延时', withReason: true);
     if (input == null) return;
-    if (input.days + input.hours <= 0) {
-      showAppToast(context, '延时时长(天+小时)必须大于0');
+    if (input.hours <= 0) {
+      showAppToast(context, '延时小时数必须大于0');
       return;
     }
     setState(() => _acting = true);
@@ -623,7 +659,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
       await ref.read(demandRepositoryProvider).requestExtend(
             widget.demandId,
             widget.stage.stageId!,
-            days: input.days,
+            days: 0,
             hours: input.hours,
             reason: input.reason.isEmpty ? null : input.reason,
           );
@@ -642,8 +678,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     final input =
         await _promptExtend(context, title: '延长时间', withReason: false);
     if (input == null) return;
-    if (input.days + input.hours <= 0) {
-      showAppToast(context, '延时时长(天+小时)必须大于0');
+    if (input.hours <= 0) {
+      showAppToast(context, '延时小时数必须大于0');
       return;
     }
     setState(() => _acting = true);
@@ -651,7 +687,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
       await ref.read(demandRepositoryProvider).selfExtend(
             widget.demandId,
             widget.stage.stageId!,
-            days: input.days,
+            days: 0,
             hours: input.hours,
           );
       ref.invalidate(demandStagesProvider(widget.demandId));
@@ -685,10 +721,9 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     }
   }
 
-  /// 延时时长输入弹窗（天/小时，可选原因）。
+  /// 延时时长输入弹窗（统一按小时填写，可选原因）。
   Future<_ExtendInput?> _promptExtend(BuildContext context,
       {required String title, required bool withReason}) async {
-    final daysCtrl = TextEditingController();
     final hoursCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
     final ok = await showDialog<bool>(
@@ -702,30 +737,13 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: daysCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: '天数',
-                          suffixText: '天',
-                          isDense: true),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: hoursCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: '小时',
-                          suffixText: '小时',
-                          isDense: true),
-                    ),
-                  ),
-                ],
+              TextField(
+                controller: hoursCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: '延长小时数',
+                    suffixText: '小时',
+                    isDense: true),
               ),
               if (withReason) ...[
                 const SizedBox(height: 12),
@@ -737,7 +755,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                 ),
               ],
               const SizedBox(height: 4),
-              Text('天数与小时至少填一项。',
+              Text('按小时填写，展示时自动折算为天。',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
             ],
           ),
@@ -756,7 +774,6 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     );
     if (ok != true) return null;
     return _ExtendInput(
-      days: int.tryParse(daysCtrl.text.trim()) ?? 0,
       hours: int.tryParse(hoursCtrl.text.trim()) ?? 0,
       reason: reasonCtrl.text.trim(),
     );
@@ -849,12 +866,11 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
   }
 }
 
-/// 延时输入弹窗的返回值（天/小时/原因）。
+/// 延时输入弹窗的返回值（统一按小时、原因）。
 class _ExtendInput {
-  final int days;
   final int hours;
   final String reason;
-  const _ExtendInput({required this.days, required this.hours, required this.reason});
+  const _ExtendInput({required this.hours, required this.reason});
 }
 
 /// 一条延时记录的行文案：来源 · 时长（原因） · 结果 · 发生时间 [ · → 截止 新截止]。

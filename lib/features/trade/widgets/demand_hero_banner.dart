@@ -5,9 +5,11 @@ import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/demand_providers.dart';
 
-/// 任务广场 Hero 横幅：主题色渐变 + 标题 + 发布按钮 + 可接单统计胶囊。
+/// 任务广场页头：引导文案 + 发布入口 + 三项统计。
 ///
-/// stats 允许为 null（首屏加载），此时统计胶囊显示 "--" 占位。
+/// 视觉与首页/我的页对齐：页头直接落在全局冰蓝渐变上，统计数字收进
+/// 白色圆角卡片（12 圆角 + 轻阴影），不再使用深蓝渐变大色块。
+/// stats 允许为 null（首屏加载），此时统计值显示 "--" 占位。
 class DemandHeroBanner extends StatelessWidget {
   const DemandHeroBanner({super.key, required this.stats, this.onPublish});
 
@@ -18,73 +20,43 @@ class DemandHeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, Color(0xFF3B6BB5)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.24),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 2, 14, 0),
+          child: Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '任务广场',
+                    Text(
+                      'TASK SQUARE · 公开接单',
                       style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        height: 1.15,
-                        letterSpacing: 0.5,
+                        fontSize: 10.5,
+                        letterSpacing: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text3,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 5),
                     Text(
-                      '找好本子 · 找好人',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.85),
-                        height: 1.3,
-                      ),
+                      '只展示已托管任务，接单即锁定赏金',
+                      style: TextStyle(fontSize: 12, color: AppColors.text2, height: 1.3),
                     ),
                   ],
                 ),
               ),
               _PublishButton(
-                  onTap: onPublish ??
-                      () => context.push(RoutePath.demandPost)),
+                onTap: onPublish ?? () => context.push(RoutePath.demandPost),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _Pill(label: '可接单', value: _fmt(stats?.openCount)),
-              const SizedBox(width: 8),
-              _Pill(label: '奖金池', value: _fmtYuan(stats?.prizePoolYuan)),
-              const SizedBox(width: 8),
-              _Pill(label: '今日新增', value: _fmt(stats?.todayNewCount)),
-            ],
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 12),
+        _StatsCard(stats: stats),
+      ],
     );
   }
 
@@ -102,6 +74,80 @@ class DemandHeroBanner extends StatelessWidget {
   }
 }
 
+/// 三项统计：白卡三栏，栏间细竖线分隔。
+class _StatsCard extends StatelessWidget {
+  const _StatsCard({required this.stats});
+
+  final DemandStats? stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.all(Radius.circular(AppRadius.r)),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Row(
+        children: [
+          _StatCell(label: '可接单', value: DemandHeroBanner._fmt(stats?.openCount)),
+          const _CellDivider(),
+          _StatCell(
+            label: '奖金池',
+            value: DemandHeroBanner._fmtYuan(stats?.prizePoolYuan),
+            highlight: true,
+          ),
+          const _CellDivider(),
+          _StatCell(label: '今日新增', value: DemandHeroBanner._fmt(stats?.todayNewCount)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  const _StatCell({required this.label, required this.value, this.highlight = false});
+
+  final String label;
+  final String value;
+
+  /// 金额用强调橙，是本页唯一的暖色重点，其余数字统一主色。
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+              color: highlight ? AppColors.accent : AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.text3)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CellDivider extends StatelessWidget {
+  const _CellDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 0.8, height: 26, color: AppColors.divider);
+  }
+}
+
+/// 发布入口：主色实心胶囊，与首页搜索栏同高的轻量按钮。
 class _PublishButton extends StatelessWidget {
   const _PublishButton({required this.onTap});
   final VoidCallback onTap;
@@ -109,70 +155,28 @@ class _PublishButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.primary,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 13, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+            children: [
+              Icon(Icons.edit_outlined, size: 15, color: Colors.white),
               SizedBox(width: 4),
               Text(
                 '发布任务',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withOpacity(0.22), width: 0.6),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                height: 1.1,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withOpacity(0.85),
-                height: 1.1,
-              ),
-            ),
-          ],
         ),
       ),
     );

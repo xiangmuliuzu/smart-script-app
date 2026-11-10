@@ -82,7 +82,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
                 if (hasStages)
                   _infoRow('验收轮次', '分 ${task.totalEpisodes} 集逐轮验收')
                 else
-                  _infoRow('完成时限', task.durationHours != null ? '${task.durationHours} 小时' : '-'),
+                  _infoRow('完成时限', formatDurationHours(task.durationHours ?? 0)),
                 _infoRow('托管状态', DemandEscrowStatus.label(task.escrowStatus)),
                 _infoRow('托管额', '¥${task.escrowYuanText}'),
                 if (task.depositStatus != null && task.depositStatus != DemandDepositStatus.none) ...[
