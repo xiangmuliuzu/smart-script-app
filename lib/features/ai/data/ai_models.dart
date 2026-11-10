@@ -227,11 +227,15 @@ class AiOutlineResult {
     this.outline,
     this.requestNo = '',
     this.quotaUsed = 0,
+    this.recordId = 0,
   });
 
   final dynamic outline;
   final String requestNo;
   final int quotaUsed;
+
+  /// 本次大纲落库的记录 ID（流式 done 事件下发，用于「AI 使用记录」按会话合并）。
+  final int recordId;
 
   /// 大纲是否有内容。
   bool get hasOutline => outline != null && '$outline'.trim().isNotEmpty;
@@ -254,6 +258,7 @@ class AiOutlineResult {
         outline: json['outline'],
         requestNo: _text(json['requestNo']),
         quotaUsed: _int(json['quotaUsed']),
+        recordId: _int(json['recordId']),
       );
 }
 

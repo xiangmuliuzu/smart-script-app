@@ -336,6 +336,9 @@ class RoutePath {
   static const String welfareExchangeRecords = '/welfare/exchange-records';
   static const String aiCenter = '/ai';
   static const String aiOutline = '/ai/outline';
+
+  /// AI 创作页（设定 → 大纲 → 章节，创作链路专用）。
+  static const String aiCreate = '/ai/create';
   static const String aiWrite = '/ai/write';
   static const String aiPolish = '/ai/polish';
   static const String aiStoryboard = '/ai/storyboard';
@@ -468,6 +471,7 @@ class RouteName {
   static const String welfareExchangeRecords = 'welfareExchangeRecords';
   static const String aiCenter = 'aiCenter';
   static const String aiOutline = 'aiOutline';
+  static const String aiCreate = 'aiCreate';
   static const String aiWrite = 'aiWrite';
   static const String aiPolish = 'aiPolish';
   static const String aiStoryboard = 'aiStoryboard';
@@ -530,6 +534,7 @@ class ProtectedRoutes {
     RoutePath.welfareCenter,
     RoutePath.welfareRecharge,
     RoutePath.aiCenter,
+    RoutePath.aiCreate,
     // 印章管理（需登录）
     RoutePath.mySeal,
     // 版权模块（需登录）

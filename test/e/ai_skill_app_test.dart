@@ -34,6 +34,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream|skill=$skillId');

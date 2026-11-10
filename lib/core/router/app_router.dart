@@ -26,6 +26,7 @@ import '../../features/comic/pages/drama_play_page.dart';
 import '../../features/comic/pages/drama_related_work_page.dart';
 import '../../features/comic/pages/drama_report_page.dart';
 import '../../features/comic/pages/drama_subscription_page.dart';
+import '../../features/create/ai_create_page.dart';
 import '../../features/create/create_page.dart';
 import '../../features/create/pages/chapter_write_page.dart';
 import '../../features/create/pages/work_upload_page.dart';
@@ -542,6 +543,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.aiOutline,
         name: RouteName.aiOutline,
         builder: (_, __) => const AiOutlinePage(),
+      ),
+      GoRoute(
+        path: RoutePath.aiCreate,
+        name: RouteName.aiCreate,
+        builder: (_, __) => const AiCreatePage(),
       ),
       GoRoute(
         path: RoutePath.aiWrite,

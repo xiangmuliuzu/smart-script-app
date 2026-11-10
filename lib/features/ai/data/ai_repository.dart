@@ -104,6 +104,7 @@ class AiRepository {
     String? type,
     int? skillId,
     String? model,
+    int? workId,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/write',
@@ -112,6 +113,7 @@ class AiRepository {
         if (type != null && type.isNotEmpty) 'type': type,
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (workId != null) 'workId': workId,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -129,6 +131,7 @@ class AiRepository {
     String? type,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -138,6 +141,7 @@ class AiRepository {
         if (type != null && type.isNotEmpty) 'type': type,
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (workId != null) 'workId': workId,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
@@ -194,6 +198,7 @@ class AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
   }) async {
     final data = await _api.post<Map<String, dynamic>>(
       '$_contentPrefix/outline',
@@ -204,6 +209,7 @@ class AiRepository {
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (workId != null) 'workId': workId,
       },
       receiveTimeout: _aiReceiveTimeout,
       parser: _map,
@@ -221,6 +227,7 @@ class AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -232,18 +239,21 @@ class AiRepository {
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (workId != null) 'workId': workId,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
     final buffer = StringBuffer();
     int quotaUsed = 0;
     var requestNo = '';
+    int recordId = 0;
     var completed = false;
     await consumeSseEvents(body.stream, (event) {
       if (event.payload?['done'] == true) {
         completed = true;
         quotaUsed = event.intValue('quotaUsed');
         requestNo = event.text('requestNo');
+        recordId = event.intValue('recordId');
         // 大纲分批生成后以 done 下发的规整全文为准（delta 可能在集号处缺换行）。
         final full = event.text('content');
         if (full.isNotEmpty) { buffer.clear(); buffer.write(full); }
@@ -259,6 +269,7 @@ class AiRepository {
       outline: _tryParseOutline(raw),
       requestNo: requestNo,
       quotaUsed: quotaUsed,
+      recordId: recordId,
     );
   }
 
@@ -379,6 +390,23 @@ class AiRepository {
   }
 
   /// AI 写作记录（分页）。
+  /// 删除本人的若干条 AI 记录（批量；后端按当前登录身份过滤归属）。
+  ///
+  /// 返回实际删除条数；一次创作的大纲与章节记录会在同一请求里一起删除。
+  Future<int> deleteWriteRecords(List<int> recordIds) async {
+    final data = await _api.delete<dynamic>(
+      '$_contentPrefix/write-records',
+      data: <String, dynamic>{'recordIds': recordIds},
+      parser: (json) => json,
+    );
+    if (data is num) return data.toInt();
+    if (data is Map) {
+      final value = data['deleted'] ?? data['count'];
+      return value is num ? value.toInt() : recordIds.length;
+    }
+    return recordIds.isEmpty ? 0 : recordIds.length;
+  }
+
   Future<AiPageResult<AiWriteRecord>> writeRecords({
     int page = 1,
     int pageSize = 20,

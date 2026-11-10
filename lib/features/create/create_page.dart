@@ -42,6 +42,43 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   String _status = 'all';
 
+  /// 新建入口：AI 创作走独立流程，自己编辑进入原来的新建作品表单。
+  Future<void> _showStartChoice(BuildContext context) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('开始创作', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
+              title: const Text('AI 创作'),
+              subtitle: const Text('描述灵感，先生成大纲；确认后逐章成文，插入作品继续改。'),
+              onTap: () => Navigator.of(sheetContext).pop('ai'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: AppColors.text2),
+              title: const Text('自己编辑'),
+              subtitle: const Text('直接新建作品，自己写或导入已完成的剧本文件。'),
+              onTap: () => Navigator.of(sheetContext).pop('editor'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted || choice == null) return;
+    context.push(choice == 'ai' ? RoutePath.aiCreate : RoutePath.workUpload);
+  }
+
   @override
   Widget build(BuildContext context) {
     // /create 根被有意排除在路由登录守卫外（避免拦截底部导航创作 tab），但本页数据来自
@@ -60,10 +97,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       appBar: AppBar(
         title: const Text('我的作品'),
         actions: [
-          // 新建入口仅对已开通创作能力的用户展示。
+          // 新建入口仅对已开通创作能力的用户展示：先选 AI 创作或自己编辑。
           if (loggedIn && canCreate)
             TextButton.icon(
-              onPressed: () => context.push(RoutePath.workUpload),
+              onPressed: () => _showStartChoice(context),
               icon: const Icon(Icons.add, size: 20),
               label: const Text('新建'),
             ),

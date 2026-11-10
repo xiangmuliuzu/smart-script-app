@@ -41,6 +41,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -58,6 +59,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
@@ -77,6 +79,7 @@ class _FakeAiRepository implements AiRepository {
     String? type,
     int? skillId,
     String? model,
+    int? workId,
   }) async {
     calls.add('write:$prompt|$type');
     if (shouldFail) throw ApiException('AI 服务不可用');
@@ -89,6 +92,7 @@ class _FakeAiRepository implements AiRepository {
     String? type,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt|$type');
@@ -192,6 +196,10 @@ class _FakeAiRepository implements AiRepository {
     required String idempotencyKey,
   }) async =>
       0;
+
+  @override
+  Future<int> deleteWriteRecords(List<int> recordIds) async => recordIds.length;
+
 }
 
 Widget _wrapPanel(_FakeAiRepository fake, {required ValueChanged<String> onInsert}) {
@@ -259,10 +267,9 @@ void main() {
       expect(find.textContaining('第一幕：跌落谷底'), findsOneWidget);
       expect(find.text('消耗 1 token'), findsOneWidget);
 
-      // 插入正文回调
-      await tester.tap(find.text('插入正文'));
-      await tester.pump();
-      expect(inserted.single, contains('第一幕：跌落谷底'));
+      // 大纲 tab 的正文写回入口已改为「按大纲生成各章」，插入按钮只出现在写作/润色 tab。
+      expect(find.text('插入正文'), findsNothing);
+      expect(find.text('按大纲生成各章'), findsOneWidget);
     });
 
     testWidgets('写作 tab：切换到写作后校验与生成', (tester) async {
@@ -415,17 +422,18 @@ void main() {
       expect(fake.calls, isNotEmpty, reason: '应已调用 outline 接口');
       expect(find.textContaining('第一幕'), findsOneWidget,
           reason: '生成结果应显示在面板中');
-      await tester.tap(find.text('插入正文'));
+      // 大纲 tab 不再直接插入正文，正文写回入口是「按大纲生成各章」。
+      expect(find.text('插入正文'), findsNothing);
+      expect(find.text('按大纲生成各章'), findsOneWidget);
       await tester.pumpAndSettle();
 
-      // 正文控制器应追加了生成文本（正文框是页面最后一个 TextField）
+      // 正文控制器保持原正文不变（未执行插入）
       final contentField = find.byType(TextField).last;
       final editor = tester.widget<TextField>(contentField);
       final content = editor.controller!.text;
       expect(content, contains('初始正文。'));
-      expect(content, contains('第一幕：跌落谷底'));
-      expect(content.indexOf('初始正文。'), lessThan(content.indexOf('第一幕：跌落谷底')),
-          reason: '生成内容应追加到原正文末尾');
+      expect(content.contains('第一幕：跌落谷底'), isFalse,
+          reason: '大纲 tab 不再直接把大纲插入正文');
     });
 
     testWidgets('悬浮窗已删除：写稿页无 floatingActionButton 悬浮球', (tester) async {

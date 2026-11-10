@@ -44,6 +44,7 @@ class _FakeAiRepository implements AiRepository {
     String? type,
     int? skillId,
     String? model,
+    int? workId,
   }) async {
     calls.add('write:$prompt');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -57,6 +58,7 @@ class _FakeAiRepository implements AiRepository {
     String? type,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('writeStream:$prompt');
@@ -103,6 +105,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
   }) async {
     calls.add('outline:$inspiration|$genre|$style');
     if (quotaInsufficient) throw ApiException('积分不足，当前余额: 0 分', code: 400);
@@ -121,6 +124,7 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('outlineStream:$inspiration|$genre|$style');
@@ -204,6 +208,10 @@ class _FakeAiRepository implements AiRepository {
     required String idempotencyKey,
   }) async =>
       0;
+
+  @override
+  Future<int> deleteWriteRecords(List<int> recordIds) async => recordIds.length;
+
 }
 
 void main() {
