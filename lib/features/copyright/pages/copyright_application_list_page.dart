@@ -134,6 +134,8 @@ class _CopyrightApplicationListPageState
           const SizedBox(width: 8),
           _buildFilterChip('待付款', CopyrightApplicationStatus.unpaid),
           const SizedBox(width: 8),
+          _buildFilterChip('待补正', CopyrightApplicationStatus.needSupplement),
+          const SizedBox(width: 8),
           _buildFilterChip('审核中', CopyrightApplicationStatus.reviewing),
           const SizedBox(width: 8),
           _buildFilterChip('已通过', CopyrightApplicationStatus.certificated),
@@ -437,6 +439,10 @@ class _CopyrightApplicationListPageState
     switch (status) {
       case CopyrightApplicationStatus.unpaid:
         return const Color(0xFFFA8C16);
+      case CopyrightApplicationStatus.needSupplement:
+        return const Color(0xFFFA541C);
+      case CopyrightApplicationStatus.supplementOverdue:
+        return const Color(0xFFCF1322);
       case CopyrightApplicationStatus.pending:
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
@@ -459,6 +465,10 @@ class _CopyrightApplicationListPageState
     switch (status) {
       case CopyrightApplicationStatus.unpaid:
         return Icons.payment;
+      case CopyrightApplicationStatus.needSupplement:
+        return Icons.upload_file;
+      case CopyrightApplicationStatus.supplementOverdue:
+        return Icons.timer_off;
       case CopyrightApplicationStatus.pending:
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:

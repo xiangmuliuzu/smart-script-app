@@ -10,6 +10,7 @@ import '../../../shared/widgets/common_views.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/services/native_file_picker.dart';
+import '../../../core/network/friendly_error.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../data/copyright_models.dart';
@@ -80,6 +81,11 @@ class _CopyrightApplicationDetailPageState
     extends ConsumerState<CopyrightApplicationDetailPage> {
   final List<_PendingDeliveryFile> _pendingFiles = [];
   bool _submitting = false;
+  List<MaterialFile> _supplementMaterials = [];
+  final TextEditingController _supplementRemarkController =
+      TextEditingController();
+  bool _supplementSubmitting = false;
+  bool _syncingStatus = false;
 
   @override
   void initState() {
@@ -87,6 +93,12 @@ class _CopyrightApplicationDetailPageState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
+  }
+
+  @override
+  void dispose() {
+    _supplementRemarkController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -181,6 +193,11 @@ class _CopyrightApplicationDetailPageState
             // 缴费信息
             if (_hasFeeInfo(application)) ...[
               _buildFeeCard(application),
+              const SizedBox(height: 16),
+            ],
+            // 补正信息
+            if (_hasSupplementInfo(application)) ...[
+              _buildSupplementCard(application),
               const SizedBox(height: 16),
             ],
             // 申请信息
@@ -628,6 +645,148 @@ class _CopyrightApplicationDetailPageState
     );
   }
 
+  bool _hasSupplementInfo(CopyrightApplication application) {
+    return application.canSupplement ||
+        application.status == CopyrightApplicationStatus.supplementOverdue ||
+        (application.supplementNotice?.isNotEmpty ?? false) ||
+        (application.openSupplement != null);
+  }
+
+  Widget _buildSupplementCard(CopyrightApplication application) {
+    final overdue =
+        application.status == CopyrightApplicationStatus.supplementOverdue;
+    final notice = application.supplementNotice?.isNotEmpty == true
+        ? application.supplementNotice!
+        : (application.openSupplement?['requirementText']?.toString() ?? '');
+    final deadline = application.supplementDeadline ??
+        application.openSupplement?['deadlineTime']?.toString();
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              overdue ? '补正已超时' : '补正信息',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text1,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (notice.isNotEmpty) ...[
+              _buildDetailRow('补正要求', notice, maxLines: 5),
+              _buildDivider(),
+            ],
+            _buildDetailRow('截止时间', deadline ?? '-'),
+            _buildDivider(),
+            _buildDetailRow(
+              '说明',
+              overdue
+                  ? '已超过补正期限，本轮可能不予登记；最终以版权中心结果为准。'
+                  : '同一申请内补正，不重交官费；请在截止日前提交材料。',
+              maxLines: 3,
+            ),
+            if (application.canSupplement) ...[
+              const SizedBox(height: 12),
+              MaterialUploadSection(
+                title: '补正材料',
+                description: '请按要求上传补充材料，支持图片与 PDF',
+                files: _supplementMaterials,
+                onFilesChanged: (files) {
+                  setState(() => _supplementMaterials = files);
+                },
+                maxFiles: 10,
+                onUploadFile: _uploadSupplementFile,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _supplementRemarkController,
+                maxLines: 2,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  hintText: '补正说明（选填）',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.all(12),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed:
+                      _supplementSubmitting ? null : () => _submitSupplement(application),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: _supplementSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('提交补正（不重交官费）'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _uploadSupplementFile(PickedFile file) async {
+    try {
+      final api = ref.read(copyrightProvider).apiService;
+      return await api.uploadMaterialFileBytes(
+        bytes: file.bytes,
+        fileName: file.filename,
+      );
+    } catch (e) {
+      if (mounted) {
+        showAppToast(context, '上传失败：$e');
+      }
+      return null;
+    }
+  }
+
+  Future<void> _submitSupplement(CopyrightApplication application) async {
+    if (_supplementMaterials.isEmpty) {
+      showAppToast(context, '请先上传补正材料');
+      return;
+    }
+    setState(() => _supplementSubmitting = true);
+    try {
+      await ref.read(copyrightProvider).submitSupplement(
+            applyId: application.applyId,
+            materialsJson: materialFilesToJson(_supplementMaterials),
+            remark: _supplementRemarkController.text.trim().isEmpty
+                ? null
+                : _supplementRemarkController.text.trim(),
+          );
+      if (!mounted) return;
+      _supplementMaterials = [];
+      _supplementRemarkController.clear();
+      showAppToast(context, '补正已提交，等待继续审核');
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        showAppToast(context, FriendlyError.message(e));
+      }
+    } finally {
+      if (mounted) setState(() => _supplementSubmitting = false);
+    }
+  }
+
   Widget _buildInfoCard(CopyrightApplication application) {
     return Card(
       elevation: 1,
@@ -656,6 +815,18 @@ class _CopyrightApplicationDetailPageState
             if (application.centerName.isNotEmpty) ...[
               _buildDivider(),
               _buildDetailRow('版权中心', application.centerName),
+            ],
+            if (application.rightsHolderName?.isNotEmpty == true) ...[
+              _buildDivider(),
+              _buildDetailRow('权利人', application.rightsHolderName!),
+            ],
+            if (application.idDocType?.isNotEmpty == true) ...[
+              _buildDivider(),
+              _buildDetailRow('证件类型', application.idDocType!),
+            ],
+            if (application.idDocNo?.isNotEmpty == true) ...[
+              _buildDivider(),
+              _buildDetailRow('证件号码', application.idDocNo!),
             ],
             _buildDivider(),
             _buildDetailRow('申请人', application.userName),
@@ -692,12 +863,48 @@ class _CopyrightApplicationDetailPageState
   Widget _buildActionButtons(CopyrightApplication application) {
     final bool canModify = application.status == CopyrightApplicationStatus.pending;
     
-    if (!canModify && !application.canResubmit && !application.isCertificated) {
+    if (!canModify &&
+        !application.canResubmit &&
+        !application.isCertificated &&
+        !application.canSupplement &&
+        !application.canSyncStatus) {
       return const SizedBox.shrink();
     }
 
     return Column(
       children: [
+        // 与 Admin「状态查询」同一 Mock：刷新第三方审核进度
+        if (application.canSyncStatus) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: _syncingStatus
+                  ? null
+                  : () => _syncApplicationStatus(application),
+              icon: _syncingStatus
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync),
+              label: Text(_syncingStatus ? '同步中…' : '刷新审核状态'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          if (canModify ||
+              application.canResubmit ||
+              application.isCertificated ||
+              application.canSupplement)
+            const SizedBox(height: 12),
+        ],
         // pending状态：显示删除按钮
         if (canModify)
           SizedBox(
@@ -738,7 +945,7 @@ class _CopyrightApplicationDetailPageState
           ),
         // certificated状态：查看证书按钮
         if (application.isCertificated && application.certId != null) ...[
-          if (application.canResubmit) const SizedBox(height: 12),
+          if (application.canResubmit || canModify) const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -760,6 +967,30 @@ class _CopyrightApplicationDetailPageState
         ],
       ],
     );
+  }
+
+  Future<void> _syncApplicationStatus(CopyrightApplication application) async {
+    setState(() => _syncingStatus = true);
+    try {
+      final result = await ref
+          .read(copyrightProvider)
+          .syncApplicationStatus(application.applyId);
+      if (!mounted) return;
+      final statusText = result['statusText']?.toString() ??
+          result['status']?.toString() ??
+          '已更新';
+      showAppToast(context, '审核状态：$statusText');
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        showAppToast(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncingStatus = false);
+    }
   }
 
   /// 显示删除确认对话框
@@ -865,13 +1096,17 @@ class _CopyrightApplicationDetailPageState
 
   Color _getStatusColor(String status) {
     switch (status) {
+      case CopyrightApplicationStatus.unpaid:
+        return const Color(0xFFFA8C16);
+      case CopyrightApplicationStatus.needSupplement:
+        return const Color(0xFFFA541C);
+      case CopyrightApplicationStatus.supplementOverdue:
+        return const Color(0xFFCF1322);
       case CopyrightApplicationStatus.pending:
-        return const Color(0xFFFFA940);
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
-        return const Color(0xFF1890FF);
       case CopyrightApplicationStatus.reviewing:
-        return const Color(0xFF722ED1);
+        return const Color(0xFF1890FF);
       case CopyrightApplicationStatus.certificated:
         return const Color(0xFF52C41A);
       case CopyrightApplicationStatus.rejected:
@@ -883,11 +1118,15 @@ class _CopyrightApplicationDetailPageState
 
   IconData _getStatusIcon(String status) {
     switch (status) {
+      case CopyrightApplicationStatus.unpaid:
+        return Icons.payment;
+      case CopyrightApplicationStatus.needSupplement:
+        return Icons.upload_file;
+      case CopyrightApplicationStatus.supplementOverdue:
+        return Icons.timer_off;
       case CopyrightApplicationStatus.pending:
-        return Icons.schedule;
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
-        return Icons.upload;
       case CopyrightApplicationStatus.reviewing:
         return Icons.hourglass_empty;
       case CopyrightApplicationStatus.certificated:

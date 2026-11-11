@@ -119,6 +119,38 @@ class CopyrightApiService {
     );
   }
 
+  /// 提交补正材料（不重交官费）
+  Future<Map<String, dynamic>> submitSupplement({
+    required int applyId,
+    required String materialsJson,
+    String? remark,
+  }) async {
+    final data = await _client.post(
+      '/content/copyright/application/$applyId/supplement',
+      data: {
+        'materialsJson': materialsJson,
+        if (remark != null && remark.isNotEmpty) 'remark': remark,
+      },
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// 同步第三方审核状态（与 Admin「状态查询」同一 Mock）
+  Future<Map<String, dynamic>> syncApplicationStatus(int applyId) async {
+    final data = await _client.post(
+      '/content/copyright/application/$applyId/sync-status',
+      data: const <String, dynamic>{},
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// 兼容旧调用：内部转 [syncApplicationStatus]
+  Future<Map<String, dynamic>> mockPushSupplement({
+    required int applyId,
+    String? content,
+  }) =>
+      syncApplicationStatus(applyId);
+
   /// @deprecated 沙箱支付已停用，请用 [directPay]
   Future<CopyrightPaymentQr> createPayment(int payOrderId) async {
     throw UnsupportedError('支付宝沙箱已停用，请使用 directPay');

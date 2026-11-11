@@ -161,6 +161,36 @@ class CopyrightProvider extends ChangeNotifier {
     return result;
   }
 
+  /// 提交补正材料
+  Future<Map<String, dynamic>> submitSupplement({
+    required int applyId,
+    required String materialsJson,
+    String? remark,
+  }) async {
+    final result = await _apiService.submitSupplement(
+      applyId: applyId,
+      materialsJson: materialsJson,
+      remark: remark,
+    );
+    await refreshApplications();
+    return result;
+  }
+
+  /// 同步第三方审核状态（与 Admin 状态查询同一 Mock）
+  Future<Map<String, dynamic>> syncApplicationStatus(int applyId) async {
+    final result = await _apiService.syncApplicationStatus(applyId);
+    await loadApplicationDetail(applyId);
+    await refreshApplications();
+    return result;
+  }
+
+  /// 兼容旧调用
+  Future<Map<String, dynamic>> mockPushSupplement({
+    required int applyId,
+    String? content,
+  }) =>
+      syncApplicationStatus(applyId);
+
   /// 删除版权申请（仅限pending状态）
   Future<bool> deleteApplication(int applyId) async {
     try {

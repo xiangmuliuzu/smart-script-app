@@ -61,9 +61,13 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
   CopyrightCenter? _selectedCenter;
   DateTime? _completeTime;
   final TextEditingController _remarkController = TextEditingController();
+  final TextEditingController _rightsHolderController = TextEditingController();
+  final TextEditingController _idDocNoController = TextEditingController();
+  String _idDocType = 'id_card';
 
-  // 分类材料
-  List<MaterialFile> _applicationMaterials = [];
+  // 分类材料：作品样本 + 身份证明（首版必填）
+  List<MaterialFile> _sampleMaterials = [];
+  List<MaterialFile> _identityMaterials = [];
 
   bool _loading = false;
   CopyrightApplication? _originalApplication;
@@ -82,6 +86,8 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
   @override
   void dispose() {
     _remarkController.dispose();
+    _rightsHolderController.dispose();
+    _idDocNoController.dispose();
     super.dispose();
   }
 
@@ -174,10 +180,27 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
       return;
     }
 
-    // 至少上传一份申请材料
-    if (_applicationMaterials.isEmpty) {
+    if (_rightsHolderController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请至少上传一份申请材料')),
+        const SnackBar(content: Text('请填写权利人姓名')),
+      );
+      return;
+    }
+    if (_idDocNoController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写证件号码')),
+      );
+      return;
+    }
+    if (_sampleMaterials.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请上传作品样本/原创性证明材料')),
+      );
+      return;
+    }
+    if (_identityMaterials.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请上传作者身份证明材料')),
       );
       return;
     }
@@ -232,12 +255,13 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
       workType: _workType,
       completeTime: _formatDate(_completeTime!),
       copyrightCenter: _selectedCenter!.centerCode,
-      originalityProof: _applicationMaterials.isNotEmpty
-          ? materialFilesToJson(_applicationMaterials)
-          : null,
-      authorIdentityDoc: null,
+      originalityProof: materialFilesToJson(_sampleMaterials),
+      authorIdentityDoc: materialFilesToJson(_identityMaterials),
       creationProcess: null,
       otherProof: null,
+      rightsHolderName: _rightsHolderController.text.trim(),
+      idDocType: _idDocType,
+      idDocNo: _idDocNoController.text.trim(),
       remark: _remarkController.text.trim().isEmpty
           ? null
           : _remarkController.text.trim(),
@@ -248,16 +272,12 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
 
   Future<CopyrightPayOrder> _submitResubmitApplication(
       CopyrightProvider provider) async {
-    final materials = _applicationMaterials.isNotEmpty
-        ? materialFilesToJson(_applicationMaterials)
-        : null;
     final dto = CopyrightResubmitDTO(
       originalApplyId: widget.originalApplyId!,
       workType: _workType,
       completeTime: _formatDate(_completeTime!),
-      fileUrl: materials,
-      originalityProof: materials,
-      authorIdentityDoc: null,
+      originalityProof: materialFilesToJson(_sampleMaterials),
+      authorIdentityDoc: materialFilesToJson(_identityMaterials),
       creationProcess: null,
       otherProof: null,
       remark: _remarkController.text.trim().isEmpty
@@ -326,6 +346,10 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
 
               // 完成时间
               _buildCompleteTimeSelector(),
+              const SizedBox(height: 16),
+
+              // 权利人信息
+              _buildRightsHolderCard(),
               const SizedBox(height: 16),
 
               // 分类材料上传
@@ -849,6 +873,83 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
     );
   }
 
+  Widget _buildRightsHolderCard() {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.badge_outlined, color: AppColors.primary),
+                SizedBox(width: 12),
+                Text(
+                  '权利人信息',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(' *', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _rightsHolderController,
+              decoration: const InputDecoration(
+                labelText: '权利人姓名',
+                hintText: '与证件一致的姓名',
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? '请填写权利人姓名' : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _idDocType,
+              decoration: const InputDecoration(
+                labelText: '证件类型',
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'id_card', child: Text('居民身份证')),
+                DropdownMenuItem(value: 'passport', child: Text('护照')),
+                DropdownMenuItem(
+                    value: 'hk_macau_pass', child: Text('港澳居民来往内地通行证')),
+                DropdownMenuItem(
+                    value: 'taiwan_pass', child: Text('台湾居民来往大陆通行证')),
+                DropdownMenuItem(value: 'other', child: Text('其他')),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _idDocType = v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _idDocNoController,
+              decoration: const InputDecoration(
+                labelText: '证件号码',
+                hintText: '请填写证件号码',
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? '请填写证件号码' : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMaterialsUploader() {
     return Card(
       elevation: 1,
@@ -863,32 +964,43 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
                 Icon(Icons.upload_file_outlined, color: AppColors.primary),
                 SizedBox(width: 12),
                 Text(
-                  '申请材料（分类上传）',
+                  '申请材料（必填）',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                Text(' *', style: TextStyle(color: Colors.red)),
               ],
             ),
             const SizedBox(height: 8),
             const Text(
-              '请根据材料类型分类上传，支持图片（JPG/PNG）和 PDF 文档',
+              '须分别上传作品样本与身份证明，支持图片（JPG/PNG）和 PDF',
               style: TextStyle(
                 fontSize: 13,
                 color: AppColors.text3,
               ),
             ),
             const Divider(height: 24),
-            
             MaterialUploadSection(
-              title: '申请材料',
-              description: '支持上传图片（jpg、png）、文档（pdf、doc、docx）和文本文件（txt），最多上传20个文件',
-              files: _applicationMaterials,
+              title: '作品样本 / 原创性证明',
+              description: '作品全文、样本稿或原创性说明，最多 10 个文件',
+              files: _sampleMaterials,
               onFilesChanged: (files) {
-                setState(() => _applicationMaterials = files);
+                setState(() => _sampleMaterials = files);
               },
-              maxFiles: 20,
+              maxFiles: 10,
+              onUploadFile: _uploadFile,
+            ),
+            const SizedBox(height: 16),
+            MaterialUploadSection(
+              title: '作者身份证明',
+              description: '身份证正反面或护照等，最多 5 个文件',
+              files: _identityMaterials,
+              onFilesChanged: (files) {
+                setState(() => _identityMaterials = files);
+              },
+              maxFiles: 5,
               onUploadFile: _uploadFile,
             ),
           ],

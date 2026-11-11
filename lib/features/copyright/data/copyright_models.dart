@@ -43,6 +43,8 @@ class CopyrightApplicationStatus {
   static const String approved = 'approved'; // 待提交
   static const String submitted = 'submitted'; // 待提交到第三方
   static const String reviewing = 'reviewing'; // 审核中
+  static const String needSupplement = 'need_supplement'; // 待补正
+  static const String supplementOverdue = 'supplement_overdue'; // 逾期待驳回
   static const String certificated = 'certificated'; // 已发证
   static const String rejected = 'rejected'; // 已驳回
 }
@@ -85,6 +87,13 @@ class CopyrightApplication {
     this.payOrderId,
     this.feeAmount,
     this.wordCount,
+    this.supplementDeadline,
+    this.supplementNotice,
+    this.rightsHolderName,
+    this.idDocType,
+    this.idDocNo,
+    this.openSupplement,
+    this.thirdPartyMessages,
     this.certNo,
     this.certId,
     this.certUrl,
@@ -123,6 +132,13 @@ class CopyrightApplication {
   final int? payOrderId;
   final double? feeAmount;
   final int? wordCount;
+  final String? supplementDeadline;
+  final String? supplementNotice;
+  final String? rightsHolderName;
+  final String? idDocType;
+  final String? idDocNo;
+  final Map<String, dynamic>? openSupplement;
+  final List<Map<String, dynamic>>? thirdPartyMessages;
   final String? certNo;
   final int? certId;
   final String? certUrl;
@@ -137,6 +153,10 @@ class CopyrightApplication {
     switch (status) {
       case CopyrightApplicationStatus.unpaid:
         return '待付款';
+      case CopyrightApplicationStatus.needSupplement:
+        return '待补正';
+      case CopyrightApplicationStatus.supplementOverdue:
+        return '逾期待驳回';
       case CopyrightApplicationStatus.pending:
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
@@ -158,6 +178,12 @@ class CopyrightApplication {
         return feeAmount != null
             ? '待支付登记费 ¥${feeAmount!.toStringAsFixed(2)}，付款后提交版权中心'
             : '待支付登记费，付款后提交版权中心';
+      case CopyrightApplicationStatus.needSupplement:
+        return supplementNotice?.isNotEmpty == true
+            ? supplementNotice!
+            : '版权中心要求补充材料，请在截止日前补正（不重交官费）';
+      case CopyrightApplicationStatus.supplementOverdue:
+        return '补正已超时，本轮可能不予登记';
       case CopyrightApplicationStatus.pending:
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
@@ -178,11 +204,22 @@ class CopyrightApplication {
   /// 是否可去付款
   bool get canPay => isUnpaid && payOrderId != null && payOrderId! > 0;
 
+  /// 是否可提交补正
+  bool get canSupplement => status == CopyrightApplicationStatus.needSupplement;
+
   /// 是否可重新提交
   bool get canResubmit => status == CopyrightApplicationStatus.rejected;
 
   /// 是否已发证
   bool get isCertificated => status == CopyrightApplicationStatus.certificated;
+
+  /// 是否可刷新第三方审核状态（与 Admin 状态查询同一 Mock）
+  bool get canSyncStatus =>
+      status == CopyrightApplicationStatus.reviewing ||
+      status == CopyrightApplicationStatus.submitted ||
+      status == CopyrightApplicationStatus.pending ||
+      status == CopyrightApplicationStatus.approved ||
+      status == CopyrightApplicationStatus.needSupplement;
 
   factory CopyrightApplication.fromJson(Map<String, dynamic> json) =>
       CopyrightApplication(
@@ -218,6 +255,20 @@ class CopyrightApplication {
         feeAmount: json['feeAmount'] == null ? null : _double(json['feeAmount']),
         wordCount:
             json['wordCount'] == null ? null : _int(json['wordCount']),
+        supplementDeadline: _textOrNull(json['supplementDeadline']),
+        supplementNotice: _textOrNull(json['supplementNotice']),
+        rightsHolderName: _textOrNull(json['rightsHolderName']),
+        idDocType: _textOrNull(json['idDocType']),
+        idDocNo: _textOrNull(json['idDocNo']),
+        openSupplement: json['openSupplement'] is Map
+            ? Map<String, dynamic>.from(json['openSupplement'] as Map)
+            : null,
+        thirdPartyMessages: json['thirdPartyMessages'] is List
+            ? (json['thirdPartyMessages'] as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+            : null,
         certNo: _textOrNull(json['certNo']),
         certId: json['certId'] != null ? _int(json['certId']) : null,
         certUrl: _textOrNull(json['certUrl']),
@@ -321,6 +372,9 @@ class CopyrightApplyDTO {
     this.authorIdentityDoc,
     this.creationProcess,
     this.otherProof,
+    this.rightsHolderName,
+    this.idDocType,
+    this.idDocNo,
     this.remark,
   });
 
@@ -337,6 +391,10 @@ class CopyrightApplyDTO {
   final String? authorIdentityDoc;   // 作者身份证明材料（JSON数组字符串）
   final String? creationProcess;     // 创作过程材料（JSON数组字符串）
   final String? otherProof;          // 其他辅助证明材料（JSON数组字符串）
+
+  final String? rightsHolderName;
+  final String? idDocType;
+  final String? idDocNo;
   
   final String? remark;
 
@@ -350,6 +408,9 @@ class CopyrightApplyDTO {
         if (authorIdentityDoc != null) 'authorIdentityDocUrls': authorIdentityDoc,
         if (creationProcess != null) 'creationProcessUrls': creationProcess,
         if (otherProof != null) 'otherProofUrls': otherProof,
+        if (rightsHolderName != null) 'rightsHolderName': rightsHolderName,
+        if (idDocType != null) 'idDocType': idDocType,
+        if (idDocNo != null) 'idDocNo': idDocNo,
         if (remark != null) 'remark': remark,
       };
 }
@@ -811,6 +872,10 @@ extension CopyrightApplicationStatusExtension on String {
     switch (this) {
       case CopyrightApplicationStatus.unpaid:
         return '待付款';
+      case CopyrightApplicationStatus.needSupplement:
+        return '待补正';
+      case CopyrightApplicationStatus.supplementOverdue:
+        return '逾期待驳回';
       case CopyrightApplicationStatus.pending:
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
