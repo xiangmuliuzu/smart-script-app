@@ -17,6 +17,7 @@ import '../welfare/data/welfare_providers.dart';
 import 'data/ai_create_session.dart';
 import 'data/author_work_providers.dart';
 import 'data/create_providers.dart';
+import 'pages/ai_chapter_read_page.dart';
 
 /// AI 创作页（创作者端）：设定 → 大纲 → 章节三步，与 PC 创作者端流程一致。
 ///
@@ -38,7 +39,7 @@ class _ChapterTask {
   _ChapterTask({required this.title, required this.summary});
 
   final String title;
-  final String summary;
+  String summary;
   bool selected = true;
   String state = 'idle'; // idle / generating / generated / failed
   String content = '';
@@ -119,6 +120,9 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
 
   int get _selectedCount => _chapters.where((c) => c.selected).length;
 
+  /// 还有勾选但未生成的章节：是则主按钮为「开始生成」，全部完成则变为「进入作品工作台」。
+  bool get _hasPending => _chapters.any((c) => c.selected && c.state != 'generated');
+
   double get _progress => _chapters.isEmpty ? 0 : _generatedCount / _chapters.length;
 
   /// 剩余积分：未加载 / 加载失败时返回 null，避免短暂显示成 0 误导用户。
@@ -130,7 +134,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       return;
     }
     if (_ideaCtrl.text.trim().isEmpty) {
-      showAppToast(context, '请先输入故事灵感或主题');
+      showAppToast(context, '请先输入你的要求');
       return;
     }
     if (_episodes < 1 || _episodes > 200) {
@@ -174,6 +178,53 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
     }
   }
 
+  /// 设定页主按钮：已有大纲时只是进入下一步，不重复生成（要重来用右上角「重置」）。
+  void _nextFromSetup() {
+    FocusScope.of(context).unfocus();
+    setState(() => _step = 2);
+  }
+
+  /// 顶部步骤条切换。章节步骤复用 [_goChapters]，会校验大纲并建好草稿作品。
+  Future<void> _goToStep(int step) async {
+    if (_running || step == _step) return;
+    if (step == 3) {
+      await _goChapters();
+      return;
+    }
+    if (step == 2 && _outline.trim().isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _step = step);
+  }
+
+  /// 重来：清空大纲与章节进度，回到设定页；已保存进作品的章节不会被删除。
+  Future<void> _reset() async {
+    if (_running || _outlineBusy) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重置创作'),
+        content: const Text('会清空当前大纲和章节生成进度，需要重新生成；已保存到作品的章节不受影响。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('重置')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _step = 1;
+      _outline = '';
+      _outlineEditing = false;
+      _chapters.clear();
+      _workId = 0;
+      _writtenChapters = 0;
+      _createError = '';
+      _reviseSelection = null;
+      _reviseInstruction = '';
+      _reviseCtrl.clear();
+    });
+  }
+
   Future<void> _goChapters() async {
     if (_outlineBusy) return;
     final parsed = _parsed;
@@ -183,9 +234,21 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
     }
     setState(() {
       _step = 3;
+      // 返回大纲再确认时保留已生成（或已落库）的章节，避免重复生成、重复扣积分。
+      final existing = {for (final task in _chapters) task.title: task};
+      final tasks = <_ChapterTask>[];
+      for (final seed in parsed) {
+        final kept = existing[seed.title];
+        if (kept != null && (kept.state == 'generated' || kept.chapterId > 0)) {
+          kept.summary = seed.summary;
+          tasks.add(kept);
+        } else {
+          tasks.add(_ChapterTask(title: seed.title, summary: seed.summary));
+        }
+      }
       _chapters
         ..clear()
-        ..addAll(parsed.map((s) => _ChapterTask(title: s.title, summary: s.summary)));
+        ..addAll(tasks);
     });
     await _ensureWork();
   }
@@ -403,9 +466,21 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !_running,
+      // 流程内返回先回上一步，不在章节/大纲步骤直接退出整个创作流程。
+      canPop: _step == 1 && !_running,
       onPopInvoked: (didPop) async {
         if (didPop) return;
+        if (_step > 1) {
+          if (_running) {
+            final router = GoRouter.of(context);
+            final leave = await _confirmLeave();
+            if (!leave) return;
+            if (mounted) router.pop();
+            return;
+          }
+          setState(() => _step -= 1);
+          return;
+        }
         final router = GoRouter.of(context);
         final leave = await _confirmLeave();
         if (!leave) return;
@@ -418,12 +493,16 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
           backgroundColor: Colors.white,
           elevation: 0.5,
           actions: [
-            if (_step > 1 && !_running)
-              TextButton(onPressed: () => setState(() => _step = 1), child: const Text('回到设定')),
+            if (_step == 1 && !_running && !_outlineBusy && (_outline.isNotEmpty || _chapters.isNotEmpty))
+              TextButton(onPressed: _reset, child: const Text('重置')),
           ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(44),
-            child: _StepBar(step: _step),
+            child: _StepBar(
+              step: _step,
+              outlineReady: _outline.trim().isNotEmpty,
+              onTap: _running ? null : _goToStep,
+            ),
           ),
         ),
         body: ListView(
@@ -454,7 +533,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
             ),
           ),
           _Labeled(
-            '故事灵感 *',
+            '我的要求 *',
             TextField(
               controller: _ideaCtrl,
               maxLines: 4,
@@ -501,7 +580,10 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            child: FilledButton(onPressed: _generateOutline, child: const Text('下一步：生成大纲')),
+            child: FilledButton(
+              onPressed: _outline.trim().isEmpty ? _generateOutline : _nextFromSetup,
+              child: Text(_outline.trim().isEmpty ? '下一步：生成大纲' : '下一步'),
+            ),
           ),
         ],
       ),
@@ -679,9 +761,13 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                 child: const Text('取消'),
               ),
               const Spacer(),
-              FilledButton(
-                onPressed: _revising || _reviseInstruction.trim().isEmpty ? null : _runRevise,
-                child: Text(_revising ? '正在改写…' : '让 AI 改这一段'),
+              // 主题按钮最小宽度无穷大，放 Row 里必须给有界宽度。
+              SizedBox(
+                width: 150,
+                child: FilledButton(
+                  onPressed: _revising || _reviseInstruction.trim().isEmpty ? null : _runRevise,
+                  child: Text(_revising ? '正在改写…' : '让 AI 改这一段'),
+                ),
               ),
             ],
           ),
@@ -803,16 +889,9 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                 children: [
                   Text('已勾选 $_selectedCount 章', style: const TextStyle(fontSize: 12, color: AppColors.text3)),
                   const Spacer(),
-                  if (!_running)
-                    FilledButton(
-                      onPressed: _selectedCount == 0 ? null : _startGeneration,
-                      child: const Text('开始生成'),
-                    )
-                  else
-                    OutlinedButton(
-                      onPressed: _stopping ? null : () => setState(() => _stopping = true),
-                      child: Text(_stopping ? '正在停止…' : '停止'),
-                    ),
+                  if (_generatedCount > 0)
+                    Text('已完成 $_generatedCount 章',
+                        style: const TextStyle(fontSize: 12, color: AppColors.success)),
                 ],
               ),
             ],
@@ -821,9 +900,20 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
         const SizedBox(height: 10),
         for (var i = 0; i < _chapters.length; i++) _chapterTile(i),
         const SizedBox(height: 14),
+        // 主按钮固定在底部：生成中显示停止，尚有未生成章节显示开始生成，全部完成变为进入工作台。
         FilledButton(
-          onPressed: _running || _saving || _generatedCount == 0 ? null : _finishToWork,
-          child: Text(_saving ? '正在保存…' : '进入作品工作台'),
+          onPressed: _running
+              ? (_stopping ? null : () => setState(() => _stopping = true))
+              : _hasPending
+                  ? (_selectedCount == 0 ? null : _startGeneration)
+                  : (_saving || _generatedCount == 0 ? null : _finishToWork),
+          child: Text(
+            _running
+                ? (_stopping ? '正在停止…' : '停止生成')
+                : _hasPending
+                    ? '开始生成'
+                    : (_saving ? '正在保存…' : '进入作品工作台'),
+          ),
         ),
       ],
     );
@@ -908,12 +998,25 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                 ),
               ),
             if (task.state == 'generated')
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 8),
-                title: Text('查看正文 · ${task.content.length} 字', style: const TextStyle(fontSize: 12, color: AppColors.primary)),
-                children: [_PreviewBox(text: task.content)],
-              ),
+              if (task.state == 'generated')
+                InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AiChapterReadPage(title: task.title, content: task.content),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 4),
+                    child: Row(
+                      children: [
+                        Text('查看正文 · ${task.content.length} 字',
+                            style: const TextStyle(fontSize: 12, color: AppColors.primary)),
+                        const Spacer(),
+                        const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
+                      ],
+                    ),
+                  ),
+                ),
           ],
         ),
       ),
@@ -922,8 +1025,13 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
 }
 
 class _StepBar extends StatelessWidget {
-  const _StepBar({required this.step});
+  const _StepBar({required this.step, required this.outlineReady, this.onTap});
+
   final int step;
+
+  /// 没有大纲时只能停在设定步骤；生成中 [onTap] 为 null，锁定切换。
+  final bool outlineReady;
+  final ValueChanged<int>? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -933,26 +1041,66 @@ class _StepBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
         children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: step == i + 1 ? AppColors.primaryTint : AppColors.fill,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                '${i + 1} ${items[i]}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: step == i + 1 ? AppColors.primary : AppColors.text3,
-                  fontWeight: step == i + 1 ? FontWeight.w600 : FontWeight.w400,
+          // 左中右三格均分：每个步骤在自己的三分之一里居中。
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: Center(
+                child: _StepChip(
+                  index: i + 1,
+                  label: items[i],
+                  current: step == i + 1,
+                  enabled: onTap != null && step != i + 1 && (i == 0 || outlineReady),
+                  onTap: onTap,
                 ),
               ),
             ),
-          ],
         ],
       ),
+    );
+  }
+}
+
+class _StepChip extends StatelessWidget {
+  const _StepChip({
+    required this.index,
+    required this.label,
+    required this.current,
+    required this.enabled,
+    this.onTap,
+  });
+
+  final int index;
+  final String label;
+  final bool current;
+  final bool enabled;
+  final ValueChanged<int>? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: current ? AppColors.primaryTint : AppColors.fill,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        '$index $label',
+        style: TextStyle(
+          fontSize: 12,
+          color: current
+              ? AppColors.primary
+              : enabled
+                  ? AppColors.text1
+                  : AppColors.text3,
+          fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+        ),
+      ),
+    );
+    if (!enabled) return chip;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => onTap?.call(index),
+      child: chip,
     );
   }
 }
