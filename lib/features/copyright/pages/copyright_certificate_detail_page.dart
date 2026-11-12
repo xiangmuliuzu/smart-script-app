@@ -333,10 +333,10 @@ class _CopyrightCertificateDetailPageState
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1890FF).withOpacity(0.05),
+          color: AppColors.primary.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFF1890FF).withOpacity(0.2),
+            color: AppColors.primary.withOpacity(0.2),
           ),
         ),
         child: Column(
@@ -344,7 +344,7 @@ class _CopyrightCertificateDetailPageState
           children: [
             Row(
               children: const [
-                Icon(Icons.verified_user, color: Color(0xFF1890FF), size: 24),
+                Icon(Icons.verified_user, color: AppColors.primary, size: 24),
                 SizedBox(width: 8),
                 Text(
                   '区块链存证',
@@ -374,7 +374,7 @@ class _CopyrightCertificateDetailPageState
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.vpn_key, size: 16, color: Color(0xFF1890FF)),
+                  const Icon(Icons.vpn_key, size: 16, color: AppColors.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

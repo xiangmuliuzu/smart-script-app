@@ -161,7 +161,7 @@ class _StatusChip extends StatelessWidget {
       case DemandStatus.open:
         return AppColors.success;
       case DemandStatus.inProgress:
-        return const Color(0xFF3B6BB5);
+        return AppColors.text2;
       case DemandStatus.completed:
       case DemandStatus.selected:
         return AppColors.primary;

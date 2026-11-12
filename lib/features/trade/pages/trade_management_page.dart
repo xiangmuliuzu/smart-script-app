@@ -43,7 +43,7 @@ class TradeManagementPage extends StatelessWidget {
                       _MenuItem(
                         icon: Icons.chat_outlined,
                         label: '交易会话',
-                        color: Colors.indigo,
+                        color: AppColors.text2,
                         onTap: () => context.push(RoutePath.tradeSessionList),
                       ),
                       _MenuItem(
@@ -64,7 +64,7 @@ class TradeManagementPage extends StatelessWidget {
                       _MenuItem(
                         icon: Icons.description_outlined,
                         label: '我的合同',
-                        color: Colors.blueGrey,
+                        color: AppColors.text3,
                         onTap: () => context.push(RoutePath.contractList),
                       ),
                     ]),

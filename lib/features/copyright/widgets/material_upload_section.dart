@@ -233,7 +233,7 @@ class _FileItem extends StatelessWidget {
                 : file.isPdf
                     ? Colors.red
                     : file.isDocument
-                        ? Colors.blue
+                        ? AppColors.text2
                         : AppColors.text2,
           ),
           const SizedBox(width: 12),

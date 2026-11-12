@@ -165,7 +165,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     switch (widget.stage.status) {
       case 'approved': return Colors.green;
       case 'ai_reviewing': return Colors.purple;
-      case 'submitted': return Colors.blue;
+      case 'submitted': return AppColors.text2;
       case 'rejected': return Colors.red;
       default: return Colors.grey;
     }
@@ -351,7 +351,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                           fontSize: 12,
                           color: s.isAiReviewing
                               ? Colors.purple
-                              : Colors.blue.shade600,
+                              : AppColors.text2,
                           height: 1.4),
                     ),
                   ],

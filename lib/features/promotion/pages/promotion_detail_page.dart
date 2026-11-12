@@ -315,7 +315,7 @@ class _PromotionDetailPageState extends ConsumerState<PromotionDetailPage> {
         color: AppColors.card,
         boxShadow: [
           BoxShadow(
-            color: Color(0x14183A6E),
+            color: Color(0x14000000),
             offset: Offset(0, -2),
             blurRadius: 12,
           ),

@@ -494,7 +494,7 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppColors.fill,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -502,7 +502,7 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, size: 20, color: Colors.blue.shade700),
+              Icon(Icons.info_outline, size: 20, color: AppColors.text2),
               const SizedBox(width: 8),
               Text(
                 '温馨提示',

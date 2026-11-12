@@ -228,7 +228,7 @@ class _CardBox extends StatelessWidget {
         ),
         shadows: const [
           BoxShadow(
-            color: Color(0x0C183A6E),
+            color: Color(0x0C000000),
             offset: Offset(0, 6),
             blurRadius: 20,
           ),
@@ -742,7 +742,7 @@ class _Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Color(0x1A183A6E),
+            color: Color(0x1A000000),
             blurRadius: 14,
             offset: Offset(0, 5),
           ),
@@ -765,7 +765,7 @@ class _Avatar extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFDCE9FA), Color(0xFFC2D8F6)],
+            colors: [Color(0xFFF0F0F0), Color(0xFFD6D6D6)],
           ),
         ),
         alignment: Alignment.center,
@@ -797,7 +797,7 @@ class _AuthButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x26254E90),
+              color: Color(0x26000000),
               blurRadius: 8,
               offset: Offset(0, 3),
             ),
@@ -854,14 +854,14 @@ class _CreatorBentoSection extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF2B59A2), Color(0xFF1A3868)],
+                      colors: [Color(0xFF4A4A4A), Color(0xFF111111)],
                     ),
                     shape: ContinuousRectangleBorder(
                       borderRadius: BorderRadius.circular(28),
                     ),
                     shadows: const [
                       BoxShadow(
-                        color: Color(0x281D3E73),
+                        color: Color(0x28000000),
                         blurRadius: 16,
                         offset: Offset(0, 6),
                       ),
@@ -1108,7 +1108,7 @@ class _BentoSubCard extends StatelessWidget {
           ),
           shadows: const [
             BoxShadow(
-              color: Color(0x0A183A6E),
+              color: Color(0x0A000000),
               offset: Offset(0, 4),
               blurRadius: 14,
             ),
@@ -1539,7 +1539,7 @@ class _ShelfBook extends StatelessWidget {
                 borderRadius: BorderRadius.circular(9),
                 boxShadow: const [
                   BoxShadow(
-                    color: Color(0x16183A6E),
+                    color: Color(0x16000000),
                     offset: Offset(0, 5),
                     blurRadius: 12,
                   ),

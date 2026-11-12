@@ -983,7 +983,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
         color: AppColors.card,
         boxShadow: [
           BoxShadow(
-            color: Color(0x14183A6E),
+            color: Color(0x14000000),
             offset: Offset(0, -2),
             blurRadius: 12,
           ),
@@ -1180,7 +1180,7 @@ class _StepProgress extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: index <= current
                           ? AppColors.primary
-                          : const Color(0xFFE3E7ED),
+                          : const Color(0xFFE5E6EB),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1242,7 +1242,7 @@ class _Surface extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0D183A6E),
+            color: Color(0x0D000000),
             offset: Offset(0, 4),
             blurRadius: 16,
           ),

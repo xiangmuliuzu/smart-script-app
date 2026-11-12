@@ -42,7 +42,7 @@ class CopyrightHomePage extends ConsumerWidget {
               icon: Icons.assignment_outlined,
               title: '申请列表',
               subtitle: '查看已提交的版权申请进度',
-              color: const Color(0xFF1890FF),
+              color: AppColors.primary,
               onTap: () => context.push(RoutePath.copyrightApplicationList),
             ),
             const SizedBox(height: 12),

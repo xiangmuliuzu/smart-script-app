@@ -147,7 +147,7 @@ class UserPrimaryButton extends StatelessWidget {
           boxShadow: enabled
               ? const [
                   BoxShadow(
-                    color: Color(0x331E4078),
+                    color: Color(0x33000000),
                     offset: Offset(0, 6),
                     blurRadius: 16,
                   ),

@@ -72,14 +72,14 @@ class _CopyrightDeliveryListPageState
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppColors.fill,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+          Icon(Icons.info_outline, color: AppColors.text2, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -330,7 +330,7 @@ class _CopyrightDeliveryListPageState
         color = Colors.orange;
         break;
       case 'pending_confirm':
-        color = Colors.blue;
+        color = AppColors.text2;
         break;
       case 'completed':
         color = Colors.green;

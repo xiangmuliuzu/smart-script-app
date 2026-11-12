@@ -271,7 +271,7 @@ class _CopyrightCertificateListPageState
                     ),
                     child: const Icon(
                       Icons.workspace_premium,
-                      color: Color(0xFF1890FF),
+                      color: AppColors.primary,
                       size: 24,
                     ),
                   ),
@@ -376,7 +376,7 @@ class _CopyrightCertificateListPageState
                     ),
                     child: const Icon(
                       Icons.shopping_bag_outlined,
-                      color: Color(0xFF1890FF),
+                      color: AppColors.primary,
                       size: 24,
                     ),
                   ),
@@ -412,10 +412,10 @@ class _CopyrightCertificateListPageState
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1890FF).withOpacity(0.1),
+                      color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFF1890FF).withOpacity(0.3),
+                        color: AppColors.primary.withOpacity(0.3),
                       ),
                     ),
                     child: const Text(

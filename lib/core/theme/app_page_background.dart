@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// 页面背景：顶部 240 像素高的冰蓝渐变，向下融入纯色页面底色。
+/// 页面背景：顶部 240 像素高的浅灰渐变，向下融入纯色页面底色。
 ///
 /// 全 App 统一使用，替代各页面的纯色 `pageBackground`，
 /// 让滚动内容在渐变上更有层次（卡片仍为纯白浮层）。

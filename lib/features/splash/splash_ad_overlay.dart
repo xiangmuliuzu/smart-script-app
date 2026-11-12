@@ -141,7 +141,7 @@ class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
       if (!_dismissed)
         Positioned.fill(
             child: Material(
-          color: const Color(0xfff6f8fb),
+          color: const Color(0xFFF5F5F5),
           child: Stack(fit: StackFit.expand, children: [
             if (!_started)
               const Center(
@@ -150,7 +150,7 @@ class _SplashAdOverlayState extends ConsumerState<SplashAdOverlay> {
                     style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xff244a59))),
+                        color: Color(0xFF1F2329))),
                 SizedBox(height: 16),
                 Text('广告加载中…', style: TextStyle(color: Colors.black54)),
               ])),

@@ -201,8 +201,8 @@ class _CenterTab extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: active
-                          ? const [Color(0xFF3264B8), Color(0xFF1A3868)]
-                          : const [Color(0xFF2B59A2), Color(0xFF20437C)],
+                          ? const [Color(0xFF4A4A4A), Color(0xFF111111)]
+                          : const [Color(0xFF6B6B6B), Color(0xFF2A2A2A)],
                     ),
                   ),
                   child: Icon(

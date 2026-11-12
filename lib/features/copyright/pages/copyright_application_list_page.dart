@@ -447,7 +447,7 @@ class _CopyrightApplicationListPageState
       case CopyrightApplicationStatus.approved:
       case CopyrightApplicationStatus.submitted:
       case CopyrightApplicationStatus.reviewing:
-        return const Color(0xFF1890FF);
+        return AppColors.text2;
       case CopyrightApplicationStatus.certificated:
         return const Color(0xFF52C41A);
       case CopyrightApplicationStatus.rejected:

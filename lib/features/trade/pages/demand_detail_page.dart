@@ -466,7 +466,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     Color color;
     switch (status) {
       case 'open': color = Colors.green;
-      case 'in_progress': color = Colors.blue;
+      case 'in_progress': color = AppColors.text2;
       case 'completed': color = AppColors.primary;
       case 'selected': color = AppColors.primary;
       case 'failed': color = Colors.red;
@@ -552,7 +552,7 @@ class _DemandCountdownBarState extends ConsumerState<DemandCountdownBar> {
     if (active != null && active.isPausedForReview) {
       // 审核期间（AI审核中/待人工验收）计时暂停，不走剩余时间倒计时
       text = active.isAiReviewing ? 'AI审核中，计时已暂停' : '验收中，计时已暂停';
-      color = active.isAiReviewing ? Colors.purple : Colors.blue;
+      color = active.isAiReviewing ? Colors.purple : AppColors.text2;
     } else if (active != null && active.hasPendingExtend) {
       // 待处理的延时申请同样暂停超时判定（与后端 refreshRoundState 同口径）
       text = '延时申请待处理，计时已暂停';
@@ -562,13 +562,13 @@ class _DemandCountdownBarState extends ConsumerState<DemandCountdownBar> {
       color = Colors.red;
     } else if (due == null) {
       text = '进行中';
-      color = Colors.blue;
+      color = AppColors.text2;
     } else {
       final remain = due.difference(DateTime.now());
       final h = remain.inHours;
       final m = remain.inMinutes % 60;
       text = '剩余 $h 小时 $m 分';
-      color = h < 24 ? Colors.orange : Colors.blue;
+      color = h < 24 ? Colors.orange : AppColors.text2;
     }
     return Container(
       width: double.infinity,

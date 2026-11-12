@@ -140,12 +140,12 @@ class _PromotionCenterPageState extends ConsumerState<PromotionCenterPage> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF254E90), Color(0xFF3E6FB5)],
+          colors: [Color(0xFF1F2329), Color(0xFF4E5969)],
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x2E254E90),
+            color: Color(0x2E000000),
             offset: Offset(0, 8),
             blurRadius: 20,
           ),
@@ -243,7 +243,7 @@ class _PromotionCenterPageState extends ConsumerState<PromotionCenterPage> {
         color: AppColors.card,
         boxShadow: [
           BoxShadow(
-            color: Color(0x14183A6E),
+            color: Color(0x14000000),
             offset: Offset(0, -2),
             blurRadius: 12,
           ),
