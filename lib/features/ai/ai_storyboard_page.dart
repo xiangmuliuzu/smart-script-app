@@ -341,7 +341,7 @@ class _ResultCard extends StatelessWidget {
             icon: const Icon(Icons.copy_all, size: 18),
             label: const Text('复制分镜（可直接出售）'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.text1,
               side: const BorderSide(color: AppColors.primary),
               minimumSize: const Size.fromHeight(42),
             ),

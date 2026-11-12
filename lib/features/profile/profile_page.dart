@@ -302,7 +302,7 @@ class _TopBar extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
+                      color: AppColors.text1,
                     ),
                   ),
                   SizedBox(width: 2),
@@ -774,7 +774,7 @@ class _Avatar extends StatelessWidget {
           style: TextStyle(
             fontSize: size * 0.36,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: AppColors.text1,
           ),
         ),
       );
@@ -1413,7 +1413,7 @@ class _ShelfSection extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                    color: AppColors.text1,
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),

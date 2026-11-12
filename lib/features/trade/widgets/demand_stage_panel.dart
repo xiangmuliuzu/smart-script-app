@@ -310,7 +310,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                           label: const Text('查看交付内容',
                               style: TextStyle(fontSize: 12)),
                           style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
+                            foregroundColor: AppColors.text1,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             visualDensity: VisualDensity.compact,
                           ),
@@ -385,7 +385,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                                     ? '收起'
                                     : '展开全部（${widget.extendApplies.length}条）',
                                 style: const TextStyle(
-                                    fontSize: 12, color: AppColors.primary),
+                                    fontSize: 12, color: AppColors.text1),
                               ),
                             ),
                         ],
@@ -469,7 +469,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
               icon: const Icon(Icons.visibility_outlined, size: 16),
               label: const Text('查看交付内容', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
+                foregroundColor: AppColors.text1,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 visualDensity: VisualDensity.compact,
               ),
@@ -509,7 +509,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
           Expanded(
             child: OutlinedButton(
               onPressed: (_canSelfExtend && !_acting) ? () => _selfExtend(context) : null,
-              style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+              style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
               child: const Text('延长时间'),
             ),
           ),
@@ -542,7 +542,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _acting ? null : () => _requestExtend(context),
-                style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
                 child: const Text('申请延时'),
               ),
             ),
@@ -768,7 +768,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('确认',
                   style: TextStyle(
-                      color: AppColors.primary, fontWeight: FontWeight.w600))),
+                      color: AppColors.text1, fontWeight: FontWeight.w600))),
         ],
       ),
     );
@@ -937,7 +937,7 @@ class _ExtendRecordSummaryState extends State<_ExtendRecordSummary> {
                   onTap: () => setState(() => _expanded = !_expanded),
                   child: Text(_expanded ? '收起' : '展开全部',
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.primary)),
+                          fontSize: 12, color: AppColors.text1)),
                 ),
             ],
           ),

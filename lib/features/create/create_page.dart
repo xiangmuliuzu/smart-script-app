@@ -189,7 +189,7 @@ class _FilterBar extends StatelessWidget {
                   labelStyle: TextStyle(
                     fontSize: 13,
                     color: selected == filter.value
-                        ? AppColors.primary
+                        ? AppColors.text1
                         : AppColors.text2,
                   ),
                   selectedColor: AppColors.primaryTint,

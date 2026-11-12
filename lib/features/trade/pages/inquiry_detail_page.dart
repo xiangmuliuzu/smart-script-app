@@ -310,7 +310,7 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
           ),
           child: Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.primary),
+            style: const TextStyle(fontSize: 12, color: AppColors.text1),
           ),
         ),
         const SizedBox(width: 12),
@@ -359,7 +359,7 @@ class _InquiryDetailPageState extends ConsumerState<InquiryDetailPage> {
           icon: const Icon(Icons.receipt_long, size: 18),
           label: const Text('查看报价记录'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
+            foregroundColor: AppColors.text1,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),

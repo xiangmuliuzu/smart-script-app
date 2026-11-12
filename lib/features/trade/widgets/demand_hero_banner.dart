@@ -127,7 +127,7 @@ class _StatCell extends StatelessWidget {
               fontSize: 19,
               fontWeight: FontWeight.w800,
               height: 1.1,
-              color: highlight ? AppColors.accent : AppColors.primary,
+              color: highlight ? AppColors.accent : AppColors.text1,
             ),
           ),
           const SizedBox(height: 4),

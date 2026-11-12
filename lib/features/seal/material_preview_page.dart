@@ -178,7 +178,7 @@ class _MaterialPreviewPageState extends State<MaterialPreviewPage> {
               child: Text(
                 '打开',
                 style: TextStyle(
-                  color: darkChrome ? Colors.white : AppColors.primary,
+                  color: darkChrome ? Colors.white : AppColors.text1,
                 ),
               ),
             ),

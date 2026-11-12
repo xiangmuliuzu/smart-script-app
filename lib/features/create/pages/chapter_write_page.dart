@@ -456,7 +456,7 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: _aiPanelOpen
-                                ? AppColors.primary
+                                ? AppColors.text1
                                 : AppColors.text2,
                           ),
                         ),
@@ -580,7 +580,7 @@ class _BottomBar extends StatelessWidget {
           if (isFree) ...[
             const SizedBox(width: 8),
             const Text('试读',
-                style: TextStyle(fontSize: 11, color: AppColors.primary)),
+                style: TextStyle(fontSize: 11, color: AppColors.text1)),
           ],
           const Spacer(),
           GestureDetector(

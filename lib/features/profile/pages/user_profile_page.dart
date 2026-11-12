@@ -476,7 +476,7 @@ class _Avatar extends StatelessWidget {
   Widget get _fallback => Center(
         child: Text(
           nickname.isNotEmpty ? nickname.substring(0, 1) : '?',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.primary),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.text1),
         ),
       );
 }

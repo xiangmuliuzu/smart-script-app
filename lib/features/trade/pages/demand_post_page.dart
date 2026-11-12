@@ -223,7 +223,7 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           onPressed: _addStageRow,
           icon: const Icon(Icons.add, size: 18),
           label: const Text('添加验收轮次'),
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
         ),
         const SizedBox(height: 4),
         Text('可不添加中间轮次，最后一轮验收会自动生成并验收到总集数。',
@@ -396,7 +396,7 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
               SizedBox(width: 4),
               Text('最后一轮验收（自动生成，集数与金额不可修改）',
                   style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                      fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text1)),
             ],
           ),
           const SizedBox(height: 6),

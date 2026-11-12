@@ -110,20 +110,21 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : AppColors.text3;
+    final iconColor = active ? AppColors.primary : AppColors.text3;
+    final labelColor = active ? AppColors.text1 : AppColors.text3;
     return InkWell(
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(active ? tab.iconActive : tab.icon, color: color, size: 22),
+          Icon(active ? tab.iconActive : tab.icon, color: iconColor, size: 22),
           const SizedBox(height: 3),
           Text(
             tab.label,
             style: TextStyle(
               fontSize: 12,
               fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: color,
+              color: labelColor,
             ),
           ),
         ],
@@ -148,7 +149,7 @@ class _CenterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelColor = active ? AppColors.primary : AppColors.text3;
+    final labelColor = active ? AppColors.text1 : AppColors.text3;
     return InkWell(
       onTap: onTap,
       child: Stack(

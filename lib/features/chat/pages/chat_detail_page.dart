@@ -432,7 +432,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             icon: const Icon(Icons.notes, size: 18),
             label: const Text('定型文'),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.text1,
               backgroundColor: AppColors.primary.withOpacity(0.08),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -605,7 +605,7 @@ class _MessageBubble extends StatelessWidget {
       child: message.senderAvatar == null
           ? Text(
               message.senderName?.characters.first ?? '?',
-              style: const TextStyle(fontSize: 12, color: AppColors.primary),
+              style: const TextStyle(fontSize: 12, color: AppColors.text1),
             )
           : null,
     );

@@ -140,7 +140,7 @@ class _DemandSandboxPayDialogState extends State<DemandSandboxPayDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('金额 ¥${widget.amountYuanText}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text1)),
             const SizedBox(height: 8),
             Text(widget.hint,
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4)),
@@ -164,7 +164,7 @@ class _DemandSandboxPayDialogState extends State<DemandSandboxPayDialog> {
               icon: const Icon(Icons.refresh, size: 16),
               label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
+                foregroundColor: AppColors.text1,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 visualDensity: VisualDensity.compact,
               ),

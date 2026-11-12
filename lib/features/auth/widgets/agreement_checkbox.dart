@@ -110,13 +110,13 @@ class _AgreementCheckboxState extends State<AgreementCheckbox>
                       const TextSpan(text: '我已阅读并同意'),
                       TextSpan(
                         text: '《用户协议》',
-                        style: const TextStyle(color: AppColors.primary),
+                        style: const TextStyle(color: AppColors.text1),
                         recognizer: _userAgreementRecognizer,
                       ),
                       const TextSpan(text: '和'),
                       TextSpan(
                         text: '《隐私政策》',
-                        style: const TextStyle(color: AppColors.primary),
+                        style: const TextStyle(color: AppColors.text1),
                         recognizer: _privacyRecognizer,
                       ),
                     ],

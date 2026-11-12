@@ -227,7 +227,7 @@ class _FilterChip extends StatelessWidget {
             count > 0 ? '$label $count' : label,
             style: TextStyle(
               fontSize: 12,
-              color: selected ? AppColors.primary : AppColors.text2,
+              color: selected ? AppColors.text1 : AppColors.text2,
             ),
           ),
         ),

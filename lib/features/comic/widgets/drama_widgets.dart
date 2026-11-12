@@ -236,7 +236,7 @@ class PlayHistoryTile extends StatelessWidget {
                     item.progressLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                    style: const TextStyle(fontSize: 12, color: AppColors.text1),
                   ),
                   if (item.playTime != null && item.playTime!.isNotEmpty) ...[
                     const SizedBox(height: 4),

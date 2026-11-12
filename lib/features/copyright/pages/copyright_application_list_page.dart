@@ -161,7 +161,7 @@ class _CopyrightApplicationListPageState
       backgroundColor: Colors.grey.shade100,
       labelStyle: TextStyle(
         fontSize: 13,
-        color: isSelected ? AppColors.primary : AppColors.text2,
+        color: isSelected ? AppColors.text1 : AppColors.text2,
       ),
     );
   }
@@ -352,7 +352,7 @@ class _CopyrightApplicationListPageState
                           ),
                         ),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
+                          foregroundColor: AppColors.text1,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 4,

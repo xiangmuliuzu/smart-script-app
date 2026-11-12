@@ -113,7 +113,7 @@ class _BlockedUserRow extends StatelessWidget {
                         child: Text(
                           nickname.substring(0, 1),
                           style: const TextStyle(
-                            color: AppColors.primary,
+                            color: AppColors.text1,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

@@ -60,7 +60,7 @@ class _ChatSessionListPageState extends ConsumerState<ChatSessionListPage>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          labelColor: AppColors.text1,
           unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(text: '全部'),
@@ -269,7 +269,7 @@ class _PeerGroupTile extends ConsumerWidget {
                     child: (group.peerAvatar == null || group.peerAvatar!.isEmpty)
                         ? Text(
                             group.peerName.characters.first,
-                            style: const TextStyle(fontSize: 18, color: AppColors.primary),
+                            style: const TextStyle(fontSize: 18, color: AppColors.text1),
                           )
                         : null,
                   ),
@@ -376,7 +376,7 @@ class _SessionSubItem extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 10,
                   color: SessionType.isAdminType(session.session.sessionType)
-                      ? AppColors.primary
+                      ? AppColors.text1
                       : AppColors.success,
                 ),
                 textAlign: TextAlign.center,
@@ -716,7 +716,7 @@ class _ConsultFormContentState extends ConsumerState<_ConsultFormContent> {
                                     opt.label,
                                     style: TextStyle(
                                       fontSize: 15,
-                                      color: isSelected ? AppColors.primary : Colors.black87,
+                                      color: isSelected ? AppColors.text1 : Colors.black87,
                                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                                     ),
                                   ),
@@ -753,7 +753,7 @@ class _ConsultFormContentState extends ConsumerState<_ConsultFormContent> {
               onPressed: _canSubmit ? () => _submit() : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
-                foregroundColor: AppColors.primary,
+                foregroundColor: AppColors.text1,
                 disabledBackgroundColor: Colors.white24,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(

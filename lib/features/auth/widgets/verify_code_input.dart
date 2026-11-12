@@ -136,7 +136,7 @@ class _VerifyCodeInputState extends State<VerifyCodeInput> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: _canSend ? AppColors.primary : AppColors.text3,
+                color: _canSend ? AppColors.text1 : AppColors.text3,
               ),
             ),
           ),

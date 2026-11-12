@@ -103,7 +103,7 @@ class _CopyrightPayPageState extends ConsumerState<CopyrightPayPage> {
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                        color: AppColors.text1,
                       ),
                     ),
                     const SizedBox(height: 12),

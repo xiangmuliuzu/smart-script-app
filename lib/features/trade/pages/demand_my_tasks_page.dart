@@ -50,7 +50,7 @@ class _DemandMyTasksPageState extends ConsumerState<DemandMyTasksPage> {
             onTap: (i) => setState(() => _tabIndex = i),
             indicatorColor: AppColors.primary,
             indicatorWeight: 2.5,
-            labelColor: AppColors.primary,
+            labelColor: AppColors.text1,
             unselectedLabelColor: AppColors.text3,
             labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             unselectedLabelStyle: const TextStyle(fontSize: 14),

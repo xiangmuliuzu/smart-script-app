@@ -600,7 +600,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
             Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
             const SizedBox(height: 2),
             Text(subtitle,
-                style: TextStyle(fontSize: 11, color: isSelected ? AppColors.primary : AppColors.text3),
+                style: TextStyle(fontSize: 11, color: isSelected ? AppColors.text1 : AppColors.text3),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
@@ -743,7 +743,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
                         final pngBytes = await controller.toPngBytes();
                         if (ctx.mounted) Navigator.pop(ctx, pngBytes);
                       },
-                      child: const Text('完成', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      child: const Text('完成', style: TextStyle(color: AppColors.text1, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
@@ -854,7 +854,7 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
           TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('再想想')),
           TextButton(
             onPressed: () => Navigator.pop(dlgCtx, true),
-            child: const Text('确认签署', style: TextStyle(color: AppColors.primary)),
+            child: const Text('确认签署', style: TextStyle(color: AppColors.text1)),
           ),
         ],
       ),

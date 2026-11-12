@@ -283,7 +283,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isSelected ? AppColors.primary : AppColors.text2,
+            color: isSelected ? AppColors.text1 : AppColors.text2,
           ),
         ),
       ),
@@ -671,7 +671,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: _canSubmit ? AppColors.primary : AppColors.text3,
+                        color: _canSubmit ? AppColors.text1 : AppColors.text3,
                       ),
                     ),
                   ),
@@ -725,7 +725,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                    color: isSelected ? AppColors.primary : AppColors.text2,
+                                    color: isSelected ? AppColors.text1 : AppColors.text2,
                                   ),
                                 ),
                                 if (dim['required'])
@@ -825,7 +825,7 @@ class _TagChip extends StatelessWidget {
             maxLines: 1,
             style: TextStyle(
               fontSize: 12,
-              color: selected ? AppColors.primary : AppColors.text2,
+              color: selected ? AppColors.text1 : AppColors.text2,
             ),
           ),
         ),

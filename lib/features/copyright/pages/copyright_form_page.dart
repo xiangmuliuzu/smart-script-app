@@ -600,7 +600,7 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
                   ),
                   child: const Text(
                     '费用说明',
-                    style: TextStyle(fontSize: 13, color: AppColors.primary),
+                    style: TextStyle(fontSize: 13, color: AppColors.text1),
                   ),
                 ),
               ],
@@ -621,7 +621,7 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: AppColors.text1,
                 ),
               ),
               const SizedBox(height: 6),
@@ -817,7 +817,7 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
       },
       selectedColor: AppColors.primary.withOpacity(0.2),
       labelStyle: TextStyle(
-        color: isSelected ? AppColors.primary : AppColors.text1,
+        color: AppColors.text1,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
       ),
     );

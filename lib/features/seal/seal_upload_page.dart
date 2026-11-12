@@ -381,7 +381,7 @@ class _SealUploadPageState extends ConsumerState<SealUploadPage> {
             children: [
               Icon(Icons.info_outline, size: 18, color: AppColors.primary),
               SizedBox(width: 8),
-              Text('温馨提示', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.primary)),
+              Text('温馨提示', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text1)),
             ],
           ),
           SizedBox(height: 8),

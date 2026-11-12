@@ -84,7 +84,7 @@ class _CopyrightCertificateListPageState
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          labelColor: AppColors.text1,
           unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(text: '我申请的'),
@@ -330,7 +330,7 @@ class _CopyrightCertificateListPageState
                     icon: const Icon(Icons.visibility, size: 16),
                     label: const Text('查看详情'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
+                      foregroundColor: AppColors.text1,
                     ),
                   ),
                 ],
@@ -422,7 +422,7 @@ class _CopyrightCertificateListPageState
                       '购买获得',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF1890FF),
+                        color: AppColors.text1,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -452,7 +452,7 @@ class _CopyrightCertificateListPageState
                     icon: const Icon(Icons.visibility, size: 16),
                     label: const Text('预览 / 下载'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
+                      foregroundColor: AppColors.text1,
                     ),
                   ),
                 ],

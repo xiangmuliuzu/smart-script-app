@@ -44,13 +44,22 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          // 描边按钮以主色勾边框，文字统一用正文黑，避免整屏蓝字。
+          foregroundColor: AppColors.text1,
           minimumSize: const Size.fromHeight(44),
           side: const BorderSide(color: AppColors.primary),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.r),
           ),
         ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.text1),
+      ),
+      tabBarTheme: const TabBarTheme(labelColor: AppColors.text1),
+      chipTheme: const ChipThemeData(
+        // 选中态靠底色区分，标签文字保持黑色；未选中态沿用默认灰字。
+        secondaryLabelStyle: TextStyle(color: AppColors.text1),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -69,6 +78,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.rSmall),
           borderSide: const BorderSide(color: AppColors.primary),
         ),
+        // 聚焦时浮动标签默认取主色，这里统一回正文色，主色只留在描边上。
+        floatingLabelStyle: const TextStyle(color: AppColors.text2),
       ),
       cardTheme: CardTheme(
         color: AppColors.card,

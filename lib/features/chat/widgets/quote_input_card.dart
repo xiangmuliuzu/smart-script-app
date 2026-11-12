@@ -69,7 +69,7 @@ class _QuoteInputCardState extends ConsumerState<QuoteInputCard> {
         children: [
           const Text(
             '¥',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text1),
           ),
           Flexible(
             child: Padding(

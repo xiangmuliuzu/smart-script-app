@@ -200,7 +200,7 @@ class _PlayerCard extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 _progressText(saved, item),
-                style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                style: const TextStyle(fontSize: 12, color: AppColors.text1),
               ),
               const SizedBox(height: 12),
               _PlayAction(
@@ -486,7 +486,7 @@ class _CommentSectionState extends ConsumerState<_CommentSection> {
                     '正在回复 ${_replyTo!.nickName.isEmpty ? '该用户' : _replyTo!.nickName}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                    style: const TextStyle(fontSize: 12, color: AppColors.text1),
                   ),
                 ),
                 TextButton(
@@ -560,7 +560,7 @@ class _CommentTile extends StatelessWidget {
             child: avatarUrl == null
                 ? Text(
                     item.nickName.isEmpty ? '客' : item.nickName.substring(0, 1),
-                    style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                    style: const TextStyle(fontSize: 12, color: AppColors.text1),
                   )
                 : null,
           ),
@@ -595,7 +595,7 @@ class _CommentTile extends StatelessWidget {
                         onTap: onReply,
                         child: const Text(
                           '回复',
-                          style: TextStyle(fontSize: 12, color: AppColors.primary),
+                          style: TextStyle(fontSize: 12, color: AppColors.text1),
                         ),
                       ),
                     ],

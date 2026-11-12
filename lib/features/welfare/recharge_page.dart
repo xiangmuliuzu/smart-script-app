@@ -306,7 +306,7 @@ class _PlanGrid extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: selectedYuan == plan.yuan ? AppColors.primary : AppColors.text1,
+                      color: AppColors.text1,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -381,7 +381,7 @@ class _CustomInput extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '预计到账 ${config.pointsOf(currentYuan)} 积分',
-              style: const TextStyle(fontSize: 12, color: AppColors.primary),
+              style: const TextStyle(fontSize: 12, color: AppColors.text1),
             ),
           ],
         ],
@@ -506,7 +506,7 @@ class _RecordList extends ConsumerWidget {
                       const SizedBox(width: 10),
                       Text(
                         '+${record.points} 积分',
-                        style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                        style: const TextStyle(fontSize: 12, color: AppColors.text1),
                       ),
                       const Spacer(),
                       Column(
@@ -575,7 +575,7 @@ class _PayBar extends StatelessWidget {
                 if (valid)
                   Text(
                     '到账 ${config.pointsOf(yuan)} 积分',
-                    style: const TextStyle(fontSize: 13, color: AppColors.primary),
+                    style: const TextStyle(fontSize: 13, color: AppColors.text1),
                   ),
               ],
             ),

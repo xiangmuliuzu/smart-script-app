@@ -21,7 +21,7 @@ class OrderContractPage extends StatelessWidget {
           foregroundColor: Colors.black,
           bottom: const TabBar(
             indicatorColor: AppColors.primary,
-            labelColor: AppColors.primary,
+            labelColor: AppColors.text1,
             unselectedLabelColor: Colors.grey,
             tabs: [Tab(text: '订单'), Tab(text: '合同')],
           ),

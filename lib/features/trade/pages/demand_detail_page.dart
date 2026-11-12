@@ -159,7 +159,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
               width: double.infinity,
               child: TextButton(
                 onPressed: () => context.push(RoutePath.demandPostEditUrl(task.demandId!)),
-                child: const Text('编辑任务', style: TextStyle(color: AppColors.primary)),
+                child: const Text('编辑任务', style: TextStyle(color: AppColors.text1)),
               ),
             ),
             SizedBox(
@@ -424,7 +424,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           onPressed: _submitting ? null : onTap,
           icon: const Icon(Icons.chat_bubble_outline, size: 18),
           label: Text(_submitting ? '发起中...' : label),
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
         ),
       ),
     );

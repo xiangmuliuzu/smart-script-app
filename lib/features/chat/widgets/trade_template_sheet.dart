@@ -139,7 +139,7 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
             child: TabBar(
               controller: _tabController,
               tabs: _tabs.map((t) => Tab(text: t.label)).toList(),
-              labelColor: AppColors.primary,
+              labelColor: AppColors.text1,
               unselectedLabelColor: AppColors.text3,
               indicatorColor: AppColors.primary,
               indicatorSize: TabBarIndicatorSize.label,
@@ -284,7 +284,7 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: AppColors.text1,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -366,7 +366,7 @@ class _TradeTemplateSheetState extends ConsumerState<TradeTemplateSheet>
               ),
               child: const Text(
                 '金额',
-                style: TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w500),
+                style: TextStyle(fontSize: 13, color: AppColors.text1, fontWeight: FontWeight.w500),
               ),
             ),
           ),

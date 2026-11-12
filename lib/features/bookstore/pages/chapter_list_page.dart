@@ -128,7 +128,7 @@ class _PreviewBanner extends StatelessWidget {
               message,
               style: TextStyle(
                 fontSize: 12,
-                color: highlighted ? AppColors.primary : AppColors.text3,
+                color: highlighted ? AppColors.text1 : AppColors.text3,
               ),
             ),
           ),
@@ -231,7 +231,7 @@ class _Tag extends StatelessWidget {
         color: AppColors.primaryTint,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+      child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.text1)),
     );
   }
 }

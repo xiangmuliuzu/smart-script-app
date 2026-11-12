@@ -128,7 +128,7 @@ class _UserRow extends StatelessWidget {
                 color: AppColors.primaryTint,
                 child: url.isEmpty
                     ? Center(child: Text(nickname.substring(0, 1),
-                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)))
+                        style: const TextStyle(color: AppColors.text1, fontWeight: FontWeight.w600)))
                     : Image.network(url, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => const Icon(Icons.person, color: AppColors.text3)),
               ),

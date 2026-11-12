@@ -76,7 +76,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
           color: AppColors.card,
           child: TabBar(
             controller: _tabController,
-            labelColor: AppColors.primary,
+            labelColor: AppColors.text1,
             unselectedLabelColor: AppColors.text2,
             indicatorColor: AppColors.primary,
             indicatorSize: TabBarIndicatorSize.label,

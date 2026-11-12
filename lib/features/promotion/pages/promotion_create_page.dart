@@ -410,7 +410,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
                           ? FontWeight.w700
                           : FontWeight.w400,
                       color: _slotType == option.value
-                          ? AppColors.primary
+                          ? AppColors.text1
                           : AppColors.text2,
                     ),
                   ),
@@ -749,7 +749,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: selected ? AppColors.primary : AppColors.text1,
+                color: AppColors.text1,
                 height: 1.2,
               ),
             ),
@@ -1194,7 +1194,7 @@ class _StepProgress extends StatelessWidget {
                       fontWeight:
                           index <= current ? FontWeight.w600 : FontWeight.w400,
                       color: index <= current
-                          ? AppColors.primary
+                          ? AppColors.text1
                           : AppColors.text3,
                     ),
                   ),
@@ -1281,7 +1281,11 @@ class _TipBox extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 10.5, height: 1.5, color: color),
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.5,
+                color: accent ? AppColors.accent : AppColors.text1,
+              ),
             ),
           ),
         ],

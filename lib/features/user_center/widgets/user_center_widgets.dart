@@ -210,7 +210,7 @@ class UserStepCard extends StatelessWidget {
                     ? const Icon(Icons.check, size: 14, color: Colors.white)
                     : Text(
                         '$index',
-                        style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                        style: const TextStyle(fontSize: 12, color: AppColors.text1),
                       ),
               ),
               const SizedBox(width: 10),

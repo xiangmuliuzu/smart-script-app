@@ -204,7 +204,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     '点击注册',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.primary,
+                      color: AppColors.text1,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

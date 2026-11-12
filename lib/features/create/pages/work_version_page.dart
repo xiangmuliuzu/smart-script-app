@@ -190,7 +190,7 @@ class _VersionTile extends StatelessWidget {
                           ),
                           child: const Text(
                             '当前版本',
-                            style: TextStyle(fontSize: 11, color: AppColors.primary),
+                            style: TextStyle(fontSize: 11, color: AppColors.text1),
                           ),
                         ),
                       ],

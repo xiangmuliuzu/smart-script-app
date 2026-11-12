@@ -597,7 +597,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                   style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primary)),
+                      color: AppColors.text1)),
               const SizedBox(width: 12),
               // AI 记录入口：记录内容多，内嵌展示不便，直接跳转记录页。
               InkWell(
@@ -619,7 +619,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                           style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.primary)),
+                              color: AppColors.text1)),
                     ],
                   ),
                 ),
@@ -748,7 +748,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       icon: Icon(icon, size: 16),
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primary,
+        foregroundColor: AppColors.text1,
         side: const BorderSide(color: AppColors.primary),
         minimumSize: const Size(0, 36),
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -780,7 +780,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            color: selected ? AppColors.primary : AppColors.text2,
+            color: selected ? AppColors.text1 : AppColors.text2,
           ),
         ),
       ),

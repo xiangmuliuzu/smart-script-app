@@ -126,7 +126,7 @@ class _AssetAction extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: filled ? AppColors.primary : Colors.white,
+              color: filled ? AppColors.text1 : Colors.white,
             ),
           ),
         ),

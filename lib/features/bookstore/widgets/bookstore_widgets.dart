@@ -252,7 +252,7 @@ class WorkListTile extends StatelessWidget {
                       progressText!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                      style: const TextStyle(fontSize: 12, color: AppColors.text1),
                     ),
                   ],
                 ],
@@ -371,7 +371,7 @@ class RankingRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: isTop3 ? AppColors.primary : AppColors.text2,
+                color: isTop3 ? AppColors.text1 : AppColors.text2,
               ),
             ),
           ],
@@ -482,7 +482,7 @@ class FilterChipBar extends StatelessWidget {
                     item.label,
                     style: TextStyle(
                       fontSize: 12,
-                      color: item.selected ? AppColors.primary : AppColors.text2,
+                      color: item.selected ? AppColors.text1 : AppColors.text2,
                     ),
                   ),
                 ),
@@ -558,7 +558,7 @@ class _FilterDropdownButton extends StatelessWidget {
                 filter.valueText,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                style: const TextStyle(fontSize: 12, color: AppColors.text1),
               ),
             ),
             const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.text3),
@@ -604,7 +604,7 @@ class _FilterDropdownButton extends StatelessWidget {
                         item.label,
                         style: TextStyle(
                           fontSize: 14,
-                          color: item.selected ? AppColors.primary : AppColors.text1,
+                          color: AppColors.text1,
                         ),
                       ),
                       trailing: item.selected

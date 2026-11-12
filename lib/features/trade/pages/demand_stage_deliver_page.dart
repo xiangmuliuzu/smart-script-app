@@ -174,7 +174,7 @@ class _DemandStageDeliverPageState extends ConsumerState<DemandStageDeliverPage>
           Expanded(
             child: Text(
               '第${widget.stageOrder}轮交付 · 提交后进入发布者审核，审核期间本轮计时暂停',
-              style: const TextStyle(fontSize: 12, color: AppColors.primary, height: 1.4),
+              style: const TextStyle(fontSize: 12, color: AppColors.text1, height: 1.4),
             ),
           ),
         ],
@@ -217,7 +217,7 @@ class _DemandStageDeliverPageState extends ConsumerState<DemandStageDeliverPage>
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.primary : Colors.grey.shade500),
+                  color: selected ? AppColors.text1 : Colors.grey.shade500),
             ),
           ],
         ),

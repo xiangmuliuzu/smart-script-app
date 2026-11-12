@@ -265,7 +265,7 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
         ),
         child: Text('${task.progress}/${task.targetCount}',
             style:
-                const TextStyle(fontSize: 12, color: AppColors.primary)),
+                const TextStyle(fontSize: 12, color: AppColors.text1)),
       );
     }
     return FilledButton(
@@ -487,7 +487,7 @@ class _TypeTag extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(label,
-          style: const TextStyle(fontSize: 10, color: AppColors.primary)),
+          style: const TextStyle(fontSize: 10, color: AppColors.text1)),
     );
   }
 }

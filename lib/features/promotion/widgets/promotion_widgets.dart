@@ -244,7 +244,7 @@ class PromotionOrderCard extends StatelessWidget {
                                   item.slotTypeLabel,
                                   style: const TextStyle(
                                     fontSize: 10,
-                                    color: AppColors.primary,
+                                    color: AppColors.text1,
                                     height: 1.4,
                                   ),
                                 ),
@@ -257,7 +257,7 @@ class PromotionOrderCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 10.5,
-                                    color: AppColors.primary,
+                                    color: AppColors.text1,
                                   ),
                                 ),
                               ),
@@ -504,7 +504,7 @@ class PromotionSlotCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: selected ? AppColors.primary : AppColors.text1,
+                          color: AppColors.text1,
                         ),
                       ),
                     ),

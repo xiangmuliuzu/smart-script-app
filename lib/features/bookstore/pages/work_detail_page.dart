@@ -397,7 +397,7 @@ class _AuthorLine extends ConsumerWidget {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        color: AppColors.text1,
                       ),
                     ),
                   )
@@ -706,7 +706,8 @@ class _TradeButton extends StatelessWidget {
       borderColor = null;
     } else {
       bgColor = AppColors.primaryTint;
-      textColor = AppColors.primary;
+      // 浅色底上的次要按钮：文字用正文黑，主色只保留在描边上。
+      textColor = AppColors.text1;
       borderColor = AppColors.primary;
     }
     // 不在按钮上拼「（未开启）」后缀：窄按钮容不下 8 字会溢出成花条（详情页加载期间

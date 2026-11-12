@@ -351,7 +351,7 @@ class _CopyrightCertificateDetailPageState
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1890FF),
+                    color: AppColors.text1,
                   ),
                 ),
               ],

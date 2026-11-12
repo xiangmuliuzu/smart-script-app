@@ -376,7 +376,7 @@ class _ResultCard extends StatelessWidget {
             icon: const Icon(Icons.copy_all, size: 18),
             label: const Text('保存（复制全文）'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.text1,
               side: const BorderSide(color: AppColors.primary),
               minimumSize: const Size.fromHeight(42),
             ),

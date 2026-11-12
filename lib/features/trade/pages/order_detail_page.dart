@@ -211,7 +211,7 @@ class OrderDetailPage extends ConsumerWidget {
   Widget _buildQuoteCard(Order order) {
     return _buildCard('报价信息', [
       _infoRow('成交金额', order.amountYuan,
-          valueStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
+          valueStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.text1)),
     ]);
   }
 
@@ -236,7 +236,7 @@ class OrderDetailPage extends ConsumerWidget {
             icon: const Icon(Icons.description_outlined, size: 18),
             label: const Text('查看合同内容', style: TextStyle(fontSize: 14)),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.text1,
               side: const BorderSide(color: AppColors.primary),
               padding: const EdgeInsets.symmetric(vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -366,7 +366,7 @@ class OrderDetailPage extends ConsumerWidget {
           icon: const Icon(Icons.folder_open_outlined, size: 18),
           label: const Text('查看交割详情', style: TextStyle(fontSize: 14)),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
+            foregroundColor: AppColors.text1,
             side: const BorderSide(color: AppColors.primary),
             padding: const EdgeInsets.symmetric(vertical: 10),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -587,7 +587,7 @@ class OrderDetailPage extends ConsumerWidget {
                   ? OutlinedButton(
                       onPressed: () => _openDeliveryPage(context, ref, order),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
+                        foregroundColor: AppColors.text1,
                         side: const BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: shape,
@@ -648,7 +648,7 @@ class OrderDetailPage extends ConsumerWidget {
                 icon: const Icon(Icons.chat_bubble_outline, size: 16),
                 label: Text('联系${isBuyer ? '卖方' : '买方'}'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+                  foregroundColor: AppColors.text1,
                   side: const BorderSide(color: AppColors.primary),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -697,7 +697,7 @@ class OrderDetailPage extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.pop(dlgCtx, true),
             child: const Text('确认付款',
-                style: TextStyle(color: AppColors.primary)),
+                style: TextStyle(color: AppColors.text1)),
           ),
         ],
       ),
@@ -986,7 +986,7 @@ class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
         icon: const Icon(Icons.refresh, size: 16),
         label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: AppColors.text1,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           visualDensity: VisualDensity.compact,
         ),

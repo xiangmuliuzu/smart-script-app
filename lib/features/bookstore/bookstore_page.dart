@@ -273,7 +273,7 @@ class _BannerImage extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 banner.title,
-                style: const TextStyle(fontSize: 13, color: AppColors.primary),
+                style: const TextStyle(fontSize: 13, color: AppColors.text1),
               ),
             ],
           ],

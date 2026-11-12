@@ -235,7 +235,7 @@ class _PeerGroupTile extends StatelessWidget {
                         : null,
                     child: (group.peerAvatar == null || group.peerAvatar!.isEmpty)
                         ? Text(group.peerName.characters.first,
-                            style: const TextStyle(fontSize: 18, color: AppColors.primary))
+                            style: const TextStyle(fontSize: 18, color: AppColors.text1))
                         : null,
                   ),
                 ),

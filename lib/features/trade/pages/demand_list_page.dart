@@ -158,7 +158,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
             Expanded(
               child: Text(label, style: TextStyle(
                 fontSize: 14,
-                color: active ? AppColors.primary : AppColors.text1,
+                color: AppColors.text1,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               )),
             ),
@@ -447,7 +447,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
               padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Text('清除',
                   style: TextStyle(
-                      fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      fontSize: 11.5, color: AppColors.text1, fontWeight: FontWeight.w600)),
             ),
           ),
         ],

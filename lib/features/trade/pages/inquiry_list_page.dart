@@ -52,7 +52,7 @@ class _InquiryListPageState extends ConsumerState<InquiryListPage>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          labelColor: AppColors.text1,
           unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(text: '我发起的'),
@@ -120,7 +120,7 @@ class _InquiryListPageState extends ConsumerState<InquiryListPage>
         selectedColor: AppColors.primaryTint,
         checkmarkColor: AppColors.primary,
         labelStyle: TextStyle(
-          color: selected ? AppColors.primary : AppColors.text2,
+          color: selected ? AppColors.text1 : AppColors.text2,
         ),
       ),
     );

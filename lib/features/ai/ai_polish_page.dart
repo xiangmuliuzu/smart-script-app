@@ -373,7 +373,7 @@ class _ResultCard extends StatelessWidget {
             icon: const Icon(Icons.copy, size: 18),
             label: const Text('复制润色结果'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.text1,
               side: const BorderSide(color: AppColors.primary),
               minimumSize: const Size.fromHeight(42),
             ),

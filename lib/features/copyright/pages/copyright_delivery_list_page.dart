@@ -90,7 +90,7 @@ class _CopyrightDeliveryListPageState
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade900,
+                    color: AppColors.text1,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -98,7 +98,7 @@ class _CopyrightDeliveryListPageState
                   '版权交割是指合同签署并付款后，卖方交付作品源文件（必传）及版权证书等约定内容，买方确认收货后订单完成。',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.blue.shade800,
+                    color: AppColors.text1,
                     height: 1.4,
                   ),
                 ),
@@ -189,7 +189,7 @@ class _CopyrightDeliveryListPageState
       backgroundColor: Colors.grey.shade100,
       labelStyle: TextStyle(
         fontSize: 13,
-        color: isSelected ? AppColors.primary : AppColors.text2,
+        color: isSelected ? AppColors.text1 : AppColors.text2,
       ),
     );
   }

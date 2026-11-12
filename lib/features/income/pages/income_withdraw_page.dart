@@ -511,7 +511,7 @@ class _AvailableBanner extends StatelessWidget {
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: AppColors.primary,
+          color: AppColors.text1,
         ),
       ),
     );
@@ -550,7 +550,7 @@ class _WithdrawTile extends StatelessWidget {
               Text(
                 record.statusLabel,
                 style: TextStyle(
-                  color: record.isFailed ? Colors.red : AppColors.primary,
+                  color: record.isFailed ? Colors.red : AppColors.text1,
                   fontWeight: FontWeight.w500,
                 ),
               ),

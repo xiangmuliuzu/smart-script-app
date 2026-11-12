@@ -80,7 +80,7 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          labelColor: AppColors.text1,
           unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(text: '买方订单'),
@@ -236,7 +236,7 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                    color: AppColors.text1,
                   ),
                 ),
                 const Spacer(),

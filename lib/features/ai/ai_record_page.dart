@@ -476,7 +476,7 @@ class _RecordCard extends StatelessWidget {
                     icon: const Icon(Icons.copy_rounded, size: 16),
                     label: const Text('复制输出'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
+                      foregroundColor: AppColors.text1,
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
@@ -613,7 +613,7 @@ class _SessionCard extends StatelessWidget {
                 TextButton(
                   onPressed: () => onContinue(session),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
+                    foregroundColor: AppColors.text1,
                     visualDensity: VisualDensity.compact,
                   ),
                   child: const Text('继续这次创作'),
@@ -639,7 +639,7 @@ class _SessionTypeTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(color: AppColors.primaryTint, borderRadius: BorderRadius.circular(4)),
-      child: const Text('AI 创作', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+      child: const Text('AI 创作', style: TextStyle(fontSize: 11, color: AppColors.text1)),
     );
   }
 }

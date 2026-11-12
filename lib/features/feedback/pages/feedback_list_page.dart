@@ -159,7 +159,7 @@ class _Filter extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: selected ? AppColors.primary : AppColors.text2,
+              color: selected ? AppColors.text1 : AppColors.text2,
             ),
           ),
         ),

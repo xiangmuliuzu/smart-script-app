@@ -891,7 +891,7 @@ class _CopyrightApplicationDetailPageState
                   : const Icon(Icons.sync),
               label: Text(_syncingStatus ? '同步中…' : '刷新审核状态'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
+                foregroundColor: AppColors.text1,
                 side: const BorderSide(color: AppColors.primary),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1304,7 +1304,7 @@ class _CopyrightApplicationDetailPageState
                 icon: const Icon(Icons.description, size: 18),
                 label: const Text('查看合同'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+                  foregroundColor: AppColors.text1,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
               ),

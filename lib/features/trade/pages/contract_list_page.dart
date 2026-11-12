@@ -79,7 +79,7 @@ class _ContractListPageState extends ConsumerState<ContractListPage>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          labelColor: AppColors.text1,
           unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(text: '买方合同'),
@@ -239,7 +239,7 @@ class _ContractListPageState extends ConsumerState<ContractListPage>
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                    color: AppColors.text1,
                   ),
                 ),
                 const SizedBox(width: 8),

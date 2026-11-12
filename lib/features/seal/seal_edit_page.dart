@@ -414,7 +414,7 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 if (material.uploading)
-                  const Text('上传中...', style: TextStyle(fontSize: 12, color: AppColors.primary))
+                  const Text('上传中...', style: TextStyle(fontSize: 12, color: AppColors.text1))
                 else if (material.error != null)
                   Text(material.error!, style: const TextStyle(fontSize: 12, color: Colors.red))
                 else if (material.ref != null)
@@ -509,7 +509,7 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Colors.blue.shade700,
+                  color: AppColors.text1,
                 ),
               ),
             ],
@@ -520,7 +520,7 @@ class _SealEditPageState extends ConsumerState<SealEditPage> {
             '2. 修改印章后需要重新审核\n'
             '3. 审核通过前无法使用该印章\n'
             '4. 请确保印章图片清晰完整',
-            style: TextStyle(fontSize: 13, color: Colors.blue.shade900, height: 1.5),
+            style: TextStyle(fontSize: 13, color: AppColors.text1, height: 1.5),
           ),
         ],
       ),

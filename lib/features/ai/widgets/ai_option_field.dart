@@ -118,9 +118,7 @@ Future<AiPick<T>?> showAiOptionPicker<T>(
                           option.label,
                           style: TextStyle(
                             fontSize: 14,
-                            color: option.value == selected
-                                ? AppColors.primary
-                                : AppColors.text1,
+                            color: AppColors.text1,
                             fontWeight: option.value == selected
                                 ? FontWeight.w600
                                 : FontWeight.w400,

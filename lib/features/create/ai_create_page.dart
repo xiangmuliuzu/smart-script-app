@@ -743,7 +743,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('选中段落 · ${selection.passage.length} 字', style: const TextStyle(fontSize: 12, color: AppColors.primary)),
+          Text('选中段落 · ${selection.passage.length} 字', style: const TextStyle(fontSize: 12, color: AppColors.text1)),
           const SizedBox(height: 6),
           Text(selection.passage, style: const TextStyle(fontSize: 12.5, height: 1.7, color: AppColors.text2)),
           const SizedBox(height: 8),
@@ -963,7 +963,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                       if (task.recovered)
                         const Padding(
                           padding: EdgeInsets.only(top: 3),
-                          child: Text('来自 AI 记录 · 进入工作台时保存', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+                          child: Text('来自 AI 记录 · 进入工作台时保存', style: TextStyle(fontSize: 11, color: AppColors.text1)),
                         ),
                       if (task.summary.isNotEmpty)
                         Padding(
@@ -1010,7 +1010,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                     child: Row(
                       children: [
                         Text('查看正文 · ${task.content.length} 字',
-                            style: const TextStyle(fontSize: 12, color: AppColors.primary)),
+                            style: const TextStyle(fontSize: 12, color: AppColors.text1)),
                         const Spacer(),
                         const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
                       ],
@@ -1087,11 +1087,7 @@ class _StepChip extends StatelessWidget {
         '$index $label',
         style: TextStyle(
           fontSize: 12,
-          color: current
-              ? AppColors.primary
-              : enabled
-                  ? AppColors.text1
-                  : AppColors.text3,
+          color: current || enabled ? AppColors.text1 : AppColors.text3,
           fontWeight: current ? FontWeight.w600 : FontWeight.w400,
         ),
       ),

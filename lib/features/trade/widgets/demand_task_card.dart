@@ -91,7 +91,7 @@ class DemandTaskCard extends StatelessWidget {
                   ),
                   child: const Text(
                     '我发布的',
-                    style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 10, color: AppColors.text1, fontWeight: FontWeight.w700),
                   ),
                 ),
               const SizedBox(width: 8),
@@ -232,7 +232,7 @@ class _BudgetBlock extends StatelessWidget {
                 text: '¥ ',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.primary,
+                  color: AppColors.text1,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -240,7 +240,7 @@ class _BudgetBlock extends StatelessWidget {
                 text: yuan,
                 style: const TextStyle(
                   fontSize: 18,
-                  color: AppColors.primary,
+                  color: AppColors.text1,
                   fontWeight: FontWeight.w800,
                   height: 1.1,
                 ),
@@ -378,7 +378,7 @@ class _PublisherBlock extends StatelessWidget {
           backgroundColor: AppColors.primaryTint,
           child: Text(
             name.isEmpty ? '·' : name.substring(0, 1),
-            style: const TextStyle(fontSize: 9.5, color: AppColors.primary, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 9.5, color: AppColors.text1, fontWeight: FontWeight.w600),
           ),
         ),
         const SizedBox(width: 5),

@@ -190,7 +190,7 @@ class _SettleTile extends StatelessWidget {
                 item.sellerAmountYuan,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                  color: AppColors.text1,
                 ),
               ),
               const Icon(Icons.chevron_right, color: AppColors.text3),

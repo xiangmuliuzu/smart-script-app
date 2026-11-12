@@ -145,7 +145,7 @@ class _MyIncomeSettleDetailPageState
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+                        color: AppColors.text1,
                       ),
                     ),
                     const SizedBox(height: 4),
