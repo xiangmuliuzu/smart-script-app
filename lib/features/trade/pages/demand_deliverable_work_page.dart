@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
@@ -105,6 +107,26 @@ class _DemandDeliverableWorkPageState
   Widget _buildContentView() {
     final v = _view!;
     final chapters = v.chapters;
+    // 分镜类任务允许不关联作品：后端只下发说明与文件链接，没有章节目录
+    if (chapters.isEmpty && (v.workId == 0 || v.title == null)) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          Text('第${v.stageOrder ?? widget.stageOrder}轮 · 分镜交付（未关联作品）',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          if ((v.deliverableDesc ?? '').isNotEmpty)
+            _buildInfoBlock('交付说明', v.deliverableDesc!),
+          if ((v.deliverableUrl ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildFileBlock(v.deliverableUrl!),
+          ],
+          const SizedBox(height: 10),
+          Text('本轮分镜未关联剧本作品，不做 AI 剧本审核，请依据以上材料与任务要求人工验收。',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.5)),
+        ],
+      );
+    }
     // 后端 episodeTo 为空表示该轮未限定集数（整单交付），此时全本可读
     final scopeText = v.episodeTo == null
         ? '本轮未限定集数，以下 ${v.readableCount} 集均可读'
@@ -176,6 +198,47 @@ class _DemandDeliverableWorkPageState
         ],
       ),
     );
+  }
+
+  /// 交付物文件链接：创作者粘贴的网盘/文档地址，或后端 /profile 相对路径，按 baseUrl 归一后外开。
+  Widget _buildFileBlock(String raw) {
+    final url = AppConfig.resolveAssetUrl(raw);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.insert_drive_file_outlined, size: 16, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(raw,
+                style: const TextStyle(fontSize: 12.5, height: 1.4),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+          ),
+          TextButton(
+              onPressed: () => _openFile(url),
+              child: const Text('打开', style: TextStyle(fontSize: 12))),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openFile(String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('文件链接无效')));
+      return;
+    }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('无法打开该链接')));
+    }
   }
 
   /// 单集条目：可读的用 ExpansionTile 展开正文，不可读的只留一行标题。

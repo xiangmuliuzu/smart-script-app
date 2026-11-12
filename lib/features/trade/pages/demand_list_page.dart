@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/demand_genre.dart';
+import '../../../core/constants/demand_task_type.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
@@ -17,6 +18,7 @@ import '../data/trade_models.dart';
 import '../widgets/demand_genre_chip_row.dart';
 import '../widgets/demand_hero_banner.dart';
 import '../widgets/demand_task_card.dart';
+import '../widgets/demand_task_type_chip_row.dart';
 
 /// 任务广场列表页（需求接单制 · 门户风格）。
 ///
@@ -45,6 +47,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   Timer? _debounce;
 
   int? _selectedGenreId;
+  String? _selectedTaskType;
   String? _keyword;
   String _sortBy = 'created'; // created / budget / deadline
   String _order = 'desc'; // asc / desc
@@ -88,6 +91,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   Future<PagedData<DemandTask>> _loadPage(int pageNum) {
     return ref.read(demandRepositoryProvider).pageDemands(
           genreId: _selectedGenreId,
+          taskType: _selectedTaskType,
           keyword: _keyword,
           sortBy: _sortBy,
           order: _order,
@@ -179,6 +183,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
 
   bool get _filterActive =>
       _selectedGenreId != null ||
+      _selectedTaskType != null ||
       _budgetMinFen != null ||
       _budgetMaxFen != null ||
       _episodesMin != null;
@@ -186,14 +191,25 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   /// 生效中的筛选条件数（供提示条与图标徽章）。
   int get _filterCount => [
         _selectedGenreId != null,
+        _selectedTaskType != null,
         _budgetMinFen != null,
         _budgetMaxFen != null,
         _episodesMin != null,
       ].where((e) => e).length;
 
+  /// 结果区标题：把生效中的类型/题材拼进文案，让列表口径一眼可辨。
+  String get _resultTitle {
+    final labels = [
+      if (_selectedTaskType != null) DemandTaskType.labelOf(_selectedTaskType!),
+      if (_selectedGenreId != null) DemandGenre.labelOf(_selectedGenreId!),
+    ].join(' · ');
+    return labels.isEmpty ? '征集中的任务' : '征集中的任务 · $labels';
+  }
+
   void _clearFilters() {
     setState(() {
       _selectedGenreId = null;
+      _selectedTaskType = null;
       _budgetMinFen = null;
       _budgetMaxFen = null;
       _episodesMin = null;
@@ -206,8 +222,9 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
     _budgetMaxCtrl.text = _budgetMaxFen == null ? '' : '${_budgetMaxFen! ~/ 100}';
     _episodesCtrl.text = _episodesMin?.toString() ?? '';
     final stats = ref.read(demandStatsProvider).valueOrNull;
-    // 题材在弹层内是暂存态，点“应用”才生效
+    // 题材/类型在弹层内是暂存态，点“应用”才生效
     var sheetGenreId = _selectedGenreId;
+    var sheetTaskType = _selectedTaskType;
     final applied = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -228,6 +245,19 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text1)),
                 const SizedBox(height: 12),
+                // 任务类型：剧本 / 剧本+分镜 / 只做分镜，共 4 个 chip（含全部）单行排布
+                const Text('任务类型',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text2)),
+                const SizedBox(height: 8),
+                DemandTaskTypeChipRow(
+                  selectedTaskType: sheetTaskType,
+                  onSelected: (v) => setSheetState(() => sheetTaskType = v),
+                  counts: stats?.typeCounts,
+                  totalCount: stats?.openCount,
+                  padding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 14),
                 // 题材：横排一行 4 个，满 5 行左滑翻页，不显页数
                 const Text('题材',
                     style: TextStyle(
@@ -289,6 +319,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
     setState(() {
       if (applied) {
         _selectedGenreId = sheetGenreId;
+        _selectedTaskType = sheetTaskType;
         final minYuan = int.tryParse(_budgetMinCtrl.text.trim());
         final maxYuan = int.tryParse(_budgetMaxCtrl.text.trim());
         _budgetMinFen = minYuan == null ? null : minYuan * 100;
@@ -296,6 +327,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
         _episodesMin = int.tryParse(_episodesCtrl.text.trim());
       } else {
         _selectedGenreId = null;
+        _selectedTaskType = null;
         _budgetMinFen = null;
         _budgetMaxFen = null;
         _episodesMin = null;
@@ -546,9 +578,7 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
           ),
           const SizedBox(width: 8),
           Text(
-            _selectedGenreId == null
-                ? '征集中的任务'
-                : '征集中的任务 · ${DemandGenre.labelOf(_selectedGenreId!)}',
+            _resultTitle,
             style: const TextStyle(
                 fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.text1),
           ),

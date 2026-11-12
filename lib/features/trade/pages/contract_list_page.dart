@@ -198,7 +198,7 @@ class _ContractListPageState extends ConsumerState<ContractListPage>
         ? (c.sellerName ?? '卖方')
         : (c.buyerName ?? '买方');
     final String counterpartyLabel = _currentRole == 'buyer' ? '卖方' : '买方';
-    final bool canSign = !c.isCompleted && !mySigned;
+    final bool canSign = !c.isCompleted && c.status != ContractStatus.cancelled && !mySigned;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

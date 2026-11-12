@@ -19,6 +19,7 @@ import '../../seal/data/seal_providers.dart';
 import '../data/contract_providers.dart';
 import '../data/contract_repository.dart';
 import '../data/trade_models.dart';
+import '../widgets/contract_rich_editor.dart';
 
 /// 合同签署页面。
 ///
@@ -141,6 +142,10 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
           // completed 状态：展示已签署合同内容 + PDF 入口
           if (contract.isCompleted) {
             return _buildCompletedView(contract);
+          }
+          // 已取消合同：只读提示，不提供签名区与提交入口
+          if (contract.status == ContractStatus.cancelled) {
+            return const ErrorView(message: '合同已取消，无需签署');
           }
           // WebView 弹性占满剩余空间（内部滚动阅读合同），签名区固定在下部；
           // WebView 平台视图会吃掉拖动手势，刷新改由 AppBar 按钮触发
@@ -769,6 +774,9 @@ class _ContractSignPageState extends ConsumerState<ContractSignPage> {
       },
     );
 
+    // 弹层关闭后签名笔迹仍驻留内存，须显式释放，否则每次打开画布都泄漏一个控制器
+    controller.dispose();
+
     if (bytes != null) {
       setState(() {
         _signatureBytes = bytes;
@@ -1337,7 +1345,7 @@ class _PlacementChip {
       );
 }
 
-/// 合同正文条款编辑底部弹窗：模板下拉 + 多行条款输入 + 保存。
+/// 合同正文条款编辑底部弹窗：模板下拉 + 富文本条款编辑 + 保存。
 class _ContractContentEditorSheet extends StatefulWidget {
   const _ContractContentEditorSheet({
     required this.contract,
@@ -1357,7 +1365,10 @@ class _ContractContentEditorSheet extends StatefulWidget {
 class _ContractContentEditorSheetState
     extends State<_ContractContentEditorSheet> {
   late String _templateId;
-  late final TextEditingController _controller;
+
+  /// 编辑器初值（库内条款原文或切换模板后的默认条款），变化时整体重建编辑区
+  late String _seed;
+  final GlobalKey<ContractRichEditorState> _editorKey = GlobalKey();
   bool _saving = false;
 
   @override
@@ -1366,13 +1377,7 @@ class _ContractContentEditorSheetState
     _templateId = widget.contract.templateId?.trim().isNotEmpty == true
         ? widget.contract.templateId!
         : (widget.templates.isNotEmpty ? widget.templates.first.templateId : '');
-    _controller = TextEditingController(text: widget.contract.clausesText ?? '');
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    _seed = widget.contract.clausesText ?? '';
   }
 
   String _defaultFor(String templateId) {
@@ -1385,17 +1390,18 @@ class _ContractContentEditorSheetState
   void _onTemplateChanged(String tid) {
     setState(() {
       _templateId = tid;
-      _controller.text = _defaultFor(tid);
+      _seed = _defaultFor(tid);
     });
   }
 
   Future<void> _save() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) {
+    if (_saving) return;
+    final text = await _editorKey.currentState?.exportClauses();
+    if (!mounted) return;
+    if (text == null) {
       showAppToast(context, '合同正文条款不能为空');
       return;
     }
-    if (_saving) return;
     setState(() => _saving = true);
     try {
       await widget.repo.updateContractContent(
@@ -1451,20 +1457,19 @@ class _ContractContentEditorSheetState
               ),
             ),
             const SizedBox(height: 12),
-            const Text('正文条款（第一条~第六条，可自由修改；切换模板将填充默认条款）',
+            const Text('正文条款（第一条~第六条，可自由修改，支持字号、加粗、对齐等排版；切换模板将填充默认条款）',
                 style: TextStyle(fontSize: 13, color: AppColors.text2)),
             const SizedBox(height: 6),
             Expanded(
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                style: const TextStyle(fontSize: 14, height: 1.6),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.all(12),
-                  hintText: '请输入合同正文条款',
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ContractRichEditor(
+                  key: _editorKey,
+                  initialClauses: _seed,
                 ),
               ),
             ),

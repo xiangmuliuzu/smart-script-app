@@ -168,8 +168,8 @@ class _InquiryListPageState extends ConsumerState<InquiryListPage>
             '${RoutePath.inquiryDetail}?id=${inquiry.inquiryId}',
           );
           if (result == true) {
-            // 刷新列表
-            ref.invalidate(inquiryListProvider(InquiryListParams(role: role)));
+            // 刷新列表：整族失效，命中当前带筛选/分页参数的实例
+            ref.invalidate(inquiryListProvider);
           }
         },
         borderRadius: BorderRadius.circular(12),

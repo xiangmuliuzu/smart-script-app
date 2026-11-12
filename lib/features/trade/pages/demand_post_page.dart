@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/demand_genre.dart';
+import '../../../core/constants/demand_task_type.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/services/native_file_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../data/demand_providers.dart';
@@ -34,6 +36,18 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
   bool _submitting = false;
   bool _loading = false;
 
+  /// 任务类型（sys_demand.task_type），决定交付口径与是否需要源剧本
+  String _taskType = DemandTaskType.script;
+  bool get _isStoryboard => DemandTaskType.isStoryboard(_taskType);
+
+  // 源剧本（仅 storyboard 需要）：本人作品 / 上传文件，至少提供一种
+  int? _sourceWorkId;
+  String _sourceScriptUrl = '';
+  String _sourceScriptName = '';
+  List<DeliverableWork> _sourceWorks = const [];
+  bool _loadingSourceWorks = false;
+  bool _uploadingScript = false;
+
   bool get _isEdit => widget.demandId != null;
 
   int? get _totalEpisodes => int.tryParse(_episodesCtrl.text.trim());
@@ -56,6 +70,56 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
     if (mounted) setState(() {});
   }
 
+  /// 源剧本候选（本人作品，含已上架）只在选中「提供剧本做分镜」后才拉，避免白跑一次接口。
+  Future<void> _loadSourceWorks() async {
+    if (_sourceWorks.isNotEmpty || _loadingSourceWorks) return;
+    setState(() => _loadingSourceWorks = true);
+    try {
+      final works = await ref.read(demandRepositoryProvider).sourceWorks();
+      if (mounted) setState(() => _sourceWorks = works);
+    } catch (e) {
+      if (mounted) showAppToast(context, '源剧本作品列表加载失败：$e');
+    } finally {
+      if (mounted) setState(() => _loadingSourceWorks = false);
+    }
+  }
+
+  void _onTaskTypeChanged(String value) {
+    setState(() => _taskType = value);
+    if (DemandTaskType.isStoryboard(value)) _loadSourceWorks();
+  }
+
+  /// 选择并上传源剧本文件（txt/doc/docx/pdf），成功后回填 url + 原始文件名。
+  Future<void> _pickSourceScript() async {
+    try {
+      final picked = await NativeFilePicker.pickDocument();
+      if (picked == null) return;
+      setState(() => _uploadingScript = true);
+      final result = await ref.read(demandRepositoryProvider).uploadSourceScript(
+            bytes: picked.bytes,
+            fileName: picked.filename,
+          );
+      if (!mounted) return;
+      setState(() {
+        _sourceScriptUrl = result['url'] as String? ?? '';
+        _sourceScriptName = (result['fileName'] as String?)?.isNotEmpty == true
+            ? result['fileName'] as String
+            : picked.filename;
+      });
+    } catch (e) {
+      if (mounted) showAppToast(context, '源剧本上传失败：$e');
+    } finally {
+      if (mounted) setState(() => _uploadingScript = false);
+    }
+  }
+
+  void _clearSourceScript() {
+    setState(() {
+      _sourceScriptUrl = '';
+      _sourceScriptName = '';
+    });
+  }
+
   /// 编辑模式：拉取任务详情与验收轮次回填表单。
   Future<void> _loadForEdit() async {
     setState(() => _loading = true);
@@ -74,6 +138,10 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
         _tagsCtrl.text = task.tags ?? '';
         _genreId = task.genreId;
         _deadline = task.deadline;
+        _taskType = DemandTaskType.normalize(task.taskType);
+        _sourceWorkId = task.sourceWorkId;
+        _sourceScriptUrl = task.sourceScriptUrl ?? '';
+        _sourceScriptName = task.sourceScriptName ?? '';
         _episodesCtrl.text = (task.totalEpisodes != null && task.totalEpisodes! > 0)
             ? '${task.totalEpisodes}'
             : '';
@@ -103,6 +171,7 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
         }
         _loading = false;
       });
+      if (_isStoryboard) _loadSourceWorks();
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -155,6 +224,12 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            _buildTaskTypeSection(),
+            const SizedBox(height: 16),
+            if (_isStoryboard) ...[
+              _buildSourceScriptSection(),
+              const SizedBox(height: 16),
+            ],
             _field('任务标题 *', _titleCtrl, validator: (v) => (v == null || v.trim().isEmpty) ? '请输入标题' : null),
             const SizedBox(height: 12),
             _genreDropdown(),
@@ -167,6 +242,7 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
             _field('标签（逗号分隔）', _tagsCtrl),
             const SizedBox(height: 12),
             _multilineField('需求描述 *', _requirementCtrl,
+                hintText: _requirementHint,
                 validator: (v) => (v == null || v.trim().isEmpty) ? '请输入需求描述' : null),
             const SizedBox(height: 20),
             // ==================== 验收设置 ====================
@@ -188,6 +264,222 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ==================== 任务类型 ====================
+
+  /// 需求描述引导文案随类型分化：分镜类要写清镜头规格，剧本+分镜类两者都要写。
+  String get _requirementHint {
+    switch (_taskType) {
+      case DemandTaskType.storyboard:
+        return '分镜规格（每集镜头数、分镜表格式、标注粒度、交付格式）、对源剧本的处理要求…';
+      case DemandTaskType.scriptStoryboard:
+        return '剧本要求 + 分镜规格（每集镜头数、分镜表格式、标注粒度、交付格式）…';
+      default:
+        return '题材定位、人物小传要求、交付格式、每集字数与时长…';
+    }
+  }
+
+  /// 轮次口径随类型分化：分镜类按源剧本集数分轮，剧本+分镜类每轮同时核对两者。
+  String get _stageNote {
+    const base = '可不添加中间轮次，最后一轮验收会自动生成并验收到总集数。';
+    switch (_taskType) {
+      case DemandTaskType.storyboard:
+        return '按源剧本集数分轮交付分镜。$base';
+      case DemandTaskType.scriptStoryboard:
+        return '每轮验收同时核对剧本作品与分镜（分镜以文件链接或交付说明随本轮提交）。$base';
+      default:
+        return base;
+    }
+  }
+
+  Widget _buildTaskTypeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.category_outlined, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text('任务类型',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text1)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('决定创作者每轮交付什么、走哪条审核链路；未托管未接单前可改。',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
+        const SizedBox(height: 10),
+        for (final type in DemandTaskType.values) _buildTypeCard(type),
+      ],
+    );
+  }
+
+  Widget _buildTypeCard(String type) {
+    final selected = _taskType == type;
+    final accent = DemandTaskType.colorOf(type);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _onTaskTypeChanged(type),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: selected ? accent.withOpacity(0.06) : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? accent : Colors.grey.shade200,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                size: 18,
+                color: selected ? accent : Colors.grey.shade400,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DemandTaskType.labelOf(type),
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? accent : AppColors.text1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      DemandTaskType.deliverHintOf(type),
+                      style: const TextStyle(
+                          fontSize: 11.5, height: 1.4, color: AppColors.text3),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 源剧本：分镜类任务必填项。本人作品与上传文件至少提供一种，可并存。
+  Widget _buildSourceScriptSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: DemandTaskType.colorOf(_taskType).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: DemandTaskType.colorOf(_taskType).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.description_outlined,
+                  size: 16, color: DemandTaskType.colorOf(_taskType)),
+              const SizedBox(width: 4),
+              Text('源剧本',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: DemandTaskType.colorOf(_taskType))),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('选择本人作品或上传剧本文件，至少提供一种；创作者在付押金接单前可查看源剧本评估工作量。',
+              style: TextStyle(fontSize: 11.5, height: 1.4, color: Colors.grey.shade600)),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<int?>(
+            value: _sourceWorkId,
+            decoration: const InputDecoration(
+              labelText: '关联本人作品',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              const DropdownMenuItem<int?>(
+                  value: null, child: Text('不关联作品（只上传文件）')),
+              ..._sourceWorks.map(
+                (w) => DropdownMenuItem<int?>(
+                  value: w.workId,
+                  child: Text(
+                    w.status == 'on_shelf' ? '${w.title ?? ''}（已上架）' : (w.title ?? ''),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+            onChanged: _loadingSourceWorks
+                ? null
+                : (v) => setState(() => _sourceWorkId = v),
+          ),
+          if (_loadingSourceWorks) ...[
+            const SizedBox(height: 8),
+            const Text('作品列表加载中…',
+                style: TextStyle(fontSize: 11.5, color: AppColors.text3)),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: _uploadingScript ? null : _pickSourceScript,
+                icon: _uploadingScript
+                    ? const SizedBox(
+                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.upload_file, size: 16),
+                label: Text(_uploadingScript
+                    ? '上传中…'
+                    : (_sourceScriptUrl.isEmpty ? '上传剧本文件' : '重新上传')),
+                // 主题 minimumSize 为 Size.fromHeight(44)（最小宽度无限），
+                // 在 Row 中会收到无限宽约束导致整个区块布局崩溃，此处覆盖为有限最小宽度。
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  minimumSize: const Size(0, 44),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _sourceScriptName.isEmpty
+                    ? Text(_sourceWorkId == null ? '未选作品、未上传文件' : '已选作品，可不上传文件',
+                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600))
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(_sourceScriptName,
+                                style: const TextStyle(fontSize: 11.5, height: 1.3),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _clearSourceScript,
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: 6),
+                              child: Text('移除',
+                                  style: TextStyle(fontSize: 11.5, color: AppColors.danger)),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+          Text('支持 txt / doc / docx / pdf，不超过 10MB。',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+        ],
       ),
     );
   }
@@ -226,8 +518,8 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
         ),
         const SizedBox(height: 4),
-        Text('可不添加中间轮次，最后一轮验收会自动生成并验收到总集数。',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        Text(_stageNote,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
         // 固定最后一轮验收：填好总集数后直接出现，集数/金额锁定，仅小时时限可填
         if (_hasValidTotalEpisodes) _buildLastStageCard(),
         // 分配对比
@@ -432,12 +724,19 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
     );
   }
 
-  Widget _multilineField(String label, TextEditingController ctrl, {String? Function(String?)? validator}) {
+  Widget _multilineField(String label, TextEditingController ctrl,
+      {String? hintText, String? Function(String?)? validator}) {
     return TextFormField(
       controller: ctrl,
       validator: validator,
       maxLines: 5,
-      decoration: InputDecoration(labelText: label, alignLabelWithHint: true, border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        hintStyle: const TextStyle(fontSize: 12, color: AppColors.text3),
+        alignLabelWithHint: true,
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 
@@ -491,6 +790,11 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
     final budgetYuan = double.tryParse(_budgetCtrl.text.trim());
     if (budgetYuan == null || budgetYuan <= 0) {
       showAppToast(context, '请输入有效预算金额');
+      return;
+    }
+    // 分镜类任务必须先给出源剧本，否则接单者无法评估工作量（后端同口径再校验一次）
+    if (_isStoryboard && _sourceWorkId == null && _sourceScriptUrl.isEmpty) {
+      showAppToast(context, '请关联源剧本作品或上传剧本文件（至少一种）');
       return;
     }
 
@@ -560,6 +864,12 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
       final deadlineStr =
           '${_deadline!.year}-${_deadline!.month.toString().padLeft(2, '0')}-${_deadline!.day.toString().padLeft(2, '0')}';
       final tags = _tagsCtrl.text.trim();
+      // 源剧本三件套仅分镜类下发；其余类型后端会清空残留字段
+      final sourceWorkId = _isStoryboard ? _sourceWorkId : null;
+      final sourceScriptUrl =
+          _isStoryboard && _sourceScriptUrl.isNotEmpty ? _sourceScriptUrl : null;
+      final sourceScriptName =
+          _isStoryboard && _sourceScriptName.isNotEmpty ? _sourceScriptName : null;
       if (_isEdit) {
         await repo.updateDemand(
           demandId: widget.demandId!,
@@ -570,6 +880,10 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           requirement: _requirementCtrl.text.trim(),
           tags: tags,
           totalEpisodes: totalEpisodes,
+          taskType: _taskType,
+          sourceWorkId: sourceWorkId,
+          sourceScriptUrl: sourceScriptUrl,
+          sourceScriptName: sourceScriptName,
           stages: stagesPayload,
         );
         if (mounted) {
@@ -586,6 +900,10 @@ class _DemandPostPageState extends ConsumerState<DemandPostPage> {
           requirement: _requirementCtrl.text.trim(),
           tags: tags.isEmpty ? null : tags,
           totalEpisodes: totalEpisodes,
+          taskType: _taskType,
+          sourceWorkId: sourceWorkId,
+          sourceScriptUrl: sourceScriptUrl,
+          sourceScriptName: sourceScriptName,
           stages: stagesPayload,
         );
         if (mounted) {

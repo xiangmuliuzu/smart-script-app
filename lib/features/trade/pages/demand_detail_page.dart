@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/demand_task_type.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
@@ -64,6 +65,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
               child: Text(task.title ?? '',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
+            _typeChip(task.taskType),
+            const SizedBox(width: 6),
             _chip(task.status),
           ],
         ),
@@ -77,12 +80,14 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
             child: Column(
               children: [
                 _infoRow('任务编号', task.demandNo ?? '-'),
+                _infoRow('任务类型', DemandTaskType.labelOf(task.taskType)),
                 _infoRow('预算', '$budgetYuan 元'),
-                _infoRow('发布日期', _fmtDate(task.deadline)),
+                _infoRow('截止日期', _fmtDate(task.deadline)),
                 if (hasStages)
-                  _infoRow('验收轮次', '分 ${task.totalEpisodes} 集逐轮验收')
+                  _infoRow('验收轮次', _roundsText(task))
                 else
                   _infoRow('完成时限', formatDurationHours(task.durationHours ?? 0)),
+                _infoRow('交付要求', DemandTaskType.deliverHintOf(task.taskType)),
                 _infoRow('托管状态', DemandEscrowStatus.label(task.escrowStatus)),
                 _infoRow('托管额', '¥${task.escrowYuanText}'),
                 if (task.depositStatus != null && task.depositStatus != DemandDepositStatus.none) ...[
@@ -121,6 +126,11 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
             ),
             child: Text(task.requirement!, style: const TextStyle(fontSize: 14, height: 1.6)),
           ),
+          const SizedBox(height: 16),
+        ],
+        // 源剧本（分镜类任务）：接单方靠它评估工作量，发布者也在详情里复核关联内容
+        if (DemandTaskType.isStoryboard(task.taskType)) ...[
+          _buildSourceScriptBlock(task),
           const SizedBox(height: 16),
         ],
         // 任务会话入口（发布者 ↔ 创作者）
@@ -201,8 +211,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
         ],
         // 进行中的倒计时（任务双方均可见：发布者也要看到剩余时限与“计时已暂停”，否则无从判断要不要延时）
         if (inProgress && (isBuyer || isClaimer)) _buildCountdown(task),
-        // 验收面板（已配置轮次且接单后/完成时可见）
-        if (hasStages && (inProgress || task.status == 'completed')) ...[
+        // 验收面板（已配置轮次且接单后/完成时可见；仅交易双方可见，第三人无操作资格不展示）
+        if (hasStages && (inProgress || task.status == 'completed') && (isBuyer || isClaimer)) ...[
           const SizedBox(height: 8),
           DemandStagePanel(demandId: task.demandId!, isBuyer: isBuyer),
         ],
@@ -459,6 +469,80 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           Expanded(child: Text(value, style: TextStyle(fontSize: 14, color: valueColor))),
         ],
       ),
+    );
+  }
+
+  /// 验收轮次文案随类型分化：分镜类是对源剧本出分镜，不是逐轮交剧本稿。
+  String _roundsText(DemandTask task) {
+    final n = task.totalEpisodes;
+    switch (DemandTaskType.normalize(task.taskType)) {
+      case DemandTaskType.storyboard:
+        return '按源剧本分 $n 集逐轮交付分镜';
+      case DemandTaskType.scriptStoryboard:
+        return '分 $n 集逐轮交付剧本与分镜';
+      default:
+        return '分 $n 集逐轮验收';
+    }
+  }
+
+  /// 源剧本区块：给出关联作品/上传文件的现状，并入口到全本查阅页。
+  Widget _buildSourceScriptBlock(DemandTask task) {
+    final hasWork = (task.sourceWorkTitle ?? '').isNotEmpty;
+    final hasFile = (task.sourceScriptUrl ?? '').isNotEmpty;
+    final accent = DemandTaskType.colorOf(task.taskType);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('源剧本',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: accent)),
+          const SizedBox(height: 6),
+          if (!hasWork && !hasFile)
+            Text('发布者尚未提供源剧本（可能已失效），请编辑任务重新关联。',
+                style: TextStyle(fontSize: 12.5, height: 1.5, color: Colors.red.shade600))
+          else
+            Text(
+              [
+                if (hasWork) '关联作品《${task.sourceWorkTitle}》',
+                if (hasFile) '剧本文件：${(task.sourceScriptName ?? '').isNotEmpty ? task.sourceScriptName : "未命名文件"}',
+              ].join(' · '),
+              style: const TextStyle(fontSize: 13, height: 1.5),
+            ),
+          if (hasWork || hasFile) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push(RoutePath.demandSourceScriptUrl(task.demandId!)),
+                icon: const Icon(Icons.visibility_outlined, size: 16),
+                label: const Text('查看源剧本'),
+                style: OutlinedButton.styleFrom(foregroundColor: accent),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _typeChip(String? taskType) {
+    final color = DemandTaskType.colorOf(taskType);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(DemandTaskType.labelOf(taskType),
+          style: TextStyle(
+              fontSize: 12, color: color, fontWeight: FontWeight.w500)),
     );
   }
 

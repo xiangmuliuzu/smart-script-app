@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/demand_genre.dart';
+import '../../../core/constants/demand_task_type.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/trade_models.dart';
@@ -107,18 +108,24 @@ class DemandTaskCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          if (tags.isNotEmpty || task.genreId != null) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                if (task.genreId != null)
-                  _TagPill(text: DemandGenre.labelOf(task.genreId), color: DemandGenre.colorOf(task.genreId)),
-                for (final t in tags) _TagPill(text: t, color: AppColors.text2),
-              ],
-            ),
-          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              // 任务类型固定首位：task_type 库里 NOT NULL DEFAULT 'script'，任何任务都有类型
+              _TagPill(
+                text: DemandTaskType.labelOf(task.taskType),
+                color: DemandTaskType.colorOf(task.taskType),
+              ),
+              // 分镜类由发布者提供源剧本，接单前需先评估剧本，卡片上点出来
+              if (DemandTaskType.isStoryboard(task.taskType))
+                _TagPill(text: '发布者提供源剧本', color: AppColors.text2),
+              if (task.genreId != null)
+                _TagPill(text: DemandGenre.labelOf(task.genreId), color: DemandGenre.colorOf(task.genreId)),
+              for (final t in tags) _TagPill(text: t, color: AppColors.text2),
+            ],
+          ),
           const SizedBox(height: 11),
           Container(height: 0.6, color: AppColors.divider),
           const SizedBox(height: 9),

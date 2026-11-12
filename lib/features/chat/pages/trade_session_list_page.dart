@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/avatar_url.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../data/chat_models.dart';
 import '../data/chat_providers.dart';
@@ -227,16 +228,19 @@ class _PeerGroupTile extends StatelessWidget {
                   onTap: group.peerId > 0
                       ? () => context.push(RoutePath.userProfileUrl(group.peerId))
                       : null,
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                    backgroundImage: (group.peerAvatar != null && group.peerAvatar!.isNotEmpty)
-                        ? NetworkImage(group.peerAvatar!)
-                        : null,
-                    child: (group.peerAvatar == null || group.peerAvatar!.isEmpty)
-                        ? Text(group.peerName.characters.first,
-                            style: const TextStyle(fontSize: 18, color: AppColors.text1))
-                        : null,
+                  child: Builder(
+                    builder: (context) {
+                      // 非 http/相对路径的脏数据头像回退到名字首字符
+                      final avatar = avatarUrl(group.peerAvatar);
+                      return CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.primary.withOpacity(0.1),
+                        // foregroundImage 加载失败时不绘制，首字符底衬自然露出
+                        foregroundImage: avatar.isEmpty ? null : NetworkImage(avatar),
+                        child: Text(group.peerName.isEmpty ? '?' : group.peerName.characters.first,
+                            style: const TextStyle(fontSize: 18, color: AppColors.text1)),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),

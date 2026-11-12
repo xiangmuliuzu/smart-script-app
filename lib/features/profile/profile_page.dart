@@ -770,7 +770,7 @@ class _Avatar extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Text(
-          nickname.characters.first,
+          nickname.isEmpty ? '?' : nickname.characters.first,
           style: TextStyle(
             fontSize: size * 0.36,
             fontWeight: FontWeight.w700,

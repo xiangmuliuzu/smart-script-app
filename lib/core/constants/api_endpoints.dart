@@ -386,6 +386,12 @@ class ApiEndpoints {
   static String demandStageDeliverableWork(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliverable-work';
   // 可交付作品（本人、非已上架售卖）
   static const String demandDeliverableWorks = '/trade/demand/deliverable-works';
+  /// 发布分镜任务的源剧本候选：本人未删除作品（不排除已上架，仅作参考不转移版权）。
+  static const String demandSourceWorks = '/trade/demand/source-works';
+  /// 源剧本文件上传（交易域端点，发布者未必有创作者资格，不能走 content/upload）。
+  static const String demandUploadScript = '/trade/demand/upload-script';
+  /// 查看分镜任务的源剧本（接单前评估，任何登录用户可读）。
+  static String demandSourceScript(int demandId) => '/trade/demand/$demandId/source-script';
   // 延时：创作者申请 / 发布者处理 / 发布者自主延时 / 延时记录
   static String demandStageExtendRequest(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/request';
   static String demandStageExtendDecision(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/decision';

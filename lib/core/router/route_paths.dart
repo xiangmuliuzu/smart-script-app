@@ -321,6 +321,7 @@ class RoutePath {
   static const String demandMyTasks = '/trade/demand/my-tasks';
   static const String demandStageDeliver = '/trade/demand/stage-deliver';
   static const String demandDeliverableWork = '/trade/demand/deliverable-work';
+  static const String demandSourceScript = '/trade/demand/source-script';
 
   static String demandDetailUrl(int demandId) => '$demandDetail?id=$demandId';
   /// 编辑已有任务（发布页带 id 进入编辑模式）。
@@ -331,6 +332,9 @@ class RoutePath {
   /// 验收查阅交付作品（全屏页：发布者看本轮已交集数的正文）。
   static String demandDeliverableWorkUrl(int demandId, int stageId, int stageOrder) =>
       '$demandDeliverableWork?demandId=$demandId&stageId=$stageId&order=$stageOrder';
+  /// 源剧本查阅（分镜类任务，接单前评估用；任何登录用户可看全本）。
+  static String demandSourceScriptUrl(int demandId) =>
+      '$demandSourceScript?demandId=$demandId';
   // 线上沟通（聊天，接入 A3）
   static const String tradeChat = '/trade/chat';
   // 聊天会话列表
@@ -469,6 +473,7 @@ class RouteName {
   static const String demandMyTasks = 'demandMyTasks';
   static const String demandStageDeliver = 'demandStageDeliver';
   static const String demandDeliverableWork = 'demandDeliverableWork';
+  static const String demandSourceScript = 'demandSourceScript';
   static const String tradeChat = 'tradeChat';
   // 聊天
   static const String chatSessionList = 'chatSessionList';
@@ -536,6 +541,7 @@ class ProtectedRoutes {
     RoutePath.demandMyTasks,
     RoutePath.demandStageDeliver,
     RoutePath.demandDeliverableWork,
+    RoutePath.demandSourceScript,
     RoutePath.tradeChat,
     // 聊天（需登录）
     RoutePath.chatSessionList,

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/avatar_url.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../trade/data/trade_models.dart';
@@ -176,8 +177,9 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     try {
       final repo = ref.read(chatRepositoryProvider);
       await repo.reopenSession(widget.sessionId);
-      // 刷新消息列表
+      // 刷新消息列表与会话状态（重开后顶部状态须同步为正常会话）
       ref.invalidate(messagesProvider(widget.sessionId));
+      ref.invalidate(sessionDetailProvider(widget.sessionId));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -596,18 +598,19 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildAvatar(BuildContext context) {
+    // 脏数据头像（非 http/相对路径）回退到发送者名字首字符
+    final avatarUrlText = avatarUrl(message.senderAvatar);
     final avatar = CircleAvatar(
       radius: 16,
       backgroundColor: AppColors.primary.withOpacity(0.1),
-      backgroundImage: message.senderAvatar != null
-          ? NetworkImage(message.senderAvatar!)
-          : null,
-      child: message.senderAvatar == null
-          ? Text(
-              message.senderName?.characters.first ?? '?',
-              style: const TextStyle(fontSize: 12, color: AppColors.text1),
-            )
-          : null,
+      // foregroundImage 加载失败时不绘制，首字符底衬自然露出
+      foregroundImage: avatarUrlText.isEmpty ? null : NetworkImage(avatarUrlText),
+      child: Text(
+        (message.senderName == null || message.senderName!.isEmpty)
+            ? '?'
+            : message.senderName!.characters.first,
+        style: const TextStyle(fontSize: 12, color: AppColors.text1),
+      ),
     );
     if (message.senderId <= 0) return avatar;
     // 点击头像进入发送者个人主页（自己则进入自己的主页）

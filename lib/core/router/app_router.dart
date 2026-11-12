@@ -101,6 +101,7 @@ import '../../features/trade/pages/demand_post_page.dart';
 import '../../features/trade/pages/demand_my_tasks_page.dart';
 import '../../features/trade/pages/demand_stage_deliver_page.dart';
 import '../../features/trade/pages/demand_deliverable_work_page.dart';
+import '../../features/trade/pages/demand_source_script_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
 import '../../features/chat/pages/chat_detail_page.dart';
@@ -745,6 +746,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
           stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
           stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,
+        ),
+      ),
+      // 源剧本查阅：分镜类任务接单前评估工作量用，正文全本可读
+      GoRoute(
+        path: RoutePath.demandSourceScript,
+        name: RouteName.demandSourceScript,
+        builder: (context, state) => DemandSourceScriptPage(
+          demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
         ),
       ),
       // ===== 版权模块（受登录守卫保护）=====

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_exception.dart';
@@ -83,12 +85,13 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
               const Text('验收进度',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
-              ...stages.map((s) => _StageTimelineItem(
-                    stage: s,
+              ...stages.asMap().entries.map((e) => _StageTimelineItem(
+                    stage: e.value,
                     demandId: widget.demandId,
                     isBuyer: widget.isBuyer,
+                    isLast: e.key == stages.length - 1,
                     extendApplies: history
-                        .where((a) => a.stageId != null && a.stageId == s.stageId)
+                        .where((a) => a.stageId != null && a.stageId == e.value.stageId)
                         .toList(),
                   )),
               // 整单延时记录汇总（跨轮，标第几轮），默认只展示最近几条
@@ -106,6 +109,8 @@ class _StageTimelineItem extends ConsumerStatefulWidget {
   final DemandStage stage;
   final int demandId;
   final bool isBuyer;
+  /// 是否最后一轮：末轮不再画向下延伸的连接线
+  final bool isLast;
   /// 本轮延时记录（申请延时与自主延时同表保留，按发生时间倒序）
   final List<DemandExtendApply> extendApplies;
 
@@ -113,6 +118,7 @@ class _StageTimelineItem extends ConsumerStatefulWidget {
     required this.stage,
     required this.demandId,
     required this.isBuyer,
+    this.isLast = false,
     this.extendApplies = const <DemandExtendApply>[],
   });
 
@@ -145,6 +151,27 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
   void dispose() {
     _aiPollTimer?.cancel();
     super.dispose();
+  }
+
+  /// 分镜类任务允许只交文件链接/说明而不关联作品，此时靠这两项判断本轮有无交付内容。
+  bool get _hasLooseDeliverable {
+    final s = widget.stage;
+    return (s.deliverableUrl?.isNotEmpty ?? false) ||
+        (s.deliverableDesc?.isNotEmpty ?? false);
+  }
+
+  /// 打开交付物链接：后端存的是 /profile/** 相对路径，按当前 baseUrl 归一后交给外部应用。
+  Future<void> _openDeliverableUrl(String raw) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.tryParse(AppConfig.resolveAssetUrl(raw));
+    if (uri == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('交付物链接无效')));
+      return;
+    }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('无法打开交付物链接')));
+    }
   }
 
   void _syncAiPolling() {
@@ -200,7 +227,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
             child: Column(
               children: [
                 Icon(_statusIcon, color: _statusColor, size: 22),
-                if (s.stageOrder != (widget.stage.demandId != null ? 999 : 0))
+                if (!widget.isLast)
                   Expanded(child: Container(width: 2, color: Colors.grey.shade300)),
               ],
             ),
@@ -298,25 +325,57 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                     const SizedBox(height: 6),
                     Text('交付作品：${s.workTitle ?? '作品${s.workId}'}',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                    // 验收前得能读到正文，否则只能凭一句交付说明拍板（仅发布者可取，后端鉴权）。
-                    // 待审核态的入口移到下方与「确认验收」同一行，这里只给非审核态（如已通过）保留。
-                    if (widget.isBuyer && s.stageId != null && s.status != 'submitted') ...[
-                      const SizedBox(height: 2),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _acting ? null : _viewDeliveredWork,
-                          icon: const Icon(Icons.visibility_outlined, size: 16),
-                          label: const Text('查看交付内容',
-                              style: TextStyle(fontSize: 12)),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.text1,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            visualDensity: VisualDensity.compact,
+                  ] else if (_hasLooseDeliverable) ...[
+                    // 分镜类任务允许不关联作品，只交文件链接/说明
+                    const SizedBox(height: 6),
+                    Text('交付内容：本轮未关联作品（分镜文件与说明）',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                  ],
+                  // 交付物链接（分镜/外部文件），发布者可点开核对
+                  if (s.deliverableUrl != null && s.deliverableUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text('交付物链接：${s.deliverableUrl}',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
+                        ),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _openDeliverableUrl(s.deliverableUrl!),
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: Text('打开',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600)),
                           ),
                         ),
+                      ],
+                    ),
+                  ],
+                  // 验收前得能读到正文/分镜，否则只能凭一句交付说明拍板（仅发布者可取，后端鉴权）。
+                  // 待审核态的入口移到下方与「确认验收」同一行，这里只给非审核态（如已通过）保留。
+                  if (widget.isBuyer && s.stageId != null && s.status != 'submitted'
+                      && (s.workId != null || _hasLooseDeliverable)) ...[
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _acting ? null : _viewDeliveredWork,
+                        icon: const Icon(Icons.visibility_outlined, size: 16),
+                        label: const Text('查看交付内容',
+                            style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.text1,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
+                        ),
                       ),
-                    ],
+                    ),
                   ],
                   // 交付说明
                   if (s.deliverableDesc != null && s.deliverableDesc!.isNotEmpty) ...[

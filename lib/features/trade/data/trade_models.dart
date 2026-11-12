@@ -777,7 +777,7 @@ class ContractDetail {
   final String? status;       // pending / partial_signed / completed
   final String? content;      // HTML 合同内容
   final String? templateId;   // 平台模板：TPL_COPYRIGHT_TRANSFER / TPL_COPYRIGHT_LICENSE
-  final String? clausesText;  // 可编辑正文条款纯文本（null=模板默认）
+  final String? clausesText;  // 可编辑正文条款：富文本标记串或历史纯文本（null=模板默认）
   final String? sourceType;   // template 平台模板 / uploaded 用户上传 PDF
   final String? sourcePdfUrl; // 上传合同 PDF 文件 URL（uploaded 时）
   final int? pageCount;       // 上传 PDF 页数（uploaded 时）
@@ -983,6 +983,12 @@ class DemandTask {
   final String? contactInfo;
   final int? totalEpisodes;
   final String? status;
+  // 任务类型与源剧本（storyboard 类型由发布者提供，供接单方评估）
+  final String? taskType;
+  final int? sourceWorkId;
+  final String? sourceScriptUrl;
+  final String? sourceScriptName;
+  final String? sourceWorkTitle;
   final DateTime? createdAt;
   final String? clientName;
   // 接单制
@@ -1006,6 +1012,8 @@ class DemandTask {
     this.demandId, this.demandNo, this.clientId, this.title, this.genreId,
     this.tags, this.budget, this.deadline, this.requirement, this.contactInfo,
     this.totalEpisodes, this.status, this.createdAt, this.clientName,
+    this.taskType, this.sourceWorkId, this.sourceScriptUrl,
+    this.sourceScriptName, this.sourceWorkTitle,
     this.acceptedCreatorId, this.acceptedAt, this.durationHours, this.dueAt,
     this.isOverdue, this.acceptedCreatorName,
     this.escrowAmount, this.escrowStatus, this.depositAmount, this.depositStatus,
@@ -1055,6 +1063,11 @@ class DemandTask {
       contactInfo: json['contactInfo'] as String?,
       totalEpisodes: (json['totalEpisodes'] as num?)?.toInt(),
       status: json['status'] as String?,
+      taskType: json['taskType'] as String?,
+      sourceWorkId: (json['sourceWorkId'] as num?)?.toInt(),
+      sourceScriptUrl: json['sourceScriptUrl'] as String?,
+      sourceScriptName: json['sourceScriptName'] as String?,
+      sourceWorkTitle: json['sourceWorkTitle'] as String?,
       createdAt: _parseDateTime(json['createdAt']),
       clientName: json['clientName'] as String?,
       acceptedCreatorId: (json['acceptedCreatorId'] as num?)?.toInt(),
@@ -1085,6 +1098,60 @@ class DemandTask {
     'totalEpisodes': totalEpisodes,
     'durationHours': durationHours,
   };
+}
+
+/// 分镜任务的源剧本（接单前评估用）：作品源给全本章节，文件源给相对地址与文件名，两者可并存。
+class SourceScript {
+  final int? demandId;
+  final String? taskType;
+  final String? title;
+  final String? authorName;
+  final int? episodeCount;
+  final int? wordCount;
+  final String? summary;
+  final List<DeliverableChapter> chapters;
+  final String? fileUrl;
+  final String? fileName;
+
+  const SourceScript({
+    this.demandId,
+    this.taskType,
+    this.title,
+    this.authorName,
+    this.episodeCount,
+    this.wordCount,
+    this.summary,
+    this.chapters = const [],
+    this.fileUrl,
+    this.fileName,
+  });
+
+  bool get hasWork => title != null || chapters.isNotEmpty;
+  bool get hasFile => (fileUrl?.isNotEmpty ?? false);
+
+  factory SourceScript.fromMap(Map<String, dynamic> m) {
+    final work = m['work'];
+    final rows = m['chapters'];
+    final chapters = <DeliverableChapter>[];
+    if (rows is List) {
+      for (final r in rows) {
+        if (r is Map<String, dynamic>) chapters.add(DeliverableChapter.fromJson(r));
+      }
+    }
+    final wm = work is Map<String, dynamic> ? work : const <String, dynamic>{};
+    return SourceScript(
+      demandId: (m['demandId'] as num?)?.toInt(),
+      taskType: m['taskType'] as String?,
+      title: wm['title'] as String?,
+      authorName: wm['authorName'] as String?,
+      episodeCount: (wm['episodeCount'] as num?)?.toInt(),
+      wordCount: (wm['wordCount'] as num?)?.toInt(),
+      summary: wm['summary'] as String?,
+      chapters: chapters,
+      fileUrl: m['fileUrl'] as String?,
+      fileName: m['fileName'] as String?,
+    );
+  }
 }
 
 // ==================== 工具函数 ====================
