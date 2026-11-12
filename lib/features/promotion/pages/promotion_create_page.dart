@@ -585,7 +585,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
       case 'search':
         return '搜索页付费作品优先展示，其余按顺序插入自然搜索结果之间。';
       case 'banner':
-        return '轮播位按序位依次展示；付费素材生效时会覆盖同序位的运营素材。';
+        return '轮播位按序位依次展示；付费素材生效时，同序位的不锁定运营素材会自动下架。';
       default:
         return '第 1–6 位直接展示在首页「热门精选」；第 7 位起需点击「更多」后可见，价格更低。';
     }

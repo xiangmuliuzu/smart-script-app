@@ -83,6 +83,8 @@ class PromotionApplication {
     this.workCover,
     this.authorName = '',
     this.source = '',
+    // 1=锁定独占，0=不锁定（可被付费素材覆盖，覆盖后自动下架）
+    this.exclusive = 1,
     this.materialUrl,
     this.createTime,
     this.payTime,
@@ -109,6 +111,7 @@ class PromotionApplication {
   final String? workCover;
   final String authorName;
   final String source;
+  final int exclusive;
 
   /// 作者申请轮播推广时提交的素材地址（仅 banner 有值）。
   final String? materialUrl;
@@ -136,6 +139,7 @@ class PromotionApplication {
         workCover: _toTextOrNull(json['workCover']),
         authorName: _toText(json['authorName']),
         source: _toText(json['source']),
+        exclusive: json['exclusive'] == null ? 1 : _toInt(json['exclusive']),
         materialUrl: _toTextOrNull(json['materialUrl']),
         createTime: _toTextOrNull(json['createTime']),
         payTime: _toTextOrNull(json['payTime']),
@@ -285,17 +289,19 @@ class PromotionSlotItem {
     }
   }
 
-  /// 可预约：启用且空闲；轮播位若只有后台默认素材（current 为空）仍可购买。
+  /// 可预约：启用且空闲；当前投放为不锁定的运营素材时同样可购买（生效后自动覆盖）。
   bool get selectable =>
-      enabled && (state == 'idle' || (state == 'active' && current == null));
+      enabled &&
+      (state == 'idle' ||
+          (state == 'active' && (current == null || current!.exclusive == 0)));
 
-  /// 位次副标题：优先展示当前投放作品，其次展示运营兜底素材与备注。
+  /// 位次副标题：优先展示当前投放作品，其次展示运营素材与备注。
   String get subtitle {
     if (!enabled) return '该位次已停用';
     final title = current?.workTitle ?? '';
     if (title.isNotEmpty) return '当前：$title';
     if (current != null) return current!.displayStatus;
-    if (state == 'active') return '运营素材 · 可覆盖（付费素材生效后自动顶替）';
+    if (state == 'active') return '运营素材 · 可预约';
     if (bannerTitle.isNotEmpty) return '运营素材：$bannerTitle';
     final note = remark ?? '';
     if (note.isNotEmpty) return note;

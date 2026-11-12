@@ -449,7 +449,9 @@ class PromotionSlotCard extends StatelessWidget {
       case 'locked':
         return '待支付锁定';
       case 'active':
-        if (slot.current == null) return '运营素材 · 可覆盖';
+        if (slot.current == null || slot.current!.exclusive == 0) {
+          return '运营素材 · 可预约';
+        }
         final end = formatPromotionMonthDay(slot.current?.endTime);
         return end.isEmpty ? '投放中' : '已占用至 $end';
       case 'reserved':
