@@ -289,12 +289,13 @@ class PromotionSlotItem {
   bool get selectable =>
       enabled && (state == 'idle' || (state == 'active' && current == null));
 
-  /// 位次副标题：优先展示当前投放作品，其次展示备注。
+  /// 位次副标题：优先展示当前投放作品，其次展示运营兜底素材与备注。
   String get subtitle {
     if (!enabled) return '该位次已停用';
     final title = current?.workTitle ?? '';
     if (title.isNotEmpty) return '当前：$title';
     if (current != null) return current!.displayStatus;
+    if (state == 'active') return '运营素材 · 可覆盖（付费素材生效后自动顶替）';
     if (bannerTitle.isNotEmpty) return '运营素材：$bannerTitle';
     final note = remark ?? '';
     if (note.isNotEmpty) return note;
