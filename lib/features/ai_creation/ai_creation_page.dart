@@ -202,7 +202,7 @@ class _FeatureCard extends StatelessWidget {
       ),
       _FeatureCell(
         icon: Icons.border_color,
-        label: 'AI 写作',
+        label: 'AI 续写',
         onTap: () => context.push(RoutePath.aiWrite),
       ),
       _FeatureCell(

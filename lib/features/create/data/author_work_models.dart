@@ -147,6 +147,7 @@ class AuthorChapterItem {
     this.chapterNo = 0,
     this.chapterTitle = '',
     this.content = '',
+    this.summary = '',
     this.wordCount = 0,
     this.isFree = false,
     this.status = '0',
@@ -156,6 +157,9 @@ class AuthorChapterItem {
   final int chapterNo;
   final String chapterTitle;
   final String content;
+
+  /// 本章摘要（AI「本章摘要」接口落库，供后续章节续写注入前情）。
+  final String summary;
   final int wordCount;
   final bool isFree;
 
@@ -171,6 +175,7 @@ class AuthorChapterItem {
         chapterNo: _int(json['chapterNo']),
         chapterTitle: _text(json['chapterTitle']),
         content: _text(json['content']),
+        summary: _text(json['summary']),
         wordCount: _int(json['wordCount']),
         isFree: _flag(json['isFree']),
         status: _text(json['status']).isEmpty ? '0' : _text(json['status']),

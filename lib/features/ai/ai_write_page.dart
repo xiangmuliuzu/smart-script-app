@@ -43,7 +43,7 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
 
   Future<void> _generate() async {
     if (_prompt.text.trim().isEmpty) {
-      showAppToast(context, '请先输入写作提示词');
+      showAppToast(context, '请先输入续写要求');
       return;
     }
     setState(() {
@@ -111,7 +111,7 @@ class _AiWritePageState extends ConsumerState<AiWritePage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('AI 写作'),
+        title: const Text('AI 续写'),
         backgroundColor: Colors.white,
         elevation: 0.5,
       ),
@@ -231,13 +231,13 @@ class _InputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _Label(text: '写作提示词', required: true),
+          const _Label(text: '续写要求', required: true),
           const SizedBox(height: 8),
           TextField(
             controller: prompt,
             maxLines: 6,
             decoration: _inputDecoration(
-                '例如：写一段男主在公司年会上与前女友重逢的对手戏，台词克制、冲突强烈'),
+                '例如：接着写下一章开头，主角在雨夜回到旧宅，压抑且克制'),
           ),
           const SizedBox(height: 16),
           AiSkillSelector(
@@ -253,7 +253,7 @@ class _InputCard extends StatelessWidget {
             enabled: !loading,
           ),
           const SizedBox(height: 16),
-          const _Label(text: '写作类型（可选）'),
+          const _Label(text: '续写侧重（可选）'),
           const SizedBox(height: 8),
           TextField(
             controller: type,

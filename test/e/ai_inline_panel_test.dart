@@ -25,6 +25,8 @@ class _FakeAiRepository implements AiRepository {
     this.writeContent = '夜色里，他站在落地窗前，沉默良久。',
     this.polishContent = '【润色】夜色如墨，他立于窗前，久久无言。',
     this.shouldFail = false,
+    this.ledger = const {},
+    this.writeTruncated = false,
   });
 
   final String outlineText;
@@ -32,7 +34,54 @@ class _FakeAiRepository implements AiRepository {
   final String polishContent;
   final bool shouldFail;
 
+  /// 模拟后端下发 truncated=true（上游 finish_reason=length）。
+  final bool writeTruncated;
+
+  /// 假台账：面板挂载时读取，续写提示词应带上其中非空字段。
+  final Map<String, String> ledger;
+
   final List<String> calls = [];
+
+  /// 方案 2：插入正文后触发的「摘要 + 台账」回写调用。
+  final List<String> summaryCalls = [];
+
+  @override
+  Future<Map<String, dynamic>> summarizeChapter({
+    required int workId,
+    required int chapterId,
+    required String content,
+    String? model,
+  }) async {
+    summaryCalls.add('summarizeChapter:$workId|$chapterId|${content.length}');
+    calls.add('summarizeChapter:$workId|$chapterId');
+    return <String, dynamic>{'summary': '本集摘要', 'ledgerUpdated': true};
+  }
+
+  @override
+  Future<Map<String, String>> workLedger(int workId) async {
+    calls.add('workLedger:$workId');
+    return ledger;
+  }
+
+  @override
+  Future<Map<String, dynamic>> reviewChapter({
+    required int workId,
+    required int chapterId,
+    required String content,
+    String? model,
+  }) async =>
+      <String, dynamic>{'passed': true};
+
+  @override
+  Future<Map<String, dynamic>> buildVolumeSnapshot({
+    required int workId,
+    required int volumeNo,
+    String? model,
+  }) async =>
+      <String, dynamic>{};
+
+  @override
+  Future<Map<int, String>> workVolumes(int workId) async => const {};
 
   @override
   Future<AiOutlineResult> outline({
@@ -99,7 +148,11 @@ class _FakeAiRepository implements AiRepository {
     if (shouldFail) throw ApiException('AI 服务不可用');
     onDelta('夜色里，他站在');
     onDelta('落地窗前，沉默良久。');
-    return AiWriteResult(content: writeContent, recordId: 1);
+    return AiWriteResult(
+      content: writeContent,
+      recordId: 1,
+      truncated: writeTruncated,
+    );
   }
 
   @override
@@ -202,13 +255,28 @@ class _FakeAiRepository implements AiRepository {
 
 }
 
-Widget _wrapPanel(_FakeAiRepository fake, {required ValueChanged<String> onInsert}) {
+Widget _wrapPanel(
+  _FakeAiRepository fake, {
+  required ValueChanged<String> onInsert,
+  int workId = 0,
+  int? chapterId,
+  String Function()? chapterTitle,
+  String Function()? currentContent,
+  String Function()? previousChapter,
+}) {
   return ProviderScope(
     overrides: [aiRepositoryProvider.overrideWithValue(fake)],
     child: MaterialApp(
       home: Scaffold(
         body: SingleChildScrollView(
-          child: AiInlinePanel(onInsert: onInsert),
+          child: AiInlinePanel(
+            onInsert: onInsert,
+            workId: workId,
+            chapterId: chapterId,
+            chapterTitle: chapterTitle,
+            currentContent: currentContent,
+            previousChapter: previousChapter,
+          ),
         ),
       ),
     ),
@@ -281,17 +349,75 @@ void main() {
           _wrapPanel(fake, onInsert: (_) {}));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('写作'));
+      await tester.tap(find.text('续写'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('生成'));
       await tester.pump();
-      expect(find.text('请先输入写作提示词'), findsOneWidget);
+      expect(find.text('请先输入续写要求'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).first, '写一段重逢对手戏');
       await tester.tap(find.text('生成'));
       await tester.pumpAndSettle();
-      expect(fake.calls.first, startsWith('writeStream:写一段重逢对手戏'));
+      expect(fake.calls.first, startsWith('writeStream:【续写要求】\n写一段重逢对手戏'));
       expect(find.text('夜色里，他站在落地窗前，沉默良久。'), findsOneWidget);
+    });
+
+    testWidgets('续写结果被上游截断时提示重试', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository(writeTruncated: true);
+      await tester.pumpWidget(_wrapPanel(fake, onInsert: (_) {}));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('续写'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '继续写');
+      await tester.tap(find.text('生成'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('输出被判截断，请重试'), findsOneWidget);
+    });
+
+    testWidgets('续写注入创作台账、上一章末尾与本集已有正文', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository(ledger: const {
+        'characters': '顾守山 45 岁',
+        'relations': '顾守山—顾星宇：父子',
+        'foreshadow': '第3集铜铃——第9集已回收',
+        'threads': '铜铃为何夜里响｜顾守山｜第2集｜未结\n三年之约｜顾星宇｜第40集｜未结',
+      });
+      await tester.pumpWidget(_wrapPanel(
+        fake,
+        onInsert: (_) {},
+        workId: 96,
+        chapterTitle: () => '第2集：旧照片',
+        currentContent: () => '他推开门。',
+        previousChapter: () => '上一集结尾，铜铃响了。',
+      ));
+      await tester.pumpAndSettle();
+      expect(fake.calls, contains('workLedger:96'));
+      await tester.tap(find.text('续写'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '写重逢');
+      await tester.tap(find.text('生成'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final prompt =
+          fake.calls.firstWhere((call) => call.startsWith('writeStream:'));
+      expect(prompt, contains('第2集：旧照片'));
+      expect(prompt, contains('【创作台账（已定事实，不得冲突）】'));
+      expect(prompt, contains('本集出场人物：\n顾守山 45 岁'));
+      expect(prompt, contains('伏笔（埋在哪集/是否回收）：\n第3集铜铃——第9集已回收'));
+      // 到期悬念必须处理，未到期的长线只能作背景
+      expect(prompt, contains('【本集必须处理（已到期未结的悬念/约定）】\n- 铜铃为何夜里响｜顾守山｜第2集｜未结'));
+      expect(prompt, contains('【背景悬念（未到期，不得提前解决）】\n- 三年之约｜顾星宇｜第40集｜未结'));
+      expect(
+          prompt, contains('【上一章末尾（承接语气与处境，勿重复）】\n上一集结尾，铜铃响了。'));
+      expect(prompt, contains('【本集已有正文（从末尾接着写）】\n他推开门。'));
+      expect(prompt, contains('【续写要求】\n写重逢'));
     });
 
     testWidgets('润色 tab：选风格后生成并插入', (tester) async {
@@ -317,6 +443,63 @@ void main() {
       await tester.tap(find.text('插入正文'));
       await tester.pump();
       expect(inserted.single, contains('【润色】'));
+    });
+
+    testWidgets('插入正文后按章节生成摘要与台账（方案 2）', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository();
+      final inserted = <String>[];
+      await tester.pumpWidget(_wrapPanel(
+        fake,
+        onInsert: inserted.add,
+        workId: 96,
+        chapterId: 285,
+        currentContent: () =>
+            '前文正文，他抬头看了看天。夜色压下来，街上没有人。'
+            '他握紧手里的钥匙，一步一步走上楼，楼道里只有自己的脚步声。',
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('续写'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '写一段对峙');
+      await tester.tap(find.text('生成'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('插入正文'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(inserted.single, contains('落地窗前'));
+      expect(fake.summaryCalls.single, startsWith('summarizeChapter:96|285|'));
+    });
+
+    testWidgets('章节尚未保存（无 chapterId）时插入正文不触发摘要', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final fake = _FakeAiRepository();
+      final inserted = <String>[];
+      await tester.pumpWidget(_wrapPanel(
+        fake,
+        onInsert: inserted.add,
+        workId: 96,
+        currentContent: () => '还没有保存的新章节正文，足够长到不会被后端拒绝，只是没有章节 id。',
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('续写'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '写一段对峙');
+      await tester.tap(find.text('生成'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('插入正文'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(inserted.single, contains('落地窗前'));
+      expect(fake.summaryCalls, isEmpty);
     });
 
     testWidgets('分镜 tab：输入剧本后生成分镜并插入', (tester) async {

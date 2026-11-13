@@ -39,6 +39,17 @@ class _FakeAiRepository implements AiRepository {
   final List<String> calls = [];
 
   @override
+  Future<Map<String, String>> workLedger(int workId) async => const {};
+
+  @override
+  Future<Map<String, dynamic>> summarizeChapter({
+    required int workId,
+    required int chapterId,
+    required String content,
+    String? model,
+  }) async => <String, dynamic>{'summary': '本集摘要', 'ledgerUpdated': false};
+
+  @override
   Future<AiWriteResult> write({
     required String prompt,
     String? type,
@@ -268,7 +279,7 @@ void main() {
 
       await tester.tap(find.text('生成内容'));
       await tester.pump();
-      expect(find.text('请先输入写作提示词'), findsOneWidget);
+      expect(find.text('请先输入续写要求'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).first, '写一段重逢对手戏');
       await tester.tap(find.text('生成内容'));

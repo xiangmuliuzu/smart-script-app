@@ -135,16 +135,24 @@ class AiQuotaRecord {
 // AI 创作（大纲/写作/润色）结果模型（对接 /api/v1/content/ai/*）
 // ================================================================
 
-/// AI 写作 / 润色结果（data：{content, recordId}）。
+/// AI 写作 / 润色结果（data：{content, recordId, truncated}）。
 class AiWriteResult {
-  const AiWriteResult({this.content = '', this.recordId = 0});
+  const AiWriteResult({
+    this.content = '',
+    this.recordId = 0,
+    this.truncated = false,
+  });
 
   final String content;
   final int recordId;
 
+  /// 上游以 finish_reason=length 结束：正文停在半句，需提示重试。
+  final bool truncated;
+
   factory AiWriteResult.fromJson(Map<String, dynamic> json) => AiWriteResult(
         content: _text(json['content']),
         recordId: _int(json['recordId']),
+        truncated: json['truncated'] == true,
       );
 }
 
@@ -294,7 +302,7 @@ class AiWriteRecord {
   String get writeTypeLabel {
     switch (writeType) {
       case 'write':
-        return 'AI 写作';
+        return 'AI 续写';
       case 'polish':
         return 'AI 润色';
       case 'outline':

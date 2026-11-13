@@ -39,7 +39,7 @@ void main() {
       expect(find.text('100'), findsOneWidget);
       for (final label in const [
         'AI 剧本',
-        'AI 写作',
+        'AI 续写',
         'AI 分镜',
         'AI 润色',
         'AI 记录',

@@ -161,7 +161,7 @@ void main() {
       expect(find.text('都市夜景提示词'), findsOneWidget);
       expect(find.text('润色一段对话'), findsOneWidget);
       expect(find.text('AI 剧本'), findsWidgets);
-      expect(find.text('AI 写作'), findsWidgets);
+      expect(find.text('AI 续写'), findsWidgets);
       expect(find.text('AI 润色'), findsWidgets);
 
       // 展开写作卡片
@@ -226,8 +226,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 筛 AI 写作（.first 为筛选条 chip）
-      await tester.tap(find.text('AI 写作').first);
+      // 筛 AI 续写（.first 为筛选条 chip）
+      await tester.tap(find.text('AI 续写').first);
       await tester.pumpAndSettle();
       expect(find.text('都市夜景提示词'), findsOneWidget);
       expect(find.text('润色一段对话'), findsNothing);

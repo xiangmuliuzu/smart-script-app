@@ -57,6 +57,9 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// 是否展示内嵌 AI 创作面板。
   bool _aiPanelOpen = false;
 
+  /// AI 面板滚动控制器：生成完成后由面板自动滚到底部露出结果区。
+  final _aiPanelScroll = ScrollController();
+
   /// 是否已从 provider 回填数据（仅编辑模式，避免覆盖用户输入）。
   bool _initialized = false;
 
@@ -90,6 +93,7 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
+    _aiPanelScroll.dispose();
     _titleCtrl.dispose();
     _contentCtrl.dispose();
     super.dispose();
@@ -124,6 +128,70 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
       if (chapter.chapterNo > maxNo) maxNo = chapter.chapterNo;
     }
     return maxNo + 1;
+  }
+
+  /// 上一章正文末尾（≤800 字）：AI 续写把它作为承接锚点，避免本集开头接不上。
+  /// 取太长的上一章会吃掉模型输出额度（曾在 8192 max_tokens 下把输出挤到半句截断）。
+  String _previousChapterTail() {
+    final detail = ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    final chapters = detail?.chapters ?? const <AuthorChapterItem>[];
+    if (chapters.isEmpty) return '';
+    AuthorChapterItem? previous;
+    if (_chapterId == 0) {
+      // 新建章节：上一章取作品内序号最大的一章。
+      previous = chapters.reduce((a, b) => a.chapterNo >= b.chapterNo ? a : b);
+    } else {
+      int? currentNo;
+      for (final chapter in chapters) {
+        if (chapter.chapterId == _chapterId) {
+          currentNo = chapter.chapterNo;
+          break;
+        }
+      }
+      if (currentNo == null) return '';
+      for (final chapter in chapters) {
+        if (chapter.chapterNo == currentNo - 1) {
+          previous = chapter;
+          break;
+        }
+      }
+    }
+    final text = (previous?.content ?? '').trim();
+    if (text.isEmpty) return '';
+    return text.length > 800 ? text.substring(text.length - 800) : text;
+  }
+
+  /// 前情摘要（当前集之前最近 6 章、合计 ≤1800 字）：补上「前几章摘要」这一环，
+  /// 只取已落库的 chapter.summary，没有摘要的章节跳过。
+  String _previousChapterSummaries() {
+    final detail = ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    final chapters = detail?.chapters ?? const <AuthorChapterItem>[];
+    if (chapters.isEmpty) return '';
+    int? currentNo;
+    if (_chapterId != 0) {
+      for (final chapter in chapters) {
+        if (chapter.chapterId == _chapterId) {
+          currentNo = chapter.chapterNo;
+          break;
+        }
+      }
+      if (currentNo == null) return '';
+    }
+    final limitNo = currentNo ?? _nextChapterNo();
+    final list = chapters
+        .where((chapter) =>
+            chapter.chapterNo < limitNo && chapter.summary.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.chapterNo - b.chapterNo);
+    if (list.isEmpty) return '';
+    var text = '';
+    for (final chapter in list.reversed.take(6)) {
+      final line = '第${chapter.chapterNo}集：${chapter.summary.trim()}';
+      final next = text.isEmpty ? line : '$line\n$text';
+      if (next.length > 1800) break;
+      text = next;
+    }
+    return text.isEmpty ? '' : '【前情摘要（已发生事实，勿重复交代）】\n$text';
   }
 
   /// 输入变化：标记 dirty + 重置自动保存定时器。
@@ -471,10 +539,17 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                 child: Offstage(
                   offstage: !_aiPanelOpen,
                   child: SingleChildScrollView(
+                    controller: _aiPanelScroll,
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                     child: AiInlinePanel(
                       onInsert: _insertAiText,
                       workId: widget.workId,
+                      chapterId: _chapterId > 0 ? _chapterId : null,
+                      chapterTitle: () => _titleCtrl.text,
+                      currentContent: () => _contentCtrl.text,
+                      previousChapter: _previousChapterTail,
+                      previousSummaries: _previousChapterSummaries,
+                      panelScroll: _aiPanelScroll,
                     ),
                   ),
                 ),

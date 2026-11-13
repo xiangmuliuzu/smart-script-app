@@ -29,6 +29,14 @@ class _FakeAiRepository implements AiRepository {
   final List<String> calls = [];
 
   @override
+  Future<Map<String, dynamic>> summarizeChapter({
+    required int workId,
+    required int chapterId,
+    required String content,
+    String? model,
+  }) async => <String, dynamic>{'summary': '本集摘要', 'ledgerUpdated': false};
+
+  @override
   Future<AiOutlineResult> outlineStream({
     String? inspiration,
     String? genre,

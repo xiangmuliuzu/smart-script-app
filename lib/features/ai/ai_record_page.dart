@@ -343,7 +343,7 @@ class _FilterBar extends StatelessWidget {
       ('all', '全部'),
       ('outline', 'AI 剧本'),
       ('storyboard', 'AI 分镜'),
-      ('write', 'AI 写作'),
+      ('write', 'AI 续写'),
       ('polish', 'AI 润色'),
     ];
     return Container(

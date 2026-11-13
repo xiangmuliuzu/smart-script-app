@@ -49,10 +49,10 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
       showAppToast(context, '请先输入你的要求');
       return;
     }
-    // 集数口径与 PC 用户端一致：1–200 的整数，默认 12。
+    // 集数口径与 PC 用户端一致：1–50 的整数（单部作品硬上限 50 集），默认 12。
     final episodes = int.tryParse(_episodes.text.trim()) ?? 0;
-    if (episodes < 1 || episodes > 200) {
-      showAppToast(context, '集数需为 1–200 的整数');
+    if (episodes < 1 || episodes > 50) {
+      showAppToast(context, '集数需为 1–50 的整数');
       return;
     }
     setState(() {

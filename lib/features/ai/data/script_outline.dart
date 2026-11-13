@@ -64,6 +64,19 @@ List<ScriptOutlineEpisode> parseScriptOutline(String text) {
   return episodes;
 }
 
+/// 只截取分集事件卡部分：从第一个「第N集：」起算，
+/// 前面的「故事简介 / 主要人物 / 人物关系」属于创作资料，不进入剧本大纲。
+/// 没有任何分集标题时返回空串，由调用方决定是否提示。
+String extractOutlineOnly(String text) {
+  final lines = text.replaceAll('\r\n', '\n').split('\n');
+  for (var i = 0; i < lines.length; i += 1) {
+    if (_episodeHead.hasMatch(lines[i].trim())) {
+      return lines.sublist(i).join('\n').trim();
+    }
+  }
+  return '';
+}
+
 /// 作品级剧本大纲的本机存储键（与 PC 用户端 `:outline:` 同构，互不影响）。
 String _outlineKey(int workId) => 'ai.scriptOutline.$workId';
 

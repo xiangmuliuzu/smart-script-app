@@ -137,8 +137,8 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       showAppToast(context, '请先输入你的要求');
       return;
     }
-    if (_episodes < 1 || _episodes > 200) {
-      showAppToast(context, '集数需为 1–200 的整数');
+    if (_episodes < 1 || _episodes > 50) {
+      showAppToast(context, '集数需为 1–50 的整数');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -551,7 +551,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
               controller: _episodesCtrl,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(hintText: '1–200'),
+              decoration: const InputDecoration(hintText: '1–50'),
             ),
           ),
           AiSkillSelector(
