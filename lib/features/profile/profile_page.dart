@@ -1036,7 +1036,8 @@ class _ClientBentoSection extends StatelessWidget {
                   iconBg: const Color(0xFFFEF3E8),
                   title: '需求发布',
                   subtitle: '发布任务等待接单',
-                  onTap: () => context.push(RoutePath.demandList),
+                  // 任务广场已升级为底部导航第二个分支：切 tab 而不是压栈
+                  onTap: () => context.go(RoutePath.demandTab),
                 ),
               ),
             ],

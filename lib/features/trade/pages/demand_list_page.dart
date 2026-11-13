@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/demand_genre.dart';
 import '../../../core/constants/demand_task_type.dart';
 import '../../../core/providers/auth_providers.dart';
-import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -20,21 +19,27 @@ import '../widgets/demand_hero_banner.dart';
 import '../widgets/demand_task_card.dart';
 import '../widgets/demand_task_type_chip_row.dart';
 
-/// 任务广场列表页（需求接单制 · 门户风格）。
+/// 任务广场·广场分段（需求接单制 · 门户风格）。
 ///
-/// 结构：AppBar（透明贴合 + 我的任务）→ Hero 页头与统计卡 →
-/// 工具条（搜索 + 排序 + 筛选）→ 结果头 → 卡片列表（触底加载更多）。
+/// 结构：Hero 页头与统计卡 → 工具条（搜索 + 排序 + 筛选）→ 结果头 →
+/// 卡片列表（触底加载更多）。作为底部导航「任务」板块的第一个分段，
+/// AppBar 与 TabBar 由 [TaskSquarePage] 提供，本页只输出正文。
 /// 题材、预算、集数统一收在筛选弹层，顶栏不放常驻 chips，避免占高与滑动找项。
 /// 广场仅展示可接取的任务（open+已托管），
-/// 自己发布的未托管/已接单等其他状态任务只在"我的任务"查看。
-class DemandListPage extends ConsumerStatefulWidget {
-  const DemandListPage({super.key});
+/// 自己发布的未托管/已接单等其他状态任务只在「我的任务」分段查看。
+/// 游客可浏览：后端对游客返回字段白名单，接单/发布等动作在各自入口校验登录。
+class DemandSquareSection extends ConsumerStatefulWidget {
+  const DemandSquareSection({super.key, required this.onPublish});
+
+  /// 「发布任务」入口。登录守卫与返回后的跨分段刷新由所在页面统一处理，
+  /// 本页只负责把自己刷新一次。
+  final VoidCallback onPublish;
 
   @override
-  ConsumerState<DemandListPage> createState() => _DemandListPageState();
+  ConsumerState<DemandSquareSection> createState() => DemandSquareSectionState();
 }
 
-class _DemandListPageState extends ConsumerState<DemandListPage> {
+class DemandSquareSectionState extends ConsumerState<DemandSquareSection> {
   static const int _pageSize = 20;
 
   final _searchController = TextEditingController();
@@ -104,6 +109,12 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
   }
 
   void _applyFilters() => _pager.reset();
+
+  /// 供所在页面在发布/接单流程返回后触发重拉（含 Hero 统计）。
+  void reload() {
+    ref.invalidate(demandStatsProvider);
+    _pager.reset();
+  }
 
   // ==================== 搜索（防抖 + 清空即还原） ====================
 
@@ -361,97 +372,28 @@ class _DemandListPageState extends ConsumerState<DemandListPage> {
     final statsAsync = ref.watch(demandStatsProvider);
     final stats = statsAsync.valueOrNull;
 
-    return Scaffold(
-      // 透明底透出 AppPageBackground 的全局冰蓝渐变，与首页/我的页同背景
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: AppColors.text1,
-        title: const Text(
-          '任务广场',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        centerTitle: true,
-        actions: [
-          // 图标 + 文案合并成一个轻量胶囊按钮：淡底淡字，字号收敛，避免抢过居中标题
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Material(
-                color: Colors.white.withOpacity(0.55),
-                borderRadius: BorderRadius.circular(15),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(15),
-                  onTap: () => AuthGuard.pushProtected(
-                    context,
-                    ref,
-                    target: RoutePath.demandMyTasks,
-                  ),
-                  child: Container(
-                    height: 30,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                          color: AppColors.primary.withOpacity(0.16)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(Icons.assignment_outlined,
-                            size: 14, color: AppColors.text3),
-                        SizedBox(width: 5),
-                        Text(
-                          '我的任务',
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1,
-                            color: AppColors.text3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(demandStatsProvider);
+        await _pager.reset();
+      },
+      child: CustomScrollView(
+        controller: _scrollCtrl,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          // 发布/托管流程 pop 返回后刷新列表与统计
+          SliverToBoxAdapter(
+            child: DemandHeroBanner(stats: stats, onPublish: widget.onPublish),
           ),
+          // 题材已收进筛选弹层，这里只留统计卡到工具条的区间留白
+          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+          SliverToBoxAdapter(child: _buildToolbar()),
+          // 筛选激活提示条：避免仅靠图标变色不易察觉
+          if (_filterActive) SliverToBoxAdapter(child: _buildFilterBanner()),
+          SliverToBoxAdapter(child: _buildResultHead()),
+          ..._buildListSlivers(),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(demandStatsProvider);
-          await _pager.reset();
-        },
-        child: CustomScrollView(
-          controller: _scrollCtrl,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            // 发布/托管流程 pop 返回后刷新列表与统计
-            SliverToBoxAdapter(
-              child: DemandHeroBanner(
-                stats: stats,
-                onPublish: () async {
-                  await context.push(RoutePath.demandPost);
-                  if (!mounted) return;
-                  ref.invalidate(demandStatsProvider);
-                  _pager.reset();
-                },
-              ),
-            ),
-            // 题材已收进筛选弹层，这里只留统计卡到工具条的区间留白
-            const SliverToBoxAdapter(child: SizedBox(height: 14)),
-            SliverToBoxAdapter(child: _buildToolbar()),
-            // 筛选激活提示条：避免仅靠图标变色不易察觉
-            if (_filterActive) SliverToBoxAdapter(child: _buildFilterBanner()),
-            SliverToBoxAdapter(child: _buildResultHead()),
-            ..._buildListSlivers(),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
-        ),
       ),
     );
   }

@@ -326,7 +326,9 @@ class _CategoryEntries extends StatelessWidget {
                 width: cellWidth,
                 icon: Icons.emoji_events_outlined,
                 label: '任务广场',
-                onTap: () => context.push(RoutePath.demandList),
+                // go 而不是 push：任务广场是底部导航第二个分支，切过去即选中该 tab，
+                // 再按返回不会退回一个「看起来在任务 tab、实际栈在首页分支」的错位状态。
+                onTap: () => context.go(RoutePath.demandTab),
               ),
             ],
           ),

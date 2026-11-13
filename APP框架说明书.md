@@ -2,7 +2,7 @@
 
 > 适用工程：`app/`（Flutter 工程根）
 > 对应团队仓库：根目录三目录 `pc/`（Vue 管理后台）、`app/`（本工程，Flutter）、`backend/`（Spring Boot 2.7.18 共享后端）中的 `app/`。
-> 当前状态：**底部导航、登录/注册/找回密码链路已完成**；书城/漫剧/创作/分类四个内容页仍为占位（后续分任务补齐）。
+> 当前状态：**底部导航、登录/注册/找回密码链路已完成**；底部第二格已由「漫剧（视频）」换成「任务广场」大板块（`/demand`：广场 + 我的任务 + 发布，游客可浏览广场）。
 > 一句话定位：本说明书讲清楚"工程里每个目录/文件是干嘛的、谁该改哪里、怎么跑起来"。
 
 ---
@@ -84,9 +84,10 @@ lib/
     │   ├── pages/agreement_page.dart      # 用户协议与隐私政策（注册前可查看，提交时带当前版本）
     │   ├── data/auth_repository.dart      # 认证请求：sms/send、login、sms/login、register、password/reset、agreements
     │   └── widgets/                       # 手机号、验证码、"获取验证码"倒计时、协议勾选等表单组件
-    ├── home/home_shell.dart          # ★ 底部五格导航容器（书城/漫剧/＋/分类/我的）
+    ├── home/home_shell.dart          # ★ 底部五格导航容器（首页/任务/＋/分类/我的）
     ├── bookstore/bookstore_page.dart # 占位
-    ├── comic/comic_page.dart         # 占位
+    ├── comic/comic_page.dart         # 漫剧信息流（已退出底部导航，仅保留 /comic 路由供深链）
+    ├── trade/pages/task_square_page.dart # ★ 底部「任务」板块根页（广场 / 我的任务 分段 + 发布入口）
     ├── create/create_page.dart       # 占位（中间＋）
     ├── category/category_page.dart   # 占位
     └── profile/profile_page.dart     # 示例页（读登录态 + 退出登录），非真实"我的"

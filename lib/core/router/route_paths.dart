@@ -20,17 +20,24 @@ class RoutePath {
   // 因此 home 必须是一个真实注册过的路由（不能是未注册的 '/'）。
   static const String home = '/bookstore';
   static const String bookstore = '/bookstore';
+
+  /// 任务广场 tab 根（大板块：广场 + 我的任务 + 发布）。
+  ///
+  /// 用顶层短路径而不是 `/trade/demand/...`：ProtectedRoutes 按「相等或 前缀/」匹配，
+  /// 独立短路径天然不会被交易域前缀命中，游客才能直接落在 tab 上。
+  static const String demandTab = '/demand';
   static const String comic = '/comic';
   static const String create = '/create';
   static const String category = '/category';
   static const String profile = '/profile';
 
-  /// 底部导航五个分支的根路径（顺序与 app_router.dart 的 StatefulShellBranch 一致）。
+  /// 底部导航四个内容分支的根路径（顺序与 app_router.dart 的 StatefulShellBranch 一致）。
   /// 登录回跳到这些目标时必须用 go 切分支；用 push 会把页面压进当前分支的导航栈，
   /// 出现「书城 tab 高亮、内容却是目标页」的错位（见 test/auth/auth_ui_flow_test.dart）。
+  /// /comic（短剧信息流）已移出底部导航，只保留路由不做入口，因此不在此列。
   static const List<String> shellRoots = <String>[
     bookstore,
-    comic,
+    demandTab,
     create,
     category,
     profile,
@@ -372,6 +379,7 @@ class RouteName {
   static const String privacyPolicy = 'privacyPolicy';
   static const String home = 'home';
   static const String bookstore = 'bookstore';
+  static const String demandTab = 'demandTab';
   static const String comic = 'comic';
   static const String create = 'create';
   static const String category = 'category';
@@ -515,8 +523,8 @@ class ProtectedRoutes {
     RoutePath.workVersions,
     RoutePath.workVersionDetail,
     // B 模块漫剧链路（需登录）：播放/历史/追更/举报；
-    // 注意不含 /comic 本身（底部导航「漫剧」tab 为公开信息流），
-    // 也不含 /comic/drama、/comic/related-work（公开详情与找同款）。
+    // 注意不含 /comic 本身（短剧信息流为公开页），也不含 /comic/drama、/comic/related-work
+    // （公开详情与找同款）。/comic 已退出底部导航，只保留路由供深链直达，没有站内入口。
     RoutePath.dramaPlay,
     RoutePath.dramaHistory,
     RoutePath.dramaSubscriptions,
@@ -535,8 +543,9 @@ class ProtectedRoutes {
     RoutePath.contractSign,
     RoutePath.cooperationCreate,
     RoutePath.followUpList,
-    RoutePath.demandList,
-    RoutePath.demandDetail,
+    // 任务广场（底部导航大板块）：tab 根 /demand 与广场/详情不登记，游客可逛；
+    // /trade/demand/list 只是指向 tab 根的兼容跳转，同样不设闸。
+    // 需要登录的是「动作与个人视角」：发布、我的任务、交付验收、源剧本。
     RoutePath.demandPost,
     RoutePath.demandMyTasks,
     RoutePath.demandStageDeliver,

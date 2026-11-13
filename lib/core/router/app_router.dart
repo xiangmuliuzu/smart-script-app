@@ -95,7 +95,7 @@ import '../../features/trade/pages/order_contract_page.dart';
 import '../../features/trade/pages/order_detail_page.dart';
 import '../../features/trade/pages/contract_sign_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
-import '../../features/trade/pages/demand_list_page.dart';
+import '../../features/trade/pages/task_square_page.dart';
 import '../../features/trade/pages/demand_detail_page.dart';
 import '../../features/trade/pages/demand_post_page.dart';
 import '../../features/trade/pages/demand_my_tasks_page.dart';
@@ -222,7 +222,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.privacyPolicy,
         builder: (_, __) => const PrivacyPolicyPage(),
       ),
-      // 底部导航：四个 tab 分支（书城 / 视频 / 分类 / 我的）+ 中间「创作」快捷入口
+      // 底部导航：四个 tab 分支（书城 / 任务广场 / 分类 / 我的）+ 中间「创作」快捷入口
       // （创作不再占用分支，点击直接进入新建作品，见 HomeShell）。
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
@@ -239,9 +239,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePath.comic,
-                name: RouteName.comic,
-                builder: (_, __) => const ComicPage(),
+                path: RoutePath.demandTab,
+                name: RouteName.demandTab,
+                builder: (_, __) => const TaskSquarePage(),
               ),
             ],
           ),
@@ -344,6 +344,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // ===== B 模块漫剧（外部视频）链路（接口 2.8）=====
       // 详情统一用查询参数 ?id=n；播放页额外支持 ?episodeId=n 指定起始集。
+      // 信息流 /comic 已退出底部导航（该位置换成任务广场），只保留路由：
+      // 站内不再有入口，历史深链与 test/a6 的公开入口判定仍然可达。
+      GoRoute(
+        path: RoutePath.comic,
+        name: RouteName.comic,
+        builder: (_, __) => const ComicPage(),
+      ),
       GoRoute(
         path: RoutePath.dramaDetail,
         name: RouteName.dramaDetail,
@@ -705,10 +712,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const OrderContractPage(initialIndex: 1),
       ),
       // ===== 任务广场 =====
+      // tab 根在底部导航分支里（RoutePath.demandTab）；旧列表路由只做兼容跳转，
+      // 让历史深链与外部分享仍然落到板块，而不是再开一个没有底栏的二级页。
       GoRoute(
         path: RoutePath.demandList,
         name: RouteName.demandList,
-        builder: (_, __) => const DemandListPage(),
+        redirect: (_, __) => RoutePath.demandTab,
       ),
       GoRoute(
         path: RoutePath.demandDetail,

@@ -10,7 +10,7 @@ import '../../core/theme/app_colors.dart';
 
 /// 主框架的底部导航容器（对应 UI 原型 `.tabbar` 五格平铺 + 中间圆形凸起）。
 ///
-/// 四个 tab 分支（书城 / 视频 / 分类 / 我的）由 [StatefulNavigationShell] 管理，
+/// 四个 tab 分支（书城 / 任务广场 / 分类 / 我的）由 [StatefulNavigationShell] 管理，
 /// 切 tab 会保留各自导航栈；中间「创作」是新建作品入口，先选 AI 创作或自己编辑，不占用分支。
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
@@ -19,7 +19,7 @@ class HomeShell extends ConsumerWidget {
 
   static const _tabs = <_TabItem>[
     _TabItem('首页', Icons.menu_book_outlined, Icons.menu_book),
-    _TabItem('视频', Icons.smart_display_outlined, Icons.smart_display),
+    _TabItem('任务', Icons.workspace_premium_outlined, Icons.workspace_premium),
     _TabItem('创作', Icons.library_books_outlined, Icons.library_books),
     _TabItem('分类', Icons.grid_view_outlined, Icons.grid_view),
     _TabItem('我的', Icons.person_outline, Icons.person),

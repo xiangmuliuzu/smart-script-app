@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/demand_providers.dart';
 
@@ -11,12 +9,12 @@ import '../data/demand_providers.dart';
 /// 白色圆角卡片（12 圆角 + 轻阴影），不再使用深蓝渐变大色块。
 /// stats 允许为 null（首屏加载），此时统计值显示 "--" 占位。
 class DemandHeroBanner extends StatelessWidget {
-  const DemandHeroBanner({super.key, required this.stats, this.onPublish});
+  const DemandHeroBanner({super.key, required this.stats, required this.onPublish});
 
   final DemandStats? stats;
 
-  /// 发布按钮行为覆盖：广场页传入后在发布/托管流程 pop 返回时刷新列表与统计。
-  final VoidCallback? onPublish;
+  /// 发布入口：由广场页注入，统一走登录守卫并在流程 pop 返回后刷新列表与统计。
+  final VoidCallback onPublish;
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +46,7 @@ class DemandHeroBanner extends StatelessWidget {
                   ],
                 ),
               ),
-              _PublishButton(
-                onTap: onPublish ?? () => context.push(RoutePath.demandPost),
-              ),
+              _PublishButton(onTap: onPublish),
             ],
           ),
         ),

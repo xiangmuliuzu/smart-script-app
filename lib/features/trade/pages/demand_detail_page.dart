@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/demand_task_type.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_providers.dart';
@@ -30,6 +31,14 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 游客与登录用户拿到的是两份不同视图（后端对游客做字段白名单，clientId 等不在其中）。
+    // 登录态一变，缓存的游客视图必须重取，否则本人回到详情页会因为拿不到 clientId
+    // 而看不到任何买方操作。
+    ref.listen(authControllerProvider, (prev, next) {
+      if (prev?.user?.userId != next.user?.userId) {
+        ref.invalidate(demandDetailProvider(widget.demandId));
+      }
+    });
     final asyncTask = ref.watch(demandDetailProvider(widget.demandId));
 
     return Scaffold(
@@ -89,7 +98,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
                   _infoRow('完成时限', formatDurationHours(task.durationHours ?? 0)),
                 _infoRow('交付要求', DemandTaskType.deliverHintOf(task.taskType)),
                 _infoRow('托管状态', DemandEscrowStatus.label(task.escrowStatus)),
-                _infoRow('托管额', '¥${task.escrowYuanText}'),
+                // 托管额不在游客白名单里，显示 0 会让游客误判赏金规模
+                if (myId != null) _infoRow('托管额', '¥${task.escrowYuanText}'),
                 if (task.depositStatus != null && task.depositStatus != DemandDepositStatus.none) ...[
                   _infoRow('押金状态', DemandDepositStatus.label(task.depositStatus)),
                   _infoRow('押金', '¥${task.depositYuanText}'),
@@ -130,7 +140,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
         ],
         // 源剧本（分镜类任务）：接单方靠它评估工作量，发布者也在详情里复核关联内容
         if (DemandTaskType.isStoryboard(task.taskType)) ...[
-          _buildSourceScriptBlock(task),
+          _buildSourceScriptBlock(task, isLoggedIn: myId != null),
           const SizedBox(height: 16),
         ],
         // 任务会话入口（发布者 ↔ 创作者）
@@ -195,13 +205,18 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
               label: '支付宝扫码付押金 ¥${_depositYuanPreview(task)}',
               loadingLabel: '获取收款码...',
               onSubmitting: _submitting,
-              onTap: () => _payDeposit(task),
+              onTap: () {
+                if (_ensureLoginForAction(task)) _payDeposit(task);
+              },
             ),
             const SizedBox(height: 2),
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: _submitting ? null : () => _devPassDeposit(task),
+                onPressed: _submitting ? null
+                    : () {
+                        if (_ensureLoginForAction(task)) _devPassDeposit(task);
+                      },
                 child: const Text('开发环境一键直通接单',
                     style: TextStyle(color: AppColors.text3, fontSize: 12)),
               ),
@@ -338,6 +353,14 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     final depositFen = (budgetFen / 10).floor();
     return (depositFen / 100).toStringAsFixed(2);
   }
+
+  /// 接单相关动作一律先过登录守卫：游客直调受保护接口会拿到 401，
+  /// 而 ApiClient 把任何 401 当会话过期处理，会把人从详情页踢走。
+  bool _ensureLoginForAction(DemandTask task) => AuthGuard.requireLogin(
+        context,
+        ref,
+        target: RoutePath.demandDetailUrl(task.demandId ?? widget.demandId),
+      );
 
   Widget _primaryActionButton({
     required IconData icon,
@@ -486,9 +509,11 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
   }
 
   /// 源剧本区块：给出关联作品/上传文件的现状，并入口到全本查阅页。
-  Widget _buildSourceScriptBlock(DemandTask task) {
+  Widget _buildSourceScriptBlock(DemandTask task, {required bool isLoggedIn}) {
     final hasWork = (task.sourceWorkTitle ?? '').isNotEmpty;
-    final hasFile = (task.sourceScriptUrl ?? '').isNotEmpty;
+    // 游客视图不带 sourceScriptUrl（后端白名单），只认文件名，否则会误报「尚未提供源剧本」
+    final hasFile =
+        (task.sourceScriptUrl ?? '').isNotEmpty || (task.sourceScriptName ?? '').isNotEmpty;
     final accent = DemandTaskType.colorOf(task.taskType);
     return Container(
       width: double.infinity,
@@ -505,8 +530,11 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: accent)),
           const SizedBox(height: 6),
           if (!hasWork && !hasFile)
-            Text('发布者尚未提供源剧本（可能已失效），请编辑任务重新关联。',
-                style: TextStyle(fontSize: 12.5, height: 1.5, color: Colors.red.shade600))
+            Text(
+              isLoggedIn
+                  ? '发布者尚未提供源剧本（可能已失效），请编辑任务重新关联。'
+                  : '登录后可查看发布者提供的源剧本。',
+              style: TextStyle(fontSize: 12.5, height: 1.5, color: Colors.red.shade600))
           else
             Text(
               [
@@ -520,7 +548,11 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
-                onPressed: () => context.push(RoutePath.demandSourceScriptUrl(task.demandId!)),
+                onPressed: () => AuthGuard.pushProtected(
+                  context,
+                  ref,
+                  target: RoutePath.demandSourceScriptUrl(task.demandId!),
+                ),
                 icon: const Icon(Icons.visibility_outlined, size: 16),
                 label: const Text('查看源剧本'),
                 style: OutlinedButton.styleFrom(foregroundColor: accent),
