@@ -84,7 +84,6 @@ const _task = DemandTask(
   taskType: DemandTaskType.script,
   budget: 20000,
   status: 'open',
-  escrowStatus: DemandEscrowStatus.escrowed,
 );
 
 Future<void> _pumpApp(WidgetTester tester) async {
@@ -131,7 +130,8 @@ Future<void> _enterLoginFromDemandDetail(WidgetTester tester) async {
   await _settle(tester);
   expect(find.text('任务详情'), findsOneWidget);
 
-  await tester.tap(find.textContaining('支付宝扫码付押金').first);
+  // 押金/托管随资金托管下线后，游客在详情页触发登录的入口是「接单」
+  await tester.tap(find.textContaining('我要接单').first);
   await _settle(tester);
   expect(find.text('需要登录'), findsOneWidget);
   await tester.tap(find.descendant(
