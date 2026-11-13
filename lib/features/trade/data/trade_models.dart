@@ -929,46 +929,6 @@ class DemandStatus {
   }
 }
 
-/// 需求任务托管资金状态（入账走支付宝沙箱，出账记账）
-class DemandEscrowStatus {
-  static const String none = 'none';
-  static const String pendingPayment = 'pending_payment';
-  static const String escrowed = 'escrowed';
-  static const String released = 'released';
-  static const String refundedToPublisher = 'refunded_to_publisher';
-
-  static String label(String? status) {
-    switch (status) {
-      case none: return '无托管';
-      case pendingPayment: return '待付托管';
-      case escrowed: return '已托管';
-      case released: return '已放款';
-      case refundedToPublisher: return '已退回发布者';
-      default: return status ?? '未知';
-    }
-  }
-}
-
-/// 需求任务押金资金状态
-/// 押金是创作者缴的履约保证金，不是发布者托管的预算款，
-/// held 不能译作「已托管」（与 DemandEscrowStatus.escrowed 撞词，页面上就分不出两笔钱）
-class DemandDepositStatus {
-  static const String none = 'none';
-  static const String held = 'held';
-  static const String refunded = 'refunded';
-  static const String forfeited = 'forfeited';
-
-  static String label(String? status) {
-    switch (status) {
-      case none: return '未缴';
-      case held: return '在押';
-      case refunded: return '已退还';
-      case forfeited: return '已没收';
-      default: return status ?? '未知';
-    }
-  }
-}
-
 /// 征集任务模型
 class DemandTask {
   final int? demandId;
@@ -983,7 +943,7 @@ class DemandTask {
   final String? contactInfo;
   final int? totalEpisodes;
   final String? status;
-  // 任务类型与源剧本（storyboard 类型由发布者提供，供接单方评估）
+  // 任务类型与源剧本（storyboard 类型由平台提供，供接单方评估）
   final String? taskType;
   final int? sourceWorkId;
   final String? sourceScriptUrl;
@@ -998,13 +958,6 @@ class DemandTask {
   final DateTime? dueAt;
   final int? isOverdue;
   final String? acceptedCreatorName;
-  // 逐轮托管押金（金额均为分）
-  final int? escrowAmount;
-  final String? escrowStatus;
-  final int? depositAmount;
-  final String? depositStatus;
-  final DateTime? depositPaidAt;
-  final DateTime? depositSettledAt;
   final String? failReason;
   final DateTime? failAt;
 
@@ -1016,24 +969,8 @@ class DemandTask {
     this.sourceScriptName, this.sourceWorkTitle,
     this.acceptedCreatorId, this.acceptedAt, this.durationHours, this.dueAt,
     this.isOverdue, this.acceptedCreatorName,
-    this.escrowAmount, this.escrowStatus, this.depositAmount, this.depositStatus,
-    this.depositPaidAt, this.depositSettledAt, this.failReason, this.failAt,
+    this.failReason, this.failAt,
   });
-
-  /// 是否已完成托管付款（广场可抢/可接单前置）。
-  bool get isEscrowed => escrowStatus == DemandEscrowStatus.escrowed;
-  /// 是否待发布者支付托管。
-  bool get isEscrowPending => escrowStatus == DemandEscrowStatus.pendingPayment;
-
-  /// 托管额（元，用于展示）。
-  String get escrowYuanText => _fenToYuanText(escrowAmount);
-  /// 押金（元，用于展示）。
-  String get depositYuanText => _fenToYuanText(depositAmount);
-
-  static String _fenToYuanText(int? fen) {
-    if (fen == null) return '0.00';
-    return (fen / 100).toStringAsFixed(2);
-  }
 
   /// 接单制状态文案；逾期优先于进行中展示。
   String get statusLabel {
@@ -1076,12 +1013,6 @@ class DemandTask {
       dueAt: _parseDateTime(json['dueAt']),
       isOverdue: (json['overdue'] as num?)?.toInt() ?? (json['isOverdue'] as num?)?.toInt(),
       acceptedCreatorName: json['acceptedCreatorName'] as String?,
-      escrowAmount: (json['escrowAmount'] as num?)?.toInt(),
-      escrowStatus: json['escrowStatus'] as String?,
-      depositAmount: (json['depositAmount'] as num?)?.toInt(),
-      depositStatus: json['depositStatus'] as String?,
-      depositPaidAt: _parseDateTime(json['depositPaidAt']),
-      depositSettledAt: _parseDateTime(json['depositSettledAt']),
       failReason: json['failReason'] as String?,
       failAt: _parseDateTime(json['failAt']),
     );
@@ -1293,7 +1224,7 @@ class DemandStage {
     if (aiScore == null && aiReviewedAt == null) return null;
     if (aiScore == null) return 'AI审核：未评分（已转人工验收）';
     final pass = aiScore! >= 60;
-    return 'AI审核：$aiScore分 · ${pass ? '通过，待发布者验收' : '未通过，已自动打回'}';
+    return 'AI审核：$aiScore分 · ${pass ? '通过，待平台验收' : '未通过，已自动打回'}';
   }
 
   /// 是否有待处理的延时申请（轮次行上的最近一次快照；完整历史见 DemandExtendApply）。
@@ -1313,7 +1244,7 @@ class DemandStage {
 }
 
 /// 延时历史记录（一条动作一行，通过/驳回均保留）。
-/// [applyType] 区分来源：request=创作者申请延时（待发布者处理），self=发布者自主延时（写入即生效）。
+/// [applyType] 区分来源：request=创作者申请延时（待平台裁决），self=平台自主延时（写入即生效）。
 class DemandExtendApply {
   final int? applyId;
   final int? demandId;
@@ -1354,7 +1285,7 @@ class DemandExtendApply {
 
   bool get isPending => status == 'pending';
 
-  /// 是否发布者自主延时（无需审核，落记录即已生效）。
+  /// 是否平台自主延时（无需审核，落记录即已生效）。
   bool get isSelf => applyType == 'self';
 
   /// 记录行前缀文案：自主延时 / 申请延时。
@@ -1426,10 +1357,10 @@ class DeliverableWork {
   }
 }
 
-/// 验收查阅：某轮交付作品的一集（一章即一集，后端 episode_count 就是本表行数）。
+/// 源剧本与交付正文共用的一集（一章即一集，后端 episode_count 就是本表行数）。
 ///
 /// readable=false 表示该集超出本轮 episodeTo、还没交上来，后端不下发正文；
-/// 保留标题是为了让发布者知道后面还剩几集。
+/// 保留标题是为了让读者知道后面还剩几集。
 class DeliverableChapter {
   final int chapterId;
   final int? chapterNo;
@@ -1462,64 +1393,4 @@ class DeliverableChapter {
 
   String get displayTitle =>
       (chapterTitle?.isNotEmpty ?? false) ? chapterTitle! : '第${chapterNo ?? '?'}集';
-}
-
-/// 验收查阅：某轮交付的作品（仅发布者可取，正文只到本轮 episodeTo）。
-class StageDeliverableView {
-  final int workId;
-  final String? title;
-  final String? authorName;
-  final int? episodeCount;
-  final int? wordCount;
-  final String? summary;
-  final int? stageOrder;
-  final int? episodeTo;
-  final String? stageStatus;
-  final String? deliverableDesc;
-  final String? deliverableUrl;
-  final int? aiScore;
-  final List<DeliverableChapter> chapters;
-
-  const StageDeliverableView({
-    required this.workId,
-    this.title,
-    this.authorName,
-    this.episodeCount,
-    this.wordCount,
-    this.summary,
-    this.stageOrder,
-    this.episodeTo,
-    this.stageStatus,
-    this.deliverableDesc,
-    this.deliverableUrl,
-    this.aiScore,
-    this.chapters = const [],
-  });
-
-  factory StageDeliverableView.fromJson(Map<String, dynamic> json) {
-    final raw = json['chapters'];
-    return StageDeliverableView(
-      workId: (json['workId'] as num?)?.toInt() ?? 0,
-      title: json['title'] as String?,
-      authorName: json['authorName'] as String?,
-      episodeCount: (json['episodeCount'] as num?)?.toInt(),
-      wordCount: (json['wordCount'] as num?)?.toInt(),
-      summary: json['summary'] as String?,
-      stageOrder: (json['stageOrder'] as num?)?.toInt(),
-      episodeTo: (json['episodeTo'] as num?)?.toInt(),
-      stageStatus: json['stageStatus'] as String?,
-      deliverableDesc: json['deliverableDesc'] as String?,
-      deliverableUrl: json['deliverableUrl'] as String?,
-      aiScore: (json['aiScore'] as num?)?.toInt(),
-      chapters: raw is List
-          ? raw
-              .whereType<Map>()
-              .map((e) => DeliverableChapter.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
-          : const [],
-    );
-  }
-
-  /// 本轮可见（已下发正文）的集数。
-  int get readableCount => chapters.where((c) => c.readable).length;
 }

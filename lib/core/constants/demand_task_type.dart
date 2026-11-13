@@ -27,9 +27,9 @@ class DemandTaskType {
 
   /// 交付口径：接单方视角，说明这一类任务要交什么、走不走 AI 审核
   static const Map<String, String> deliverHints = <String, String>{
-    script: '逐轮交付本人未上架的剧本作品，AI 剧本审核通过后进入发布者人工验收',
+    script: '逐轮交付本人未上架的剧本作品，AI 剧本审核通过后进入平台人工验收',
     scriptStoryboard: '逐轮交付剧本作品，分镜以文件链接或交付说明随本轮一并提交，AI 剧本审核通过后进入人工验收',
-    storyboard: '按发布者提供的源剧本产出分镜：交付分镜文件或填写交付说明即可（作品可选），提交后直接进入人工验收',
+    storyboard: '按平台提供的源剧本产出分镜：交付分镜文件或填写交付说明即可（作品可选），提交后直接进入人工验收',
   };
 
   static const Color fallbackColor = Color(0xFF6B7280);

@@ -323,7 +323,7 @@ void main() {
       // 空输入
       await tester.tap(find.text('生成'));
       await tester.pump();
-      expect(find.text('请先输入作品主题或灵感'), findsOneWidget);
+      expect(find.text('请先填写故事灵感（或你的要求）'), findsOneWidget);
 
       // 输入主题并生成
       final fields = find.byType(TextField);
@@ -331,7 +331,7 @@ void main() {
       await tester.tap(find.text('生成'));
       await tester.pumpAndSettle();
 
-      expect(fake.calls.first, contains('outlineStream:都市青年逆袭'));
+      expect(fake.calls.first, contains('outlineStream:故事灵感：\n都市青年逆袭'));
       expect(find.textContaining('第一幕：跌落谷底'), findsOneWidget);
       expect(find.text('消耗 1 token'), findsOneWidget);
 

@@ -134,7 +134,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       return;
     }
     if (_ideaCtrl.text.trim().isEmpty) {
-      showAppToast(context, '请先输入你的要求');
+      showAppToast(context, '请先输入故事灵感');
       return;
     }
     if (_episodes < 1 || _episodes > 50) {

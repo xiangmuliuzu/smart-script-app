@@ -14,10 +14,9 @@ import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
-import '../widgets/demand_sandbox_pay_dialog.dart';
 import '../widgets/demand_stage_panel.dart';
 
-/// 任务详情页（接单制：展示需求 + 抢单/交付/验收）。
+/// 任务详情页（平台发布 → 创作者先到先得接单 → 逐轮交付）。
 class DemandDetailPage extends ConsumerStatefulWidget {
   const DemandDetailPage({super.key, required this.demandId});
   final int demandId;
@@ -31,9 +30,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 游客与登录用户拿到的是两份不同视图（后端对游客做字段白名单，clientId 等不在其中）。
-    // 登录态一变，缓存的游客视图必须重取，否则本人回到详情页会因为拿不到 clientId
-    // 而看不到任何买方操作。
+    // 游客与登录用户拿到的是两份不同视图（后端对游客做字段白名单，接单人等私密字段不在其中）。
+    // 登录态一变，缓存的游客视图必须重取，否则本人回到详情页会因为拿不到最新字段而看不到接单入口。
     ref.listen(authControllerProvider, (prev, next) {
       if (prev?.user?.userId != next.user?.userId) {
         ref.invalidate(demandDetailProvider(widget.demandId));
@@ -59,7 +57,6 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
   Widget _buildContent(DemandTask task) {
     final budgetYuan = task.budget != null ? (task.budget! / 100).toStringAsFixed(2) : '-';
     final myId = ref.watch(authControllerProvider).user?.userId;
-    final isBuyer = myId != null && myId == task.clientId;
     final isClaimer = myId != null && task.acceptedCreatorId != null && myId == task.acceptedCreatorId;
     final inProgress = task.status == 'in_progress';
     final hasStages = task.totalEpisodes != null && task.totalEpisodes! > 0;
@@ -97,16 +94,9 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
                 else
                   _infoRow('完成时限', formatDurationHours(task.durationHours ?? 0)),
                 _infoRow('交付要求', DemandTaskType.deliverHintOf(task.taskType)),
-                _infoRow('托管状态', DemandEscrowStatus.label(task.escrowStatus)),
-                // 托管额不在游客白名单里，显示 0 会让游客误判赏金规模
-                if (myId != null) _infoRow('托管额', '¥${task.escrowYuanText}'),
-                if (task.depositStatus != null && task.depositStatus != DemandDepositStatus.none) ...[
-                  _infoRow('押金状态', DemandDepositStatus.label(task.depositStatus)),
-                  _infoRow('押金', '¥${task.depositYuanText}'),
-                ],
                 if (task.status == 'failed' && task.failReason != null)
                   _infoRow('失败原因', task.failReason!, valueColor: Colors.red),
-                _infoRow('发布者', task.clientName ?? '-'),
+                _infoRow('需求方', task.clientName ?? '-'),
                 if (task.acceptedCreatorName != null || task.acceptedCreatorId != null)
                   _infoRow('接单人', task.acceptedCreatorName ?? '#${task.acceptedCreatorId}'),
                 if (task.acceptedAt != null)
@@ -138,206 +128,54 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           ),
           const SizedBox(height: 16),
         ],
-        // 源剧本（分镜类任务）：接单方靠它评估工作量，发布者也在详情里复核关联内容
+        // 源剧本（分镜类任务）：接单方靠它评估工作量
         if (DemandTaskType.isStoryboard(task.taskType)) ...[
           _buildSourceScriptBlock(task, isLoggedIn: myId != null),
           const SizedBox(height: 16),
         ],
-        // 任务会话入口（发布者 ↔ 创作者）
-        if (myId != null && !isBuyer)
+        // 任务会话入口（创作者 ↔ 平台运营）
+        if (myId != null && isClaimer)
           _chatEntryButton(
-            label: '联系发布者',
+            label: '联系平台',
             onTap: () => _openDemandChat(task),
           ),
-        if (myId != null && isBuyer && task.acceptedCreatorId != null)
-          _chatEntryButton(
-            label: '联系接单人',
-            onTap: () => _openDemandChat(task, targetUserId: task.acceptedCreatorId),
-          ),
-        // 操作区（接单制 + 逐轮托管押金）
+        // 操作区：平台已托管预算，创作者先到先得直接接单
         if (task.status == 'open') ...[
-          if (isBuyer && task.isEscrowPending) ...[
-            _primaryActionButton(
-              icon: Icons.qr_code_2,
-              label: '支付宝扫码付托管款 ¥${task.escrowYuanText}',
-              loadingLabel: '获取收款码...',
-              onSubmitting: _submitting,
-              onTap: () => _payEscrow(task),
-            ),
-            const SizedBox(height: 2),
-            // 沙箱未配置（缺密钥或当前库未授权）时的备用通路，与后端同一开关
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: _submitting ? null : () => _devPassEscrow(task),
-                child: const Text('开发环境一键直通托管',
-                    style: TextStyle(color: AppColors.text3, fontSize: 12)),
-              ),
-            ),
-            const SizedBox(height: 6),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => context.push(RoutePath.demandPostEditUrl(task.demandId!)),
-                child: const Text('编辑任务', style: TextStyle(color: AppColors.text1)),
-              ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => _confirmClose(task),
-                child: const Text('关闭任务', style: TextStyle(color: Colors.red)),
-              ),
-            ),
-          ] else if (isBuyer) ...[
-            _escrowPaidBanner(),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => _confirmClose(task),
-                child: const Text('关闭任务', style: TextStyle(color: Colors.red)),
-              ),
-            ),
-          ] else if (task.isEscrowed) ...[
-            _primaryActionButton(
-              icon: Icons.qr_code_2,
-              // 未接单前库里 deposit_amount 默认 0，固定按总价 10% 预览，实际金额以收款码返回为准
-              label: '支付宝扫码付押金 ¥${_depositYuanPreview(task)}',
-              loadingLabel: '获取收款码...',
-              onSubmitting: _submitting,
-              onTap: () {
-                if (_ensureLoginForAction(task)) _payDeposit(task);
-              },
-            ),
-            const SizedBox(height: 2),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: _submitting ? null
-                    : () {
-                        if (_ensureLoginForAction(task)) _devPassDeposit(task);
-                      },
-                child: const Text('开发环境一键直通接单',
-                    style: TextStyle(color: AppColors.text3, fontSize: 12)),
-              ),
-            ),
-          ] else
-            _hintBar('该任务尚未完成托管付款，暂不可接单'),
+          _primaryActionButton(
+            icon: Icons.gavel,
+            label: '我要接单',
+            loadingLabel: '接单中...',
+            onSubmitting: _submitting,
+            onTap: () {
+              if (_ensureLoginForAction(task)) _claim(task);
+            },
+          ),
+          const SizedBox(height: 2),
+          _hintBar('接单后按轮次交付，每轮通过验收即结算该轮款项。'),
         ],
-        // 进行中的倒计时（任务双方均可见：发布者也要看到剩余时限与“计时已暂停”，否则无从判断要不要延时）
-        if (inProgress && (isBuyer || isClaimer)) _buildCountdown(task),
-        // 验收面板（已配置轮次且接单后/完成时可见；仅交易双方可见，第三人无操作资格不展示）
-        if (hasStages && (inProgress || task.status == 'completed') && (isBuyer || isClaimer)) ...[
+        // 进行中的倒计时（仅接单人可见：后续验收与延时已收归平台运营）
+        if (inProgress && isClaimer) _buildCountdown(task),
+        // 验收面板（已配置轮次且接单后/完成时可见；仅接单人可见）
+        if (hasStages && (inProgress || task.status == 'completed') && isClaimer) ...[
           const SizedBox(height: 8),
-          DemandStagePanel(demandId: task.demandId!, isBuyer: isBuyer),
+          DemandStagePanel(demandId: task.demandId!),
         ],
       ],
     );
   }
 
-  /// 备用通路：一键直通完成托管（沙箱未配置时使用，与后端 APP_DEMAND_ESCROW_MOCK_PASS 同开关）。
-  Future<void> _devPassEscrow(DemandTask task) async {
+  /// 创作者抢单（先到先得，无需押金）。落败/资格不足由后端 message 说明。
+  Future<void> _claim(DemandTask task) async {
     setState(() => _submitting = true);
     try {
-      await ref.read(demandRepositoryProvider).devPassEscrow(task.demandId!);
-      ref.invalidate(demandDetailProvider(widget.demandId));
-      ref.invalidate(demandStatsProvider); // 直通托管后广场可接单数/奖金池变化
-      if (mounted) showAppToast(context, '托管已到账，任务已对外发布');
-    } catch (e) {
-      if (mounted) showAppToast(context, '完成托管失败：${_errText(e)}');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  /// 发布者付托管款（主路径）：拿二维码 → 弹窗扫码 → 服务端查单确认（支付宝沙箱）。
-  Future<void> _payEscrow(DemandTask task) async {
-    setState(() => _submitting = true);
-    try {
-      final data = await ref.read(demandRepositoryProvider).payEscrow(task.demandId!);
-      if (!mounted) return;
-      // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
-      var paid = data['paid'] == true;
-      if (!paid) {
-        paid = await showDialog<bool>(
-          context: context,
-          builder: (_) => DemandSandboxPayDialog(
-            title: '支付托管款',
-            qrCode: data['qrCode'] as String,
-            amountYuanText: task.escrowYuanText,
-            hint: '将预算全额付入平台第三方托管账户（沙箱收款，不产生真实资金）。托管完成后任务才对外可接单。',
-            confirm: () => ref.read(demandRepositoryProvider).confirmEscrow(task.demandId!),
-            onRefresh: () =>
-                ref.read(demandRepositoryProvider).payEscrow(task.demandId!, refresh: true),
-          ),
-        ) ??
-            false;
-      }
-      if (paid) {
-        ref.invalidate(demandDetailProvider(widget.demandId));
-        ref.invalidate(demandStatsProvider); // 托管到账后任务对外可接单
-        if (mounted) showAppToast(context, '托管已到账，任务已发布');
-      }
-    } catch (e) {
-      if (mounted) showAppToast(context, '发起托管付款失败：${_errText(e)}');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  /// 备用通路：一键直通押金付款并接单（与托管直通同开关同口径）。
-  Future<void> _devPassDeposit(DemandTask task) async {
-    setState(() => _submitting = true);
-    try {
-      await ref.read(demandRepositoryProvider).devPassDeposit(task.demandId!);
+      await ref.read(demandRepositoryProvider).claimDemand(task.demandId!);
       ref.invalidate(demandDetailProvider(widget.demandId));
       ref.invalidate(demandStagesProvider(widget.demandId));
       ref.invalidate(demandStatsProvider); // 接单后任务脱离可接单集合
-      if (mounted) showAppToast(context, '押金已支付，接单成功');
+      if (mounted) showAppToast(context, '接单成功，请按首轮时限交付');
     } catch (e) {
-      if (mounted) showAppToast(context, '支付押金失败：${_errText(e)}');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  /// 创作者付押金即接单（主路径）：拿押金二维码 → 扫码 → 查单确认（服务端自动接单）。
-  Future<void> _payDeposit(DemandTask task) async {
-    setState(() => _submitting = true);
-    try {
-      final data = await ref.read(demandRepositoryProvider).payDeposit(task.demandId!);
-      if (!mounted) return;
-      final amountFen = (data['amount'] as num?)?.toInt();
-      final amountYuan = amountFen != null ? (amountFen / 100).toStringAsFixed(2) : _depositYuanPreview(task);
-      // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
-      var paid = data['paid'] == true;
-      if (!paid) {
-        paid = await showDialog<bool>(
-          context: context,
-          builder: (_) => DemandSandboxPayDialog(
-            title: '支付押金',
-            qrCode: data['qrCode'] as String,
-            amountYuanText: amountYuan,
-            hint: '支付押金即视为接单成功（沙箱收款）。逾期未验收通过，押金将被没收。',
-            confirm: () => ref.read(demandRepositoryProvider).confirmDeposit(task.demandId!),
-            onRefresh: () =>
-                ref.read(demandRepositoryProvider).payDeposit(task.demandId!, refresh: true),
-          ),
-        ) ??
-            false;
-      }
-      if (paid) {
-        ref.invalidate(demandDetailProvider(widget.demandId));
-        ref.invalidate(demandStagesProvider(widget.demandId));
-        ref.invalidate(demandStatsProvider); // 接单后任务脱离可接单集合
-        if (mounted) showAppToast(context, '押金已入账，接单成功');
-      } else {
-        // 未成交：可能是任务已被他人抢先接走（弹窗展示 reason），刷新详情同步最新状态
-        ref.invalidate(demandDetailProvider(widget.demandId));
-        ref.invalidate(demandStatsProvider);
-      }
-    } catch (e) {
-      if (mounted) showAppToast(context, '发起押金付款失败：${_errText(e)}');
+      if (mounted) showAppToast(context, '接单失败：${_errText(e)}');
+      ref.invalidate(demandDetailProvider(widget.demandId));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -345,14 +183,6 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
 
   /// 提取可读错误文案：业务异常取后端 message（如“请先开通创作者资格再接单”），其余回退默认。
   String _errText(Object e) => e is ApiException && e.message.isNotEmpty ? e.message : '请稍后重试';
-
-  /// 押金预览（预算的10%、向下取整到分）。
-  String _depositYuanPreview(DemandTask task) {
-    final budgetFen = task.budget;
-    if (budgetFen == null || budgetFen <= 0) return '0.00';
-    final depositFen = (budgetFen / 10).floor();
-    return (depositFen / 100).toStringAsFixed(2);
-  }
 
   /// 接单相关动作一律先过登录守卫：游客直调受保护接口会拿到 401，
   /// 而 ApiClient 把任何 401 当会话过期处理，会把人从详情页踢走。
@@ -387,28 +217,6 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
   String onsubmittingGuard(String loadingLabel, String label) =>
       _submitting ? loadingLabel : label;
 
-  Widget _escrowPaidBanner() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.verified, size: 18, color: Colors.green),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text('托管已到账，等待创作者付押金接单', style: TextStyle(fontSize: 13, color: Colors.green)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _hintBar(String text) {
     return Container(
       width: double.infinity,
@@ -423,31 +231,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
 
   Widget _buildCountdown(DemandTask task) => DemandCountdownBar(task: task);
 
-  Future<void> _confirmClose(DemandTask task) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认关闭'),
-        content: const Text('关闭后将不再接受新的抢单，确定吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      try {
-        await ref.read(demandRepositoryProvider).closeDemand(task.demandId!);
-        ref.invalidate(demandDetailProvider(widget.demandId));
-        ref.invalidate(demandStatsProvider); // 关闭后任务脱离可接单集合
-        if (mounted) showAppToast(context, '已关闭');
-      } catch (e) {
-        if (mounted) showAppToast(context, '操作失败：${_errText(e)}');
-      }
-    }
-  }
-
-  /// 任务会话入口按钮（发布者 ↔ 创作者）。
+  /// 任务会话入口按钮（创作者 ↔ 平台运营）。
   Widget _chatEntryButton({required String label, required VoidCallback onTap}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -463,15 +247,15 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     );
   }
 
-  /// 发起/获取任务会话并跳转聊天详情。[targetUserId] 为发布者发起时指定的创作者。
-  Future<void> _openDemandChat(DemandTask task, {int? targetUserId}) async {
+  /// 发起/获取任务会话（创作者侧：与接单任务的平台运营沟通）并跳转聊天详情。
+  Future<void> _openDemandChat(DemandTask task) async {
     final demandId = task.demandId;
     if (demandId == null) return;
     setState(() => _submitting = true);
     try {
       final sessionId = await ref
           .read(demandRepositoryProvider)
-          .createDemandChatSession(demandId, targetUserId: targetUserId);
+          .createDemandChatSession(demandId);
       if (!mounted) return;
       setState(() => _submitting = false);
       context.push(RoutePath.chatDetail(sessionId));
@@ -532,8 +316,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           if (!hasWork && !hasFile)
             Text(
               isLoggedIn
-                  ? '发布者尚未提供源剧本（可能已失效），请编辑任务重新关联。'
-                  : '登录后可查看发布者提供的源剧本。',
+                  ? '平台尚未提供源剧本（可能已失效），请联系平台补充后再接单。'
+                  : '登录后可查看平台提供的源剧本。',
               style: TextStyle(fontSize: 12.5, height: 1.5, color: Colors.red.shade600))
           else
             Text(

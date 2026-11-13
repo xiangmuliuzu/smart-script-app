@@ -14,16 +14,12 @@ import '../data/trade_models.dart';
 /// 视觉规范：
 /// - 左侧竖色条按题材着色（[DemandGenre.colorOf]），一眼分类型；
 /// - 右上状态 chip：待接单绿 / 进行中蓝 / 已完成 primary / 逾期红 / 已关闭灰；
-/// - 底部一行三段布局：预算大字 + 剩余时限/截止徽章 + 接单人·发布者；
+/// - 底部一行三段布局：预算大字 + 剩余时限/截止徽章 + 接单状态·需求方；
 /// - 需求预览与 tags 均"缺省即省略"，卡片高度自适应避免大片留白。
 class DemandTaskCard extends StatelessWidget {
-  const DemandTaskCard({super.key, required this.task, this.isMine = false, this.onTap});
+  const DemandTaskCard({super.key, required this.task, this.onTap});
 
   final DemandTask task;
-
-  /// 当前登录用户是否为该任务的发布方（广场可接单卡片中若为自己发布的，用于隐藏接单入口等）。
-  final bool isMine;
-
   /// 点击行为覆盖：列表页传入后在 navigate pop 返回时刷新分页/统计；
   /// 为 null 时默认直接推入任务详情。
   final VoidCallback? onTap;
@@ -81,20 +77,6 @@ class DemandTaskCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isMine)
-                Container(
-                  margin: const EdgeInsets.only(right: 6, top: 1),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 0.6),
-                  ),
-                  child: const Text(
-                    '我发布的',
-                    style: TextStyle(fontSize: 10, color: AppColors.text1, fontWeight: FontWeight.w700),
-                  ),
-                ),
               const SizedBox(width: 8),
               _StatusChip(task: task),
             ],
@@ -118,9 +100,9 @@ class DemandTaskCard extends StatelessWidget {
                 text: DemandTaskType.labelOf(task.taskType),
                 color: DemandTaskType.colorOf(task.taskType),
               ),
-              // 分镜类由发布者提供源剧本，接单前需先评估剧本，卡片上点出来
+              // 分镜类由平台提供源剧本，接单前需先评估剧本，卡片上点出来
               if (DemandTaskType.isStoryboard(task.taskType))
-                _TagPill(text: '发布者提供源剧本', color: AppColors.text2),
+                _TagPill(text: '平台提供源剧本', color: AppColors.text2),
               if (task.genreId != null)
                 _TagPill(text: DemandGenre.labelOf(task.genreId), color: DemandGenre.colorOf(task.genreId)),
               for (final t in tags) _TagPill(text: t, color: AppColors.text2),

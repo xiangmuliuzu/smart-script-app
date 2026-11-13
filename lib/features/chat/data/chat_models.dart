@@ -1,7 +1,7 @@
 /// A3 聊天域数据模型（会话 + 消息）。
 ///
 /// 字段对齐后端 domain：ChatSession / ChatMessage。
-/// 会话类型：ADMIN（用户与管理员沟通）/ TRADE（买卖双方交易沟通）/ DEMAND（任务发布者与创作者就某任务沟通）。
+/// 会话类型：ADMIN（用户与管理员沟通）/ TRADE（买卖双方交易沟通）/ DEMAND（平台运营与创作者就某任务沟通）。
 
 // ==================== 会话类型 ====================
 
@@ -9,7 +9,7 @@
 class SessionType {
   static const String admin = 'ADMIN';   // 咨询会话（用户与管理员）
   static const String trade = 'TRADE';   // 交易会话（买卖双方）
-  static const String demand = 'DEMAND'; // 任务会话（任务发布者与创作者）
+  static const String demand = 'DEMAND'; // 任务会话（平台运营与创作者）
   static const String chat = 'CHAT';     // 旧数据兼容（等同于 ADMIN）
 
   static String label(String? type) {
