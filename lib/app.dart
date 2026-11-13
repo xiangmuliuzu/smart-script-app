@@ -6,6 +6,7 @@ import 'features/splash/splash_ad_overlay.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/services/notification_poller.dart';
+import 'core/services/realtime_socket.dart';
 import 'core/theme/app_page_background.dart';
 import 'core/theme/app_theme.dart';
 
@@ -29,6 +30,8 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
 
   @override
   Widget build(BuildContext context) {
+    // 站内实时通知长连接：随登录建连、退出断开，各页面只订阅事件流。
+    ref.watch(realtimeSocketProvider);
     // 会话期消息通知轮询：随登录启动、退出停止（本地通知，非离线推送）。
     ref.watch(notificationPollerProvider);
 

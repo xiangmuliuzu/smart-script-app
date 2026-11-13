@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
+import '../../../core/services/realtime_socket.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../user_center/data/user_center_models.dart';
@@ -30,7 +31,13 @@ class _MessageListPageState extends ConsumerState<MessageListPage>
   /// 当前筛选类型；null 表示全部。
   MessageType? _filter;
   Timer? _timer;
+  StreamSubscription<RealtimeEvent>? _realtime;
   bool _foreground = true;
+
+  /// 兜底轮询频率：长连接可用时拉长，事件帧负责即时刷新。
+  static const Duration _pollActive = Duration(seconds: 5);
+  static const Duration _pollIdle = Duration(seconds: 60);
+  Duration _cadence = _pollActive;
 
   @override
   void initState() {
@@ -47,7 +54,9 @@ class _MessageListPageState extends ConsumerState<MessageListPage>
     );
     _controller.addListener(() => setState(() {}));
     _controller.load();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
+    _cadence = ref.read(realtimeSocketProvider).isConnected ? _pollIdle : _pollActive;
+    _timer = Timer.periodic(_cadence, (_) => _poll());
+    _realtime = ref.read(realtimeSocketProvider).events.listen(_onRealtime);
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
@@ -59,6 +68,8 @@ class _MessageListPageState extends ConsumerState<MessageListPage>
   @override
   void dispose() {
     _timer?.cancel();
+    _realtime?.cancel();
+    _realtime = null;
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _scrollController.dispose();
@@ -79,6 +90,35 @@ class _MessageListPageState extends ConsumerState<MessageListPage>
     }
     ref.invalidate(unreadCountProvider);
     _controller.refreshSilently();
+  }
+
+  /// 实时帧驱动刷新；链路连通状态变化时调整兜底轮询频率。
+  void _onRealtime(RealtimeEvent event) {
+    switch (event.type) {
+      case 'connected':
+        _applyCadence(idle: true);
+        break;
+      case 'disconnected':
+        _applyCadence(idle: false);
+        break;
+      case 'reconnect':
+        // 断线期间可能积压了消息，立刻补拉而不是干等下一轮
+        _applyCadence(idle: ref.read(realtimeSocketProvider).isConnected);
+        _poll();
+        break;
+      case 'notification':
+      case 'chat':
+        _poll();
+        break;
+    }
+  }
+
+  void _applyCadence({required bool idle}) {
+    final target = idle ? _pollIdle : _pollActive;
+    if (_cadence == target || _timer == null) return;
+    _cadence = target;
+    _timer!.cancel();
+    _timer = Timer.periodic(target, (_) => _poll());
   }
 
   Future<void> _refresh() async {

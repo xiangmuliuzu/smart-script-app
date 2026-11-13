@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/user_center/data/user_center_providers.dart';
 import '../providers/auth_providers.dart';
 import 'local_notifier.dart';
+import 'realtime_socket.dart';
 
 /// 会话期的消息通知轮询。
 ///
@@ -23,7 +24,14 @@ class NotificationPoller {
   final Set<int> _seen = {};
 
   static const Duration _interval = Duration(seconds: 30);
+
+  /// 长连接可用时的兜底周期。事件帧已经能即时触发拉取，轮询只负责防漏。
+  static const Duration _idleInterval = Duration(minutes: 5);
+
   static const int _pageSize = 10;
+
+  StreamSubscription<RealtimeEvent>? _realtime;
+  Duration _cadence = _interval;
 
   void start() {
     if (_timer != null) return;
@@ -33,14 +41,47 @@ class NotificationPoller {
     _seen.clear();
     // 登录后申请一次通知权限（Android 13+）；已授权或低版本为无副作用调用。
     LocalNotifier.ensurePermission();
-    _timer = Timer.periodic(_interval, (_) => _poll());
+    _cadence = _interval;
+    _timer = Timer.periodic(_cadence, (_) => _poll());
     // 启动后稍等再首拉，避开登录瞬间的多请求并发。
     Future<void>.delayed(const Duration(seconds: 3), _poll);
+    _realtime ??= _ref.read(realtimeSocketProvider).events.listen(_onRealtime);
   }
 
   void stop() {
     _timer?.cancel();
     _timer = null;
+    _realtime?.cancel();
+    _realtime = null;
+  }
+
+  /// 实时事件驱动：新消息立刻拉一次；链路状态变化时调整兜底轮询频率。
+  void _onRealtime(RealtimeEvent event) {
+    switch (event.type) {
+      case 'connected':
+        _applyCadence(connected: true);
+        break;
+      case 'disconnected':
+        _applyCadence(connected: false);
+        break;
+      case 'reconnect':
+        // 断线期间可能已经积压了消息，补拉而不是干等下一轮
+        _applyCadence(connected: _ref.read(realtimeSocketProvider).isConnected);
+        _poll();
+        break;
+      case 'notification':
+      case 'chat':
+        _poll();
+        break;
+    }
+  }
+
+  void _applyCadence({required bool connected}) {
+    final target = connected ? _idleInterval : _interval;
+    if (_cadence == target || _timer == null) return;
+    _cadence = target;
+    _timer!.cancel();
+    _timer = Timer.periodic(target, (_) => _poll());
   }
 
   Future<void> _poll() async {
