@@ -324,21 +324,14 @@ class RoutePath {
   // 需求
   static const String demandList = '/trade/demand/list';
   static const String demandDetail = '/trade/demand/detail';
-  static const String demandPost = '/trade/demand/post';
   static const String demandMyTasks = '/trade/demand/my-tasks';
   static const String demandStageDeliver = '/trade/demand/stage-deliver';
-  static const String demandDeliverableWork = '/trade/demand/deliverable-work';
   static const String demandSourceScript = '/trade/demand/source-script';
 
   static String demandDetailUrl(int demandId) => '$demandDetail?id=$demandId';
-  /// 编辑已有任务（发布页带 id 进入编辑模式）。
-  static String demandPostEditUrl(int demandId) => '$demandPost?id=$demandId';
   /// 提交本轮交付物（全屏页：选作品+说明+提交）。
   static String demandStageDeliverUrl(int demandId, int stageId, int stageOrder) =>
       '$demandStageDeliver?demandId=$demandId&stageId=$stageId&order=$stageOrder';
-  /// 验收查阅交付作品（全屏页：发布者看本轮已交集数的正文）。
-  static String demandDeliverableWorkUrl(int demandId, int stageId, int stageOrder) =>
-      '$demandDeliverableWork?demandId=$demandId&stageId=$stageId&order=$stageOrder';
   /// 源剧本查阅（分镜类任务，接单前评估用；任何登录用户可看全本）。
   static String demandSourceScriptUrl(int demandId) =>
       '$demandSourceScript?demandId=$demandId';
@@ -477,10 +470,8 @@ class RouteName {
   static const String followUpList = 'followUpList';
   static const String demandList = 'demandList';
   static const String demandDetail = 'demandDetail';
-  static const String demandPost = 'demandPost';
   static const String demandMyTasks = 'demandMyTasks';
   static const String demandStageDeliver = 'demandStageDeliver';
-  static const String demandDeliverableWork = 'demandDeliverableWork';
   static const String demandSourceScript = 'demandSourceScript';
   static const String tradeChat = 'tradeChat';
   // 聊天
@@ -545,11 +536,10 @@ class ProtectedRoutes {
     RoutePath.followUpList,
     // 任务广场（底部导航大板块）：tab 根 /demand 与广场/详情不登记，游客可逛；
     // /trade/demand/list 只是指向 tab 根的兼容跳转，同样不设闸。
-    // 需要登录的是「动作与个人视角」：发布、我的任务、交付验收、源剧本。
-    RoutePath.demandPost,
+    // 需要登录的是「动作与个人视角」：我的任务、交付、源剧本。
+    // 发布与验收查阅已收归管理端，APP 不再有对应路由。
     RoutePath.demandMyTasks,
     RoutePath.demandStageDeliver,
-    RoutePath.demandDeliverableWork,
     RoutePath.demandSourceScript,
     RoutePath.tradeChat,
     // 聊天（需登录）

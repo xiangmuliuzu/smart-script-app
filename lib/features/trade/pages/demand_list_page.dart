@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/demand_genre.dart';
 import '../../../core/constants/demand_task_type.dart';
-import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -25,15 +24,11 @@ import '../widgets/demand_task_type_chip_row.dart';
 /// 卡片列表（触底加载更多）。作为底部导航「任务」板块的第一个分段，
 /// AppBar 与 TabBar 由 [TaskSquarePage] 提供，本页只输出正文。
 /// 题材、预算、集数统一收在筛选弹层，顶栏不放常驻 chips，避免占高与滑动找项。
-/// 广场仅展示可接取的任务（open+已托管），
-/// 自己发布的未托管/已接单等其他状态任务只在「我的任务」分段查看。
-/// 游客可浏览：后端对游客返回字段白名单，接单/发布等动作在各自入口校验登录。
+/// 广场仅展示可接取的任务（status=open），
+/// 已接单/进行中/已完成只在「我的任务」分段查看。
+/// 游客可浏览：后端对游客返回字段白名单，接单等动作在各自入口校验登录。
 class DemandSquareSection extends ConsumerStatefulWidget {
-  const DemandSquareSection({super.key, required this.onPublish});
-
-  /// 「发布任务」入口。登录守卫与返回后的跨分段刷新由所在页面统一处理，
-  /// 本页只负责把自己刷新一次。
-  final VoidCallback onPublish;
+  const DemandSquareSection({super.key});
 
   @override
   ConsumerState<DemandSquareSection> createState() => DemandSquareSectionState();
@@ -381,9 +376,8 @@ class DemandSquareSectionState extends ConsumerState<DemandSquareSection> {
         controller: _scrollCtrl,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          // 发布/托管流程 pop 返回后刷新列表与统计
           SliverToBoxAdapter(
-            child: DemandHeroBanner(stats: stats, onPublish: widget.onPublish),
+            child: DemandHeroBanner(stats: stats),
           ),
           // 题材已收进筛选弹层，这里只留统计卡到工具条的区间留白
           const SliverToBoxAdapter(child: SizedBox(height: 14)),
@@ -536,7 +530,6 @@ class DemandSquareSectionState extends ConsumerState<DemandSquareSection> {
 
   List<Widget> _buildListSlivers() {
     final items = _pager.items;
-    final myId = ref.watch(authControllerProvider).user?.userId;
 
     // 首屏加载：骨架屏占位（保持卡片布局形状，减少跳动）
     if (_pager.loading && items.isEmpty) {
@@ -580,10 +573,9 @@ class DemandSquareSectionState extends ConsumerState<DemandSquareSection> {
         sliver: SliverList.separated(
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
-          // 详情 pop 返回后重拉第一页并刷新统计（接单/关闭/编辑后不留陈旧卡片）
+          // 详情 pop 返回后重拉第一页并刷新统计（接单后不留陈旧卡片）
           itemBuilder: (context, i) => DemandTaskCard(
             task: items[i],
-            isMine: myId != null && items[i].clientId == myId,
             onTap: () async {
               final id = items[i].demandId;
               if (id == null) return;

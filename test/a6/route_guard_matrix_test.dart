@@ -363,19 +363,16 @@ void main() {
 
   // ================================================================
   group('G6-E 任务广场板块：游客可浏览，动作要登录', () {
-    test('广场浏览路径不受保护，发布/我的任务/交付路径受保护', () {
+    test('广场浏览路径不受保护，我的任务/交付路径受保护', () {
       expect(ProtectedRoutes.isProtected('${RoutePath.demandDetail}?id=7'), isFalse);
+      // 发布与验收查阅已收归管理端，APP 不再有对应路由
       for (final path in const [
-        RoutePath.demandPost,
         RoutePath.demandMyTasks,
         RoutePath.demandStageDeliver,
-        RoutePath.demandDeliverableWork,
         RoutePath.demandSourceScript,
       ]) {
         expect(ProtectedRoutes.isProtected(path), isTrue, reason: '$path 必须登录');
       }
-      // 编辑走同一发布页，带 id 的深链也要被前缀规则覆盖
-      expect(ProtectedRoutes.isProtected('${RoutePath.demandPost}?id=3'), isTrue);
     });
 
     testWidgets('游客进入任务 tab 落在广场分段，不弹登录也不跳登录页', (tester) async {
@@ -413,28 +410,8 @@ void main() {
       expect(find.textContaining('登录后即可查看'), findsOneWidget);
     });
 
-    testWidgets('游客点「发布任务」确认后带回收跳意图', (tester) async {
-      await _pumpApp(tester);
-      final container = _containerOf(tester);
-      container.read(routerProvider).go(RoutePath.demandTab);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // 顶栏常驻的发布入口（Hero 里还有一个同款 CTA，这里点的是顶栏图标）
-      await tester.tap(find.byTooltip('发布任务'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('需要登录'), findsOneWidget);
-      await tester.tap(find.text('去登录'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byType(LoginPage), findsOneWidget);
-      expect(container.read(routeIntentStoreProvider).pending?.target,
-          RoutePath.demandPost);
-    });
-
     testWidgets('游客进详情页只看白名单字段，点接单动作要先登录', (tester) async {
-      // 后端对游客裁剪掉 clientId / escrowAmount / sourceScriptUrl，这里用同一份视图打桩
+      // 后端对游客裁剪掉 clientId / sourceScriptUrl，这里用同一份视图打桩
       const task = DemandTask(
         demandId: 60,
         demandNo: 'DM20261110095105A001',
@@ -444,7 +421,6 @@ void main() {
         totalEpisodes: 5,
         durationHours: 24,
         status: 'open',
-        escrowStatus: DemandEscrowStatus.escrowed,
         clientName: '测试创作者',
       );
       await _pumpApp(tester, overrides: [
@@ -457,12 +433,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('任务详情'), findsOneWidget);
-      expect(find.textContaining('支付宝扫码付押金'), findsOneWidget);
-      // 托管额不在游客白名单里，显示 ¥0.00 会让人误判赏金规模
+      expect(find.textContaining('我要接单'), findsOneWidget);
+      // 押金/托管已随资金托管一起下线，APP 不再展示相关字段
+      expect(find.text('押金'), findsNothing);
       expect(find.text('托管额'), findsNothing);
       expect(find.text('联系发布者'), findsNothing);
 
-      await tester.tap(find.textContaining('支付宝扫码付押金'));
+      await tester.tap(find.textContaining('我要接单'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('需要登录'), findsOneWidget);
@@ -473,30 +450,6 @@ void main() {
       expect(find.byType(LoginPage), findsNothing);
       expect(find.text('任务详情'), findsOneWidget);
       expect(container.read(routeIntentStoreProvider).pending, isNull);
-    });
-
-    testWidgets('游客点「开发环境一键直通接单」同样过登录守卫', (tester) async {
-      const task = DemandTask(
-        demandId: 61,
-        title: '直通接单任务',
-        taskType: DemandTaskType.script,
-        budget: 20000,
-        status: 'open',
-        escrowStatus: DemandEscrowStatus.escrowed,
-      );
-      await _pumpApp(tester, overrides: [
-        demandDetailProvider.overrideWith((ref, id) => Future.value(task)),
-      ]);
-      final container = _containerOf(tester);
-      container.read(routerProvider).go(RoutePath.demandDetailUrl(61));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      await tester.tap(find.text('开发环境一键直通接单'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('需要登录'), findsOneWidget);
-      expect(find.byType(LoginPage), findsNothing);
     });
   });
 }

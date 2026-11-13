@@ -3,50 +3,40 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/demand_providers.dart';
 
-/// 任务广场页头：引导文案 + 发布入口 + 三项统计。
+/// 任务广场页头：引导文案 + 三项统计。
 ///
 /// 视觉与首页/我的页对齐：页头直接落在全局冰蓝渐变上，统计数字收进
 /// 白色圆角卡片（12 圆角 + 轻阴影），不再使用深蓝渐变大色块。
 /// stats 允许为 null（首屏加载），此时统计值显示 "--" 占位。
 class DemandHeroBanner extends StatelessWidget {
-  const DemandHeroBanner({super.key, required this.stats, required this.onPublish});
+  const DemandHeroBanner({super.key, required this.stats});
 
   final DemandStats? stats;
-
-  /// 发布入口：由广场页注入，统一走登录守卫并在流程 pop 返回后刷新列表与统计。
-  final VoidCallback onPublish;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 14, 0),
-          child: Row(
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 2, 14, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'TASK SQUARE · 公开接单',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        letterSpacing: 1.4,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.text3,
-                      ),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      '只展示已托管任务，接单即锁定赏金',
-                      style: TextStyle(fontSize: 12, color: AppColors.text2, height: 1.3),
-                    ),
-                  ],
+              Text(
+                'TASK SQUARE · 公开接单',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  letterSpacing: 1.4,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text3,
                 ),
               ),
-              _PublishButton(onTap: onPublish),
+              SizedBox(height: 5),
+              Text(
+                '平台发布任务，接单即锁定赏金',
+                style: TextStyle(fontSize: 12, color: AppColors.text2, height: 1.3),
+              ),
             ],
           ),
         ),
@@ -140,41 +130,5 @@ class _CellDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(width: 0.8, height: 26, color: AppColors.divider);
-  }
-}
-
-/// 发布入口：主色实心胶囊，与首页搜索栏同高的轻量按钮。
-class _PublishButton extends StatelessWidget {
-  const _PublishButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.primary,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.edit_outlined, size: 15, color: Colors.white),
-              SizedBox(width: 4),
-              Text(
-                '发布任务',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

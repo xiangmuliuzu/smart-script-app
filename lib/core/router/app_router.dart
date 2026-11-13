@@ -97,10 +97,8 @@ import '../../features/trade/pages/contract_sign_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
 import '../../features/trade/pages/task_square_page.dart';
 import '../../features/trade/pages/demand_detail_page.dart';
-import '../../features/trade/pages/demand_post_page.dart';
 import '../../features/trade/pages/demand_my_tasks_page.dart';
 import '../../features/trade/pages/demand_stage_deliver_page.dart';
-import '../../features/trade/pages/demand_deliverable_work_page.dart';
 import '../../features/trade/pages/demand_source_script_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
@@ -727,13 +725,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: RoutePath.demandPost,
-        name: RouteName.demandPost,
-        builder: (context, state) => DemandPostPage(
-          demandId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
-        ),
-      ),
-      GoRoute(
         path: RoutePath.demandMyTasks,
         name: RouteName.demandMyTasks,
         builder: (_, __) => const DemandMyTasksPage(),
@@ -742,16 +733,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.demandStageDeliver,
         name: RouteName.demandStageDeliver,
         builder: (context, state) => DemandStageDeliverPage(
-          demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
-          stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
-          stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,
-        ),
-      ),
-      // 验收查阅：发布者看本轮交付作品的正文（只到 episodeTo）
-      GoRoute(
-        path: RoutePath.demandDeliverableWork,
-        name: RouteName.demandDeliverableWork,
-        builder: (context, state) => DemandDeliverableWorkPage(
           demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
           stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
           stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,

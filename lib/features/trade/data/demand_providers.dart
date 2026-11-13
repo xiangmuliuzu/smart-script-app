@@ -24,13 +24,13 @@ final demandDetailProvider = FutureProvider.autoDispose.family<DemandTask, int>(
 
 /// Hero 横幅统计：可接单数 / 奖金池(分) / 今日新增 / 各题材与各任务类型待接单数（供 chip 角标）。
 ///
-/// 走后端 `/trade/demand/stats` 轻量聚合接口（口径 open+escrowed），
+/// 走后端 `/trade/demand/stats` 轻量聚合接口（口径 status=open），
 /// 不再为拿 total 而发一次整表列表请求；金额与 /list 一致以分交互。
 class DemandStats {
   final int openCount;
   final int prizePoolFen; // 奖金池（分）
   final int todayNewCount;
-  final Map<int, int> genreCounts; // genreId → 待接单数（公开口径 open+escrowed）
+  final Map<int, int> genreCounts; // genreId → 待接单数（公开口径 status=open）
   final Map<String, int> typeCounts; // taskType → 待接单数（同上口径）
 
   const DemandStats({
@@ -90,7 +90,7 @@ final demandStagesProvider = FutureProvider.autoDispose.family<List<DemandStage>
   (ref, demandId) => ref.watch(demandRepositoryProvider).demandStages(demandId),
 );
 
-/// 某任务的延时记录（申请延时 + 自主延时，每条动作一行，通过/驳回均保留；仅任务双方可查）
+/// 某任务的延时记录（申请延时 + 运营自主延时，每条动作一行，通过/驳回均保留；仅任务双方可查）
 final demandExtendHistoryProvider =
     FutureProvider.autoDispose.family<List<DemandExtendApply>, int>(
   (ref, demandId) => ref.watch(demandRepositoryProvider).extendHistory(demandId),

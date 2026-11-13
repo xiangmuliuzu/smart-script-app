@@ -371,39 +371,18 @@ class ApiEndpoints {
   /// 任务广场轻量统计（可接单数 / 奖金池 / 今日新增 / 题材角标）。
   static const String demandStats = '/trade/demand/stats';
   static String demandDetail(int demandId) => '/trade/demand/$demandId';
-  static const String demandCreate = '/trade/demand';
-  /// 编辑任务（PUT，仅发布者且未托管未接单可改）。
-  static String demandUpdate(int demandId) => '/trade/demand/$demandId';
-  static String demandClose(int demandId) => '/trade/demand/$demandId/close';
   static String demandClaim(int demandId) => '/trade/demand/$demandId/claim';
-  /// 任务会话（发布者 ↔ 创作者，POST；发布者发起可带 targetUserId）。
+  /// 任务会话（平台运营 ↔ 创作者，POST；创作者发起即与接单任务沟通）。
   static String demandChatSession(int demandId) => '/trade/demand/$demandId/chat/session';
   // 验收轮次
   static String demandStages(int demandId) => '/trade/demand/$demandId/stages';
   static String demandStageDeliver(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliver';
-  static String demandStageReview(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/review';
-  /// 验收查阅：发布者看该轮交付的作品（正文只含本轮集数）。
-  static String demandStageDeliverableWork(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliverable-work';
   // 可交付作品（本人、非已上架售卖）
   static const String demandDeliverableWorks = '/trade/demand/deliverable-works';
-  /// 发布分镜任务的源剧本候选：本人未删除作品（不排除已上架，仅作参考不转移版权）。
-  static const String demandSourceWorks = '/trade/demand/source-works';
-  /// 源剧本文件上传（交易域端点，发布者未必有创作者资格，不能走 content/upload）。
-  static const String demandUploadScript = '/trade/demand/upload-script';
   /// 查看分镜任务的源剧本（接单前评估，任何登录用户可读）。
   static String demandSourceScript(int demandId) => '/trade/demand/$demandId/source-script';
-  // 延时：创作者申请 / 发布者处理 / 发布者自主延时 / 延时记录
+  // 延时：创作者申请 / 延时记录（审批与自主延时已收归管理端）
   static String demandStageExtendRequest(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/request';
-  static String demandStageExtendDecision(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/decision';
-  static String demandStageExtend(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend';
-  // 延时记录（申请延时 + 自主延时，每条一行，通过/驳回均保留）
+  // 延时记录（申请延时 + 运营自主延时，每条一行，通过/驳回均保留）
   static String demandExtendHistory(int demandId) => '/trade/demand/$demandId/extend/history';
-  // 支付宝沙箱入账（托管/押金）
-  static String demandPayEscrow(int demandId) => '/trade/demand/$demandId/pay/escrow';
-  static String demandPayEscrowConfirm(int demandId) => '/trade/demand/$demandId/pay/escrow/confirm';
-  static String demandPayDeposit(int demandId) => '/trade/demand/$demandId/pay/deposit';
-  static String demandPayDepositConfirm(int demandId) => '/trade/demand/$demandId/pay/deposit/confirm';
-  // 开发直通入账（点一下即完成；沙箱密钥未接入时用，正式收款走上面沙箱端点）
-  static String demandEscrowDevPass(int demandId) => '/trade/demand/$demandId/pay/escrow/dev-pass';
-  static String demandPayDepositDevPass(int demandId) => '/trade/demand/$demandId/pay/deposit/dev-pass';
 }

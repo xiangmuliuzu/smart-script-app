@@ -13,16 +13,14 @@ import '../../../core/widgets/app_toast.dart';
 import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
 
-/// 验收轮次面板：竖向时间线展示，支持创作者提交交付 / 买方审核操作。
+/// 验收轮次面板：竖向时间线展示，供创作者提交交付 / 申请延时。
+/// 审核、延时审批与自主延时已收归平台运营端（管理端）。
 class DemandStagePanel extends ConsumerStatefulWidget {
   final int demandId;
-  /// 当前用户角色：true=买方(发布者)，false=创作者
-  final bool isBuyer;
 
   const DemandStagePanel({
     super.key,
     required this.demandId,
-    this.isBuyer = false,
   });
 
   @override
@@ -73,7 +71,7 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
                 style: TextStyle(color: Colors.grey, fontSize: 14)),
           );
         }
-        // 延时记录（申请延时 + 自主延时）：整单取一次，按轮分发到各条目（每条一行，不互相覆盖）
+        // 延时记录（创作者申请 + 运营自主）：整单取一次，按轮分发到各条目（每条一行，不互相覆盖）
         final history =
             ref.watch(demandExtendHistoryProvider(widget.demandId)).valueOrNull ??
                 const <DemandExtendApply>[];
@@ -88,7 +86,6 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
               ...stages.asMap().entries.map((e) => _StageTimelineItem(
                     stage: e.value,
                     demandId: widget.demandId,
-                    isBuyer: widget.isBuyer,
                     isLast: e.key == stages.length - 1,
                     extendApplies: history
                         .where((a) => a.stageId != null && a.stageId == e.value.stageId)
@@ -108,16 +105,14 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
 class _StageTimelineItem extends ConsumerStatefulWidget {
   final DemandStage stage;
   final int demandId;
-  final bool isBuyer;
   /// 是否最后一轮：末轮不再画向下延伸的连接线
   final bool isLast;
-  /// 本轮延时记录（申请延时与自主延时同表保留，按发生时间倒序）
+  /// 本轮延时记录（创作者申请延时与运营自主延时同表保留，按发生时间倒序）
   final List<DemandExtendApply> extendApplies;
 
   const _StageTimelineItem({
     required this.stage,
     required this.demandId,
-    required this.isBuyer,
     this.isLast = false,
     this.extendApplies = const <DemandExtendApply>[],
   });
@@ -331,7 +326,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                     Text('交付内容：本轮未关联作品（分镜文件与说明）',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                   ],
-                  // 交付物链接（分镜/外部文件），发布者可点开核对
+                  // 交付物链接（分镜/外部文件），创作者可点开自检
                   if (s.deliverableUrl != null && s.deliverableUrl!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Row(
@@ -355,26 +350,6 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                           ),
                         ),
                       ],
-                    ),
-                  ],
-                  // 验收前得能读到正文/分镜，否则只能凭一句交付说明拍板（仅发布者可取，后端鉴权）。
-                  // 待审核态的入口移到下方与「确认验收」同一行，这里只给非审核态（如已通过）保留。
-                  if (widget.isBuyer && s.stageId != null && s.status != 'submitted'
-                      && (s.workId != null || _hasLooseDeliverable)) ...[
-                    const SizedBox(height: 2),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: _acting ? null : _viewDeliveredWork,
-                        icon: const Icon(Icons.visibility_outlined, size: 16),
-                        label: const Text('查看交付内容',
-                            style: TextStyle(fontSize: 12)),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.text1,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
                     ),
                   ],
                   // 交付说明
@@ -454,7 +429,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        '申请延时 ${s.extendAskText}${(s.extendReason != null && s.extendReason!.isNotEmpty) ? '：${s.extendReason}' : ''}（待发布者处理）',
+                        '申请延时 ${s.extendAskText}${(s.extendReason != null && s.extendReason!.isNotEmpty) ? '：${s.extendReason}' : ''}（待平台处理）',
                         style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
                       ),
                     )
@@ -496,93 +471,14 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
   }
 
   /// 创作者可交付：活动轮且处于待交付/已驳回。
-  bool get _canDeliver => !widget.isBuyer && _isActiveRound &&
-      (widget.stage.status == 'pending' || widget.stage.status == 'rejected');
+  bool get _canDeliver =>
+      _isActiveRound && (widget.stage.status == 'pending' || widget.stage.status == 'rejected');
 
   /// 创作者可申请延时：可交付状态且无待处理申请。
   bool get _canRequestExtend => _canDeliver && !widget.stage.hasPendingExtend;
 
-  /// 买方可审核：待审核。
-  bool get _canReview => widget.isBuyer && widget.stage.status == 'submitted';
-
-  /// 买方可处理延时申请：存在待处理申请。
-  bool get _canDecideExtend => widget.isBuyer && widget.stage.hasPendingExtend;
-
-  /// 买方可自主延时：活动轮且处于待交付/已驳回；
-  /// 本轮已有待处理申请时不可再自延（否则与审核叠加造成双重顺延）。
-  bool get _canSelfExtend => widget.isBuyer && _isActiveRound &&
-      (widget.stage.status == 'pending' || widget.stage.status == 'rejected') &&
-      !widget.stage.hasPendingExtend;
-
   List<Widget> _buildActions(BuildContext context) {
     final actions = <Widget>[];
-    // 买方：审核 + 处理延时申请
-    if (_canReview) {
-      actions.add(const SizedBox(height: 10));
-      // 查看交付内容与验收操作同一行：验收前先把正文读一遍，再点「确认验收」选通过/驳回
-      actions.add(Row(
-        children: [
-          if (widget.stage.stageId != null)
-            TextButton.icon(
-              onPressed: _acting ? null : _viewDeliveredWork,
-              icon: const Icon(Icons.visibility_outlined, size: 16),
-              label: const Text('查看交付内容', style: TextStyle(fontSize: 12)),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.text1,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          const Spacer(),
-          ElevatedButton.icon(
-            onPressed: _acting ? null : () => _confirmReview(context),
-            icon: const Icon(Icons.fact_check_outlined, size: 18),
-            label: const Text('确认验收'),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-          ),
-        ],
-      ));
-    }
-    // 发布者：延时申请审核（左）+ 延长时间（右）同一行；无待处理申请时审核按钮置灰
-    // 有待处理申请时「延长时间」置灰，避免自延 + 审核同意造成两次顺延
-    if (widget.isBuyer && (_canSelfExtend || _canDecideExtend)) {
-      actions.add(const SizedBox(height: 8));
-      actions.add(Row(
-        children: [
-          Expanded(
-            child: widget.stage.hasPendingExtend
-                ? OutlinedButton(
-                    onPressed: _acting ? null : () => _reviewExtendDialog(context),
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange.shade700),
-                    child: const Text('延时审核'),
-                  )
-                : OutlinedButton(
-                    onPressed: null,
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.grey),
-                    child: const Text('无延时申请'),
-                  ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton(
-              onPressed: (_canSelfExtend && !_acting) ? () => _selfExtend(context) : null,
-              style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
-              child: const Text('延长时间'),
-            ),
-          ),
-        ],
-      ));
-      if (widget.stage.hasPendingExtend) {
-        actions.add(Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text('请先处理创作者的延时申请，处理前不可再自主延时（避免重复顺延）。',
-              style: TextStyle(
-                  fontSize: 11, color: Colors.orange.shade800, height: 1.4)),
-        ));
-      }
-    }
     // 创作者：提交交付物 + 申请延长时间 同一行
     if (_canDeliver) {
       actions.add(const SizedBox(height: 10));
@@ -612,86 +508,9 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     return actions;
   }
 
-  /// 发布者审核本轮延时申请：展示申请信息后当场接受/拒绝（按 stageId 定位，任务×轮次相互独立）。
-  Future<void> _reviewExtendDialog(BuildContext context) async {
-    final s = widget.stage;
-    final applied = s.extendAppliedAt;
-    final appliedText = applied == null
-        ? null
-        : '${applied.month}月${applied.day}日 '
-            '${applied.hour.toString().padLeft(2, '0')}:${applied.minute.toString().padLeft(2, '0')}';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('第${s.stageOrder}轮 延时审核'),
-        content: SizedBox(
-          width: 300,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _kvRow('申请延时', s.extendAskText),
-              if (s.extendReason != null && s.extendReason!.isNotEmpty)
-                _kvRow('申请原因', s.extendReason!),
-              if (appliedText != null) _kvRow('申请时间', appliedText),
-              const SizedBox(height: 4),
-              Text('接受后将按申请时长顺延本轮截止时间。',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('拒绝', style: TextStyle(color: Colors.grey.shade700))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('接受',
-                  style: TextStyle(
-                      color: Colors.orange, fontWeight: FontWeight.w600))),
-        ],
-      ),
-    );
-    if (ok == null) return;
-    await _decideExtend(context, ok);
-  }
-
-  /// 弹窗内 label-value 信息行。
-  Widget _kvRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-              width: 64,
-              child: Text(label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
-          Expanded(
-              child: Text(value,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      height: 1.4))),
-        ],
-      ),
-    );
-  }
-
   /// 提取可读错误文案：业务异常取后端 message，其余回退默认。
   String _errText(Object e) =>
       e is ApiException && e.message.isNotEmpty ? e.message : '请稍后重试';
-
-  /// 查看本轮交付正文（仅发布者）：跳全屏页，后端只下发本轮 episodeTo 内的集。
-  void _viewDeliveredWork() {
-    final s = widget.stage;
-    final stageId = s.stageId;
-    if (stageId == null) return;
-    context.push(RoutePath.demandDeliverableWorkUrl(
-        widget.demandId, stageId, s.stageOrder ?? 0));
-  }
 
   /// 提交本轮交付：跳转全屏提交页（选作品+交付说明），提交后先进入 AI 审核。
   Future<void> _deliver(BuildContext context) async {
@@ -706,8 +525,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
 
   /// 创作者发起延时申请（按小时填写）。
   Future<void> _requestExtend(BuildContext context) async {
-    final input = await _promptExtend(context,
-        title: '申请延时', withReason: true);
+    final input = await _promptExtend(context, title: '申请延时');
     if (input == null) return;
     if (input.hours <= 0) {
       showAppToast(context, '延时小时数必须大于0');
@@ -724,7 +542,7 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
           );
       ref.invalidate(demandStagesProvider(widget.demandId));
       ref.invalidate(demandExtendHistoryProvider(widget.demandId));
-      if (mounted) showAppToast(context, '延时申请已提交，等待发布者处理');
+      if (mounted) showAppToast(context, '延时申请已提交，等待平台处理');
     } catch (e) {
       if (mounted) showAppToast(context, '申请失败：${_errText(e)}');
     } finally {
@@ -732,57 +550,9 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     }
   }
 
-  /// 发布者延长时间（不经申请直接顺延本轮截止，并落一条自主延时记录）。
-  Future<void> _selfExtend(BuildContext context) async {
-    final input =
-        await _promptExtend(context, title: '延长时间', withReason: false);
-    if (input == null) return;
-    if (input.hours <= 0) {
-      showAppToast(context, '延时小时数必须大于0');
-      return;
-    }
-    setState(() => _acting = true);
-    try {
-      await ref.read(demandRepositoryProvider).selfExtend(
-            widget.demandId,
-            widget.stage.stageId!,
-            days: 0,
-            hours: input.hours,
-          );
-      ref.invalidate(demandStagesProvider(widget.demandId));
-      ref.invalidate(demandDetailProvider(widget.demandId));
-      // 自主延时已落一条延时记录，刷新记录列表
-      ref.invalidate(demandExtendHistoryProvider(widget.demandId));
-      if (mounted) showAppToast(context, '已延长本轮截止时间');
-    } catch (e) {
-      if (mounted) showAppToast(context, '延时失败：${_errText(e)}');
-    } finally {
-      if (mounted) setState(() => _acting = false);
-    }
-  }
-
-  /// 发布者处理延时申请。
-  Future<void> _decideExtend(BuildContext context, bool approved) async {
-    setState(() => _acting = true);
-    try {
-      await ref.read(demandRepositoryProvider).decideExtend(
-            widget.demandId,
-            widget.stage.stageId!,
-            approved: approved,
-          );
-      ref.invalidate(demandStagesProvider(widget.demandId));
-      ref.invalidate(demandExtendHistoryProvider(widget.demandId));
-      if (mounted) showAppToast(context, approved ? '已同意延时' : '已拒绝延时');
-    } catch (e) {
-      if (mounted) showAppToast(context, '操作失败：${_errText(e)}');
-    } finally {
-      if (mounted) setState(() => _acting = false);
-    }
-  }
-
-  /// 延时时长输入弹窗（统一按小时填写，可选原因）。
+  /// 延时时长输入弹窗（按小时填写 + 可选原因）。
   Future<_ExtendInput?> _promptExtend(BuildContext context,
-      {required String title, required bool withReason}) async {
+      {required String title}) async {
     final hoursCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
     final ok = await showDialog<bool>(
@@ -804,15 +574,13 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                     suffixText: '小时',
                     isDense: true),
               ),
-              if (withReason) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: reasonCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                      labelText: '延时原因（可选）', isDense: true),
-                ),
-              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                    labelText: '延时原因（可选）', isDense: true),
+              ),
               const SizedBox(height: 4),
               Text('按小时填写，展示时自动折算为天。',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
@@ -836,92 +604,6 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
       hours: int.tryParse(hoursCtrl.text.trim()) ?? 0,
       reason: reasonCtrl.text.trim(),
     );
-  }
-
-  /// 确认验收：把通过/驳回合并成一个入口，点击后在弹窗里二选一，避免误触直接放款。
-  Future<void> _confirmReview(BuildContext context) async {
-    final choice = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('第${widget.stage.stageOrder}轮 · 确认验收'),
-        content: const Text(
-          '建议先「查看交付内容」读一遍本轮正文再决定。\n'
-          '通过：按本轮金额放款给创作者；驳回：退回创作者修改后重新提交。',
-          style: TextStyle(fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('驳回',
-                style: TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.w600)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('通过',
-                style: TextStyle(
-                    color: Colors.green, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-    if (choice == null) return;
-    if (!context.mounted) return;
-    await _review(context, choice);
-  }
-
-  Future<void> _review(BuildContext context, bool approved) async {
-    String? reason;
-    if (!approved) {
-      final ctrl = TextEditingController();
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('驳回交付物'),
-          content: SizedBox(
-            width: 300,
-            child: TextField(
-              controller: ctrl,
-              maxLines: 3,
-              autofocus: true,
-              decoration: const InputDecoration(
-                  hintText: '请输入驳回原因，便于创作者修改后重新提交',
-                  isDense: true),
-            ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text('取消', style: TextStyle(color: Colors.grey.shade700))),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('确认驳回',
-                    style:
-                        TextStyle(color: Colors.red, fontWeight: FontWeight.w600))),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-      reason = ctrl.text.trim().isEmpty ? null : ctrl.text.trim();
-    }
-
-    setState(() => _acting = true);
-    try {
-      await ref.read(demandRepositoryProvider).reviewStage(
-            widget.demandId,
-            widget.stage.stageId!,
-            approved: approved,
-            rejectReason: reason,
-          );
-      ref.invalidate(demandStagesProvider(widget.demandId));
-      if (mounted) showAppToast(context, approved ? '已审核通过' : '已驳回');
-    } catch (e) {
-      if (mounted) showAppToast(context, '操作失败：${_errText(e)}');
-    } finally {
-      if (mounted) setState(() => _acting = false);
-    }
   }
 }
 

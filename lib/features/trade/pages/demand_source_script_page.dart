@@ -9,9 +9,9 @@ import '../data/trade_models.dart';
 
 /// 源剧本查阅页（分镜类任务）。
 ///
-/// 接单方在付押金之前要靠它评估工作量，所以任何登录用户都能看，且正文是全本
-/// ——与「验收查阅」按本轮 episodeTo 截断不同，这里不做集数裁剪。
-/// 源剧本可能是发布者上传的文件（txt/pdf…），此时没有章节目录，只给下载入口。
+/// 接单方在接单之前要靠它评估工作量，所以任何登录用户都能看，且正文是全本
+/// ——与运营端的验收查阅不同，这里不做集数裁剪。
+/// 源剧本可能是平台上传的文件（txt/pdf…），此时没有章节目录，只给下载入口。
 class DemandSourceScriptPage extends ConsumerStatefulWidget {
   const DemandSourceScriptPage({super.key, required this.demandId, this.demandTitle});
 
@@ -128,7 +128,7 @@ class _DemandSourceScriptPageState extends ConsumerState<DemandSourceScriptPage>
               color: Colors.orange.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text('发布者没有提供可读的源剧本内容，请先联系发布者确认。',
+            child: Text('平台没有提供可读的源剧本内容，请先联系平台确认。',
                 style: TextStyle(
                     fontSize: 12, color: Colors.orange.shade800, height: 1.4)),
           )

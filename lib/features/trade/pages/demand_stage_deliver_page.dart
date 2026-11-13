@@ -9,7 +9,7 @@ import '../data/trade_models.dart';
 
 /// 提交本轮交付物（全屏页）。
 ///
-/// 剧本类：选定本人未上架作品 + 交付说明，提交后先走 AI 审核再进发布者验收。
+/// 剧本类：选定本人未上架作品 + 交付说明，提交后先走 AI 审核再进平台验收。
 /// 分镜类（storyboard）：作品可不选，交付说明与文件链接至少填一项，
 /// 后端跳过 AI 剧本审核直接进入人工验收（分镜不是剧本正文，AI 剧本评分无意义）。
 class DemandStageDeliverPage extends ConsumerStatefulWidget {
@@ -79,7 +79,7 @@ class _DemandStageDeliverPageState extends ConsumerState<DemandStageDeliverPage>
       setState(() => _submitError = '请先选择一个交付作品');
       return;
     }
-    // 不关联作品时，本轮交付至少要能落到文件或说明上，否则发布者无从验收
+    // 不关联作品时，本轮交付至少要能落到文件或说明上，否则平台无从验收
     if (isStoryboard && _selectedWorkId == null && desc.isEmpty && url.isEmpty) {
       setState(() => _submitError = '请交付分镜作品，或填写交付说明 / 粘贴分镜文件链接');
       return;
@@ -196,8 +196,8 @@ class _DemandStageDeliverPageState extends ConsumerState<DemandStageDeliverPage>
                 const SizedBox(height: 12),
                 Text(
                   isStoryboard
-                      ? '分镜类任务不做 AI 剧本审核，提交后直接进入发布者人工验收，本轮计时暂停至验收出结果。'
-                      : '提交后先由 AI 审核（60 分以上自动进入发布者验收，低于 60 分直接打回重交），'
+                      ? '分镜类任务不做 AI 剧本审核，提交后直接进入平台人工验收，本轮计时暂停至验收出结果。'
+                      : '提交后先由 AI 审核（60 分以上自动进入平台验收，低于 60 分直接打回重交），'
                           'AI 审核与验收期间本轮计时均暂停。',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.5),
                 ),
@@ -224,7 +224,7 @@ class _DemandStageDeliverPageState extends ConsumerState<DemandStageDeliverPage>
           Expanded(
             child: Text(
               '第${widget.stageOrder}轮交付 · ${DemandTaskType.labelOf(taskType)}'
-              ' · ${storyboard ? '提交后进入发布者人工验收' : '提交后先走 AI 审核，审核期间本轮计时暂停'}',
+              ' · ${storyboard ? '提交后进入平台人工验收' : '提交后先走 AI 审核，审核期间本轮计时暂停'}',
               style: const TextStyle(fontSize: 12, color: AppColors.text1, height: 1.4),
             ),
           ),
