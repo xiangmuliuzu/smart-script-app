@@ -25,8 +25,12 @@ class AiOutlinePage extends ConsumerStatefulWidget {
 
 class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   final _inspiration = TextEditingController();
+  // 故事灵感讲「讲什么」，你的要求讲「怎么写」。
+  final _idea = TextEditingController();
   final _genre = TextEditingController();
   final _episodes = TextEditingController(text: '12');
+  // 「一集时长」1 / 1.5 / 2 分钟，默认 1 分钟，与 PC 用户端同一口径。
+  double _episodeMinutes = 1;
   int? _skillId;
   String? _model;
 
@@ -39,14 +43,15 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   @override
   void dispose() {
     _inspiration.dispose();
+    _idea.dispose();
     _genre.dispose();
     _episodes.dispose();
     super.dispose();
   }
 
   Future<void> _generate() async {
-    if (_inspiration.text.trim().isEmpty) {
-      showAppToast(context, '请先输入你的要求');
+    if (_idea.text.trim().isEmpty && _inspiration.text.trim().isEmpty) {
+      showAppToast(context, '请先填写故事灵感（或你的要求）');
       return;
     }
     // 集数口径与 PC 用户端一致：1–50 的整数（单部作品硬上限 50 集），默认 12。
@@ -62,15 +67,25 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
     });
     try {
       final container = ProviderScope.containerOf(context, listen: false);
+      final ideaText = _idea.text.trim();
+      final askText = _inspiration.text.trim();
+      final brief = [
+        if (ideaText.isNotEmpty) '故事灵感：\n$ideaText',
+        if (askText.isNotEmpty) '写法要求：\n$askText',
+      ].join('\n');
+      final minuteLabel =
+          _episodeMinutes == 1.5 ? '1.5 分钟' : '${_episodeMinutes.toInt()} 分钟';
       final result = await ref.read(aiRepositoryProvider).outlineStream(
-            inspiration: '${_inspiration.text.trim()}\n'
+            inspiration: '$brief\n'
                 '请按下面格式写 $episodes 集分集事件卡，从第1集起连续编号：\n'
                 '第1集：事件名\n本集事件：……\n冲突与推进：……\n'
                 '结果或反转：……\n结尾钩子：……\n'
                 '每集是一件完整的事（有开场、交锋、结果），结尾钩子要具体；'
-                '不要写场景头、镜号、景别、运镜。',
+                '不要写场景头、镜号、景别、运镜。\n'
+                '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋，'
+                '不要塞进多天多地的内容。',
             genre: _genre.text.trim(),
-            style: '共 $episodes 集',
+            style: '共 $episodes 集，每集 $minuteLabel',
             skillId: _skillId,
             model: _model,
             onDelta: (delta) {
@@ -125,9 +140,12 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
         padding: const EdgeInsets.all(12),
         children: [
           _InputCard(
+            idea: _idea,
             inspiration: _inspiration,
             genre: _genre,
             episodes: _episodes,
+            episodeMinutes: _episodeMinutes,
+            onMinutesChanged: (value) => setState(() => _episodeMinutes = value),
             loading: _loading,
             selectedSkillId: _skillId,
             onSkillChanged: (value) => setState(() => _skillId = value),
@@ -204,9 +222,12 @@ class _StreamingCard extends StatelessWidget {
 /// 输入表单卡。
 class _InputCard extends StatelessWidget {
   const _InputCard({
+    required this.idea,
     required this.inspiration,
     required this.genre,
     required this.episodes,
+    required this.episodeMinutes,
+    required this.onMinutesChanged,
     required this.loading,
     required this.selectedSkillId,
     required this.onSkillChanged,
@@ -215,9 +236,12 @@ class _InputCard extends StatelessWidget {
     required this.onGenerate,
   });
 
+  final TextEditingController idea;
   final TextEditingController inspiration;
   final TextEditingController genre;
   final TextEditingController episodes;
+  final double episodeMinutes;
+  final ValueChanged<double> onMinutesChanged;
   final bool loading;
   final int? selectedSkillId;
   final ValueChanged<int?> onSkillChanged;
@@ -237,12 +261,20 @@ class _InputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _Label(text: '你的要求', required: true),
+          const _Label(text: '故事灵感'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: idea,
+            maxLines: 4,
+            decoration: _inputDecoration('这个故事大体讲了什么：谁、在什么处境、要解决什么…'),
+          ),
+          const SizedBox(height: 16),
+          const _Label(text: '你的要求'),
           const SizedBox(height: 8),
           TextField(
             controller: inspiration,
             maxLines: 4,
-            decoration: _inputDecoration('人物、故事线、希望埋下的反转…'),
+            decoration: _inputDecoration('写法上的要求，例如：节奏必须紧凑，前三集埋一个反转…'),
           ),
           const SizedBox(height: 16),
           AiSkillSelector(
@@ -293,6 +325,8 @@ class _InputCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
+          SizedBox(width: 140, child: _durationField()),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             height: 46,
@@ -319,6 +353,45 @@ class _InputCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// 「一集时长」下拉：1 / 1.5 / 2 分钟，默认 1 分钟，与 PC 用户端同一口径。
+  Widget _durationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _Label(text: '一集时长'),
+        const SizedBox(height: 8),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.fill,
+            borderRadius: BorderRadius.circular(AppRadius.rSmall),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<double>(
+              value: episodeMinutes,
+              isDense: true,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  size: 18, color: AppColors.text2),
+              style: const TextStyle(fontSize: 13, color: AppColors.text1),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1 分钟')),
+                DropdownMenuItem(value: 1.5, child: Text('1.5 分钟')),
+                DropdownMenuItem(value: 2, child: Text('2 分钟')),
+              ],
+              onChanged: loading
+                  ? null
+                  : (value) {
+                      if (value != null) onMinutesChanged(value);
+                    },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

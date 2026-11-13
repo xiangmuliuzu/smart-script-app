@@ -78,8 +78,12 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
 
   // 大纲（与 PC 用户端一致：题材 + 集数 + 你的要求）
   final _inspiration = TextEditingController();
+  // 故事灵感讲「讲什么」，你的要求讲「怎么写」，两个字段分开传给大纲接口。
+  final _idea = TextEditingController();
   final _genre = TextEditingController();
   final _episodes = TextEditingController(text: '12');
+  // 一集时长（分钟）：1 / 1.5 / 2，默认 1，与 PC 用户端同一口径。
+  double _episodeMinutes = 1;
 
   // 写作
   final _prompt = TextEditingController();
@@ -154,6 +158,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   @override
   void dispose() {
     _inspiration.dispose();
+    _idea.dispose();
     _genre.dispose();
     _episodes.dispose();
     _prompt.dispose();
@@ -389,14 +394,15 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       return;
     }
     final requiredEmpty = switch (_tab) {
-      _AiTab.outline => _inspiration.text.trim().isEmpty,
+      _AiTab.outline =>
+        _idea.text.trim().isEmpty && _inspiration.text.trim().isEmpty,
       _AiTab.write => _prompt.text.trim().isEmpty,
       _AiTab.polish => _content.text.trim().isEmpty,
       _AiTab.storyboard => _script.text.trim().isEmpty,
     };
     if (!feedbackMode && requiredEmpty) {
       final hint = switch (_tab) {
-        _AiTab.outline => '请先输入作品主题或灵感',
+        _AiTab.outline => '请先填写故事灵感（或你的要求）',
         _AiTab.write => '请先输入续写要求',
         _AiTab.polish => '请先填写或粘贴需要润色的内容',
         _AiTab.storyboard => '请先填写或粘贴剧本文本',
@@ -433,20 +439,30 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       var truncated = false;
       switch (_tab) {
         case _AiTab.outline:
+          final ideaText = _idea.text.trim();
+          final askText = _inspiration.text.trim();
+          final brief = [
+            if (ideaText.isNotEmpty) '故事灵感：\n$ideaText',
+            if (askText.isNotEmpty) '写法要求：\n$askText',
+          ].join('\n');
           final core = feedbackMode
-              ? '上一版大纲（大体满意，请在保留整体结构与事件走向的前提下按修改意见调整）：\n'
+              ? '$brief\n上一版大纲（大体满意，请在保留整体结构与事件走向的前提下按修改意见调整）：\n'
                   '${previous.length > 12000 ? previous.substring(0, 12000) : previous}\n'
                   '修改意见：${feedback.trim()}'
-              : _inspiration.text.trim();
+              : brief;
+          final minuteLabel =
+              _episodeMinutes == 1.5 ? '1.5 分钟' : '${_episodeMinutes.toInt()} 分钟';
           final result = await repo.outlineStream(
             inspiration: '$core\n'
                 '请按下面格式写 $episodeCount 集分集事件卡，从第1集起连续编号：\n'
                 '第1集：事件名\n本集事件：……\n冲突与推进：……\n'
                 '结果或反转：……\n结尾钩子：……\n'
                 '每集是一件完整的事（有开场、交锋、结果），结尾钩子要具体；'
-                '不要写场景头、镜号、景别、运镜。',
+                '不要写场景头、镜号、景别、运镜。\n'
+                '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋，'
+                '不要塞进多天多地的内容。',
             genre: _genre.text.trim(),
-            style: '共 $episodeCount 集',
+            style: '共 $episodeCount 集，每集 $minuteLabel',
             skillId: _skillId,
             model: _model,
             onDelta: onDelta,
@@ -1178,7 +1194,9 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       _AiTab.outline => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _field(_inspiration, '你的要求 *', 4, '人物、故事线、希望埋下的反转…'),
+            _field(_idea, '故事灵感', 4, '这个故事大体讲了什么：谁、在什么处境、要解决什么…'),
+            const SizedBox(height: 10),
+            _field(_inspiration, '你的要求', 4, '写法上的要求，例如：节奏必须紧凑，前三集埋一个反转…'),
             const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1199,6 +1217,8 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            SizedBox(width: 120, child: _durationField()),
             if (_scriptOutline.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
               Align(
@@ -1364,6 +1384,47 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             ),
           ),
           style: const TextStyle(fontSize: 13, color: AppColors.text1),
+        ),
+      ],
+    );
+  }
+
+  /// 「一集时长」下拉：1 / 1.5 / 2 分钟，默认 1 分钟，与 PC 用户端同一口径。
+  Widget _durationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('一集时长',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text1)),
+        const SizedBox(height: 6),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.fill,
+            borderRadius: BorderRadius.circular(AppRadius.rSmall),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<double>(
+              value: _episodeMinutes,
+              isDense: true,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  size: 18, color: AppColors.text2),
+              style: const TextStyle(fontSize: 13, color: AppColors.text1),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1 分钟')),
+                DropdownMenuItem(value: 1.5, child: Text('1.5 分钟')),
+                DropdownMenuItem(value: 2, child: Text('2 分钟')),
+              ],
+              onChanged: _loading
+                  ? null
+                  : (value) => setState(() => _episodeMinutes = value ?? 1),
+            ),
+          ),
         ),
       ],
     );

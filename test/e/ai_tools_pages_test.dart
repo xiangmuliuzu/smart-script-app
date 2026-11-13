@@ -264,12 +264,12 @@ void main() {
       // 空输入点击生成
       await tester.tap(find.text('生成剧本大纲'));
       await tester.pump();
-      expect(find.text('请先输入你的要求'), findsOneWidget);
+      expect(find.text('请先填写故事灵感（或你的要求）'), findsOneWidget);
 
-      // 填入要求/题材；集数保持默认 12（表单字段顺序：要求、题材、集数）
+      // 填入灵感/题材；集数保持默认 12（表单字段顺序：故事灵感、你的要求、题材、集数）
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), '都市青年逆袭');
-      await tester.enterText(fields.at(1), '都市');
+      await tester.enterText(fields.at(2), '都市');
       await tester.pumpAndSettle();
       await tester.tap(find.text('生成剧本大纲'));
       await tester.pumpAndSettle();
@@ -279,8 +279,8 @@ void main() {
           findsOneWidget);
       expect(find.text('消耗 1 token'), findsOneWidget);
       expect(find.text('保存（复制全文）'), findsOneWidget);
-      // inspiration 会附加「请提供 N 个分集…」后缀，style 由集数派生为「共 12 集」
-      expect(fake.calls.first, contains('outlineStream:都市青年逆袭'));
+      // inspiration 由「故事灵感/写法要求」分段拼成，后缀是分集格式要求，style 由集数派生为「共 12 集」
+      expect(fake.calls.first, contains('outlineStream:故事灵感：\n都市青年逆袭'));
       expect(fake.calls.first, contains('|都市|共 12 集'));
     });
   });
