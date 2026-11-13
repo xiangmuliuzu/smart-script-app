@@ -42,6 +42,24 @@ class _FakeAiRepository implements AiRepository {
   Future<Map<String, String>> workLedger(int workId) async => const {};
 
   @override
+  Future<Map<int, String>> workVolumes(int workId) async => const {};
+
+  @override
+  Future<Map<String, dynamic>> reviewChapter({
+    required int workId,
+    required int chapterId,
+    required String content,
+    String? model,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> buildVolumeSnapshot({
+    required int workId,
+    required int volumeNo,
+    String? model,
+  }) async => <String, dynamic>{};
+
+  @override
   Future<Map<String, dynamic>> summarizeChapter({
     required int workId,
     required int chapterId,
