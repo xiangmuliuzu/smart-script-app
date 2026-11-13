@@ -136,11 +136,15 @@ class _RouterRefresh extends ChangeNotifier {
 ///   - 游客访问受保护路径时先确认，确认后保存 RouteIntent 并进入登录页；
 ///   - 登录成功后由登录页消费一次意图回跳，非法或不可恢复时回安全默认首页；
 ///   - 用户主动点击登录入口不产生回跳（URL 无 redirect 参数即不产生意图）。
+/// 根导航键：全局弹窗（如进入 App 的公告提醒）用它定位当前 Navigator。
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh(ref);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: RoutePath.splash,
     debugLogDiagnostics: true,
     refreshListenable: refresh,
@@ -178,7 +182,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               auth.user?.authorCapability != true) {
             return RoutePath.creatorApply;
           }
-          return (isAuthPage || isSplash) ? RoutePath.home : null;
+          if (isAuthPage) {
+            // 登录成功的那一刻，回跳由登录页自己完成：它要把目标页替换进
+            // 登录页原来的位置，保留拦截前的原浏览栈。这里若改写到首页会
+            // 重建整条导航栈，导致返回键直接退出应用或残留登录页。
+            return PostLoginNavigationPass.isOpen ? null : RoutePath.home;
+          }
+          return isSplash ? RoutePath.home : null;
       }
     },
     routes: [

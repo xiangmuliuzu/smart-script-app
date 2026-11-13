@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_constants.dart';
+import 'features/message/data/announcement_entry_checker.dart';
+import 'features/message/widgets/announcement_popup_dialog.dart';
 import 'features/splash/splash_ad_overlay.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
@@ -9,6 +11,7 @@ import 'core/services/notification_poller.dart';
 import 'core/services/realtime_socket.dart';
 import 'core/theme/app_page_background.dart';
 import 'core/theme/app_theme.dart';
+import 'features/user_center/data/user_center_providers.dart';
 
 /// 应用根组件。使用 go_router 作为路由来源，主题全局统一。
 ///
@@ -29,6 +32,42 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
       GlobalKey<ScaffoldMessengerState>();
 
   @override
+  void initState() {
+    super.initState();
+    // 已登录状态下冷启动：首帧后检查一次未读公告。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkAnnouncements();
+    });
+  }
+
+  void _scheduleAnnouncementCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkAnnouncements();
+    });
+  }
+
+  /// 弹最新未读公告；关闭后由 checker 写已读，消息中心仍可再次查看。
+  Future<void> _checkAnnouncements() async {
+    final dialogContext = rootNavigatorKey.currentContext;
+    if (dialogContext == null) return;
+    final shown = await ref.read(announcementEntryCheckerProvider).check(
+          isSessionActive: () =>
+              mounted && ref.read(authControllerProvider).isAuthenticated,
+          present: (detail) => showDialog<void>(
+            context: dialogContext,
+            barrierDismissible: false,
+            useRootNavigator: true,
+            builder: (_) => AnnouncementPopupDialog(
+              title: detail.title,
+              content: detail.content ?? '',
+              createdAt: detail.createdAt,
+            ),
+          ),
+        );
+    if (shown && mounted) ref.invalidate(unreadCountProvider);
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 站内实时通知长连接：随登录建连、退出断开，各页面只订阅事件流。
     ref.watch(realtimeSocketProvider);
@@ -36,6 +75,11 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
     ref.watch(notificationPollerProvider);
 
     ref.listen(authControllerProvider, (previous, next) {
+      if (next.isAuthenticated && !(previous?.isAuthenticated ?? false)) {
+        _scheduleAnnouncementCheck();
+      } else if (!next.isAuthenticated) {
+        ref.read(announcementEntryCheckerProvider).reset();
+      }
       final message = next.errorMessage;
       if (message == null || message == previous?.errorMessage) return;
       _messengerKey.currentState

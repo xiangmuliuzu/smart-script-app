@@ -20,7 +20,8 @@ import '../widgets/verify_code_input.dart';
 
 /// 注册页：手机号 -> 验证码 -> 设置密码 -> 确认密码 -> 注册并登录。
 ///
-/// 注册成功后服务端直接下发会话，登录守卫随即把根路由切到首页（不额外回跳）。
+/// 注册成功后服务端直接下发会话：与登录一样消费一次回跳意图，回到触发
+/// 登录的页面；无意图时退回注册前页面（由 [resolvePostLoginTarget] 统一处理）。
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
@@ -120,13 +121,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     }
 
     setState(() => _submitting = true);
+    beginLoginNavigation();
+    // 回跳成功时由 resolvePostLoginTarget 关闭放行开关（可能推迟一帧），
+    // 只有失败或页面销毁才在这里恢复。
+    var navigating = false;
     try {
       await ref.read(authControllerProvider.notifier).register(
             phone: _phoneController.text.trim(),
             code: _codeController.text.trim(),
             password: _passwordController.text,
           );
-      // 注册成功后服务端直接下发令牌，登录守卫把根路由切到首页
+      if (!mounted) {
+        return;
+      }
+      // 注册成功后服务端直接下发令牌：与登录一致，消费回跳意图后回到
+      // 触发登录的页面；无意图时退回注册前页面。
+      resolvePostLoginTarget(context, ref);
+      navigating = true;
     } on ApiException catch (e) {
       if (mounted) {
         showAppToast(context, AuthFeedback.apiMessage(e));
@@ -136,6 +147,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         showAppToast(context, '注册失败，请稍后重试');
       }
     } finally {
+      if (!navigating) endLoginNavigation();
       if (mounted) {
         setState(() => _submitting = false);
       }
