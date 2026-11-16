@@ -38,7 +38,6 @@ import '../../features/feedback/pages/feedback_detail_page.dart';
 import '../../features/feedback/pages/feedback_list_page.dart';
 import '../../features/ai_creation/ai_creation_page.dart';
 import '../../features/ai/ai_outline_page.dart';
-import '../../features/ai/ai_write_page.dart';
 import '../../features/ai/ai_polish_page.dart';
 import '../../features/ai/ai_storyboard_page.dart';
 import '../../features/ai/ai_record_page.dart';
@@ -565,11 +564,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.aiCreate,
         name: RouteName.aiCreate,
         builder: (_, __) => const AiCreatePage(),
-      ),
-      GoRoute(
-        path: RoutePath.aiWrite,
-        name: RouteName.aiWrite,
-        builder: (_, __) => const AiWritePage(),
       ),
       GoRoute(
         path: RoutePath.aiPolish,

@@ -13,7 +13,6 @@ import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/features/ai/ai_outline_page.dart';
 import 'package:script_app/features/ai/ai_polish_page.dart';
 import 'package:script_app/features/ai/ai_storyboard_page.dart';
-import 'package:script_app/features/ai/ai_write_page.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
@@ -40,6 +39,9 @@ class _FakeAiRepository implements AiRepository {
 
   @override
   Future<Map<String, String>> workLedger(int workId) async => const {};
+
+  @override
+  Future<void> saveWorkLedger(int workId, Map<String, String> ledger) async {}
 
   @override
   Future<Map<int, String>> workVolumes(int workId) async => const {};
@@ -252,8 +254,8 @@ void main() {
       );
 
   // ================================================================
-  group('E 阶段2-A AI 大纲页', () {
-    testWidgets('空输入提示；输入后生成并显示大纲与消耗', (tester) async {
+  group('E 阶段2-A AI 剧本续写页', () {
+    testWidgets('未选作品时提示，不发起生成', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -261,55 +263,16 @@ void main() {
       await tester.pumpWidget(wrap(const AiOutlinePage(), fake));
       await tester.pumpAndSettle();
 
-      // 空输入点击生成
-      await tester.tap(find.text('生成剧本大纲'));
+      // 续写必须先选作品：页面只做续写，起稿走 AI 创作页。
+      await tester.tap(find.text('续写后续分集'));
       await tester.pump();
-      expect(find.text('请先填写故事灵感（或你的要求）'), findsOneWidget);
-
-      // 填入灵感/题材；集数保持默认 12（表单字段顺序：故事灵感、你的要求、题材、集数）
-      final fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), '都市青年逆袭');
-      await tester.enterText(fields.at(2), '都市');
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('生成剧本大纲'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('生成的剧本大纲'), findsOneWidget);
-      expect(find.text('第一幕：跌入谷底\n第二幕：逆袭崛起\n第三幕：登顶巅峰'),
-          findsOneWidget);
-      expect(find.text('消耗 1 token'), findsOneWidget);
-      expect(find.text('保存（复制全文）'), findsOneWidget);
-      // inspiration 由「故事灵感/写法要求」分段拼成，后缀是分集格式要求，style 由集数派生为「共 12 集」
-      expect(fake.calls.first, contains('outlineStream:故事灵感：\n都市青年逆袭'));
-      expect(fake.calls.first, contains('|都市|共 12 集'));
+      expect(find.text('请先选择要续写的作品'), findsOneWidget);
+      expect(fake.calls, isEmpty);
     });
   });
 
   // ================================================================
-  group('E 阶段2-B AI 写作页', () {
-    testWidgets('空输入提示；生成后显示正文并可复制/存草稿', (tester) async {
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-      final fake = _FakeAiRepository();
-      await tester.pumpWidget(wrap(const AiWritePage(), fake));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('生成内容'));
-      await tester.pump();
-      expect(find.text('请先输入续写要求'), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField).first, '写一段重逢对手戏');
-      await tester.tap(find.text('生成内容'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('生成内容'), findsNWidgets(2)); // 按钮+结果卡标题
-      expect(find.text('夜色里，他站在落地窗前，沉默良久。'), findsOneWidget);
-      expect(find.text('复制'), findsOneWidget);
-      expect(find.text('存草稿'), findsOneWidget);
-      expect(fake.calls.first, 'writeStream:写一段重逢对手戏');
-    });
-  });
+  // AI 写作页（独立「AI 续写」入口）已移除：续写职责并入「AI 剧本续写」。
 
   // ================================================================
   group('E 阶段2-C AI 润色页', () {
@@ -357,22 +320,22 @@ void main() {
             return (points: const PointsBalance(balance: 5000), aiAvailable: 5);
           }),
         ],
-        child: const MaterialApp(home: AiWritePage()),
+        child: const MaterialApp(home: AiPolishPage()),
       ));
       await tester.pumpAndSettle();
 
       // 首次读取资产（模拟 AI 创作页已经 watch 过一次）
       final container =
-          ProviderScope.containerOf(tester.element(find.byType(AiWritePage)),
+          ProviderScope.containerOf(tester.element(find.byType(AiPolishPage)),
               listen: false);
       await container.read(welfareAssetProvider.future);
       expect(assetCalls, 1);
 
       // 生成一次
-      await tester.enterText(find.byType(TextField).first, 'test');
-      await tester.tap(find.text('生成内容'));
+      await tester.enterText(find.byType(TextField).first, '他很生气地走了。');
+      await tester.tap(find.text('开始润色'));
       await tester.pumpAndSettle();
-      expect(fake.calls.first, 'writeStream:test');
+      expect(fake.calls.first, startsWith('polishStream:他很生气地走了。'));
 
       // 生成成功后页面已 invalidate → 再次读取触发重新获取
       await container.read(welfareAssetProvider.future);
@@ -387,11 +350,11 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       final fake = _FakeAiRepository(quotaInsufficient: true);
-      await tester.pumpWidget(wrap(const AiWritePage(), fake));
+      await tester.pumpWidget(wrap(const AiPolishPage(), fake));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, '测试');
-      await tester.tap(find.text('生成内容'));
+      await tester.tap(find.text('开始润色'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 

@@ -3,19 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../welfare/data/welfare_providers.dart';
-import 'ai_quota_dialog.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../create/data/author_work_models.dart';
+import '../create/data/author_work_providers.dart';
+import '../welfare/data/welfare_providers.dart';
+import 'ai_quota_dialog.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
+import 'data/script_outline.dart';
 import 'widgets/ai_model_selector.dart';
 import 'widgets/ai_skill_selector.dart';
 
-/// AI 剧本页（E 模块）：让完全不懂创作的人也能产出专业级剧本大纲。
+/// 注入大纲时只取末尾若干字，避免 50 集大纲把提示词撑爆。
+String _tailText(String value, int max) {
+  final text = value.trim();
+  return text.length <= max ? text : '……${text.substring(text.length - max)}';
+}
+
+/// AI 剧本续写页（E 模块）：在已有作品的大纲/正文基础上，接着写后面的分集。
 ///
-/// 对接 POST /api/v1/content/ai/outline；生成即落 sys_ai_request 记录，
-/// 「保存结果」提供复制全文。可选「导演(skill)」注入导演风格。
+/// 不是重新起稿：先选要续写的作品，读它的章节与创作台账，算出续写起点，
+/// 只输出后续事件卡，已有集不重写、不重复。起稿请用「AI 创作」第 1 步。
 class AiOutlinePage extends ConsumerStatefulWidget {
   const AiOutlinePage({super.key});
 
@@ -25,12 +34,11 @@ class AiOutlinePage extends ConsumerStatefulWidget {
 
 class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   final _inspiration = TextEditingController();
-  // 故事灵感讲「讲什么」，你的要求讲「怎么写」。
-  final _idea = TextEditingController();
-  final _genre = TextEditingController();
-  final _episodes = TextEditingController(text: '12');
+  final _episodes = TextEditingController(text: '3');
   // 「一集时长」1 / 1.5 / 2 分钟，默认 1 分钟，与 PC 用户端同一口径。
   double _episodeMinutes = 1;
+  // 要续写的作品；未选不能生成（本页只做续写，起稿走 AI 创作页）。
+  int? _workId;
   int? _skillId;
   String? _model;
 
@@ -43,21 +51,20 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
   @override
   void dispose() {
     _inspiration.dispose();
-    _idea.dispose();
-    _genre.dispose();
     _episodes.dispose();
     super.dispose();
   }
 
   Future<void> _generate() async {
-    if (_idea.text.trim().isEmpty && _inspiration.text.trim().isEmpty) {
-      showAppToast(context, '请先填写故事灵感（或你的要求）');
+    final workId = _workId;
+    if (workId == null || workId <= 0) {
+      showAppToast(context, '请先选择要续写的作品');
       return;
     }
-    // 集数口径与 PC 用户端一致：1–50 的整数（单部作品硬上限 50 集），默认 12。
+    // 续写集数是本次新增的集数，口径 1–10，与起稿页上限一致。
     final episodes = int.tryParse(_episodes.text.trim()) ?? 0;
-    if (episodes < 1 || episodes > 50) {
-      showAppToast(context, '集数需为 1–50 的整数');
+    if (episodes < 1 || episodes > 10) {
+      showAppToast(context, '续写集数需为 1–10 的整数');
       return;
     }
     setState(() {
@@ -67,25 +74,63 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
     });
     try {
       final container = ProviderScope.containerOf(context, listen: false);
-      final ideaText = _idea.text.trim();
       final askText = _inspiration.text.trim();
-      final brief = [
-        if (ideaText.isNotEmpty) '故事灵感：\n$ideaText',
-        if (askText.isNotEmpty) '写法要求：\n$askText',
-      ].join('\n');
       final minuteLabel =
           _episodeMinutes == 1.5 ? '1.5 分钟' : '${_episodeMinutes.toInt()} 分钟';
+      // 读作品现状：已有正文章数与台账，作为续写起点与既定内容。
+      // 读取失败（网络抖动/台账为空）只降级为「无既有内容」，不阻断本次续写。
+      var chapters = const <AuthorChapterItem>[];
+      try {
+        chapters =
+            (await ref.read(authorWorkRepositoryProvider).workDetail(workId))
+                .chapters;
+      } catch (_) {}
+      var maxNo = 0;
+      for (final chapter in chapters) {
+        if (chapter.chapterNo > maxNo) maxNo = chapter.chapterNo;
+      }
+      var ledger = const <String, String>{};
+      try {
+        ledger = await ref.read(aiRepositoryProvider).workLedger(workId);
+      } catch (_) {}
+      // 已有大纲（跨端落在台账 outline）：既影响续写起点，也要作为既定内容注入，
+      // 否则只有大纲没正文时，续写会从第 1 集重新开写。
+      final existingOutline = (ledger['outline'] ?? '').trim();
+      var outlineMaxNo = 0;
+      for (final episode in parseScriptOutline(existingOutline)) {
+        if (episode.no > outlineMaxNo) outlineMaxNo = episode.no;
+      }
+      final lastNo = maxNo > outlineMaxNo ? maxNo : outlineMaxNo;
+      final startNo = lastNo + 1;
+      final ledgerBrief = [
+        if ((ledger['storySummary'] ?? '').isNotEmpty)
+          '故事简介（已定内容）：\n${ledger['storySummary']}',
+        if ((ledger['characters'] ?? '').isNotEmpty)
+          '人物便签（已定内容）：\n${ledger['characters']}',
+        if ((ledger['relations'] ?? '').isNotEmpty)
+          '人物关系（已定内容）：\n${ledger['relations']}',
+        if (existingOutline.isNotEmpty)
+          '已有大纲（已定内容，截止第 $outlineMaxNo 集，不要重写这些集）：\n${_tailText(existingOutline, 1600)}',
+      ].join('\n\n');
+      final brief = [
+        '这是对作品 #$workId 的一次「续写」，不是重新起稿：'
+            '下面给出的故事简介、人物便签、已有大纲、已有正文章节都属于既定内容，'
+            '必须沿用，不得改写、不得重写、不得重复输出。',
+        '已有正文 ${chapters.length} 集，已有大纲最大集号 $lastNo 集，因此续写从第 $startNo 集开始。',
+        if (ledgerBrief.isNotEmpty) ledgerBrief,
+        if (askText.isNotEmpty) '你的要求：\n$askText',
+        '请按下面三段输出，只输出这三段，不要额外解释：',
+        '故事简介：\n沿用原简介（不要重写）。',
+        '人物增补：\n只写本次新增或发生状态变化的人物，格式「姓名：变化」；没有就写「无」。',
+        '分集事件卡：\n从「第$startNo集：事件名」起连续编号 $episodes 集，每集四行：\n'
+            '本集事件：……\n冲突与推进：……\n结果或反转：……\n结尾钩子：……\n'
+            '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋，'
+            '结尾钩子要具体，不写场景头、镜号、景别、运镜。',
+      ].join('\n');
       final result = await ref.read(aiRepositoryProvider).outlineStream(
-            inspiration: '$brief\n'
-                '请按下面格式写 $episodes 集分集事件卡，从第1集起连续编号：\n'
-                '第1集：事件名\n本集事件：……\n冲突与推进：……\n'
-                '结果或反转：……\n结尾钩子：……\n'
-                '每集是一件完整的事（有开场、交锋、结果），结尾钩子要具体；'
-                '不要写场景头、镜号、景别、运镜。\n'
-                '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋，'
-                '不要塞进多天多地的内容。',
-            genre: _genre.text.trim(),
-            style: '共 $episodes 集，每集 $minuteLabel',
+            inspiration: brief,
+            genre: '',
+            style: '续写 $episodes 集，每集 $minuteLabel',
             skillId: _skillId,
             model: _model,
             onDelta: (delta) {
@@ -108,7 +153,7 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
     } on ApiException catch (e) {
       if (!mounted) return;
       if (isQuotaInsufficientError(e)) {
-        showAiQuotaInsufficientDialog(context, message: e.message);
+        await showAiQuotaInsufficientDialog(context, message: e.message);
       } else {
         showAppToast(context, e.message);
       }
@@ -129,10 +174,12 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
 
   @override
   Widget build(BuildContext context) {
+    final worksAsync = ref.watch(myWorksProvider('all'));
+    final works = worksAsync.valueOrNull ?? const <AuthorWorkItem>[];
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('AI 剧本'),
+        title: const Text('AI 剧本续写'),
         backgroundColor: Colors.white,
         elevation: 0.5,
       ),
@@ -140,9 +187,10 @@ class _AiOutlinePageState extends ConsumerState<AiOutlinePage> {
         padding: const EdgeInsets.all(12),
         children: [
           _InputCard(
-            idea: _idea,
+            works: works,
+            workId: _workId,
+            onWorkChanged: (value) => setState(() => _workId = value),
             inspiration: _inspiration,
-            genre: _genre,
             episodes: _episodes,
             episodeMinutes: _episodeMinutes,
             onMinutesChanged: (value) => setState(() => _episodeMinutes = value),
@@ -222,9 +270,10 @@ class _StreamingCard extends StatelessWidget {
 /// 输入表单卡。
 class _InputCard extends StatelessWidget {
   const _InputCard({
-    required this.idea,
+    required this.works,
+    required this.workId,
+    required this.onWorkChanged,
     required this.inspiration,
-    required this.genre,
     required this.episodes,
     required this.episodeMinutes,
     required this.onMinutesChanged,
@@ -236,9 +285,10 @@ class _InputCard extends StatelessWidget {
     required this.onGenerate,
   });
 
-  final TextEditingController idea;
+  final List<AuthorWorkItem> works;
+  final int? workId;
+  final ValueChanged<int?> onWorkChanged;
   final TextEditingController inspiration;
-  final TextEditingController genre;
   final TextEditingController episodes;
   final double episodeMinutes;
   final ValueChanged<double> onMinutesChanged;
@@ -261,12 +311,25 @@ class _InputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _Label(text: '故事灵感'),
+          const _Label(text: '续写作品'),
           const SizedBox(height: 8),
-          TextField(
-            controller: idea,
-            maxLines: 4,
-            decoration: _inputDecoration('这个故事大体讲了什么：谁、在什么处境、要解决什么…'),
+          DropdownButtonFormField<int>(
+            value: workId,
+            isExpanded: true,
+            items: [
+              for (final work in works)
+                DropdownMenuItem(
+                  value: work.workId,
+                  child: Text(
+                    work.title.isEmpty ? '作品 #${work.workId}' : work.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: loading ? null : onWorkChanged,
+            decoration: _inputDecoration(
+                works.isEmpty ? '还没有作品，请先到 AI 创作页新建' : '选择要接着写的作品'),
           ),
           const SizedBox(height: 16),
           const _Label(text: '你的要求'),
@@ -274,7 +337,7 @@ class _InputCard extends StatelessWidget {
           TextField(
             controller: inspiration,
             maxLines: 4,
-            decoration: _inputDecoration('写法上的要求，例如：节奏必须紧凑，前三集埋一个反转…'),
+            decoration: _inputDecoration('续写方向，例如：下一集让男主身份暴露，别再拖节奏'),
           ),
           const SizedBox(height: 16),
           AiSkillSelector(
@@ -293,35 +356,26 @@ class _InputCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              SizedBox(
+                width: 110,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _Label(text: '题材（可选）'),
+                    const _Label(text: '续写集数'),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: genre,
-                      decoration: _inputDecoration('例如：都市情感'),
+                      controller: episodes,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
+                      decoration: _inputDecoration('3'),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              SizedBox(
-                width: 88,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _Label(text: '集数'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: episodes,
-                      keyboardType: TextInputType.number,
-                      decoration: _inputDecoration('12'),
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: _durationField()),
             ],
           ),
           const SizedBox(height: 20),
@@ -346,7 +400,7 @@ class _InputCard extends StatelessWidget {
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2),
                     )
-                  : const Text('生成剧本大纲',
+                  : const Text('续写后续分集',
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600)),
             ),

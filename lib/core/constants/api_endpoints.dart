@@ -271,9 +271,7 @@ class ApiEndpoints {
   static const String drafts = '/drafts';
   static String reviewStatus(int workId) => '/works/$workId/review-status';
   static String workVersions(int workId) => '/works/$workId/versions';
-  static const String aiWrite = '/ai/write';
   static const String aiPolish = '/ai/polish';
-  static const String aiWriteRecords = '/ai/write/records';
   static const String aiOutline = '/ai/outline';
   static const String tags = '/tags';
 

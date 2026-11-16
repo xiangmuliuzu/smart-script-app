@@ -139,8 +139,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('AI 剧本'), findsWidgets);
-      expect(find.text('生成剧本大纲'), findsOneWidget);
+      expect(find.text('AI 剧本续写'), findsWidgets);
+      expect(find.text('续写后续分集'), findsOneWidget);
       expect(find.text('导演(skill)'), findsOneWidget);
       expect(find.text('AI 大纲'), findsNothing);
       expect(find.text('生成大纲'), findsNothing);

@@ -353,7 +353,6 @@ class RoutePath {
 
   /// AI 创作页（设定 → 大纲 → 章节，创作链路专用）。
   static const String aiCreate = '/ai/create';
-  static const String aiWrite = '/ai/write';
   static const String aiPolish = '/ai/polish';
   static const String aiStoryboard = '/ai/storyboard';
   static const String aiRecords = '/ai/records';
@@ -487,7 +486,6 @@ class RouteName {
   static const String aiCenter = 'aiCenter';
   static const String aiOutline = 'aiOutline';
   static const String aiCreate = 'aiCreate';
-  static const String aiWrite = 'aiWrite';
   static const String aiPolish = 'aiPolish';
   static const String aiStoryboard = 'aiStoryboard';
   static const String aiRecords = 'aiRecords';

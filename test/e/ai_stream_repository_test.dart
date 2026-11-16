@@ -10,8 +10,6 @@ import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/features/ai/data/ai_models.dart';
 import 'package:script_app/features/ai/data/ai_repository.dart';
 import 'package:script_app/features/ai/data/ai_providers.dart';
-import 'package:script_app/features/ai/ai_outline_page.dart';
-import 'package:script_app/features/ai/ai_write_page.dart';
 import 'package:script_app/features/ai/ai_polish_page.dart';
 import 'package:script_app/features/ai/widgets/ai_inline_panel.dart';
 
@@ -26,8 +24,6 @@ class _StreamApi extends ApiClient {
 
 void main() {
   for (final entry in <(Widget, String)>[
-    (const AiOutlinePage(), '生成剧本大纲'),
-    (const AiWritePage(), '生成内容'),
     (const AiPolishPage(), '开始润色'),
     (
       Scaffold(
@@ -80,13 +76,13 @@ void main() {
             .overrideWithValue(AiRepository(_StreamApi(source.stream))),
         aiSkillsProvider.overrideWith((ref) async => const <AiSkill>[]),
       ],
-      child: const MaterialApp(home: AiWritePage()),
+      child: const MaterialApp(home: AiPolishPage()),
     ));
     await tester.enterText(find.byType(TextField).first, '故事要求');
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('生成内容'));
+    await tester.ensureVisible(find.text('开始润色'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('生成内容'));
+    await tester.tap(find.text('开始润色'));
     await tester.pump();
     source.add(Uint8List.fromList(utf8.encode('data:{"delta":"保留下来的正文"}\n\n')));
     await tester.pump();

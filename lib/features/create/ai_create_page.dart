@@ -58,7 +58,10 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
   final _titleCtrl = TextEditingController();
   final _ideaCtrl = TextEditingController();
   final _genreCtrl = TextEditingController();
-  final _episodesCtrl = TextEditingController(text: '12');
+  final _episodesCtrl = TextEditingController(text: '10');
+  final _requireCtrl = TextEditingController();
+  // 一集时长（分钟）：AI 起稿时按这个容量规划每集事件量。
+  double _minutes = 1;
   int? _skillId;
   String? _model;
 
@@ -106,6 +109,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
     _ideaCtrl.dispose();
     _genreCtrl.dispose();
     _episodesCtrl.dispose();
+    _requireCtrl.dispose();
     _reviseCtrl.dispose();
     super.dispose();
   }
@@ -137,8 +141,8 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       showAppToast(context, '请先输入故事灵感');
       return;
     }
-    if (_episodes < 1 || _episodes > 50) {
-      showAppToast(context, '集数需为 1–50 的整数');
+    if (_episodes < 1 || _episodes > 10) {
+      showAppToast(context, '集数需为 1–10 的整数');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -147,14 +151,16 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       _outlineBusy = true;
       _outline = '';
     });
+    final minutesLabel = _minutes == 1.5 ? '1.5 分钟' : '${_minutes.toInt()} 分钟';
+    final askText = _requireCtrl.text.trim();
     final inspiration = '书名：${_titleCtrl.text.trim()}\n'
-        '故事灵感：${_ideaCtrl.text.trim()}\n'
-        '请提供 $_episodes 个分集，每集单独一行标题，格式为“第1集：章节名称”，下一行写该集剧情概要。';
+        '故事灵感（已定内容，必须沿用）：${_ideaCtrl.text.trim()}\n'
+        '${askText.isEmpty ? '' : '你的要求：\n$askText\n'}';
     try {
       final result = await ref.read(aiRepositoryProvider).outlineStream(
             inspiration: inspiration,
             genre: _genreCtrl.text.trim(),
-            style: '共 $_episodes 集',
+            style: '共 $_episodes 集，每集 $minutesLabel',
             skillId: _skillId,
             model: _model,
             onDelta: (delta) {
@@ -551,7 +557,31 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
               controller: _episodesCtrl,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(hintText: '1–50'),
+              decoration: const InputDecoration(hintText: '1–10'),
+            ),
+          ),
+          _Labeled(
+            '一集时长',
+            DropdownButtonFormField<double>(
+              value: _minutes,
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1 分钟')),
+                DropdownMenuItem(value: 1.5, child: Text('1.5 分钟')),
+                DropdownMenuItem(value: 2, child: Text('2 分钟')),
+              ],
+              onChanged: (value) =>
+                  setState(() => _minutes = value ?? 1),
+              decoration: const InputDecoration(isDense: true),
+            ),
+          ),
+          _Labeled(
+            '你的要求',
+            TextField(
+              controller: _requireCtrl,
+              maxLines: 3,
+              minLines: 2,
+              decoration: const InputDecoration(
+                  hintText: '写法上的要求，例如：前三集必须埋一个反转；不要血腥'),
             ),
           ),
           AiSkillSelector(

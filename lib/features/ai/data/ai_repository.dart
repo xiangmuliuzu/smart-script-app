@@ -355,10 +355,28 @@ class AiRepository {
       'timeline',
       'items',
       'threads',
+      'props',
+      'styleGuide',
+      'outline',
     ];
     return {
       for (final key in keys) key: (data[key] ?? '').toString().trim(),
     };
+  }
+
+  /// 保存创作台账（App 端「AI 剧本续写」把简介/人物增补写回后端，与 PC 端共用一份）。
+  ///
+  /// 后端 `PUT /api/v1/content/works/{workId}/ledger`，整份写入；
+  /// 调用方必须传入已读取的完整台账，避免把未改动的字段清空。
+  Future<void> saveWorkLedger(
+      int workId, Map<String, String> ledger) async {
+    if (workId <= 0) return;
+    await _api.put<void>(
+      '/content/works/$workId/ledger',
+      data: <String, dynamic>{
+        for (final entry in ledger.entries) entry.key: entry.value,
+      },
+    );
   }
 
   /// 卷级状态快照（每 10 集一卷）：返回 {卷号: 快照}；未生成时为空。
