@@ -171,6 +171,9 @@ class RoutePath {
   static const String chapterList = '/chapters';
   static const String chapterRead = '/chapter';
 
+  /// 作品分镜目录（预留入口，仅本人已有分镜成果时从详情页进入）。
+  static const String workStoryboards = '/work/storyboards';
+
   // B 模块漫剧（外部视频）链路（接口 2.8）
   // 详情统一用查询参数：与消息/反馈详情同风格，登录回跳只需还原整串。
   static const String dramaDetail = '/comic/drama'; // 公开：外部视频详情（2.8.15）
@@ -213,6 +216,15 @@ class RoutePath {
         path: chapterRead,
         queryParameters: <String, String>{
           'id': '$chapterId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 作品分镜目录 URL；[title] 只用于页面标题展示。
+  static String workStoryboardsUrl(int workId, {String? title}) => Uri(
+        path: workStoryboards,
+        queryParameters: <String, String>{
+          'id': '$workId',
           if (title != null && title.isNotEmpty) 'title': title,
         },
       ).toString();
@@ -423,6 +435,7 @@ class RouteName {
   static const String search = 'search';
   static const String chapterList = 'chapterList';
   static const String chapterRead = 'chapterRead';
+  static const String workStoryboards = 'workStoryboards';
   static const String dramaDetail = 'dramaDetail';
   static const String dramaRelatedWork = 'dramaRelatedWork';
   static const String dramaPlay = 'dramaPlay';

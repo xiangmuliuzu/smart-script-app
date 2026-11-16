@@ -11,6 +11,7 @@ import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
 import '../../features/bookstore/pages/chapter_list_page.dart';
+import '../../features/bookstore/pages/work_storyboard_page.dart';
 import '../../features/bookstore/pages/chapter_read_page.dart';
 import '../../features/bookstore/pages/favorite_list_page.dart';
 import '../../features/bookstore/pages/ranking_page.dart';
@@ -333,6 +334,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final query = state.uri.queryParameters;
           return ChapterListPage(
+            workId: int.tryParse(query['id'] ?? '') ?? 0,
+            title: query['title'],
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePath.workStoryboards,
+        name: RouteName.workStoryboards,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return WorkStoryboardPage(
             workId: int.tryParse(query['id'] ?? '') ?? 0,
             title: query['title'],
           );

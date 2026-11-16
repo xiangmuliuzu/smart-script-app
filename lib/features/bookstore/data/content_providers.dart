@@ -117,6 +117,13 @@ final workRatingProvider = FutureProvider.autoDispose.family<WorkRating, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).workRating(workId),
 );
 
+/// 作品分镜目录摘要：>0 表示当前用户在该作品下已有分镜成果，详情页才展示入口。
+///
+/// 接口为预留契约，后端未接入时 repository 静默返回 0，入口自动隐藏。
+final workStoryboardSummaryProvider = FutureProvider.autoDispose.family<int, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).storyboardSummary(workId),
+);
+
 /// 作品章节目录；payload 含试读配置，每条章节自带 readable 标记。
 final chapterListProvider = FutureProvider.autoDispose.family<ChapterListPayload, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).listChapters(workId),

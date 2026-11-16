@@ -46,6 +46,7 @@ class WorkDetailPage extends ConsumerWidget {
               _Header(work: work),
               _RatingBar(workId: work.workId),
               _ChapterEntry(work: work),
+              _StoryboardEntry(workId: work.workId, title: work.title),
               if (work.summary.isNotEmpty || work.tags.isNotEmpty)
                 _Block(title: '作品简介', content: work.summary, tags: work.tags),
               _InfoBlock(work: work),
@@ -479,6 +480,64 @@ class _ChapterEntry extends StatelessWidget {
               Expanded(
                 child: Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: AppColors.text3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 分镜目录入口（预留）：仅当当前用户在当前作品下已有分镜成果时展示。
+///
+/// 常规作品详情不出现；摘要接口失败或后端未接入时返回 0，同样隐藏，
+/// 避免出现空入口与加载闪烁。入口进入的页面为占位页，供后续接入方替换。
+class _StoryboardEntry extends ConsumerWidget {
+  const _StoryboardEntry({required this.workId, required this.title});
+
+  final int workId;
+  final String title;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!AuthGuard.isLoggedIn(ref)) return const SizedBox.shrink();
+    final count = ref.watch(workStoryboardSummaryProvider(workId)).valueOrNull ?? 0;
+    if (count <= 0) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: InkWell(
+        onTap: () => context.push(
+          RoutePath.workStoryboardsUrl(workId, title: title),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Row(
+            children: [
+              const Icon(Icons.movie_filter_outlined, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Text(
+                '分镜目录',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$count 个分镜',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.text3),

@@ -85,6 +85,26 @@ class ContentRepository {
     return PagedData.parse<BookItem>(data, BookItem.fromJson);
   }
 
+  /// 作品分镜目录摘要（预留接口）：仅当前登录用户本人在该作品下的分镜数量。
+  ///
+  /// 详情页入口按「已有成果才展示」控制，因此任何异常（未接入 404、未登录 401、
+  /// 网络失败）都静默返回 0，入口保持隐藏，不影响作品详情主链路。
+  Future<int> storyboardSummary(int workId) async {
+    if (workId <= 0) return 0;
+    try {
+      final data = await _api.get<Map<String, dynamic>>(
+        ApiEndpoints.contentWorkStoryboardSummary(workId),
+        parser: _mapParser,
+      );
+      final count = data?['count'];
+      if (count is num) return count.toInt();
+      if (count is String) return int.tryParse(count) ?? 0;
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// 作品详情；未上架或不存在时后端按 404 拒绝，由 [ApiClient] 抛 [ApiException]。
   Future<BookItem> workDetail(int workId) async {
     final data = await _api.get<Map<String, dynamic>>(
