@@ -16,6 +16,11 @@ class ApiEndpoints {
   static const String passwordReset = '/auth/password/reset';
   static const String agreements = '/auth/agreements';
 
+  // ===== 扫码登录（PC 出码；App 扫码 / 确认 / 取消）=====
+  static const String qrLoginScan = '/auth/qr/scan';
+  static const String qrLoginConfirm = '/auth/qr/confirm';
+  static const String qrLoginCancel = '/auth/qr/cancel';
+
   // ===== A5 用户中心契约：个人资料与账号安全 =====
   static const String myProfile = '/users/me/profile';
   static const String myRealName = '/users/me/real-name';

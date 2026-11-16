@@ -12,6 +12,10 @@ class RoutePath {
   static const String passwordLogin = '/login/password';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
+  /// 扫一扫（扫码登录）：扫网页上的登录码；需登录后使用（App 账号确认登录）。
+  static const String qrScan = '/qr-scan';
+  /// 扫码后的登录确认页；`t` 为票据令牌。
+  static const String qrConfirm = '/qr-confirm';
   // 登录前即可阅读的协议正文（协议勾选区域的两个链接）
   static const String agreement = '/agreement';
   static const String privacyPolicy = '/privacy-policy';
@@ -379,6 +383,8 @@ class RouteName {
   static const String passwordLogin = 'passwordLogin';
   static const String register = 'register';
   static const String forgotPassword = 'forgotPassword';
+  static const String qrScan = 'qrScan';
+  static const String qrConfirm = 'qrConfirm';
   static const String agreement = 'agreement';
   static const String privacyPolicy = 'privacyPolicy';
   static const String home = 'home';
@@ -515,6 +521,8 @@ class ProtectedRoutes {
   /// 需要登录的路径前缀。
   static const List<String> prefixes = <String>[
     RoutePath.profile, // 我的及用户中心全部子页面
+    RoutePath.qrScan, // 扫一扫：确认登录必须基于 App 已登录账号
+    RoutePath.qrConfirm,
     RoutePath.bookshelf, // A6 示例（B 模块）受保护入口
     RoutePath.favorites, // B 模块我的收藏列表（需登录）
     // B 模块创作链路（新建作品 / 工作台 / 版本，需登录）；

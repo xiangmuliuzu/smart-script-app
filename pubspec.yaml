@@ -61,6 +61,8 @@ dependencies:
   # 合同签署：手写签名画布
   signature: ^5.5.0
   qr_flutter: ^4.1.0
+  # 扫码登录：App 端扫一扫（扫码登录需求实现时引入）。
+  mobile_scanner: ^4.0.1
   web_socket_channel: ^3.0.3
 
 dev_dependencies:

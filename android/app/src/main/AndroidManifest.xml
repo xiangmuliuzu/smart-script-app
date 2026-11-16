@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Android 13+ 弹出系统通知需要运行时权限（App 运行时本地通知）。 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- 扫一扫（扫码登录）：相机权限由 mobile_scanner 在首次进入时请求。 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- 扫码页需要相机，但不要求设备必须有自动对焦（部分平板/模拟器没有）。 -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <!-- Android 9 及以下写入公共「下载」目录；10+ 走应用可见 Downloads，可不申请。 -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

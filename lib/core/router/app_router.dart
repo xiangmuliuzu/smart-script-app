@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/data/qr_login_models.dart';
 import '../../features/auth/pages/agreement_page.dart';
 import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_page.dart';
 import '../../features/auth/pages/password_login_page.dart';
 import '../../features/auth/pages/privacy_policy_page.dart';
+import '../../features/auth/pages/qr_confirm_page.dart';
+import '../../features/auth/pages/qr_scan_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
@@ -218,6 +221,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.forgotPassword,
         name: RouteName.forgotPassword,
         builder: (_, __) => const ForgotPasswordPage(),
+      ),
+      // 扫一扫（扫码登录）：确认页的登录端信息由扫一扫页通过 extra 带入，
+      // 深链直达时信息为空，确认页按创作者端兜底展示但不会自动确认。
+      GoRoute(
+        path: RoutePath.qrScan,
+        name: RouteName.qrScan,
+        builder: (_, __) => const QrScanPage(),
+      ),
+      GoRoute(
+        path: RoutePath.qrConfirm,
+        name: RouteName.qrConfirm,
+        builder: (_, state) => QrConfirmPage(
+          qrToken: state.uri.queryParameters['t'] ?? '',
+          target: state.extra is QrScanTarget ? state.extra as QrScanTarget : null,
+        ),
       ),
       // 协议正文：登录前即可阅读，由协议勾选区域的两个链接进入
       GoRoute(

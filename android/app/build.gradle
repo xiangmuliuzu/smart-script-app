@@ -46,7 +46,9 @@ android {
         manifestPlaceholders.appLabel = "剧本创作"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion flutter.minSdkVersion
+        // 扫一扫（mobile_scanner 4.x / MLKit）要求 minSdk ≥ 21；
+        // Flutter 3.19 的默认值仍是 19，这里显式抬到 21（Android 5.0）。
+        minSdkVersion 21
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

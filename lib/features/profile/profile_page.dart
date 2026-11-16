@@ -380,6 +380,11 @@ class _ProfileDrawer extends StatelessWidget {
             ),
             const Divider(height: 1, color: AppColors.divider),
             _DrawerItem(
+              icon: Icons.qr_code_scanner,
+              label: '扫一扫',
+              onTap: () => _push(context, RoutePath.qrScan),
+            ),
+            _DrawerItem(
               icon: Icons.lock_outline,
               label: '账号安全',
               onTap: () => _push(context, RoutePath.accountSecurity),
