@@ -200,11 +200,6 @@ class ApiEndpoints {
   static const String copyrightEvidences = '/copyright-evidences';
   static const String creatorWorks = '/creator/works';
   static String creatorWorkById(int workId) => '/creator/works/$workId';
-  static const String inquiries = '/inquiries';
-  static String inquiryById(int id) => '/inquiries/$id';
-  static String inquiryQuotes(int inquiryId) => '/inquiries/$inquiryId/quotes';
-  static String inquiryAccept(int inquiryId) => '/inquiries/$inquiryId/accept';
-  static String inquiryReject(int inquiryId) => '/inquiries/$inquiryId/reject';
   static const String chatSessions = '/users/me/chat/sessions';
   static String chatSessionDetail(int sessionId) => '/users/me/chat/sessions/$sessionId';
   static String chatMessages(int sessionId) => '/users/me/chat/sessions/$sessionId/messages';
@@ -216,29 +211,19 @@ class ApiEndpoints {
   // TRADE 类型会话创建（通过询盘）
   static const String tradeChatSessions = '/trade/inquiry/chat/sessions';
   static const String orders = '/orders';
-  static String orderById(int orderId) => '/orders/$orderId';
-  static String orderContract(int orderId) => '/orders/$orderId/contract';
-  static String orderContractSign(int orderId) => '/orders/$orderId/contract/sign';
-  static String orderEscrow(int orderId) => '/orders/$orderId/escrow';
-  static String orderPay(int orderId) => '/orders/$orderId/pay';
   static String orderCancel(int orderId) => '/orders/$orderId/cancel';
-  static String orderRefund(int orderId) => '/orders/$orderId/refund';
-  static String orderDelivery(int orderId) => '/orders/$orderId/delivery';
   static String workTradeConfig(int workId) => '/works/$workId/trade-config';
   static const String clientSelectionsPurchased = '/client/selections/purchased';
-  static const String clientDemands = '/client/demands';
   static const String clientPayments = '/client/payments';
   static const String clientDramas = '/client/dramas';
   static String clientDramaPlayStats(int workId) => '/client/dramas/$workId/play-stats';
   static String bookContact(int workId) => '/books/$workId/contact';
-  static const String cooperations = '/cooperations';
   static const String creatorStatsIncome = '/creator/stats/income';
   static const String creatorStatsOverview = '/creator/stats/overview';
   static const String creatorReviews = '/creator/reviews';
   static const String creatorBills = '/creator/bills';
   static const String creatorDashboard = '/creator/dashboard';
   static const String creatorContactProfile = '/creator/contact-profile';
-  static const String creatorCooperations = '/creator/cooperations';
   static const String pointsAccount = '/points/account';
   static const String pointsTasks = '/points/tasks';
   static String pointTaskClaim(int taskId) => '/points/tasks/$taskId/claim';
@@ -283,43 +268,25 @@ class ApiEndpoints {
   static String copyrightSealDisable(int sealId) => '/content/copyright-seals/$sealId/disable';
 
   // ===== C 交易域（APP 专用接口） =====
-  // 交易作品
-  static const String adminTradeWorks = '/admin/trade/works';
-  static String adminTradeWorkById(int workId) => '/admin/trade/works/$workId';
   // 询盘
-  static const String adminTradeInquiryList = '/trade/inquiry/list';
-  static String adminTradeInquiryDetail(int id) => '/trade/inquiry/$id';
-  static const String adminTradeInquiry = '/trade/inquiry';
-  static String adminTradeInquiryAccept(int id) => '/trade/inquiry/$id/accept';
-  static String adminTradeInquiryReject(int id) => '/trade/inquiry/$id/reject';
-  static String adminTradeInquiryClose(int id) => '/trade/inquiry/$id/close';
+  static const String tradeInquiryList = '/trade/inquiry/list';
+  static String tradeInquiryDetail(int id) => '/trade/inquiry/$id';
+  static const String tradeInquiry = '/trade/inquiry';
+  static String tradeInquiryAccept(int id) => '/trade/inquiry/$id/accept';
+  static String tradeInquiryReject(int id) => '/trade/inquiry/$id/reject';
+  static String tradeInquiryClose(int id) => '/trade/inquiry/$id/close';
   // 作品确权状态（无版权作品：发起询盘不选授权类型，成交后跳过合同直达付款）
   static const String tradeInquiryCopyrightStatus = '/trade/inquiry/copyright-status';
-  // 报价/议价（PC管理端）
-  static const String adminTradeQuoteList = '/admin/trade/quote/list';
-  static const String adminTradeQuote = '/admin/trade/quote';
-  static const String adminTradeQuoteCounterOffer = '/admin/trade/quote/counter-offer';
-  static String adminTradeQuoteById(int id) => '/admin/trade/quote/$id';
-  static String adminTradeQuoteAccept(int id) => '/admin/trade/quote/$id/accept';
-  static String adminTradeQuoteReject(int id) => '/admin/trade/quote/$id/reject';
-  static String adminTradeQuoteSellerAccept(int id) => '/admin/trade/quote/$id/seller-accept';
-  static String adminTradeQuoteSellerReject(int id) => '/admin/trade/quote/$id/seller-reject';
   // 报价/议价（APP端）
   static const String appQuoteList = '/trade/quote/list';
   static const String appQuoteCreate = '/trade/quote';
   static const String appQuoteCounterOffer = '/trade/quote/counter-offer';
-  static String appQuoteById(int id) => '/trade/quote/$id';
-  static String appQuoteModify(int id) => '/trade/quote/$id';
   static String appQuoteAccept(int id) => '/trade/quote/$id/accept';
-  static String appQuoteReject(int id) => '/trade/quote/$id/reject';
   static const String appQuoteLatest = '/trade/quote/latest';
   // 订单
-  static const String adminTradeOrders = '/admin/trade/orders';
-  static String adminTradeOrderById(int id) => '/admin/trade/orders/$id';
   static const String appOrderList = '/trade/order/list';
   static String appOrderById(int orderId) => '/trade/order/$orderId';
   static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
-  static String appOrderComplete(int orderId) => '/trade/order/$orderId/complete';
   static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
   /// 版权交割（交易域）
   static const String appDeliveryList = '/trade/delivery/list';
@@ -340,7 +307,7 @@ class ApiEndpoints {
   // 上传 PDF 替换模板（POST multipart）与从上传件切回平台模板（PUT）
   static String appContractSourcePdf(int contractId) => '/trade/contracts/$contractId/source-pdf';
   static String appContractSourcePdfOff(int contractId) => '/trade/contracts/$contractId/source-pdf/off';
-  // 财务（资金托管 / 收益 / 待结算 / 提现）
+  // 财务（收益 / 待结算 / 提现）
   static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
   static const String appFinanceIncomeDetail = '/trade/finance/income/detail';
   static const String appFinanceIncomeStats = '/trade/finance/income/stats';
@@ -355,15 +322,6 @@ class ApiEndpoints {
       '/trade/finance/income/settle/$settleId/dispute';
   static const String appFinanceWithdrawApply = '/trade/finance/withdraw/apply';
   static const String appFinanceWithdrawList = '/trade/finance/withdraw/list';
-  static const String appFinanceEscrowList = '/trade/finance/escrow/list';
-  static String appFinanceEscrowById(int escrowId) => '/trade/finance/escrow/$escrowId';
-  // 合作记录
-  static const String adminTradeCooperationList = '/admin/trade/cooperation/list';
-  static const String adminTradeCooperation = '/admin/trade/cooperation';
-  // 商务跟进
-  static const String adminTradeFollowUps = '/admin/trade/partners/follow-ups';
-  // 需求标签
-  static const String adminTradeDemandTags = '/admin/trade/partners/tags';
 
   // ===== 任务广场（需求悬赏） =====
   static const String demandList = '/trade/demand/list';

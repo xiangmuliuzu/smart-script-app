@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/chat/data/chat_providers.dart';
 import '../../features/user_center/data/user_center_providers.dart';
 import '../providers/auth_providers.dart';
 import 'local_notifier.dart';
@@ -70,7 +71,13 @@ class NotificationPoller {
         _poll();
         break;
       case 'notification':
+        // 站内信/公告红点与弹通知同源，事件到达即刷新计数，不等下一轮兜底轮询
+        _ref.invalidate(unreadCountProvider);
+        _poll();
+        break;
       case 'chat':
+        // 会话未读只在聊天页刷新过，底部导航/会话列表的红点靠这里联动
+        _ref.invalidate(chatUnreadCountProvider);
         _poll();
         break;
     }

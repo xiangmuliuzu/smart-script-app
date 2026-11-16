@@ -139,7 +139,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
             label: '联系平台',
             onTap: () => _openDemandChat(task),
           ),
-        // 操作区：平台已托管预算，创作者先到先得直接接单
+        // 操作区：平台代需求方发布，创作者先到先得直接接单
         if (task.status == 'open') ...[
           _primaryActionButton(
             icon: Icons.gavel,
