@@ -474,8 +474,9 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                 '请只输出第$startNo集起、连续 $episodeCount 集的分集事件卡，已有集不要重复。\n'
                 '如需新增人物或人物状态变化，先在开头写一段「人物增补」，格式：姓名：身份 / 变化；没有就省略。\n'
                 '分集事件卡格式：\n'
-                '第$startNo集：事件名\n本集事件：……\n冲突与推进：……\n'
+                '第$startNo集：事件名\n开场承接：……\n本集事件：……\n冲突与推进：……\n'
                 '结果或反转：……\n结尾钩子：……\n'
+                '「开场承接」写清上一集停在哪、本集从哪个动作接起、隔了多久；换场要写明理由。\n'
                 '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋；'
                 '不写场景头、镜号、景别、运镜。',
             genre: '',
@@ -809,7 +810,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             minLines: 8,
             maxLines: 14,
             decoration: const InputDecoration(
-              hintText: '第1集：事件名\n本集事件：……\n冲突与推进：……\n结果或反转：……\n结尾钩子：……',
+              hintText: '第1集：事件名\n开场承接：……\n本集事件：……\n冲突与推进：……\n结果或反转：……\n结尾钩子：……',
               border: OutlineInputBorder(),
             ),
           ),
