@@ -40,6 +40,32 @@ class MessageRepository {
     return UnreadCount.fromJson(data ?? const {});
   }
 
+  /// 我的平台公告分页（服务端按公告 ID 倒序）。
+  ///
+  /// 列表只返回标题与已读状态，正文需再取 [detail]。
+  Future<PagedData<MessageItem>> announcements({
+    int pageNum = 1,
+    int pageSize = 10,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.announcements,
+      query: {'pageNum': pageNum, 'pageSize': pageSize},
+      parser: _mapParser,
+    );
+    if (data == null) return const PagedData<MessageItem>(total: 0, list: []);
+    return PagedData.parse(
+      data,
+      (json) => MessageItem(
+        messageId: (json['noticeId'] as num?)?.toInt() ?? 0,
+        source: 'ANNOUNCEMENT',
+        type: 'SYSTEM',
+        title: json['noticeTitle'] as String? ?? '',
+        read: json['isRead'] as bool? ?? false,
+        createdAt: json['createTime'] as String?,
+      ),
+    );
+  }
+
   Future<MessageItem> detail(int messageId,
       {String source = 'NOTIFICATION'}) async {
     final data = await _api.get<Map<String, dynamic>>(

@@ -47,6 +47,7 @@ class ApiEndpoints {
   static const String messages = '/messages';
   static const String messagesUnreadCount = '/messages/unread-count';
   static const String messagesReadAll = '/messages/read-all';
+  static const String announcements = '/announcements';
   static String messageById(int messageId) => '/messages/$messageId';
   static String messageRead(int messageId) => '/messages/$messageId/read';
 

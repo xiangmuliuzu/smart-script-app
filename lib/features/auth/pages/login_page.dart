@@ -108,6 +108,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
 
     setState(() => _submitting = true);
+    beginLoginNavigation();
+    // 回跳成功时由 resolvePostLoginTarget 关闭放行开关（可能推迟一帧），
+    // 只有失败或页面销毁才在这里恢复。
+    var navigating = false;
     try {
       await ref.read(authControllerProvider.notifier).loginWithSms(
             phone: _phoneController.text.trim(),
@@ -120,6 +124,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       unawaited(reportTaskProgressByType(ref, 'DAILY'));
       // 登录成功后消费一次回跳意图，否则回安全默认首页
       resolvePostLoginTarget(context, ref);
+      navigating = true;
     } on ApiException catch (e) {
       if (mounted) {
         showAppToast(context, AuthFeedback.apiMessage(e));
@@ -129,6 +134,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         showAppToast(context, '登录失败，请稍后重试');
       }
     } finally {
+      if (!navigating) endLoginNavigation();
       if (mounted) {
         setState(() => _submitting = false);
       }

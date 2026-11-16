@@ -6,6 +6,28 @@ import '../providers/auth_providers.dart';
 import 'route_intent.dart';
 import 'route_paths.dart';
 
+/// 登录请求期间的认证页 redirect 放行开关。
+///
+/// 登录接口成功的一瞬间鉴权状态切到已登录，全局 redirect 会把仍停在
+/// `/login`（包括账号密码登录、注册子页）的导航改写到首页；那会重建整条
+/// 导航栈，丢掉登录页下方的原浏览栈——表现为登录回跳后按返回键直接退出
+/// 应用，或登录页残留、返回时又回到登录页。
+///
+/// 登录提交开始时打开、请求结束（成功由 [resolvePostLoginTarget] 完成回跳，
+/// 失败或页面销毁在 finally 中关闭）时关闭；期间 redirect 对认证页放行，
+/// 由登录页自己把目标页替换进原浏览栈。
+class PostLoginNavigationPass {
+  PostLoginNavigationPass._();
+
+  static bool _open = false;
+
+  static bool get isOpen => _open;
+
+  static void open() => _open = true;
+
+  static void close() => _open = false;
+}
+
 /// A5 统一登录守卫（规格 §8.1）。
 ///
 /// 唯一职责边界：

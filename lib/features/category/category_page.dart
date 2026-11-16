@@ -12,6 +12,12 @@ import '../bookstore/data/content_providers.dart';
 /// 顶部：频道 Tab（男生 / 女生），切换时重新加载对应频道标签
 /// 左侧：维度导航（热门标签 / 主题 / 角色 / 情节），滚动联动高亮
 /// 右侧：所有维度标签按区块堆叠展示，每区块可展开/收起
+///
+/// 频道切换的过渡：
+/// - Tab 文案与底部指示条做隐式补间，不再是瞬间跳变；
+/// - 新频道数据到达前继续展示旧内容，不会先清空成 loading；
+/// - 新内容淡出淡入 + 轻微上滑，播放期间保留可滚动布局，滚动条不抖动；
+/// - 每个频道各自记住滚动位置与维度高亮，切回时原地恢复。
 class CategoryPage extends ConsumerStatefulWidget {
   const CategoryPage({super.key});
 
@@ -21,51 +27,59 @@ class CategoryPage extends ConsumerStatefulWidget {
 
 class _CategoryPageState extends ConsumerState<CategoryPage> {
   int? _selectedChannelId;
-  int _currentDimensionIndex = 0;
-  final _scrollController = ScrollController();
-  final _dimensionKeys = <GlobalKey>[];
 
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
+  /// 各频道的导航数据缓存：切回看过的频道时直接出内容，不再闪一次加载态。
+  final Map<int?, CategoryNav> _navCache = {};
+
+  /// 各频道的滚动位置：切回频道时回到离开时的位置。
+  final Map<int?, double> _scrollOffsets = {};
+
+  /// 正在展示的数据与它所属的频道（切换加载期间仍是上一个频道的内容）。
+  CategoryNav? _shownNav;
+  int? _shownChannelId;
+
+  /// 频道列表里对应 [channelId] 的下标；找不到时回落到数据自带频道，再回落第一个。
+  int _channelIndexOf(CategoryNav nav, [int? channelId]) {
+    final id = channelId ?? _selectedChannelId;
+    var index = nav.channels.indexWhere((c) => c.channelId == id);
+    if (index < 0) {
+      index = nav.channels.indexWhere((c) => c.channelId == nav.channelId);
+    }
+    return index < 0 ? 0 : index;
   }
 
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_dimensionKeys.isEmpty) return;
-    // 滚动区域顶部的位置
-    final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight + 46;
-    int newIndex = 0;
-    // 从第一个维度开始遍历，哪个维度的标题滚到顶部线以下就更新，最后一个就是当前高亮
-    for (int i = 0; i < _dimensionKeys.length; i++) {
-      final ctx = _dimensionKeys[i].currentContext;
-      if (ctx == null) continue;
-      final box = ctx.findRenderObject() as RenderBox;
-      final dy = box.localToGlobal(Offset.zero).dy;
-      // 标题到达顶部线位置，就把它设为当前维度
-      if (dy <= screenTop + 10) {
-        newIndex = i;
-      }
-    }
-    // 已经滚到最底部，直接高亮最后一个维度（情节）
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 20) {
-      newIndex = _dimensionKeys.length - 1;
-    }
-    if (newIndex != _currentDimensionIndex) {
-      setState(() => _currentDimensionIndex = newIndex);
-    }
+  void _selectChannel(CategoryNav nav, int index) {
+    final channelId = nav.channels[index].channelId;
+    if (channelId == _selectedChannelId) return;
+    setState(() => _selectedChannelId = channelId);
   }
 
   @override
   Widget build(BuildContext context) {
     final navAsync = ref.watch(categoryNavProvider(_selectedChannelId));
+
+    // 新频道数据到达：先把"当前频道"定下来，再按请求参数与实际频道各缓存一份，
+    // 切回看过的频道时能立刻出内容，不再闪一次 loading。
+    final latest = navAsync.valueOrNull;
+    if (latest != null) {
+      _selectedChannelId ??= latest.channelId ??
+          (latest.channels.isNotEmpty ? latest.channels.first.channelId : null);
+      _navCache[_selectedChannelId] = latest;
+      if (latest.channelId != null) _navCache[latest.channelId] = latest;
+    }
+
+    // 本次选中频道的缓存；没命中时沿用上一个频道的内容，等新数据落位再换。
+    final target = _navCache[_selectedChannelId];
+    final nav = target ?? _shownNav;
+    // 展示内容换人时同步它所属的频道：后端没回 channelId 时回落到请求用的频道，
+    // 否则钥匙不变，AnimatedSwitcher 就不会做淡出淡入。
+    if (nav != null && !identical(nav, _shownNav)) {
+      _shownNav = nav;
+      _shownChannelId =
+          identical(nav, latest) ? (latest!.channelId ?? _selectedChannelId) : _selectedChannelId;
+    }
+    // 目标频道没有缓存且请求失败时才让位给错误态，避免把旧内容当成新频道。
+    final failed = navAsync.hasError && target == null;
 
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
@@ -80,135 +94,101 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
           ),
         ],
       ),
-      body: navAsync.when(
-        loading: () => const Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-        error: (error, _) => Center(
-          child: TextButton(
-            onPressed: () => ref.invalidate(categoryNavProvider),
-            child: const Text('重试', style: TextStyle(fontSize: 13)),
-          ),
-        ),
-        data: (nav) {
-          if (nav.channels.isEmpty) {
-            return const Center(
-              child: Text(
-                '暂无频道',
-                style: TextStyle(fontSize: 13, color: AppColors.text3),
+      body: nav == null || failed
+          ? navAsync.when(
+              loading: () => const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
-            );
-          }
-
-          // 初始化选中的频道ID
-          if (_selectedChannelId == null) {
-            _selectedChannelId = nav.channelId ?? nav.channels.first.channelId;
-          }
-          int safeChannelIdx = nav.channels
-              .indexWhere((c) => c.channelId == _selectedChannelId);
-          if (safeChannelIdx < 0) safeChannelIdx = 0;
-
-          // 初始化维度key
-          if (_dimensionKeys.length != nav.dimensions.length) {
-            _dimensionKeys
-              ..clear()
-              ..addAll(nav.dimensions.map((_) => GlobalKey()));
-            _currentDimensionIndex = 0;
-          }
-
-          return Column(
-            children: [
-              // 顶部频道 Tab
-              _ChannelTabs(
-                channels: [for (final c in nav.channels) c.channelName],
-                current: safeChannelIdx,
-                onChanged: (i) {
-                  setState(() {
-                    _selectedChannelId = nav.channels[i].channelId;
-                    _currentDimensionIndex = 0;
-                    _dimensionKeys.clear();
-                  });
-                },
+              error: (error, _) => Center(
+                child: TextButton(
+                  onPressed: () => ref.invalidate(categoryNavProvider),
+                  child: const Text('重试', style: TextStyle(fontSize: 13)),
+                ),
               ),
-              Expanded(
-                child: nav.dimensions.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '暂无标签维度',
-                          style: TextStyle(fontSize: 13, color: AppColors.text3),
-                        ),
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 左侧维度导航栏
-                          _DimensionNav(
-                            dimensions: [for (final d in nav.dimensions) d.name],
-                            currentIndex: _currentDimensionIndex,
-                            onTap: (index) => _scrollToDimension(index),
-                          ),
-                          // 右侧标签区块堆叠：直接全部渲染，不用懒加载，彻底解决定位问题
-                          Expanded(
-                            child: Container(
-                              color: AppColors.card,
-                              child: SingleChildScrollView(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    for (var i = 0; i < nav.dimensions.length; i++)
-                                      _DimensionSection(
-                                        key: _dimensionKeys[i],
-                                        dimension: nav.dimensions[i],
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
+              data: (_) => const SizedBox.shrink(),
+            )
+          : _buildContent(nav),
     );
   }
 
-  void _scrollToDimension(int index) async {
-    setState(() => _currentDimensionIndex = index);
-    if (index < 0 || index >= _dimensionKeys.length) return;
-    // 如果目标区块还没渲染，先滚动到底部触发渲染，再等一帧定位
-    final key = _dimensionKeys[index];
-    var ctx = key.currentContext;
-    if (ctx == null) {
-      // 先快速滚一段距离，让目标区块进入渲染范围
-      await _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent * (index / (_dimensionKeys.length - 1)),
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.linear,
-      );
-      // 等一帧让widget渲染完成
-      await Future.delayed(const Duration(milliseconds: 50));
-      ctx = key.currentContext;
-    }
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 300),
-        alignment: 0.0,
+  Widget _buildContent(CategoryNav nav) {
+    if (nav.channels.isEmpty) {
+      return const Center(
+        child: Text(
+          '暂无频道',
+          style: TextStyle(fontSize: 13, color: AppColors.text3),
+        ),
       );
     }
+
+    // Tab 高亮跟随"已点击的频道"，内容则等数据到位后再淡入，两者不会打架。
+    final current = _channelIndexOf(nav);
+    // 固定本次构建的频道：淡出中的旧视图回调时，不能把它的滚动位置写到新频道名下。
+    final shownId = _shownChannelId;
+
+    return Column(
+      children: [
+        // 顶部频道 Tab
+        _ChannelTabs(
+          channels: [for (final c in nav.channels) c.channelName],
+          current: current,
+          onChanged: (i) => _selectChannel(nav, i),
+        ),
+        Expanded(
+          child: nav.dimensions.isEmpty
+              ? const Center(
+                  child: Text(
+                    '暂无标签维度',
+                    style: TextStyle(fontSize: 13, color: AppColors.text3),
+                  ),
+                )
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  reverseDuration: const Duration(milliseconds: 170),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: Alignment.topLeft,
+                    children: [...previous, if (current != null) current],
+                  ),
+                  // 位移只放在淡入淡出里：过渡期间仍是完整的可滚动布局，
+                  // 滚动条不会因为内容被裁剪而闪一下。
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.012),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
+                      child: child,
+                    ),
+                  ),
+                  child: _ChannelTags(
+                    key: ValueKey<int?>(shownId),
+                    dimensions: nav.dimensions,
+                    initialOffset: _scrollOffsets[shownId] ?? 0,
+                    onScrollChanged: (offset) => _scrollOffsets[shownId] = offset,
+                  ),
+                ),
+        ),
+      ],
+    );
   }
 }
 
 /// 顶部频道 Tab（男生 / 女生）。
+///
+/// 文案大小 / 字重 / 颜色，以及底部指示条宽度，都用隐式动画补间，
+/// 切换时不再瞬间跳变。
 class _ChannelTabs extends StatelessWidget {
   const _ChannelTabs({
     required this.channels,
@@ -249,6 +229,9 @@ class _TabItem extends StatelessWidget {
     required this.onTap,
   });
 
+  static const Duration _duration = Duration(milliseconds: 220);
+  static const Curve _curve = Curves.easeOutCubic;
+
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -260,18 +243,23 @@ class _TabItem extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text(
-            label,
+          AnimatedDefaultTextStyle(
+            duration: _duration,
+            curve: _curve,
             style: TextStyle(
               fontSize: selected ? 16 : 14,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
               color: selected ? AppColors.text1 : AppColors.text2,
             ),
+            child: Text(label),
           ),
           const SizedBox(height: 8),
-          Container(
+          AnimatedContainer(
+            duration: _duration,
+            curve: _curve,
             height: 3,
-            width: 28,
+            // 宽度从 0 长到 28：指示条随文字一起"长出来"，而不是整条闪现
+            width: selected ? 28 : 0,
             decoration: BoxDecoration(
               color: selected ? AppColors.primary : Colors.transparent,
               borderRadius: BorderRadius.circular(2),
@@ -283,14 +271,161 @@ class _TabItem extends StatelessWidget {
   }
 }
 
+/// 某个频道的标签墙：左侧维度导航 + 右侧标签区块堆叠。
+///
+/// 每个频道各自持有一份滚动位置与维度高亮，切换频道不会串台。
+class _ChannelTags extends StatefulWidget {
+  const _ChannelTags({
+    super.key,
+    required this.dimensions,
+    required this.initialOffset,
+    required this.onScrollChanged,
+  });
+
+  final List<NavDimension> dimensions;
+
+  /// 挂载时恢复的滚动位置（切回看过的频道时是离开时的位置）。
+  final double initialOffset;
+
+  /// 滚动位置变化回调，供父级按频道记忆位置。
+  final ValueChanged<double> onScrollChanged;
+
+  @override
+  State<_ChannelTags> createState() => _ChannelTagsState();
+}
+
+class _ChannelTagsState extends State<_ChannelTags> {
+  int _currentDimensionIndex = 0;
+  late final ScrollController _scrollController;
+  final _dimensionKeys = <GlobalKey>[];
+
+  /// "跳到某个维度"的补间进行中：此时暂停滚动联动，免得高亮被中途位置抢走。
+  bool _jumping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _dimensionKeys.addAll(widget.dimensions.map((_) => GlobalKey()));
+    _scrollController =
+        ScrollController(initialScrollOffset: widget.initialOffset);
+    _scrollController.addListener(_onScroll);
+    // 恢复的滚动位置要等首帧布局后才能换算左侧高亮；
+    // 频道的标签变少了导致旧位置越界时，先收紧到可滚动范围内。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final max = _scrollController.position.maxScrollExtent;
+      if (_scrollController.offset > max) _scrollController.jumpTo(max);
+      _onScroll();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (!_jumping) _syncDimensionIndex();
+    widget.onScrollChanged(_scrollController.offset);
+  }
+
+  void _syncDimensionIndex() {
+    if (_dimensionKeys.isEmpty) return;
+    // 滚动区域顶部的位置
+    final screenTop = MediaQuery.of(context).padding.top + kToolbarHeight + 46;
+    int newIndex = 0;
+    // 从第一个维度开始遍历，哪个维度的标题滚到顶部线以下就更新，最后一个就是当前高亮
+    for (int i = 0; i < _dimensionKeys.length; i++) {
+      final ctx = _dimensionKeys[i].currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox;
+      final dy = box.localToGlobal(Offset.zero).dy;
+      // 标题到达顶部线位置，就把它设为当前维度
+      if (dy <= screenTop + 10) {
+        newIndex = i;
+      }
+    }
+    // 已经滚到最底部，直接高亮最后一个维度（情节）
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 20) {
+      newIndex = _dimensionKeys.length - 1;
+    }
+    if (newIndex != _currentDimensionIndex) {
+      setState(() => _currentDimensionIndex = newIndex);
+    }
+  }
+
+  Future<void> _scrollToDimension(int index) async {
+    if (index < 0 || index >= _dimensionKeys.length) return;
+    if (index == _currentDimensionIndex) return;
+    final ctx = _dimensionKeys[index].currentContext;
+    if (ctx == null) return;
+    _jumping = true;
+    setState(() => _currentDimensionIndex = index);
+    try {
+      // 用缓动的定位补间替换原来的"瞬移 + 恢复"两段式
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.0,
+      );
+    } finally {
+      _jumping = false;
+      if (mounted) _syncDimensionIndex();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 左侧维度导航栏
+        _DimensionNav(
+          dimensions: [for (final d in widget.dimensions) d.name],
+          currentIndex: _currentDimensionIndex,
+          onTap: _scrollToDimension,
+        ),
+        // 右侧标签区块堆叠：直接全部渲染，不用懒加载，彻底解决定位问题
+        Expanded(
+          child: Container(
+            color: AppColors.card,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < widget.dimensions.length; i++)
+                    _DimensionSection(
+                      key: _dimensionKeys[i],
+                      dimension: widget.dimensions[i],
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// 左侧维度导航栏（热门标签 / 主题 / 角色 / 情节）。
-/// 带选中态高亮：左侧竖条 + 橙色文字
+/// 带选中态高亮：左侧竖条 + 深色文字
 class _DimensionNav extends StatelessWidget {
   const _DimensionNav({
     required this.dimensions,
     required this.currentIndex,
     required this.onTap,
   });
+
+  static const Duration _duration = Duration(milliseconds: 200);
+  static const Curve _curve = Curves.easeOutCubic;
 
   final List<String> dimensions;
   final int currentIndex;
@@ -307,14 +442,16 @@ class _DimensionNav extends StatelessWidget {
           final selected = index == currentIndex;
           return InkWell(
             onTap: () => onTap(index),
-            child: Container(
+            child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
               child: Row(
                 children: [
-                  // 选中态左侧竖条
-                  Container(
+                  // 选中态左侧竖条：高度从 0 长到 16，像从中间"长"出来
+                  AnimatedContainer(
+                    duration: _duration,
+                    curve: _curve,
                     width: 3,
-                    height: 16,
+                    height: selected ? 16 : 0,
                     decoration: BoxDecoration(
                       color: selected ? AppColors.primary : Colors.transparent,
                       borderRadius: BorderRadius.circular(2),
@@ -322,14 +459,17 @@ class _DimensionNav extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      dimensions[index],
+                    child: AnimatedDefaultTextStyle(
+                      duration: _duration,
+                      curve: _curve,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w400,
                         color: selected ? AppColors.text1 : AppColors.text3,
                       ),
+                      child: Text(dimensions[index]),
                     ),
                   ),
                 ],
@@ -392,10 +532,16 @@ class _DimensionSectionState extends State<_DimensionSection> {
                         color: AppColors.text3,
                       ),
                     ),
-                    Icon(
-                      _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: AppColors.text3,
+                    // 箭头翻转而不是换图标，展开/收起的动作连成一条
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      child: const Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 16,
+                        color: AppColors.text3,
+                      ),
                     ),
                   ],
                 ),
@@ -403,19 +549,27 @@ class _DimensionSectionState extends State<_DimensionSection> {
           ],
         ),
         const SizedBox(height: 12),
-        // 标签 chips 网格：3列，紧凑间距
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final item in visibleItems)
-              _TagChip(
-                label: item.itemName,
-                onTap: () => context.push(
-                  RoutePath.workListUrl(tagId: item.itemId, title: item.itemName),
+        // 标签 chips 网格：3列，紧凑间距；展开/收起时高度补间而非整块跳变
+        AnimatedSize(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final item in visibleItems)
+                _TagChip(
+                  label: item.itemName,
+                  onTap: () => context.push(
+                    RoutePath.workListUrl(
+                      tagId: item.itemId,
+                      title: item.itemName,
+                    ),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 24),
       ],
