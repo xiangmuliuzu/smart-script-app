@@ -1,0 +1,404 @@
+import '../../../core/constants/api_endpoints.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
+import '../../user_center/data/paged_data.dart';
+import 'bookstore_models.dart';
+
+/// B 模块书城数据层（内容与作品）。
+///
+/// 只做三件事：拼查询参数、解析 App 信封里的 `data`、把 JSON 映射成页面模型。
+/// 鉴权与 Token 由 [ApiClient] 统一处理；书城浏览链路全部对游客开放，不需要登录态。
+class ContentRepository {
+  ContentRepository(this._api);
+
+  final ApiClient _api;
+
+  /// 首页 Banner 轮播（后端只返回已启用且在展示时间窗内的 Banner）。
+  Future<List<BannerItem>> listBanners({String? position}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentBanners,
+      query: _compact({'position': position}),
+      parser: _mapParser,
+    );
+    return _items(data, BannerItem.fromJson);
+  }
+
+  /// 标签列表（后端按位次升序下发）。
+  ///
+  /// [tagType] 可限定维度（hot/theme/role/plot）；
+  /// [channelId] 有值时按频道过滤（分类页标签体系）。
+  Future<List<TagItem>> listTags({String? tagType, int? channelId}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentTags,
+      query: _compact({
+        'tagType': tagType,
+        'channelId': channelId,
+      }),
+      parser: _mapParser,
+    );
+    return _items(data, TagItem.fromJson);
+  }
+
+  /// 分类页导航：频道列表 + 四维度（热门标签 / 主题 / 角色 / 情节）分组。
+  ///
+  /// [channelId] 为空时不传参，由后端回落第一个频道。
+  Future<CategoryNav> categoryNav({int? channelId}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentCategoryNav,
+      query: _compact({'channelId': channelId}),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取分类导航失败');
+    return CategoryNav.fromJson(data);
+  }
+
+  /// 作品列表（分页 + 筛选 + 排序）。
+  ///
+  /// [sort] 为空时由后端回落 `latest`；非法值同样回落，客户端不需要做白名单校验。
+  /// [recommendStatus] 传入时后端只回该推荐位下未过期的作品，并按推荐权重降序
+  /// （配合权重同级回落浏览量）；用于书城首页「热门作品」取推荐位。
+  Future<PagedData<BookItem>> pageWorks({
+    int? tagId,
+    String? keyword,
+    String? sort,
+    String? recommendStatus,
+    String? showScope,
+    int? authorId,
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorks,
+      query: _compact({
+        'tagId': tagId,
+        'keyword': keyword,
+        'sort': sort,
+        'recommendStatus': recommendStatus,
+        'showScope': showScope,
+        'authorId': authorId,
+        'page': pageNum,
+        'pageSize': pageSize,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取作品列表失败');
+    return PagedData.parse<BookItem>(data, BookItem.fromJson);
+  }
+
+  /// 作品详情；未上架或不存在时后端按 404 拒绝，由 [ApiClient] 抛 [ApiException]。
+  Future<BookItem> workDetail(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkById(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取作品详情失败');
+    return BookItem.fromJson(data);
+  }
+
+  /// 作品章节目录；payload 附带作品试读配置，目录页无需再取详情。
+  ///
+  /// [ChapterSummary.readable] 由服务端按试读范围判定，客户端不自行推算。
+  Future<ChapterListPayload> listChapters(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkChapters(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取章节目录失败');
+    return ChapterListPayload.fromJson(data);
+  }
+
+  /// 章节正文；超出试读范围时后端返回 code=403 且 data 不含 content，
+  /// 由 [ApiClient] 抛 [ApiException]，阅读页据此展示「试读结束」提示。
+  Future<ChapterDetail> chapterDetail(int chapterId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentChapter(chapterId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取章节正文失败');
+    return ChapterDetail.fromJson(data);
+  }
+
+  /// 作品试读包：可读章节 + 试读文件（游客可读）。
+  Future<PreviewPayload> workPreview(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkPreview(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取试读内容失败');
+    return PreviewPayload.fromJson(data);
+  }
+
+  /// 版权合作联系方式：只返回「是否登记 + 展示范围」，不含明文联系方式。
+  Future<WorkContact> workContact(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkContact(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取合作联系方式失败');
+    return WorkContact.fromJson(data);
+  }
+
+  /// 作品榜单（接口 2.7.7，五榜：view/favorite/sale/rating/new）；
+  /// [type] 空值由后端回落 view，返回 { list, updatedAt }。
+  Future<RankingPayload> listRankings({String? type, int? limit}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentRankings,
+      query: _compact({'type': type, 'limit': limit}),
+      parser: _mapParser,
+    );
+    return RankingPayload.fromJson(data);
+  }
+
+  /// 我的书架列表（需 App Token，接口 2.7.12，分页 {total, list}）。
+  ///
+  /// 书架语义：只包含已购买 / 已授权作品（由订单完成态与生效授权派生，按最近成交时间倒序），
+  /// 不再支持把普通作品加入书架。响应同时携带身份摘要块（identity / downloadable /
+  /// realNameRequired），书架页一次请求即可渲染身份卡片与列表。
+  Future<ShelfPayload> shelf({int pageNum = 1, int pageSize = 20}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentShelf,
+      query: {'page': pageNum, 'pageSize': pageSize},
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取书架失败');
+    return ShelfPayload.fromJson(data);
+  }
+
+  /// 当前身份是否已获该作品授权（已购或授权生效中），供详情页回显状态标识。
+  Future<bool> isWorkAuthorized(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentShelfByWorkId(workId),
+      parser: _mapParser,
+    );
+    return data != null && data['authorized'] == true;
+  }
+
+  /// 记录阅读进度（需 App Token，接口 2.7.12 补充写入）。
+  ///
+  /// 首次阅读由服务端自动建立进度行（upsert），不再要求作品预先在书架中。
+  Future<void> saveShelfProgress(int workId, int chapterId) async {
+    await _api.put<Map<String, dynamic>>(
+      ApiEndpoints.contentShelfProgress(workId),
+      data: {'chapterId': chapterId},
+      parser: _mapParser,
+    );
+  }
+
+  /// 搜索历史列表（需 App Token，接口 2.7.4）。
+  ///
+  /// 后端按最近搜索时间倒序下发最近若干条（不做分页），故无 total。
+  Future<List<SearchHistoryItem>> listSearchHistory() async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistory,
+      parser: _mapParser,
+    );
+    return _items(data, SearchHistoryItem.fromJson);
+  }
+
+  /// 记录搜索历史（需 App Token）。
+  ///
+  /// 契约未定义写入接口，按 sys_search_history 表补齐；同关键词已存在时
+  /// 由后端合并计数并刷新时间。关键词长度上限由后端校验（超 100 字按 400 拒绝）。
+  Future<void> recordSearchHistory(String keyword) async {
+    await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistory,
+      data: {'keyword': keyword},
+      parser: _mapParser,
+    );
+  }
+
+  /// 删除单条搜索历史（需 App Token，接口 2.7.5）；不存在或非本人时后端按 404 拒绝。
+  Future<void> removeSearchHistory(int id) async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistoryById(id),
+      parser: _mapParser,
+    );
+  }
+
+  /// 清空全部搜索历史（需 App Token，接口 2.7.6）；无历史时为幂等成功。
+  Future<void> clearSearchHistory() async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentSearchHistory,
+      parser: _mapParser,
+    );
+  }
+
+  /// 我的收藏列表（需 App Token，接口 2.7.11，分页 {total, list}）。
+  ///
+  /// 只回上架未删除的作品，按收藏时间倒序；归属由服务端身份决定。
+  Future<PagedData<BookItem>> pageFavorites({
+    required int pageNum,
+    required int pageSize,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentFavorites,
+      query: _compact({'page': pageNum, 'pageSize': pageSize}),
+      parser: _mapParser,
+    );
+    if (data == null) throw ApiException('获取收藏列表失败');
+    return PagedData.parse<BookItem>(data, BookItem.fromJson);
+  }
+
+  /// 收藏作品（需 App Token，接口 2.7.10）；作品不存在或未上架时后端按 404 拒绝。
+  ///
+  /// 重复收藏为幂等成功（后端不因已收藏而失败）。
+  Future<void> addFavorite(int workId) async {
+    await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentFavoriteByWorkId(workId),
+      parser: _mapParser,
+    );
+  }
+
+  /// 取消收藏（需 App Token，接口 2.7.10）；未收藏时为幂等成功。
+  Future<void> removeFavorite(int workId) async {
+    await _api.delete<Map<String, dynamic>>(
+      ApiEndpoints.contentFavoriteByWorkId(workId),
+      parser: _mapParser,
+    );
+  }
+
+  /// 查询当前身份是否已收藏该作品（需 App Token）。
+  Future<FavoriteState> favoriteStatus(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentFavoriteByWorkId(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取收藏状态失败');
+    return FavoriteState.fromJson(data);
+  }
+
+  /// 查询作品评分态（需 App Token）。
+  ///
+  /// data 含 {workId, rating, ratingCount, myScore}；myScore 为当前身份的分值，
+  /// 未评分时为 null；作品不存在或未上架时后端按 404 拒绝。
+  Future<WorkRating> workRating(int workId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkRating(workId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('获取评分失败');
+    return WorkRating.fromJson(data);
+  }
+
+  /// 提交评分（需 App Token，body {score}，1~5 星）。
+  ///
+  /// 一人一评：同一身份重复提交即覆盖分值，评分数不增长；
+  /// 返回覆盖后回写过的 {rating, ratingCount, myScore}。
+  Future<WorkRating> submitRating(int workId, int score) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.contentWorkRating(workId),
+      data: {'score': score},
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('提交评分失败');
+    return WorkRating.fromJson(data);
+  }
+
+  static Map<String, dynamic> _mapParser(dynamic raw) {
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{};
+  }
+
+  /// 去掉空值参数：后端按「参数缺失 = 不过滤」处理，传空串会变成无效条件。
+  static Map<String, dynamic> _compact(Map<String, dynamic> raw) {
+    final query = <String, dynamic>{};
+    raw.forEach((key, value) {
+      if (value == null) return;
+      if (value is String && value.trim().isEmpty) return;
+      query[key] = value;
+    });
+    return query;
+  }
+
+  static List<T> _items<T>(
+    Map<String, dynamic>? data,
+    T Function(Map<String, dynamic> item) parser,
+  ) {
+    final raw = data?['list'];
+    if (raw is! List) return <T>[];
+    return raw
+        .whereType<Map>()
+        .map((e) => parser(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+}
+
+/// 后端下发的身份摘要（规格 §10：身份由服务端提供，客户端不自行拼装）。
+class IdentitySummary {
+  const IdentitySummary({
+    required this.authenticated,
+    required this.guest,
+    this.userId,
+    this.accountType,
+    this.realNameStatus = 'NOT_SUBMITTED',
+    this.authorCapability = false,
+    this.roleCodes = const [],
+    this.permissionCodes = const [],
+  });
+
+  final bool authenticated;
+  final bool guest;
+  final int? userId;
+  final String? accountType;
+  final String realNameStatus;
+  final bool authorCapability;
+  final List<String> roleCodes;
+  final List<String> permissionCodes;
+
+  factory IdentitySummary.fromJson(Map<String, dynamic> json) => IdentitySummary(
+        authenticated: json['authenticated'] as bool? ?? false,
+        guest: json['guest'] as bool? ?? true,
+        userId: (json['userId'] as num?)?.toInt(),
+        accountType: json['accountType'] as String?,
+        realNameStatus: json['realNameStatus'] as String? ?? 'NOT_SUBMITTED',
+        authorCapability: json['authorCapability'] as bool? ?? false,
+        roleCodes: (json['roleCodes'] as List?)?.whereType<String>().toList() ?? const [],
+        permissionCodes:
+            (json['permissionCodes'] as List?)?.whereType<String>().toList() ?? const [],
+      );
+}
+
+/// 我的书架载荷（接口 2.7.12）：身份摘要块 + 真实分页作品。
+///
+/// 作品元素与 2.7.1 作品列表同为 [BookItem]（后端在书城作品字段上追加本书架阅读进度，
+/// 故 [BookItem.lastReadChapterId] 等进度字段仅书架列表有值），
+/// 书架页因此可与书城其它列表共用渲染组件。
+class ShelfPayload {
+  const ShelfPayload({
+    required this.identity,
+    required this.total,
+    required this.list,
+    required this.downloadable,
+    required this.realNameRequired,
+  });
+
+  final IdentitySummary identity;
+
+  /// 书架总条数（用于分页）。
+  final int total;
+
+  /// 当前页作品（只含上架未删除作品）。
+  final List<BookItem> list;
+
+  /// 是否可下载素材：由实名状态决定（业务准入），与角色无关。
+  final bool downloadable;
+  final bool realNameRequired;
+
+  factory ShelfPayload.fromJson(Map<String, dynamic> json) {
+    final rawWorks = json['list'];
+    return ShelfPayload(
+      identity: IdentitySummary.fromJson(
+        json['identity'] is Map ? Map<String, dynamic>.from(json['identity'] as Map) : const {},
+      ),
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      list: rawWorks is List
+          ? rawWorks
+              .whereType<Map>()
+              .map((e) => BookItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const <BookItem>[],
+      downloadable: json['downloadable'] as bool? ?? false,
+      realNameRequired: json['realNameRequired'] as bool? ?? true,
+    );
+  }
+}

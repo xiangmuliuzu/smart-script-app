@@ -1,0 +1,281 @@
+/// 「我的作品」写作链路页面模型（A 套接口 /api/v1/users/me/works）。
+///
+/// 字段与后端一一对应，不自行拼装：
+///   - [AuthorWorkItem]    ← GET /users/me/works 列表元素
+///   - [AuthorWorkDetail]  ← GET /users/me/works/{workId}（work + tags + chapters + latestReview）
+///   - [AuthorChapterItem] ← 章节元素（含正文 content）
+///   - [ReviewRecordItem]  ← GET /users/me/works/{workId}/review-records 元素
+///
+/// 作品状态口径（A 套由最新审核记录派生，服务端下发）：
+///   draft（无记录）/ reviewing（pending、ai_reviewing）/ revision（待修改）
+///   rejected（已驳回）/ published（approved，已发布）。
+/// 编辑闸门：仅 reviewing（审核中）锁定，其余状态均可编辑；已发布作品改动后需重新提交审核。
+library;
+
+import '../../bookstore/data/bookstore_models.dart';
+
+bool _flag(dynamic value) => value == '1' || value == 1 || value == true;
+
+String _text(dynamic value) => value == null ? '' : value.toString();
+
+String? _textOrNull(dynamic value) => value?.toString();
+
+int _int(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+int? _intOrNull(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
+}
+
+double? _doubleOrNull(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String && value.isNotEmpty) return double.tryParse(value);
+  return null;
+}
+
+/// 作品状态中文标签（A 套口径）。
+///
+/// 未知取值原样返回，避免后端新增枚举时前端丢信息。
+String workStatusLabel(String status) {
+  switch (status) {
+    case 'draft':
+      return '草稿';
+    case 'reviewing':
+      return '审核中';
+    case 'revision':
+      return '待修改';
+    case 'rejected':
+      return '已驳回';
+    case 'published':
+      return '已发布';
+    default:
+      return status;
+  }
+}
+
+/// 审核记录状态中文标签；未知取值原样返回。
+String reviewStatusLabel(String status) {
+  switch (status) {
+    case 'pending':
+      return '待审核';
+    case 'ai_reviewing':
+      return 'AI 审核中';
+    case 'revision':
+      return '待修改';
+    case 'rejected':
+      return '已驳回';
+    case 'approved':
+      return '已通过';
+    default:
+      return status;
+  }
+}
+
+/// 我的作品列表条目（A 套 GET /users/me/works）。
+class AuthorWorkItem {
+  const AuthorWorkItem({
+    required this.workId,
+    this.title = '',
+    this.cover,
+    this.summary,
+    this.workType,
+    this.wordCount = 0,
+    this.price,
+    this.status = 'draft',
+    this.shelfStatus = '',
+    this.channelId,
+    this.createTime,
+    this.updateTime,
+  });
+
+  final int workId;
+  final String title;
+
+  /// 封面地址：列表接口不下发（恒为 null），详情接口下发。
+  final String? cover;
+  final String? summary;
+  final String? workType;
+  final int wordCount;
+
+  /// 定价（后端下发，A 套列表/详情均携带）。
+  final double? price;
+
+  /// 审核派生状态（见库文档头注释）。
+  final String status;
+
+  /// 上架开关（后端 sys_work.status：on_shelf / off_shelf）。
+  /// 列表接口未下发时为空字符串，调用方按审核状态兜底。
+  final String shelfStatus;
+
+  /// 所属频道（146 男频 / 147 女频）；后端未设置时为 null。
+  final int? channelId;
+  final String? createTime;
+  final String? updateTime;
+
+  /// 状态中文标签。
+  String get statusLabel => workStatusLabel(status);
+
+  /// 仅「审核中」锁定，其余状态（含已发布）均可编辑；
+  /// 已发布作品改动后需重新提交审核（与后端 requireEditable 一致）。
+  bool get editable => status != 'reviewing';
+
+  factory AuthorWorkItem.fromJson(Map<String, dynamic> json) => AuthorWorkItem(
+        workId: _int(json['workId']),
+        title: _text(json['title']),
+        cover: _textOrNull(json['cover']),
+        summary: _textOrNull(json['summary']),
+        workType: _textOrNull(json['workType']),
+        wordCount: _int(json['wordCount']),
+        price: _doubleOrNull(json['price']),
+        status: _text(json['status']).isEmpty ? 'draft' : _text(json['status']),
+        shelfStatus: _text(json['shelfStatus']),
+        channelId: _intOrNull(json['channelId']),
+        createTime: _textOrNull(json['createTime']),
+        updateTime: _textOrNull(json['updateTime']),
+      );
+}
+
+/// 作者视角章节条目（A 套章节接口，含正文全文）。
+///
+/// isFree/status 为 tinyint，契约以字符串 "0"/"1" 下发（若依字典风格）。
+class AuthorChapterItem {
+  const AuthorChapterItem({
+    required this.chapterId,
+    this.chapterNo = 0,
+    this.chapterTitle = '',
+    this.content = '',
+    this.summary = '',
+    this.wordCount = 0,
+    this.isFree = false,
+    this.status = '0',
+  });
+
+  final int chapterId;
+  final int chapterNo;
+  final String chapterTitle;
+  final String content;
+
+  /// 本章摘要（AI「本章摘要」接口落库，供后续章节续写注入前情）。
+  final String summary;
+  final int wordCount;
+  final bool isFree;
+
+  /// 章节状态："0"=已发布（读者可见），"1"=草稿（仅作者可见）。
+  final String status;
+
+  /// 是否为草稿（未发布）。保留历史命名 isHidden 以减少连带改动。
+  bool get isHidden => status == '1';
+
+  factory AuthorChapterItem.fromJson(Map<String, dynamic> json) =>
+      AuthorChapterItem(
+        chapterId: _int(json['chapterId']),
+        chapterNo: _int(json['chapterNo']),
+        chapterTitle: _text(json['chapterTitle']),
+        content: _text(json['content']),
+        summary: _text(json['summary']),
+        wordCount: _int(json['wordCount']),
+        isFree: _flag(json['isFree']),
+        status: _text(json['status']).isEmpty ? '0' : _text(json['status']),
+      );
+}
+
+/// 审核记录条目（A 套 GET /users/me/works/{workId}/review-records）。
+class ReviewRecordItem {
+  const ReviewRecordItem({
+    required this.reviewId,
+    this.reviewNo = '',
+    this.status = '',
+    this.reviewResult,
+    this.reviewOpinion,
+    this.createdAt,
+  });
+
+  final int reviewId;
+  final String reviewNo;
+
+  /// 审核状态（pending/ai_reviewing/revision/rejected/approved）。
+  final String status;
+
+  /// 审核结果（approved/rejected/revision 等），未出结论时为 null。
+  final String? reviewResult;
+
+  /// 审核意见，可为空。
+  final String? reviewOpinion;
+
+  /// 提交时间（"yyyy-MM-dd HH:mm:ss"）。
+  final String? createdAt;
+
+  String get statusLabel => reviewStatusLabel(status);
+
+  factory ReviewRecordItem.fromJson(Map<String, dynamic> json) =>
+      ReviewRecordItem(
+        reviewId: _int(json['reviewId']),
+        reviewNo: _text(json['reviewNo']),
+        status: _text(json['status']),
+        reviewResult: _textOrNull(json['reviewResult']),
+        reviewOpinion: _textOrNull(json['reviewOpinion']),
+        createdAt: _textOrNull(json['createdAt']),
+      );
+}
+
+/// 作品工作台详情（A 套 GET /users/me/works/{workId}，一次拿全）。
+class AuthorWorkDetail {
+  const AuthorWorkDetail({
+    required this.work,
+    this.tags = const [],
+    this.chapters = const [],
+    this.latestReview,
+    this.shelfStatus,
+  });
+
+  final AuthorWorkItem work;
+
+  /// 上架状态（on_shelf / off_shelf），供上下架按钮使用；null 表示未知。
+  final String? shelfStatus;
+
+  /// 作品标签（A 套详情 tags 字段，复用书城 TagItem）；
+  /// 设置页据此回填已选标签。
+  final List<TagItem> tags;
+
+  final List<AuthorChapterItem> chapters;
+
+  /// 最近一条审核记录；从未提交过审核时为 null。
+  final ReviewRecordItem? latestReview;
+
+  /// 章节总字数（各章 wordCount 之和）。
+  int get totalWordCount =>
+      chapters.fold(0, (sum, chapter) => sum + chapter.wordCount);
+
+  factory AuthorWorkDetail.fromJson(Map<String, dynamic> json) {
+    final rawWork = json['work'];
+    final rawTags = json['tags'];
+    final rawChapters = json['chapters'];
+    final rawLatest = json['latestReview'];
+    final rawShelfStatus = json['shelfStatus'];
+    return AuthorWorkDetail(
+      work: rawWork is Map
+          ? AuthorWorkItem.fromJson(Map<String, dynamic>.from(rawWork))
+          : const AuthorWorkItem(workId: 0),
+      tags: rawTags is List
+          ? rawTags
+              .whereType<Map>()
+              .map((e) => TagItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      chapters: rawChapters is List
+          ? rawChapters
+              .whereType<Map>()
+              .map((e) =>
+                  AuthorChapterItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      latestReview: rawLatest is Map
+          ? ReviewRecordItem.fromJson(Map<String, dynamic>.from(rawLatest))
+          : null,
+      shelfStatus: rawShelfStatus?.toString(),
+    );
+  }
+}

@@ -3,25 +3,40 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_constants.dart';
+import 'secure_token_storage.dart';
 
-/// 登录态本地存储（token / refreshToken / 当前角色 / 用户缓存）。
-///
-/// 由框架层统一持有，供网络拦截器与 auth 状态共用，页面不要各自存 token。
+/// A3 session storage:
+/// - The RuoYi token lives in [TokenSecureStorage] only.
+/// - SharedPreferences stores non-sensitive display cache only.
 class TokenStorage {
-  TokenStorage(this._prefs);
+  TokenStorage(this._secure, this._prefs);
 
+  final TokenSecureStorage _secure;
   final SharedPreferences _prefs;
 
-  String? get token => _prefs.getString(AppConstants.spToken);
+  String? _token;
+  int _generation = 0;
+  int _tokenGeneration = 0;
+  Future<void>? _writes;
 
-  String? get refreshToken => _prefs.getString(AppConstants.spRefreshToken);
+  int get generation => _generation;
+  int get tokenGeneration => _tokenGeneration;
 
-  /// 当前登录账号类型：creator / client（接口文档 2.1.3 userType）。
-  String? get userType => _prefs.getString(AppConstants.spUserType);
+  Future<void> _serialize(Future<void> Function() action) {
+    final operation =
+        _writes == null ? action() : _writes!.then((_) => action());
+    final queued = operation.catchError((Object _) {});
+    _writes = queued;
+    queued.then((_) {
+      if (identical(_writes, queued)) _writes = null;
+    });
+    return operation;
+  }
 
-  bool get isLoggedIn => token != null && token!.isNotEmpty;
+  String? get token => _token;
 
-  /// 读取缓存的用户信息（用于重启后恢复会话），无缓存时返回 null。
+  bool get isLoggedIn => _token != null && _token!.isNotEmpty;
+
   Map<String, dynamic>? get cachedUser {
     final raw = _prefs.getString(AppConstants.spUserCache);
     if (raw == null || raw.isEmpty) return null;
@@ -33,31 +48,59 @@ class TokenStorage {
     }
   }
 
-  Future<void> cacheUser(Map<String, dynamic> userJson) =>
-      _prefs.setString(AppConstants.spUserCache, jsonEncode(userJson));
-
-  Future<void> saveSession({
-    required String token,
-    String? refreshToken,
-    String? userType,
-    Map<String, dynamic>? user,
-  }) async {
-    await _prefs.setString(AppConstants.spToken, token);
-    if (refreshToken != null) {
-      await _prefs.setString(AppConstants.spRefreshToken, refreshToken);
-    }
-    if (userType != null) {
-      await _prefs.setString(AppConstants.spUserType, userType);
-    }
-    if (user != null) {
-      await cacheUser(user);
+  Future<void> loadFromSecure() async {
+    final generation = _generation;
+    if (_writes != null) await _writes;
+    final token = await _secure.read(AppConstants.kAccessToken);
+    // Remove the retired refresh token when upgrading an existing installation.
+    await _secure.delete(AppConstants.kRefreshToken);
+    if (generation == _generation) {
+      _token = token;
+      _tokenGeneration = generation;
     }
   }
 
-  Future<void> clear() async {
-    await _prefs.remove(AppConstants.spToken);
-    await _prefs.remove(AppConstants.spRefreshToken);
-    await _prefs.remove(AppConstants.spUserType);
-    await _prefs.remove(AppConstants.spUserCache);
+  Future<void> cacheUser(Map<String, dynamic> userJson) =>
+      _prefs.setString(AppConstants.spUserCache, jsonEncode(userJson));
+
+  Future<void> saveSession(
+      {required String token, Map<String, dynamic>? user}) {
+    final generation = ++_generation;
+    return _serialize(() async {
+      await _secure.write(AppConstants.kAccessToken, token);
+      await _secure.delete(AppConstants.kRefreshToken);
+      if (generation == _generation) {
+        _token = token;
+        _tokenGeneration = generation;
+        if (user != null) await cacheUser(user);
+      }
+    });
+  }
+
+  /// Clear credentials when signing out or the RuoYi session expires.
+  Future<void> clear() {
+    _tokenGeneration = ++_generation;
+    _token = null;
+    return _serialize(() async {
+      await _secure.delete(AppConstants.kAccessToken);
+      await _secure.delete(AppConstants.kRefreshToken);
+      await _prefs.remove(AppConstants.spUserCache);
+    });
+  }
+
+  /// Used by APP-13: assert SharedPreferences never holds tokens.
+  Future<bool> prefsContainCredentials() async {
+    for (final key in [
+      AppConstants.kAccessToken,
+      AppConstants.kRefreshToken,
+      'auth_token',
+      'auth_refresh_token',
+      'a3_access_token',
+      'a3_refresh_token',
+    ]) {
+      final v = _prefs.getString(key);
+      if (v != null && v.isNotEmpty) return true;
+    }
+    return false;
   }
 }

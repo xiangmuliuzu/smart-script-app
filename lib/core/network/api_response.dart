@@ -14,10 +14,16 @@ class ApiResponse<T> {
     Map<String, dynamic> json, {
     T Function(dynamic raw)? parser,
   }) {
-    final raw = json['data'];
+    // RuoYi login/captcha responses carry their fields at the top level.
+    final raw = json['data'] ??
+        (json.containsKey('token') ||
+                json.containsKey('captchaEnabled') ||
+                json.containsKey('user')
+            ? json
+            : null);
     return ApiResponse<T>(
       code: (json['code'] as num?)?.toInt() ?? 0,
-      message: json['message'] as String? ?? '',
+      message: json['msg'] as String? ?? json['message'] as String? ?? '',
       data: raw == null ? null : (parser != null ? parser(raw) : raw as T),
     );
   }

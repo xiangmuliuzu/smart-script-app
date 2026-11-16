@@ -1,0 +1,5 @@
+feat(trade): 订单域四页UI优化
+
+- order_list_page: 加loading状态、空状态图标、错误重试、对方名称显示
+- order_detail_page: 加进度步骤条、移除报价ID行、取消二次确认、联系对方按钮
+- negotiation_status_bar: 接受按钮加loading锁防重复点击

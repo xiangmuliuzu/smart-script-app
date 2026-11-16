@@ -1,13 +1,554 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../shared/widgets/placeholder_page.dart';
+import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/router/auth_guard.dart';
+import '../../core/router/route_paths.dart';
+import '../../core/theme/app_colors.dart';
+import 'data/bookstore_models.dart';
+import 'data/content_providers.dart';
+import 'widgets/bookstore_widgets.dart';
 
-/// 书城（接口文档 2.7）——占位，待书城负责人实现。
-class BookstorePage extends StatelessWidget {
+/// 书城首页（B 模块：内容与作品）。
+///
+/// 浏览链路全部为公开接口，游客可读；顶部「消息」是受保护入口，
+/// 由 [AuthGuard.pushProtected] 统一拦截（未登录先登录，登录后回到消息页）。
+class BookstorePage extends ConsumerWidget {
   const BookstorePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const PlaceholderPage(title: '书城', subtitle: '作品列表 / 详情 / 榜单 / 书架');
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        titleSpacing: 16,
+        title: SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            onPressed: () => context.push(RoutePath.search),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.fill,
+              foregroundColor: AppColors.text3,
+              alignment: Alignment.centerLeft,
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              shape: const StadiumBorder(),
+              textStyle: const TextStyle(fontSize: 14),
+            ),
+            icon: const Icon(Icons.search, size: 18),
+            label: const Text(
+              '搜索作品名称、作者、标签',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () => AuthGuard.pushProtected(
+                context,
+                ref,
+                target: RoutePath.messages,
+              ),
+              icon: const Icon(Icons.notifications_none),
+              tooltip: '消息',
+            ),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(bannersProvider);
+          ref.invalidate(categoryNavProvider(null));
+          ref.invalidate(hotWorksProvider);
+        },
+        child: ListView(
+          // 顶部不再留白：搜索栏已在透明 AppBar 内，渐变直接落到 Banner。
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            const SizedBox(height: 16),
+            const _BannerCarousel(position: 'home_top'),
+            const AppCard(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: _CategoryEntries(),
+              ),
+            ),
+            const AppCard(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _RankingPreview(),
+              ),
+            ),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _WorkSection(title: '热门精选', provider: hotWorksProvider),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
+
+/// 首页 Banner 轮播（顶部/中部共用）：多于一张时每 4 秒自动切换，可手动滑动。
+/// [position] 决定取哪个展示位的 Banner，空位不占高度。
+class _BannerCarousel extends ConsumerStatefulWidget {
+  const _BannerCarousel({required this.position});
+
+  final String position;
+
+  @override
+  ConsumerState<_BannerCarousel> createState() => _BannerCarouselState();
+}
+
+class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
+  static const Duration _interval = Duration(seconds: 4);
+
+  final PageController _controller = PageController();
+  Timer? _timer;
+  int _index = 0;
+  int _count = 0;
+
+  /// 上一次渲染用的 Banner 列表实例：用于识别「数据是否刷新出了一份新数据」。
+  /// Riverpod 每次成功取数都会生成新列表实例，未取数的重建保持同一实例。
+  List<BannerItem> _lastBanners = const <BannerItem>[];
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// 按当前数量同步定时器；数据变化时重建，少于两张不轮播。
+  void _syncAutoPlay(int count) {
+    if (count == _count) return;
+    _count = count;
+    _timer?.cancel();
+    if (count < 2) return;
+    _timer = Timer.periodic(_interval, (_) {
+      if (!mounted || !_controller.hasClients) return;
+      _controller.animateToPage(
+        (_index + 1) % count,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bannersAsync = ref.watch(bannersProvider(widget.position));
+
+    // 首次加载（无历史数据）时渲染与轮播同高的灰底占位：否则数据到达瞬间 Banner
+    // 才撑开 160，下方分类/榜单板块会整体上移跳动。下拉刷新时 isLoading 仍持有
+    // 旧数据（hasValue=true），继续渲染旧 Banner，布局不跳动。
+    if (bannersAsync.isLoading && !bannersAsync.hasValue) {
+      return const _BannerSkeleton();
+    }
+
+    final banners = bannersAsync.valueOrNull ?? const <BannerItem>[];
+
+    // 定时器只在数据就绪后启动，且不在 build 过程中直接创建。
+    // 数据变化（数量变化或刷新出一份新数据）时下标归零并跳回首页：
+    // 否则下拉刷新后 Banner 变少，PageView 停在越界旧下标，自动轮播基于旧计数
+    // 还会跳到异常页。定时器本身的启停逻辑保持不变。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final dataChanged = !identical(banners, _lastBanners);
+      _lastBanners = banners;
+      if (dataChanged && _index != 0 && _controller.hasClients) {
+        setState(() => _index = 0);
+        _controller.jumpToPage(0);
+      }
+      _syncAutoPlay(banners.length);
+    });
+
+    if (banners.isEmpty) {
+      // 已加载但为空列表 / 首次加载失败：Banner 属装饰性内容，不占位，
+      // 页面级下拉刷新可重试。
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      // Banner 在首页区块里，由外层卡片提供左右留白；卡片内再加水平内边距会双重缩进。
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: SizedBox(
+        height: 160,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: banners.length,
+              onPageChanged: (value) => setState(() => _index = value),
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.r),
+                  child: _BannerImage(banner: banners[index]),
+                ),
+              ),
+            ),
+            if (banners.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 10,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var i = 0; i < banners.length; i++)
+                      Container(
+                        width: i == _index ? 14 : 6,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          color: i == _index ? AppColors.card : AppColors.card.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BannerImage extends StatelessWidget {
+  const _BannerImage({required this.banner});
+
+  final BannerItem banner;
+
+  /// 点击跳转：仅 linkType=work 且有关联作品时跳作品详情，否则无动作。
+  void _onTap(BuildContext context) {
+    if (banner.linkType == 'work' && banner.linkId != null) {
+      context.push(RoutePath.workDetailUrl(banner.linkId!));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (banner.imageUrl.isEmpty) return _placeholder();
+    // 作者上传的素材尺寸不可控，按实际显示宽度解码，避免大图全尺寸解码造成掉帧/卡死。
+    final cacheWidth = ((MediaQuery.sizeOf(context).width - 32) *
+            MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(320, 1440)
+        .toInt();
+    return GestureDetector(
+      onTap: () => _onTap(context),
+      child: Image.network(
+        AppConfig.resolveAssetUrl(banner.imageUrl),
+        fit: BoxFit.cover,
+        cacheWidth: cacheWidth,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      ),
+    );
+  }
+
+  Widget _placeholder() => Container(
+        color: AppColors.primaryTint,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.image_outlined, color: AppColors.primary, size: 28),
+            if (banner.title.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                banner.title,
+                style: const TextStyle(fontSize: 13, color: AppColors.text1),
+              ),
+            ],
+          ],
+        ),
+      );
+}
+
+/// Banner 首次加载占位：与轮播同高（160）、同左右留白与圆角，灰底轻量骨架，
+/// 避免数据到达瞬间 Banner 才撑开、下方板块整体上移跳动。
+class _BannerSkeleton extends StatelessWidget {
+  const _BannerSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: SizedBox(
+        height: 160,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.r),
+            child: Container(color: AppColors.primaryTint),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 首页功能入口快捷栏：当前仅「任务广场」一项，后续可继续往 Wrap 里添。
+///
+/// 这是 C 模块（交易域）在首页的固定入口，与 B 模块的分类栏无关：
+/// 分类栏已随分类页改版为标签墙被移除，本入口不随之删除。
+/// 图标风格参考「我的」页快捷宫格（圆形浅底图标 + 下方文字）。
+class _CategoryEntries extends StatelessWidget {
+  const _CategoryEntries();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 与「我的」页宫格同宽基准：一行四格，未满的行留白在右侧。
+        final cellWidth = constraints.maxWidth / 4;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Wrap(
+            children: [
+              _QuickCell(
+                width: cellWidth,
+                icon: Icons.emoji_events_outlined,
+                label: '任务广场',
+                // go 而不是 push：任务广场是底部导航第二个分支，切过去即选中该 tab，
+                // 再按返回不会退回一个「看起来在任务 tab、实际栈在首页分支」的错位状态。
+                onTap: () => context.go(RoutePath.demandTab),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 首页快捷栏的单个宫格单元：圆形浅底图标 + 单行文字，整格可点。
+class _QuickCell extends StatelessWidget {
+  const _QuickCell({required this.width, required this.icon, required this.label, required this.onTap});
+
+  final double width;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryTint,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 20, color: AppColors.primary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: AppColors.text2),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 榜单预览：切换榜单类型只看前三，完整榜单进榜单页。
+class _RankingPreview extends ConsumerStatefulWidget {
+  const _RankingPreview();
+
+  @override
+  ConsumerState<_RankingPreview> createState() => _RankingPreviewState();
+}
+
+class _RankingPreviewState extends ConsumerState<_RankingPreview> {
+  static const int _previewSize = 5;
+
+  String _type = RankingType.all.first.code;
+
+  @override
+  Widget build(BuildContext context) {
+    final rankingAsync = ref.watch(rankingProvider(_type));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: '榜单'),
+        FilterChipBar(
+          items: [
+            for (final type in RankingType.all)
+              FilterChipItem(
+                label: type.label,
+                selected: type.code == _type,
+                onTap: () => setState(() => _type = type.code),
+              ),
+          ],
+        ),
+        rankingAsync.when(
+          loading: () => const _SectionLoading(),
+          error: (error, _) => _SectionError(
+            message: error is ApiException ? error.message : '榜单加载失败',
+            onRetry: () => ref.invalidate(rankingProvider(_type)),
+          ),
+          data: (payload) {
+            final items = payload.list;
+            if (items.isEmpty) return const _SectionEmpty(message: '榜单暂无数据');
+            final preview = items.take(_previewSize).toList();
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  for (var i = 0; i < preview.length; i++)
+                    RankingRow(
+                      item: preview[i],
+                      scoreText: _scoreText(preview[i]),
+                      showDivider: i != preview.length - 1,
+                      onTap: () => context.push(RoutePath.workDetailUrl(preview[i].workId)),
+                    ),
+                  // 底部"查看更多"按钮，明确表达"当前榜单还有更多内容"
+                  TextButton(
+                    onPressed: () => context.push(RoutePath.rankingUrl(_type)),
+                    child: const Text('查看更多 >', style: TextStyle(fontSize: 13)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  String _scoreText(RankingItem item) {
+    if (_type == 'rating') return '${item.score.toStringAsFixed(1)} 分';
+    // 新书榜按上架时间排序，右侧展示上架日期而非阅读量
+    if (_type == 'new') {
+      return item.shelfTime.isNotEmpty
+          ? item.shelfTime.substring(0, 10)
+          : '—';
+    }
+    return '${item.score.toInt()}';
+  }
+}
+
+/// 首页作品区块：按 provider 取前若干部，完整列表进推荐列表页。
+class _WorkSection extends ConsumerWidget {
+  const _WorkSection({required this.title, required this.provider});
+
+  final String title;
+  final AutoDisposeFutureProvider<List<BookItem>> provider;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final worksAsync = ref.watch(provider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: title,
+          onMore: worksAsync.valueOrNull != null && worksAsync.value!.length > 6
+              ? () => context.push(RoutePath.recommendList)
+              : null,
+        ),
+        worksAsync.when(
+          loading: () => const _SectionLoading(),
+          error: (error, _) => _SectionError(
+            message: error is ApiException ? error.message : '作品加载失败',
+            onRetry: () => ref.invalidate(provider),
+          ),
+          data: (works) {
+            if (works.isEmpty) return const _SectionEmpty(message: '暂无作品');
+            // 首页区块只显示前 6 本，剩余的通过"更多"按钮进列表页看
+            final displayWorks = works.take(6).toList();
+            return Column(
+              children: [
+                for (var i = 0; i < displayWorks.length; i++)
+                  WorkListTile(
+                    work: displayWorks[i],
+                    showDivider: i != displayWorks.length - 1,
+                    onTap: () => context.push(RoutePath.workDetailUrl(displayWorks[i].workId)),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionLoading extends StatelessWidget {
+  const _SectionLoading();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+          ),
+        ),
+      );
+}
+
+class _SectionError extends StatelessWidget {
+  const _SectionError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          children: [
+            Text(message, style: const TextStyle(fontSize: 13, color: AppColors.text3)),
+            TextButton(onPressed: onRetry, child: const Text('重新加载')),
+          ],
+        ),
+      );
+}
+
+class _SectionEmpty extends StatelessWidget {
+  const _SectionEmpty({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Center(
+          child: Text(message, style: const TextStyle(fontSize: 13, color: AppColors.text3)),
+        ),
+      );
 }

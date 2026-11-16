@@ -15,11 +15,16 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.pageBackground,
+      // 页面背景由 AppPageBackground 的渐变提供，Scaffold 须透明透出。
+      scaffoldBackgroundColor: Colors.transparent,
+      // 顶栏同样透明，让顶部冰蓝渐变从状态栏一直延伸到内容区，
+      // 避免白色 AppBar 与渐变背景之间出现割裂的色块。
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.card,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.text1,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
           fontSize: 16,
@@ -39,13 +44,22 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          // 描边按钮以主色勾边框，文字统一用正文黑，避免整屏蓝字。
+          foregroundColor: AppColors.text1,
           minimumSize: const Size.fromHeight(44),
           side: const BorderSide(color: AppColors.primary),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.r),
           ),
         ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.text1),
+      ),
+      tabBarTheme: const TabBarTheme(labelColor: AppColors.text1),
+      chipTheme: const ChipThemeData(
+        // 选中态靠底色区分，标签文字保持黑色；未选中态沿用默认灰字。
+        secondaryLabelStyle: TextStyle(color: AppColors.text1),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -64,6 +78,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.rSmall),
           borderSide: const BorderSide(color: AppColors.primary),
         ),
+        // 聚焦时浮动标签默认取主色，这里统一回正文色，主色只留在描边上。
+        floatingLabelStyle: const TextStyle(color: AppColors.text2),
       ),
       cardTheme: CardTheme(
         color: AppColors.card,

@@ -1,0 +1,219 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/network/api_exception.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../core/router/route_paths.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/auth_validators.dart';
+import '../../../core/widgets/app_toast.dart';
+import '../../welfare/data/welfare_providers.dart';
+import '../auth_feedback.dart';
+import '../auth_navigation.dart';
+import '../widgets/auth_buttons.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/auth_page_scaffold.dart';
+import '../widgets/underlined_input.dart';
+
+final loginCaptchaProvider = FutureProvider<Map<String, dynamic>>(
+  (ref) => ref.watch(authRepositoryProvider).captcha(),
+);
+
+/// 账号密码登录页（登录首页的次入口）。
+///
+/// 与登录首页共用同一套输入行 / 按钮组件，保证间距、字号与错误态完全一致。
+class PasswordLoginPage extends ConsumerStatefulWidget {
+  const PasswordLoginPage({super.key});
+
+  @override
+  ConsumerState<PasswordLoginPage> createState() => _PasswordLoginPageState();
+}
+
+class _PasswordLoginPageState extends ConsumerState<PasswordLoginPage> {
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _captchaController = TextEditingController();
+  final FocusNode _passwordFocusNode = FocusNode();
+
+  bool _obscure = true;
+  bool _submitting = false;
+  String? _phoneError;
+  String? _passwordError;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _captchaController.dispose();
+    _passwordFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (_submitting) return;
+    FocusScope.of(context).unfocus();
+    final phoneError = AuthValidators.registrationIdentifier(_phoneController.text);
+    final passwordError =
+        AuthValidators.loginPassword(_passwordController.text);
+    setState(() {
+      _phoneError = phoneError;
+      _passwordError = passwordError;
+    });
+    if (phoneError != null || passwordError != null) {
+      return;
+    }
+
+    final captcha = ref.read(loginCaptchaProvider).valueOrNull;
+    if (captcha == null) {
+      showAppToast(context, '请先加载验证码配置');
+      return;
+    }
+    if (captcha['captchaEnabled'] == true &&
+        _captchaController.text.trim().isEmpty) {
+      showAppToast(context, '请输入图形验证码');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    beginLoginNavigation();
+    // 回跳成功时由 resolvePostLoginTarget 关闭放行开关（可能推迟一帧），
+    // 只有失败或页面销毁才在这里恢复。
+    var navigating = false;
+    try {
+      await ref.read(authControllerProvider.notifier).loginWithPassword(
+            _phoneController.text.trim(),
+            _passwordController.text,
+            code: _captchaController.text.trim(),
+            uuid: captcha['uuid'] as String?,
+          );
+      if (!mounted) {
+        return;
+      }
+      // 登录成功：上报每日任务行为进度（fire-and-forget，失败静默）
+      unawaited(reportTaskProgressByType(ref, 'DAILY'));
+      // 与验证码登录一致：登录成功后消费一次回跳意图
+      resolvePostLoginTarget(context, ref);
+      navigating = true;
+    } on ApiException catch (e) {
+      if (mounted) {
+        showAppToast(context, AuthFeedback.passwordLoginError(e));
+        _captchaController.clear();
+        ref.invalidate(loginCaptchaProvider);
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppToast(context, '登录失败，请稍后重试');
+      }
+    } finally {
+      if (!navigating) endLoginNavigation();
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final captcha = ref.watch(loginCaptchaProvider);
+    return AuthPageScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AuthHeader(
+            title: '账号密码登录',
+            subtitle: '使用手机号或邮箱与登录密码进入平台',
+            onBack: () => backToLogin(context),
+          ),
+          UnderlinedInput(
+            controller: _phoneController,
+            label: '账号',
+            hintText: '请输入手机号或邮箱',
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            errorText: _phoneError,
+            onChanged: (_) {
+              if (_phoneError != null) {
+                setState(() => _phoneError = null);
+              }
+            },
+            onSubmitted: (_) => _passwordFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 8),
+          UnderlinedInput(
+            controller: _passwordController,
+            focusNode: _passwordFocusNode,
+            hintText: '请输入密码',
+            label: '密码',
+            errorText: _passwordError,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _handleLogin(),
+            trailing: IconButton(
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 20,
+                color: AppColors.text3,
+              ),
+              tooltip: _obscure ? '显示密码' : '隐藏密码',
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => context.push(RoutePath.forgotPassword),
+              child: const Text('忘记密码？', style: TextStyle(fontSize: 13)),
+            ),
+          ),
+          captcha.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => TextButton(
+              onPressed: () => ref.invalidate(loginCaptchaProvider),
+              child: const Text('验证码加载失败，点击重试'),
+            ),
+            data: (data) => data['captchaEnabled'] == true
+                ? UnderlinedInput(
+                    controller: _captchaController,
+                    label: '验证码',
+                    hintText: '请输入图形验证码',
+                    onSubmitted: (_) => _handleLogin(),
+                    trailing: InkWell(
+                      onTap: _submitting
+                          ? null
+                          : () {
+                              _captchaController.clear();
+                              ref.invalidate(loginCaptchaProvider);
+                            },
+                      child: Semantics(
+                        label: '点击更换图形验证码',
+                        button: true,
+                        child: Image.memory(base64Decode(data['img'] as String),
+                            width: 100, height: 40, fit: BoxFit.contain),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            label: '登录',
+            loading: _submitting,
+            onPressed: _handleLogin,
+          ),
+          const SizedBox(height: 14),
+          SecondaryButton(
+            label: '验证码登录',
+            onPressed: () => backToLogin(context),
+          ),
+        ],
+      ),
+    );
+  }
+}

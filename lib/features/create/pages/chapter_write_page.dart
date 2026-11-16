@@ -1,0 +1,670 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/network/api_exception.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/common_views.dart';
+import '../../ai/widgets/ai_inline_panel.dart';
+import '../data/author_work_models.dart';
+import '../data/author_work_providers.dart';
+
+/// 全屏章节写作编辑器（番茄作家助手式）。
+///
+/// - [chapterId] 为 0 时新建模式，否则编辑模式。
+/// - 编辑模式下从 [authorWorkDetailProvider] 读取章节标题与正文回填，
+///   不通过路由参数传长文本（URL 长度有限）。
+/// - 保存策略：输入停顿 3 秒自动保存（debounce）；返回 / 点「完成」时立即保存。
+/// - 支持「设为试读章节」开关，随保存一并提交 isFree（走 B 套章节接口）。
+/// - 支持「发布章节」开关（章节两态）：已发布 status="0" / 草稿 status="1"；
+///   新建章节后端默认落草稿，选择发布时保存后补一次更新置为已发布。
+/// - 作品处于审核中时 TextField 禁用，只读浏览。
+class ChapterWritePage extends ConsumerStatefulWidget {
+  const ChapterWritePage({
+    super.key,
+    required this.workId,
+    this.chapterId = 0,
+  });
+
+  final int workId;
+  final int chapterId;
+
+  @override
+  ConsumerState<ChapterWritePage> createState() => _ChapterWritePageState();
+}
+
+class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _contentCtrl;
+
+  /// 当前已持久化的 chapterId（新建首次保存后更新为后端返回值）。
+  int _chapterId = 0;
+
+  /// 是否有未保存的修改。
+  bool _dirty = false;
+
+  /// 自动保存定时器（debounce 3 秒）。
+  Timer? _autoSaveTimer;
+
+  /// 是否正在保存中（避免重入）。
+  bool _saving = false;
+
+  /// 进行中的保存 Future；返回时复用以避免重复 POST。
+  Future<bool>? _savingFuture;
+
+  /// 是否展示内嵌 AI 创作面板。
+  bool _aiPanelOpen = false;
+
+  /// AI 面板滚动控制器：生成完成后由面板自动滚到底部露出结果区。
+  final _aiPanelScroll = ScrollController();
+
+  /// 是否已从 provider 回填数据（仅编辑模式，避免覆盖用户输入）。
+  bool _initialized = false;
+
+  /// 从详情中派生的可编辑状态；详情未加载前禁用输入，返回后再决定可写。
+  bool _editable = false;
+
+  /// 返回流程是否已在执行中（防止 PopScope 与返回按钮并发触发）。
+  bool _backing = false;
+
+  /// 上一次静默自动保存是否失败（底部栏展示「保存失败，点击重试」）。
+  bool _saveFailed = false;
+
+  /// 是否设为免费试读章节（随保存提交 isFree）。
+  bool _isFree = false;
+
+  /// 章节发布状态：true=已发布（读者可见），false=草稿（仅作者可见）。
+  ///
+  /// 新建章节默认草稿；已有章节按详情中的 status 回填（"1" 为草稿）。
+  bool _published = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _chapterId = widget.chapterId;
+    _titleCtrl = TextEditingController();
+    _contentCtrl = TextEditingController();
+    _titleCtrl.addListener(_onChanged);
+    _contentCtrl.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    _autoSaveTimer?.cancel();
+    _aiPanelScroll.dispose();
+    _titleCtrl.dispose();
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  /// 从工作台详情中回填章节标题与正文（仅编辑模式，仅首次）。
+  void _tryInitFromProvider() {
+    if (_initialized || _chapterId == 0) return;
+    final detail = ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    if (detail == null) return;
+    AuthorChapterItem? chapter;
+    for (final c in detail.chapters) {
+      if (c.chapterId == _chapterId) {
+        chapter = c;
+        break;
+      }
+    }
+    if (chapter == null) return;
+    _titleCtrl.text = chapter.chapterTitle;
+    _contentCtrl.text = chapter.content;
+    _isFree = chapter.isFree;
+    // 已有章节按详情回填发布态：status "1" 为草稿，其余（"0"）为已发布。
+    _published = chapter.status != '1';
+    _initialized = true;
+  }
+
+  /// 当前作品内最大章节序号 + 1（B 套要求 chapterNo 作品内唯一正整数）。
+  int _nextChapterNo() {
+    final detail = ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    var maxNo = 0;
+    for (final chapter in detail?.chapters ?? const <AuthorChapterItem>[]) {
+      if (chapter.chapterNo > maxNo) maxNo = chapter.chapterNo;
+    }
+    return maxNo + 1;
+  }
+
+  /// 上一章正文末尾（≤800 字）：AI 续写把它作为承接锚点，避免本集开头接不上。
+  /// 取太长的上一章会吃掉模型输出额度（曾在 8192 max_tokens 下把输出挤到半句截断）。
+  String _previousChapterTail() {
+    final detail = ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    final chapters = detail?.chapters ?? const <AuthorChapterItem>[];
+    if (chapters.isEmpty) return '';
+    AuthorChapterItem? previous;
+    if (_chapterId == 0) {
+      // 新建章节：上一章取作品内序号最大的一章。
+      previous = chapters.reduce((a, b) => a.chapterNo >= b.chapterNo ? a : b);
+    } else {
+      int? currentNo;
+      for (final chapter in chapters) {
+        if (chapter.chapterId == _chapterId) {
+          currentNo = chapter.chapterNo;
+          break;
+        }
+      }
+      if (currentNo == null) return '';
+      for (final chapter in chapters) {
+        if (chapter.chapterNo == currentNo - 1) {
+          previous = chapter;
+          break;
+        }
+      }
+    }
+    final text = (previous?.content ?? '').trim();
+    if (text.isEmpty) return '';
+    return text.length > 800 ? text.substring(text.length - 800) : text;
+  }
+
+  /// 前情摘要（当前集之前最近 6 章、合计 ≤1800 字）：补上「前几章摘要」这一环，
+  /// 只取已落库的 chapter.summary，没有摘要的章节跳过。
+  String _previousChapterSummaries() {
+    final detail = ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    final chapters = detail?.chapters ?? const <AuthorChapterItem>[];
+    if (chapters.isEmpty) return '';
+    int? currentNo;
+    if (_chapterId != 0) {
+      for (final chapter in chapters) {
+        if (chapter.chapterId == _chapterId) {
+          currentNo = chapter.chapterNo;
+          break;
+        }
+      }
+      if (currentNo == null) return '';
+    }
+    final limitNo = currentNo ?? _nextChapterNo();
+    final list = chapters
+        .where((chapter) =>
+            chapter.chapterNo < limitNo && chapter.summary.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.chapterNo - b.chapterNo);
+    if (list.isEmpty) return '';
+    var text = '';
+    for (final chapter in list.reversed.take(6)) {
+      final line = '第${chapter.chapterNo}集：${chapter.summary.trim()}';
+      final next = text.isEmpty ? line : '$line\n$text';
+      if (next.length > 1800) break;
+      text = next;
+    }
+    return text.isEmpty ? '' : '【前情摘要（已发生事实，勿重复交代）】\n$text';
+  }
+
+  /// 输入变化：标记 dirty + 重置自动保存定时器。
+  void _onChanged() {
+    _dirty = true;
+    // 用户重新输入后，旧的「保存失败」态失效。
+    _saveFailed = false;
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(seconds: 3), _autoSave);
+    setState(() {});
+  }
+
+  /// 自动保存（静默，不弹提示）。
+  Future<void> _autoSave() async {
+    if (_saving || !_dirty) return;
+    await _save(silent: true);
+  }
+
+  /// 保存到后端。
+  ///
+  /// [silent] 为 true 时静默保存（自动保存），false 时显示成功提示。
+  Future<bool> _save({bool silent = false}) async {
+    if (!_editable) return true;
+    // 已有保存进行中：等待同一请求完成，避免自动保存与返回保存重复 POST。
+    if (_savingFuture != null) return _savingFuture!;
+
+    final title = _titleCtrl.text.trim();
+    final content = _contentCtrl.text;
+
+    // 新建模式：必须有标题才能创建。
+    if (_chapterId == 0 && title.isEmpty) {
+      if (!silent) _toast('请先填写章节标题');
+      return false;
+    }
+
+    final Completer<bool> completer = Completer<bool>();
+    _savingFuture = completer.future;
+    if (mounted) setState(() => _saving = true);
+    var ok = false;
+    try {
+      final repo = ref.read(authorWorkRepositoryProvider);
+      if (_chapterId == 0) {
+        final newId = await repo.addChapter(
+          widget.workId,
+          chapterNo: _nextChapterNo(),
+          chapterTitle: title,
+          content: content,
+          isFree: _isFree,
+        );
+        _chapterId = newId;
+        // 新建章节后端默认落草稿（status="1"）；作者选择发布时补一次更新置为 "0"。
+        if (_published) {
+          await repo.updateChapter(newId, status: '0');
+        }
+        // 新建章首次保存成功即视为已初始化：后续详情回包不得再回填覆盖
+        // 请求飞行窗口内用户继续输入的内容。
+        _initialized = true;
+      } else {
+        // 已有章节显式带上 status，保证草稿 ↔ 发布可来回切换。
+        await repo.updateChapter(
+          _chapterId,
+          chapterTitle: title,
+          content: content,
+          isFree: _isFree,
+          status: _published ? '0' : '1',
+        );
+      }
+      _dirty = false;
+      _saveFailed = false;
+      if (!silent) _toast('已保存');
+      // 刷新工作台数据源
+      ref.invalidate(authorWorkDetailProvider(widget.workId));
+      ok = true;
+    } on ApiException catch (e) {
+      if (!silent) {
+        if (mounted) _toast(e.message);
+      } else {
+        // 静默保存失败：标记失败态，由底部栏提供「点击重试」入口。
+        _saveFailed = true;
+      }
+    } catch (_) {
+      if (!silent) {
+        if (mounted) _toast('保存失败，请稍后重试');
+      } else {
+        _saveFailed = true;
+      }
+    } finally {
+      completer.complete(ok);
+      _savingFuture = null;
+      if (mounted) setState(() => _saving = false);
+    }
+    return ok;
+  }
+
+  /// 返回前保存未提交内容。
+  Future<void> _onBack() async {
+    // 进行中保护：PopScope 与 AppBar 返回按钮并发触发时只执行一次，
+    // 且必须等保存完成后再 pop。
+    if (_backing) return;
+    _backing = true;
+    _autoSaveTimer?.cancel();
+    try {
+      // 新建章只写正文、未写标题即返回：服务端无法建章，内容会被静默丢弃，
+      // 先弹确认，不新增持久化层、不改服务端建章规则。
+      final hasContent = _contentCtrl.text.trim().isNotEmpty;
+      final title = _titleCtrl.text.trim();
+      if (_chapterId == 0 && hasContent && title.isEmpty && _editable) {
+        final discard = await _confirmDiscard();
+        if (!discard) return; // 用户取消，留在编辑页
+        // 用户确认放弃：直接返回，不再尝试保存。
+      } else if (_dirty && _editable) {
+        await _save(silent: true);
+      }
+      if (mounted) context.pop();
+    } finally {
+      _backing = false;
+    }
+  }
+
+  /// 无标题草稿放弃确认对话框。
+  Future<bool> _confirmDiscard() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('内容未保存'),
+        content: const Text('当前章节未填写标题，正文将无法保存，确定放弃吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('继续编辑'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('放弃'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  /// 把 AI 生成内容追加到正文末尾（保留原正文，换行分隔）。
+  void _insertAiText(String text) {
+    if (text.trim().isEmpty) return;
+    final current = _contentCtrl.text;
+    final sep = current.isEmpty ? '' : '\n\n';
+    final updated = '$current$sep${text.trim()}';
+    _contentCtrl.text = updated;
+    // 光标移到文末，触发 _onChanged 的自动保存计时。
+    _contentCtrl.selection =
+        TextSelection.collapsed(offset: updated.length);
+    _onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 从工作台详情派生 editable 状态 + 回填编辑数据
+    final detailAsync = ref.watch(authorWorkDetailProvider(widget.workId));
+    final detail = detailAsync.valueOrNull;
+    if (detail != null) {
+      _editable = detail.work.editable;
+      if (!_initialized) _tryInitFromProvider();
+    }
+
+    final isNew = _chapterId == 0;
+    final appTitle = isNew ? '新建章节' : '编辑章节';
+
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) _onBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _onBack,
+          ),
+          title: Text(appTitle),
+          actions: [
+            if (_editable)
+              TextButton(
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        final router = GoRouter.of(context);
+                        final ok = await _save();
+                        if (!mounted) return;
+                        if (ok) router.pop();
+                      },
+                child: const Text('完成'),
+              ),
+          ],
+        ),
+        // detail 未返回前不渲染空白可编辑表单，先给加载占位；
+        // detail 到达后再渲染编辑区。上方 _editable 派生与 _tryInitFromProvider 逻辑不变。
+        body: detail == null
+            ? const LoadingView(message: '加载中')
+            : Column(
+          children: [
+            // 标题输入
+            Container(
+              color: AppColors.card,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: _titleCtrl,
+                enabled: _editable,
+                maxLines: 1,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  hintText: '章节标题',
+                  border: InputBorder.none,
+                ),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text1,
+                ),
+              ),
+            ),
+            const Divider(height: 0.5, color: AppColors.divider),
+            // 试读开关（仅可编辑状态可切换）
+            if (_editable) ...[
+              Container(
+                color: AppColors.card,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.lock_open_outlined,
+                        size: 16, color: AppColors.text3),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        '设为试读章节（免费阅读）',
+                        style: TextStyle(fontSize: 13, color: AppColors.text2),
+                      ),
+                    ),
+                    Switch(
+                      value: _isFree,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (value) {
+                        _isFree = value;
+                        _onChanged();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0.5, color: AppColors.divider),
+              // 发布状态开关（章节两态：已发布 / 草稿）
+              Container(
+                color: AppColors.card,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.public_outlined,
+                        size: 16, color: AppColors.text3),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '发布章节',
+                            style:
+                                TextStyle(fontSize: 13, color: AppColors.text2),
+                          ),
+                          Text(
+                            _published ? '发布后读者可见' : '草稿仅自己可见',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.text3),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _published,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (value) {
+                        _published = value;
+                        _onChanged();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0.5, color: AppColors.divider),
+            ],
+            // AI 创作入口栏（仅可编辑状态显示）：展开内嵌 AI 大纲/写作/润色面板。
+            if (_editable) ...[
+              Container(
+                color: AppColors.card,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome,
+                        size: 16, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    const Text('AI 创作',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text2)),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () {
+                        // 收起时先收起键盘，避免残留焦点。
+                        if (_aiPanelOpen) FocusScope.of(context).unfocus();
+                        setState(() => _aiPanelOpen = !_aiPanelOpen);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _aiPanelOpen
+                              ? AppColors.primaryTint
+                              : AppColors.fill,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          _aiPanelOpen ? '收起' : '展开',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _aiPanelOpen
+                                ? AppColors.text1
+                                : AppColors.text2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 0.5, color: AppColors.divider),
+              // 收起时只隐藏、不销毁面板 State：再次展开仍保留上次输入与生成结果。
+              Flexible(
+                child: Offstage(
+                  offstage: !_aiPanelOpen,
+                  child: SingleChildScrollView(
+                    controller: _aiPanelScroll,
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: AiInlinePanel(
+                      onInsert: _insertAiText,
+                      workId: widget.workId,
+                      chapterId: _chapterId > 0 ? _chapterId : null,
+                      chapterTitle: () => _titleCtrl.text,
+                      currentContent: () => _contentCtrl.text,
+                      previousChapter: _previousChapterTail,
+                      previousSummaries: _previousChapterSummaries,
+                      panelScroll: _aiPanelScroll,
+                    ),
+                  ),
+                ),
+              ),
+              if (_aiPanelOpen) const SizedBox(height: 4),
+            ],
+            // 正文输入
+            Expanded(
+              child: Container(
+                color: AppColors.card,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _contentCtrl,
+                  enabled: _editable,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(
+                    hintText: '开始写作...',
+                    border: InputBorder.none,
+                  ),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.8,
+                    color: AppColors.text1,
+                  ),
+                ),
+              ),
+            ),
+            // 底部状态栏
+            _BottomBar(
+              wordCount: _contentCtrl.text.length,
+              saving: _saving,
+              dirty: _dirty,
+              failed: _saveFailed,
+              editable: _editable,
+              isFree: _isFree,
+              onRetry: () {
+                _autoSave();
+              },
+            ),
+          ],
+            ),
+      ),
+    );
+  }
+}
+
+/// 底部状态栏：字数 + 保存状态。
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.wordCount,
+    required this.saving,
+    required this.dirty,
+    required this.failed,
+    required this.editable,
+    required this.isFree,
+    this.onRetry,
+  });
+
+  final int wordCount;
+  final bool saving;
+  final bool dirty;
+  final bool failed;
+  final bool editable;
+  final bool isFree;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final String status;
+    final Color statusColor;
+    final bool tappable;
+    if (!editable) {
+      status = '只读';
+      statusColor = AppColors.text3;
+      tappable = false;
+    } else if (saving) {
+      status = '保存中...';
+      statusColor = AppColors.warning;
+      tappable = false;
+    } else if (failed) {
+      status = '保存失败，点击重试';
+      statusColor = AppColors.danger;
+      tappable = onRetry != null;
+    } else if (dirty) {
+      status = '未保存';
+      statusColor = AppColors.warning;
+      tappable = false;
+    } else {
+      status = '已保存';
+      statusColor = AppColors.success;
+      tappable = false;
+    }
+    return Container(
+      color: AppColors.card,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Text('$wordCount 字',
+              style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+          if (isFree) ...[
+            const SizedBox(width: 8),
+            const Text('试读',
+                style: TextStyle(fontSize: 11, color: AppColors.text1)),
+          ],
+          const Spacer(),
+          GestureDetector(
+            onTap: tappable ? onRetry : null,
+            child: Text(status,
+                style: TextStyle(fontSize: 12, color: statusColor)),
+          ),
+        ],
+      ),
+    );
+  }
+}

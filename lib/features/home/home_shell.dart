@@ -1,34 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/router/auth_guard.dart';
+import '../../core/router/route_paths.dart';
+import '../../core/providers/auth_providers.dart';
+import '../create/widgets/create_start_sheet.dart';
 import '../../core/theme/app_colors.dart';
 
-/// 主框架的底部导航容器（对应 UI 原型 `.tabbar` 五格平铺 + 中间"+"凸起）。
+/// 主框架的底部导航容器（对应 UI 原型 `.tabbar` 五格平铺 + 中间圆形凸起）。
 ///
-/// 五个分支由 [StatefulNavigationShell] 管理，切 tab 会保留各自导航栈。
-class HomeShell extends StatelessWidget {
+/// 四个 tab 分支（书城 / 任务广场 / 分类 / 我的）由 [StatefulNavigationShell] 管理，
+/// 切 tab 会保留各自导航栈；中间「创作」是新建作品入口，先选 AI 创作或自己编辑，不占用分支。
+class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
 
   static const _tabs = <_TabItem>[
-    _TabItem('书城', Icons.menu_book_outlined, Icons.menu_book),
-    _TabItem('漫剧', Icons.smart_display_outlined, Icons.smart_display),
-    _TabItem('创作', Icons.add, Icons.add),
+    _TabItem('首页', Icons.menu_book_outlined, Icons.menu_book),
+    _TabItem('任务', Icons.workspace_premium_outlined, Icons.workspace_premium),
+    _TabItem('创作', Icons.library_books_outlined, Icons.library_books),
     _TabItem('分类', Icons.grid_view_outlined, Icons.grid_view),
     _TabItem('我的', Icons.person_outline, Icons.person),
   ];
 
-  void _onTap(int index) {
+  /// 从底部导航进入新建作品：与「我的作品」右上角「新建」一致，先选方式。
+  Future<void> _startCreate(BuildContext context, WidgetRef ref) async {
+    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.workUpload)) return;
+    final choice = await showCreateChoice(context);
+    if (choice == null || !context.mounted) return;
+    context.push(choice == 'ai' ? RoutePath.aiCreate : RoutePath.workUpload);
+  }
+
+  void _onTap(BuildContext context, WidgetRef ref, int index) {
+    // 中间「创作」是新建作品入口：先选 AI 创作或自己编辑，不占用/切换 tab 分支。
+    if (index == 2) {
+      _startCreate(context, ref);
+      return;
+    }
+    if (index == 4 && !AuthGuard.isLoggedIn(ref)) {
+      if (ref.read(authControllerProvider).status == AuthStatus.unauthenticated) {
+        context.go(AuthGuard.loginLocation(ref, RoutePath.profile));
+      }
+      return;
+    }
+    // 去掉创作分支后，其余四个 tab 映射到 0-3 四个分支（视觉 index>2 时减 1）。
+    final branchIndex = index > 2 ? index - 1 : index;
     shell.goBranch(
-      index,
+      branchIndex,
       // 点击当前 tab 时回到该分支首页
-      initialLocation: index == shell.currentIndex,
+      initialLocation: branchIndex == shell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: shell,
       bottomNavigationBar: Container(
@@ -47,13 +74,14 @@ class HomeShell extends StatelessWidget {
                     child: i == 2
                         ? _CenterTab(
                             tab: _tabs[i],
-                            active: shell.currentIndex == i,
-                            onTap: () => _onTap(i),
+                            // 创作是快捷动作，不存在常驻选中态。
+                            active: false,
+                            onTap: () => _onTap(context, ref, i),
                           )
                         : _TabButton(
                             tab: _tabs[i],
-                            active: shell.currentIndex == i,
-                            onTap: () => _onTap(i),
+                            active: shell.currentIndex == (i > 2 ? i - 1 : i),
+                            onTap: () => _onTap(context, ref, i),
                           ),
                   ),
               ],
@@ -82,22 +110,35 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : AppColors.text3;
+    final iconColor = active ? AppColors.primary : AppColors.text3;
+    final labelColor = active ? AppColors.text1 : AppColors.text3;
     return InkWell(
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(active ? tab.iconActive : tab.icon, color: color, size: 22),
+          Icon(active ? tab.iconActive : tab.icon, color: iconColor, size: 22),
           const SizedBox(height: 3),
-          Text(tab.label, style: TextStyle(fontSize: 12, color: color)),
+          Text(
+            tab.label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+              color: labelColor,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// 中间"+"创作按钮：圆形凸起样式。
+/// 中间「创作」按钮：立体渐变圆形凸起样式，作为**新建作品**的快捷入口，点击直接
+/// 进入新建表单（workUpload），不占用底部 tab 分支，故无常驻选中态。
+///
+/// 造型：44×44 圆形（内含 2.5px 纯白护圈与深湖蓝立体渐变），用 [Stack] + [Positioned]
+/// 让其顶部高出底栏上沿 10px（`top: -10`），配柔和弥散投影；label 贴底对齐，
+/// 与其余四个 tab 的文字基线保持一致。Stack 设 `Clip.none`，允许圆形溢出到 body 区。
 class _CenterTab extends StatelessWidget {
   const _CenterTab(
       {required this.tab, required this.active, required this.onTap});
@@ -108,23 +149,72 @@ class _CenterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labelColor = active ? AppColors.text1 : AppColors.text3;
     return InkWell(
       onTap: onTap,
-      child: Center(
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: active ? AppColors.primary : AppColors.primaryTint,
-            border: Border.all(color: AppColors.primary),
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          // label：位于圆形正下方、水平居中
+          Positioned(
+            bottom: 6,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                tab.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  color: labelColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
           ),
-          child: Icon(
-            tab.icon,
-            color: active ? Colors.white : AppColors.primary,
-            size: 24,
+          // 圆形凸起：top=-10 使其高出 56px 栏顶 10px，外包纯白护圈与弥散蓝影
+          Positioned(
+            top: -10,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 44,
+                height: 44,
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.card,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(active ? 0.32 : 0.20),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: active
+                          ? const [Color(0xFF4A4A4A), Color(0xFF111111)]
+                          : const [Color(0xFF6B6B6B), Color(0xFF2A2A2A)],
+                    ),
+                  ),
+                  child: Icon(
+                    active ? tab.iconActive : tab.icon,
+                    color: Colors.white,
+                    size: 21,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

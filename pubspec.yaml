@@ -43,11 +43,33 @@ dependencies:
   go_router: ^13.2.0
   # 网络请求（对接接口文档 RESTful API）
   dio: ^5.4.0
-  # 登录态持久化（token / 用户信息）
+  # 登录态持久化（非敏感展示字段）
   shared_preferences: ^2.2.2
+  # A3：平台安全存储（Token/Refresh Token）；经负责人批准引入
+  flutter_secure_storage: ^9.2.2
+  # B 模块 2.8：外部视频 / 剧集播放地址为站外链接，需拉起系统浏览器或外部播放器
+  url_launcher: ^6.2.5
+  video_player: ^2.9.2
+  # B 模块 2.9：上传新作品的封面与剧本文件需从本机选择（拿到本地路径交给 2.9.1 上传）
+  file_picker: ^8.0.0
+  # 印章模块：材料在线预览（图片和文档）
+  webview_flutter: ^4.4.2
+  # 印章模块：材料预览页面下载文本文件内容
+  http: ^1.1.0
+  # 开屏素材落到应用缓存目录；复用锁文件中已有版本。
+  path_provider: ^2.1.4
+  # 合同签署：手写签名画布
+  signature: ^5.5.0
+  qr_flutter: ^4.1.0
+  web_socket_channel: ^3.0.3
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+
+  # H-05 设备级集成测试（Flutter SDK 自带包；经负责人 2026-09-25 批准引入，
+  # 随之将传递依赖 file 固定为 7.0.0，属本次接入的一部分）
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -68,10 +90,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # 认证页品牌资源。
+  assets:
+    - assets/images/logo_script.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

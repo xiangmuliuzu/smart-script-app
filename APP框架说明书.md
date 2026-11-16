@@ -2,7 +2,7 @@
 
 > 适用工程：`app/`（Flutter 工程根）
 > 对应团队仓库：根目录三目录 `pc/`（Vue 管理后台）、`app/`（本工程，Flutter）、`backend/`（Spring Boot 2.7.18 共享后端）中的 `app/`。
-> 当前状态：**底部导航已完成、内容页全部占位**（对应排期"完成APP端框架搭建"），登录注册等业务由后续分任务补齐。
+> 当前状态：**底部导航、登录/注册/找回密码链路已完成**；底部第二格已由「漫剧（视频）」换成「任务广场」大板块（`/demand`：广场 + 我的任务 + 发布，游客可浏览广场）。
 > 一句话定位：本说明书讲清楚"工程里每个目录/文件是干嘛的、谁该改哪里、怎么跑起来"。
 
 ---
@@ -47,7 +47,7 @@ lib/
 ├── app.dart              # 根组件：MaterialApp.router + 全局主题
 │
 ├── core/                 # 【框架层·公共地基，改动需对齐】
-│   ├── config/app_config.dart        # 后端地址(默认 http://10.0.2.2:3000/api/v1)、超时、日志开关
+│   ├── config/app_config.dart        # 后端地址(默认 https://www.eyhereal.site/api/v1)、超时、日志开关
 │   ├── constants/
 │   │   ├── api_endpoints.dart        # 接口路径唯一出处（2.1~2.10 全登记），页面禁止手写 URL
 │   │   └── app_constants.dart        # 存储 key、成功码 200、分页默认值
@@ -69,20 +69,25 @@ lib/
 │       └── app_theme.dart            # 全局 ThemeData
 │
 ├── models/               # 跨模块基础模型
-│   ├── user.dart                     # User / UserType(user,creator,client,admin)
-│   └── paged_result.dart             # PagedResult {total,list}
+│   └── user.dart                     # User / UserType(user,creator,client,admin)
 │
 ├── shared/widgets/       # 通用组件
-│   ├── common_views.dart             # LoadingView / EmptyView / ErrorView 三态
-│   └── placeholder_page.dart         # 占位页（未实现模块用）
+│   └── common_views.dart             # LoadingView / EmptyView / ErrorView 三态
 │
 └── features/             # 【业务层·各负责人只改自己的子目录】
     ├── splash/splash_page.dart       # 启动页（会话恢复中）
-    ├── auth/pages/login_page.dart    # 登录参考实现（真实调 /auth/login）；登录按钮下含“测试进入”免登录入口，直达书城
-    ├── auth/pages/register_page.dart # 注册占位（待分任务）
-    ├── home/home_shell.dart          # ★ 底部五格导航容器（书城/漫剧/＋/分类/我的）
+    ├── auth/
+    │   ├── pages/login_page.dart          # 登录入口：短信验证码登录，底部含密码登录、注册、忘记密码
+    │   ├── pages/password_login_page.dart # 账号密码登录（验证码按服务端开关显示），下方"忘记密码？"入口
+    │   ├── pages/register_page.dart       # 注册：手机号 → 验证码 → 密码 → 确认密码 → 勾选协议，成功即登录
+    │   ├── pages/forgot_password_page.dart# 找回密码：手机号 + 短信验证码 + 新密码，成功后回登录页
+    │   ├── pages/agreement_page.dart      # 用户协议与隐私政策（注册前可查看，提交时带当前版本）
+    │   ├── data/auth_repository.dart      # 认证请求：sms/send、login、sms/login、register、password/reset、agreements
+    │   └── widgets/                       # 手机号、验证码、"获取验证码"倒计时、协议勾选等表单组件
+    ├── home/home_shell.dart          # ★ 底部五格导航容器（首页/任务/＋/分类/我的）
     ├── bookstore/bookstore_page.dart # 占位
-    ├── comic/comic_page.dart         # 占位
+    ├── comic/comic_page.dart         # 漫剧信息流（已退出底部导航，仅保留 /comic 路由供深链）
+    ├── trade/pages/task_square_page.dart # ★ 底部「任务」板块根页（广场 / 我的任务 分段 + 发布入口）
     ├── create/create_page.dart       # 占位（中间＋）
     ├── category/category_page.dart   # 占位
     └── profile/profile_page.dart     # 示例页（读登录态 + 退出登录），非真实"我的"
@@ -94,7 +99,9 @@ lib/
 
 已完成（"APP端框架搭建"范围内）：底部五格导航（可切换、各 tab 保留导航栈、中间圆形凸起＋）；登录参考页跑通登录→存 token→进导航；401 自动登出；会话重启恢复；统一网络/异常/分页/主题/存储地基；自定义图标与桌面名；`flutter analyze` 无问题、`flutter test` 通过。
 
-占位未做（后续分任务）：书城/漫剧/创作/分类四个内容页（纯占位）；"我的"为示例页而非真实业务页；注册/验证码登录/找回密码；创作者与甲方角色分流。
+已完成（认证业务）：注册个人账号（手机号 + 短信验证码 + 密码强度校验 + 协议勾选，成功直接登录）；短信验证码登录；账号密码登录；忘记密码（重置后回到登录页）；协议版本从 `GET /auth/agreements` 实时读取，避免版本漂移导致注册 409。
+
+占位未做（后续分任务）：书城/漫剧/创作/分类四个内容页（纯占位）；"我的"为示例页而非真实业务页；创作者与甲方角色分流。
 
 ---
 
@@ -106,7 +113,7 @@ lib/
    - 正常流程（进登录页）：`flutter run`
    - **演示导航（免后端直接进底部导航）**：`flutter run --dart-define=DEMO_SESSION=true`
      该开关在 `auth_providers.dart`，仅调试用；不带参数时行为不变。给负责人看导航效果用带参数的方式。
-4. 后端地址：模拟器必须用 `10.0.2.2`（已默认），真机/远程改局域网 IP 或 `--dart-define=BASE_URL=...`。
+4. 后端地址：默认统一使用 `https://www.eyhereal.site/api/v1`，模拟器和真机均无需本机后端。本地联调时可用 `--dart-define=BASE_URL=http://10.0.2.2:8080/api/v1` 覆盖，真机改用电脑的局域网 IP。
 5. 校验：`flutter analyze`、`flutter test`。
 6. 换图标/改桌面名后需**重新构建安装**才生效：`flutter build apk --debug` 后 `adb install -r`。
 
@@ -136,7 +143,7 @@ lib/
 
 ## 8. 常见问题（FAQ）
 
-- **一点登录就"网络连接失败"**：后端未启动或地址不对；模拟器必须 `10.0.2.2`。只想看导航请用 `DEMO_SESSION=true`。
+- **一点登录就"网络连接失败"**：检查设备网络及服务器统一接口是否可访问；如使用 `BASE_URL` 覆盖，确认目标后端已启动且地址正确。只想看导航请用 `DEMO_SESSION=true`。
 - **登录后白屏/报 no routes for location: /**：`RoutePath.home` 被改成了未注册路由，改回 `/bookstore`。
 - **图标还是 Flutter 默认**：改图标后没重新构建安装；执行第 5 节第 6 条。
 - **桌面找不到 App**：Pixel 系 launcher 新装 App 进应用抽屉（桌面上滑），长按可拖到首屏。

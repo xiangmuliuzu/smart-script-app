@@ -1,0 +1,76 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/providers/app_providers.dart';
+import '../data/message_repository.dart';
+import '../data/user_center_models.dart';
+import '../data/user_center_repository.dart';
+import '../data/user_social_models.dart';
+import '../data/user_social_repository.dart';
+
+/// A5 用户中心依赖注入（与框架层 [apiClientProvider] 同源，不新建网络栈）。
+
+final userCenterRepositoryProvider = Provider<UserCenterRepository>(
+  (ref) => UserCenterRepository(ref.watch(apiClientProvider)),
+);
+
+final userSocialRepositoryProvider = Provider<UserSocialRepository>(
+  (ref) => UserSocialRepository(ref.watch(apiClientProvider)),
+);
+
+/// 指定用户的公开资料（个人主页头部）。family 按 userId 缓存。
+final userProfileViewProvider =
+    FutureProvider.autoDispose.family<UserProfileView, int>(
+  (ref, userId) => ref.watch(userSocialRepositoryProvider).publicProfile(userId),
+);
+
+/// 关注列表 / 粉丝列表。
+final userFollowingProvider =
+    FutureProvider.autoDispose.family<List<UserSummary>, int>(
+  (ref, userId) => ref.watch(userSocialRepositoryProvider).following(userId),
+);
+
+final userFollowersProvider =
+    FutureProvider.autoDispose.family<List<UserSummary>, int>(
+  (ref, userId) => ref.watch(userSocialRepositoryProvider).followers(userId),
+);
+
+/// 我拉黑的用户列表；解除拉黑后 invalidate。
+final blockedUsersProvider = FutureProvider.autoDispose<List<UserSummary>>(
+  (ref) => ref.watch(userSocialRepositoryProvider).blockedUsers(),
+);
+
+final messageRepositoryProvider = Provider<MessageRepository>(
+  (ref) => MessageRepository(ref.watch(apiClientProvider)),
+);
+
+final feedbackRepositoryProvider = Provider<FeedbackRepository>(
+  (ref) => FeedbackRepository(ref.watch(apiClientProvider)),
+);
+
+/// 个人资料：进入资料页时拉取最新值，返回后由页面触发全局 currentUser 刷新。
+final userProfileProvider = FutureProvider.autoDispose<UserProfile>(
+  (ref) => ref.watch(userCenterRepositoryProvider).profile(),
+);
+
+/// 实名状态：提交或重提后 invalidate 以重新拉取。
+final realNameStatusProvider = FutureProvider.autoDispose<RealNameStatus>(
+  (ref) => ref.watch(userCenterRepositoryProvider).realNameStatus(),
+);
+
+/// 创作者申请状态：提交后 invalidate 以重新拉取。
+final creatorApplyStatusProvider = FutureProvider.autoDispose<CreatorApplyStatus>(
+  (ref) => ref.watch(userCenterRepositoryProvider).creatorApplyStatus(),
+);
+
+/// 未读消息数：我的页与消息中心共用；已读操作后 invalidate。
+final unreadCountProvider = FutureProvider<UnreadCount>(
+  (ref) => ref
+      .watch(messageRepositoryProvider)
+      .unreadCount(includeAnnouncements: true),
+);
+
+/// 通知偏好。
+final notificationPreferencesProvider =
+    FutureProvider.autoDispose<List<NotificationPreference>>(
+  (ref) => ref.watch(messageRepositoryProvider).preferences(),
+);

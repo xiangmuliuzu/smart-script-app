@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+
+import '../data/paged_data.dart';
+
+/// A5 分页列表控制器（消息中心与反馈列表共用）。
+///
+/// 只做「首屏加载 + 触底追加 + 重试」三件事；筛选条件变化由页面调用 [reset]。
+/// 抽离原因见 `rules.md` §3.2：消息与反馈两个列表的分页、空态、错误态逻辑一致，
+/// 复制两份必然产生行为漂移。
+class PagedListController<T> extends ChangeNotifier {
+  PagedListController({required this.fetchPage, this.pageSize = 10});
+
+  /// 拉取第 [pageNum] 页（从 1 开始）。
+  final Future<PagedData<T>> Function(int pageNum, int pageSize) fetchPage;
+
+  final int pageSize;
+
+  final List<T> items = [];
+  int total = 0;
+  bool loading = false;
+  bool loadingMore = false;
+  String? error;
+
+  /// 触底追加失败的原因（非空时 footer 显示提示与重试，已加载数据不动）。
+  /// 首屏错误用 [error]；两者互不覆盖。
+  String? loadMoreError;
+  bool _end = false;
+  int _page = 0;
+  int _generation = 0;
+  bool _refreshing = false;
+
+  /// 在途请求期间收到的 refresh 请求：当前请求收尾后自动补发一次（多次合并为一次）。
+  bool _pendingRefresh = false;
+
+  bool get hasMore => !_end;
+  bool get isEmpty => items.isEmpty;
+
+  /// 接收新消息时更新首屏，不清空现有内容或打断正在翻页的列表。
+  /// 网络失败保留当前数据；手动刷新和销毁会使在途响应作废。
+  Future<void> refreshSilently() async {
+    if (loading || loadingMore || _refreshing || _page > 1) return;
+    final generation = _generation;
+    _refreshing = true;
+    try {
+      final data = await fetchPage(1, pageSize);
+      if (generation != _generation) return;
+      items
+        ..clear()
+        ..addAll(data.list);
+      total = data.total;
+      _page = 1;
+      _end = data.list.isEmpty || items.length >= total;
+      error = null;
+      notifyListeners();
+    } catch (_) {
+      // 自动接收失败不覆盖已有列表，用户仍可手动刷新或重试。
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    // 切换页面后丢弃在途响应，防止已释放的控制器继续通知监听者。
+    _generation++;
+    super.dispose();
+  }
+
+  /// 首屏加载（或筛选变化后重新加载）。
+  Future<void> load({bool refresh = false}) async {
+    if (loading) {
+      // 在途请求期间收到新的 refresh：记录待刷新标志并直接返回，避免「UI 已更新但数据未变」；
+      // 非 refresh 调用仍按原样丢弃。当前请求收尾后会自动补发一次（多次合并为一次）。
+      if (refresh) _pendingRefresh = true;
+      return;
+    }
+    final generation = ++_generation;
+    // 刷新前的分页游标：刷新失败但已有数据时据此恢复，避免 loadMore 从页码 0 重复拉取第 1 页。
+    var previousPage = _page;
+    var previousEnd = _end;
+    if (refresh) {
+      _page = 0;
+      _end = false;
+      // 已有数据时不在请求发出前清空，避免下拉刷新整页闪白；成功后由下方整体替换。
+      if (items.isEmpty) items.clear();
+    }
+    loading = true;
+    error = null;
+    loadMoreError = null;
+    notifyListeners();
+    try {
+      final data = await fetchPage(1, pageSize);
+      if (generation != _generation) return;
+      items
+        ..clear()
+        ..addAll(data.list);
+      total = data.total;
+      _page = 1;
+      _end = data.list.length >= data.total || data.list.isEmpty;
+    } catch (e) {
+      if (generation != _generation) return;
+      if (refresh && items.isNotEmpty) {
+        // 刷新失败但已有数据：保留旧列表与分页游标，不置 error 覆盖列表。
+        _page = previousPage;
+        _end = previousEnd;
+      } else {
+        error = e is Exception ? _messageOf(e) : '加载失败，请稍后重试';
+        _end = true;
+      }
+    } finally {
+      if (generation == _generation) {
+        loading = false;
+        // 在途期间积累的 refresh 请求：复位标志并自动补发一次。
+        final pendingRefresh = _pendingRefresh;
+        _pendingRefresh = false;
+        notifyListeners();
+        if (pendingRefresh) load(refresh: true);
+      }
+    }
+  }
+
+  /// 触底追加下一页。
+  Future<void> loadMore() async {
+    if (loading || loadingMore || _refreshing || _end) return;
+    if (loadMoreError != null) return; // 失败驻留时不再自动重试，等 [retryLoadMore]
+    final generation = _generation;
+    loadingMore = true;
+    notifyListeners();
+    try {
+      final data = await fetchPage(_page + 1, pageSize);
+      if (generation != _generation) return;
+      items.addAll(data.list);
+      total = data.total;
+      _page += 1;
+      _end = data.list.isEmpty || items.length >= data.total;
+    } catch (e) {
+      // 追加失败不覆盖首屏结果：保留已加载数据与分页游标，给出明确提示与重试。
+      // 刷新或切换筛选已使本请求作废时（generation 变化），失败不得覆盖新列表状态。
+      if (generation != _generation) return;
+      loadMoreError = e is Exception ? _messageOf(e) : '加载失败，请稍后重试';
+    } finally {
+      // loadingMore 是本调用自身的在途标记，无条件复位；
+      // 通知仍按代际收敛，过期代际的 UI 状态由当次 load 负责刷新。
+      loadingMore = false;
+      if (generation == _generation) {
+        notifyListeners();
+      }
+    }
+  }
+
+  /// 触底失败后的重试：按同一页码重取（失败时未曾追加，天然无重复项）。
+  Future<void> retryLoadMore() async {
+    if (loading || loadingMore) return;
+    loadMoreError = null;
+    notifyListeners();
+    await loadMore();
+  }
+
+  static String _messageOf(Object e) {
+    final dynamic value = e;
+    try {
+      final message = value.message;
+      if (message is String && message.isNotEmpty) return message;
+    } catch (_) {
+      // 非 ApiException：走通用文案
+    }
+    return '加载失败，请稍后重试';
+  }
+}

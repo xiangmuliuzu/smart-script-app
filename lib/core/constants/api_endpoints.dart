@@ -1,55 +1,230 @@
-/// 接口端点常量（对照《智能剧本创作平台 接口设计文档 app 版》）。
-///
-/// 所有路径均为相对 [AppConfig.baseUrl]（已含 `/api/v1`）的子路径。
-/// 带 `{id}` 的路径请用对应的 `xxxById(...)` 方法拼接，避免手写字符串。
-/// 页面开发者**只从这里取路径**，不要在自己代码里硬编码 URL。
+/// A3-AUTH-CONTRACT-v1 与 A5-USER-CENTER-CONTRACT-v1 端点
+/// （相对 [AppConfig.baseUrl]，已含 `/api/v1`）。
 class ApiEndpoints {
   ApiEndpoints._();
 
-  // ===== 2.1 登录注册 =====
-  static const String smsCode = '/auth/sms-code';
+  // ===== A3 认证契约 =====
+  static const String smsSend = '/auth/sms/send';
+  static const String smsLogin = '/auth/sms/login';
+  static const String passwordLogin = '/auth/login';
+  static const String captchaImage = '/auth/captchaImage';
   static const String register = '/auth/register';
-  static const String login = '/auth/login';
   static const String logout = '/auth/logout';
-  static const String loginSms = '/auth/login-sms';
+  static const String me = '/auth/getInfo';
+  static const String passwordSet = '/auth/password/set';
+  static const String passwordChange = '/auth/password/change';
   static const String passwordReset = '/auth/password/reset';
-  static const String tokenRefresh = '/auth/refresh';
+  static const String agreements = '/auth/agreements';
 
-  // ===== 2.2 我的（通用）=====
+  // ===== A5 用户中心契约：个人资料与账号安全 =====
+  static const String myProfile = '/users/me/profile';
+  static const String myRealName = '/users/me/real-name';
+  static const String myRealNameResubmit = '/users/me/real-name/resubmit';
+  /// 创作者申请（GET 查状态，POST 提交）。
+  static const String myCreatorApply = '/users/me/creator-application';
+  static const String phoneChangeOldSend = '/users/me/phone/change/old/send';
+  static const String phoneChangeOldVerify = '/users/me/phone/change/old/verify';
+  static const String phoneChangeNewSend = '/users/me/phone/change/new/send';
+  static const String phoneChangeConfirm = '/users/me/phone/change/confirm';
+  static const String myNotificationPreferences = '/users/me/notification-preferences';
+
+  // ===== A5 个人主页与关注（§1.7）=====
+  /// 指定用户公开资料（GET）。
+  static String userPublicProfile(int userId) => '/users/$userId/public-profile';
+  /// 关注列表 / 粉丝列表（GET）。
+  static String userFollowing(int userId) => '/users/$userId/following';
+  static String userFollowers(int userId) => '/users/$userId/followers';
+  /// 关注 / 取消关注（POST / DELETE，幂等）。
+  static String userFollow(int userId) => '/users/$userId/follow';
+  /// 拉黑 / 解除拉黑（POST / DELETE，幂等）。
+  static String userBlock(int userId) => '/users/$userId/block';
+  /// 我拉黑的用户列表（GET）。
+  static const String myBlocks = '/users/me/blocks';
+  /// 作者获赞统计（内容域）；作品列表复用书城 /content/works?authorId=。
+  static String userProfileStats(int userId) => '/content/users/$userId/stats';
+
+  // ===== A5 用户中心契约：消息中心 =====
+  static const String messages = '/messages';
+  static const String messagesUnreadCount = '/messages/unread-count';
+  static const String messagesReadAll = '/messages/read-all';
+  static const String announcements = '/announcements';
+  static String messageById(int messageId) => '/messages/$messageId';
+  static String messageRead(int messageId) => '/messages/$messageId/read';
+
+  // ===== A5 用户中心契约：意见反馈 =====
+  static const String feedback = '/feedback';
+  static String feedbackById(int feedbackId) => '/feedback/$feedbackId';
+
+  // ===== B 模块书城契约（App 公开只读，游客可读）=====
+  /// 首页 Banner 轮播（可传 position）
+  static const String contentBanners = '/content/banners';
+  /// 标签列表（可传 tagType）
+  static const String contentTags = '/content/tags';
+  /// 分类页导航（频道 + 热门标签/主题/角色/情节四维度分组；可传 channelId）
+  static const String contentCategoryNav = '/content/categories/nav';
+  /// 作品列表（分页 {total, list}；可传 tagId/keyword/sort/page/pageSize）
+  static const String contentWorks = '/content/works';
+  /// 作品详情
+  static String contentWorkById(int workId) => '/content/works/$workId';
+  /// 向当前作者绑定手机号发送作品删除验证码（POST）。
+  static String contentWorkDeleteCode(int workId) =>
+      '/content/works/$workId/delete-code';
+  /// 作品章节目录（含试读可读标记；游客可读）
+  static String contentWorkChapters(int workId) => '/content/works/$workId/chapters';
+  /// 作品试读包（可读章节 + 试读文件；游客可读）
+  static String contentWorkPreview(int workId) => '/content/works/$workId/preview';
+  /// 版权合作联系方式（{workId, hasContact, displayScope}；游客可读，不下发明文）
+  static String contentWorkContact(int workId) => '/content/works/$workId/contact';
+  /// 章节正文（超出试读范围时后端按 403 拒绝，data 不含 content）
+  static String contentChapter(int chapterId) => '/content/chapters/$chapterId';
+  /// 作品榜单（可传 type=view/favorite/sale/rating 与 limit）
+  static const String contentRankings = '/content/rankings';
+  /// 我的书架列表（已购 / 已授权作品，需 App Token，分页 {total, list}，接口 2.7.12）
+  static const String contentShelf = '/content/shelf';
+  /// 作品授权态（需 App Token，返回 {authorized}，接口 2.7.12）
+  static String contentShelfByWorkId(int workId) => '/content/shelf/$workId';
+  /// 记录阅读进度（需 App Token，PUT，body {chapterId}；首次阅读自动建进度行）
+  static String contentShelfProgress(int workId) => '/content/shelf/$workId/progress';
+  /// 搜索历史列表/记录（需 App Token；GET 列表、POST 记录，见接口 2.7.4）
+  static const String contentSearchHistory = '/content/search/history';
+  /// 删除单条搜索历史（需 App Token，接口 2.7.5）
+  static String contentSearchHistoryById(int id) => '/content/search/history/$id';
+  /// 我的收藏列表（需 App Token，分页 {total, list}，接口 2.7.11）
+  static const String contentFavorites = '/content/favorites';
+  /// 收藏 / 取消收藏 / 收藏态（需 App Token，接口 2.7.10）
+  static String contentFavoriteByWorkId(int workId) => '/content/favorites/$workId';
+  /// 作品读者评分：查询评分态 / 提交评分（需 App Token；POST body {score}）
+  static String contentWorkRating(int workId) => '/content/works/$workId/rating';
+  /// 内容文件上传（需 App Token，multipart 字段 file；type=cover/script，接口 2.9.1）
+  static const String contentUpload = '/content/upload';
+  /// 作品版本列表 / 新建版本（需 App Token，接口 2.9.7 / 2.9.8）
+  static String contentWorkVersions(int workId) => '/content/works/$workId/versions';
+  /// 作品版本详情（需 App Token，接口 2.9.9）
+  static String contentWorkVersionDetail(int versionId) => '/content/works/versions/$versionId';
+
+  // ===== B 模块「我的作品」写作链路（A 套：/users/me/works，需 App Token）=====
+  /// 我的作品列表（列表不分页；status=all/draft/reviewing/revision/rejected/published）
+  static const String authorWorks = '/users/me/works';
+  /// 作品详情（含章节目录与最近审核意见，一次拿全）
+  static String authorWorkById(int workId) => '/users/me/works/$workId';
+  /// 提交审核（draft/revision/rejected/published → reviewing；已发布作品改动后可重新提交）
+  static String authorWorkSubmit(int workId) => '/users/me/works/$workId/submit';
+  /// 作者上下架（query: status=on_shelf/off_shelf；仅已通过审核的作品可操作）
+  static String authorWorkShelf(int workId, String status) =>
+      '/users/me/works/$workId/shelf?status=$status';
+  /// 作者章节新增（B 套 POST /content/works/{workId}/chapters）
+  /// 注意：与书城目录 [contentWorkChapters] 同路径、不同方法（游客 GET / 作者 POST）。
+  static String contentAuthorChapterCreate(int workId) =>
+      '/content/works/$workId/chapters';
+  /// 作者章节更新 / 删除（B 套 PUT / DELETE /content/chapters/{chapterId}）
+  /// 注意：与书城正文 [contentChapter] 同路径、不同方法（游客 GET / 作者 PUT、DELETE）。
+  static String contentAuthorChapterById(int chapterId) =>
+      '/content/chapters/$chapterId';
+  /// 审核记录（审核历史 + 管理员意见）
+  static String authorWorkReviewRecords(int workId) =>
+      '/users/me/works/$workId/review-records';
+
+  // ===== B 模块外部视频/漫剧契约（2.8）=====
+  /// 短剧信息流（公开，分页 {total, list}，接口 2.8.1）
+  static const String contentDramaFeed = '/content/drama-feed';
+  /// 剧集列表（公开，{list}，接口 2.8.2）
+  static String contentWorkEpisodes(int workId) => '/content/works/$workId/episodes';
+  /// 剧集详情（公开，接口 2.8.3）
+  static String contentEpisode(int episodeId) => '/content/episodes/$episodeId';
+  /// 播放进度：GET 读取（2.8.5）/ POST 保存（2.8.4），均需 App Token
+  static String contentEpisodeProgress(int episodeId) => '/content/episodes/$episodeId/progress';
+  /// 播放历史（需 App Token，分页 {total, list}，接口 2.8.6）
+  static const String contentPlayHistory = '/content/play-history';
+  /// 剧集解锁状态（需 App Token，{isUnlocked, unlockType}，接口 2.8.7）
+  static String contentEpisodeUnlockStatus(int episodeId) =>
+      '/content/episodes/$episodeId/unlock-status';
+  /// 付费解锁（需 App Token，幂等 {unlockId, message}，接口 2.8.8）
+  static String contentEpisodeUnlock(int episodeId) => '/content/episodes/$episodeId/unlock';
+  /// 广告解锁（需 App Token，幂等 {unlockId, message}，接口 2.8.9）
+  static String contentEpisodeAdUnlock(int episodeId) =>
+      '/content/episodes/$episodeId/ad-unlock';
+  /// 追更订阅：POST 订阅 / DELETE 取消（需 App Token，接口 2.8.13）
+  static String contentWorkSubscribe(int workId) => '/content/works/$workId/subscribe';
+  /// 我的追更列表（需 App Token，分页 {total, list}，接口 2.8.14）
+  static const String contentSubscriptions = '/content/subscriptions';
+  /// 外部视频详情（公开，接口 2.8.15）
+  static String contentExternalDrama(int dramaId) => '/content/external-dramas/$dramaId';
+  /// 找同款剧本（公开，{dramaId, hasRelatedWork, work}，接口 2.8.16）
+  static String contentExternalDramaRelatedWork(int dramaId) =>
+      '/content/external-dramas/$dramaId/related-work';
+  /// 内容举报（需 App Token，接口 2.8.17）
+  static const String contentReports = '/content/reports';
+  /// 剧集评论列表（需 App Token，分页 {total, list}，接口 2.8.10）
+  static String contentEpisodeComments(int episodeId) =>
+      '/content/episodes/$episodeId/comments';
+  /// 发表剧集评论（需 App Token，body {content, parentId}，接口 2.8.11）
+  static String contentEpisodeCommentCreate(int episodeId) =>
+      '/content/episodes/$episodeId/comments';
+  /// 剧集点赞 / 取消点赞（需 App Token，幂等 {liked, likeCount}，接口 2.8.12）
+  static String contentEpisodeLike(int episodeId) =>
+      '/content/episodes/$episodeId/like';
+
+  // ===== B 模块作品推广（付费推荐，需 App Token）=====
+  /// 资源位位次列表（slotType=hot/search/banner）
+  static const String contentPromotionSlots = '/content/promotion/slots';
+  /// 提交推广申请 / 我的推广列表
+  static const String contentPromotionApplications = '/content/promotion/applications';
+  static const String contentPromotionMyApplications =
+      '/content/promotion/applications/my';
+  /// 推广申请详情 / 取消
+  static String contentPromotionApplication(int applyId) =>
+      '/content/promotion/applications/$applyId';
+  static String contentPromotionCancel(int applyId) =>
+      '/content/promotion/applications/$applyId/cancel';
+  /// 创建沙箱支付（返回 qrCode）/ 查询支付结果
+  static String tradePromotionPay(int applyId) =>
+      '/trade/promotion/$applyId/pay';
+  static String tradePromotionConfirm(int applyId) =>
+      '/trade/promotion/$applyId/confirm';
+
+  /// App 域头像上传（multipart，字段名 `file`）。
+  ///
+  /// 不走平台原生的 `/common/upload`：该端点属于 PC 凭证链，App Token 无法通过鉴权，
+  /// 且响应是若依 AjaxResult 而非 App 信封。
+  static const String myAvatar = '/users/me/avatar';
+
+  // ===== 业务端点（非 A3 认证范围，保持既有命名） =====
   static const String userProfile = '/user/profile';
-  static const String userAuth = '/user/auth'; // POST 提交 / GET 查询
+  static const String userAuth = '/user/auth';
   static const String notifications = '/notifications';
   static const String notificationsRead = '/notifications/read';
-  static const String seals = '/seals'; // POST 提交 / GET 查询 / DELETE 停用
-  static const String passwordChange = '/user/password/change';
+  static const String seals = '/seals';
   static const String phoneChange = '/user/phone/change';
   static const String notificationSettings = '/user/notification-settings';
   static const String feedbacks = '/feedbacks';
   static const String copyrightEvidences = '/copyright-evidences';
-
-  // ===== 2.3 我的（创作者）=====
   static const String creatorWorks = '/creator/works';
   static String creatorWorkById(int workId) => '/creator/works/$workId';
-  static const String inquiries = '/inquiries'; // GET 列表(双向) / POST 发起
+  static const String inquiries = '/inquiries';
   static String inquiryById(int id) => '/inquiries/$id';
   static String inquiryQuotes(int inquiryId) => '/inquiries/$inquiryId/quotes';
   static String inquiryAccept(int inquiryId) => '/inquiries/$inquiryId/accept';
   static String inquiryReject(int inquiryId) => '/inquiries/$inquiryId/reject';
-  static const String chatSessions = '/chat/sessions';
-  static String chatMessages(int sessionId) => '/chat/sessions/$sessionId/messages';
+  static const String chatSessions = '/users/me/chat/sessions';
+  static String chatSessionDetail(int sessionId) => '/users/me/chat/sessions/$sessionId';
+  static String chatMessages(int sessionId) => '/users/me/chat/sessions/$sessionId/messages';
+  static String chatMarkRead(int sessionId) => '/users/me/chat/sessions/$sessionId/read';
+  static const String chatUnreadCount = '/users/me/chat/unread-count';
+  static String chatChangeStatus(int sessionId) => '/users/me/chat/sessions/$sessionId/status';
+  // 交易会话定型文模板
+  static const String chatTradeTemplates = '/users/me/chat/trade-templates';
+  // TRADE 类型会话创建（通过询盘）
+  static const String tradeChatSessions = '/trade/inquiry/chat/sessions';
   static const String orders = '/orders';
   static String orderById(int orderId) => '/orders/$orderId';
   static String orderContract(int orderId) => '/orders/$orderId/contract';
   static String orderContractSign(int orderId) => '/orders/$orderId/contract/sign';
   static String orderEscrow(int orderId) => '/orders/$orderId/escrow';
-  static String orderInvoice(int orderId) => '/orders/$orderId/invoice';
   static String orderPay(int orderId) => '/orders/$orderId/pay';
   static String orderCancel(int orderId) => '/orders/$orderId/cancel';
   static String orderRefund(int orderId) => '/orders/$orderId/refund';
   static String orderDelivery(int orderId) => '/orders/$orderId/delivery';
   static String workTradeConfig(int workId) => '/works/$workId/trade-config';
-
-  // ===== 2.4 我的（甲方）=====
   static const String clientSelectionsPurchased = '/client/selections/purchased';
   static const String clientDemands = '/client/demands';
   static const String clientPayments = '/client/payments';
@@ -57,8 +232,6 @@ class ApiEndpoints {
   static String clientDramaPlayStats(int workId) => '/client/dramas/$workId/play-stats';
   static String bookContact(int workId) => '/books/$workId/contact';
   static const String cooperations = '/cooperations';
-
-  // ===== 2.5 创作者工作台 =====
   static const String creatorStatsIncome = '/creator/stats/income';
   static const String creatorStatsOverview = '/creator/stats/overview';
   static const String creatorReviews = '/creator/reviews';
@@ -66,11 +239,9 @@ class ApiEndpoints {
   static const String creatorDashboard = '/creator/dashboard';
   static const String creatorContactProfile = '/creator/contact-profile';
   static const String creatorCooperations = '/creator/cooperations';
-
-  // ===== 2.6 福利中心 =====
   static const String pointsAccount = '/points/account';
   static const String pointsTasks = '/points/tasks';
-  static String pointsTaskClaim(int taskId) => '/points/tasks/$taskId/claim';
+  static String pointTaskClaim(int taskId) => '/points/tasks/$taskId/claim';
   static const String pointsRecords = '/points/records';
   static const String aiQuotaAccount = '/ai-quota/account';
   static const String aiQuotaRecords = '/ai-quota/records';
@@ -78,19 +249,13 @@ class ApiEndpoints {
   static const String adRewardConfig = '/ads/reward-config';
   static const String adTaskReward = '/ads/task-reward';
   static const String earnOverview = '/earn/overview';
-
-  // ===== 2.7 书城 =====
   static const String books = '/books';
   static String bookById(int workId) => '/books/$workId';
   static const String booksFilter = '/books/filter';
   static const String booksRanking = '/books/ranking';
   static String bookFreeRead(int workId) => '/books/$workId/free-read';
-  static const String searchHistory = '/search-history';
-  static const String favorites = '/favorites';
   static const String bookshelf = '/bookshelf';
   static const String banners = '/banners';
-
-  // ===== 2.8 漫剧 =====
   static const String dramaFeed = '/dramas/feed';
   static const String episodes = '/episodes';
   static String episodeById(int id) => '/episodes/$id';
@@ -98,12 +263,8 @@ class ApiEndpoints {
   static const String playHistory = '/play-history';
   static String episodeUnlockStatus(int id) => '/episodes/$id/unlock-status';
   static String episodeUnlockPay(int id) => '/episodes/$id/unlock';
-  static const String episodeComments = '/comments';
-  static String episodeLike(int id) => '/episodes/$id/like';
   static const String subscriptions = '/subscriptions';
   static const String externalDramas = '/external-dramas';
-
-  // ===== 2.9 上传和创作 =====
   static const String fileUpload = '/files/upload';
   static const String works = '/works';
   static String workById(int workId) => '/works/$workId';
@@ -114,9 +275,115 @@ class ApiEndpoints {
   static const String aiPolish = '/ai/polish';
   static const String aiWriteRecords = '/ai/write/records';
   static const String aiOutline = '/ai/outline';
-
-  // ===== 2.10 分类 =====
-  static const String categories = '/categories';
-  static String categoryById(int id) => '/categories/$id';
   static const String tags = '/tags';
+
+  // ===== 印章管理 =====
+  static const String copyrightSeals = '/content/copyright-seals';
+  static String copyrightSealById(int sealId) => '/content/copyright-seals/$sealId';
+  static String copyrightSealMaterials(int sealId) => '/content/copyright-seals/$sealId/materials';
+  static String copyrightSealResubmit(int sealId) => '/content/copyright-seals/$sealId/resubmit';
+  static String copyrightSealDisable(int sealId) => '/content/copyright-seals/$sealId/disable';
+
+  // ===== C 交易域（APP 专用接口） =====
+  // 交易作品
+  static const String adminTradeWorks = '/admin/trade/works';
+  static String adminTradeWorkById(int workId) => '/admin/trade/works/$workId';
+  // 询盘
+  static const String adminTradeInquiryList = '/trade/inquiry/list';
+  static String adminTradeInquiryDetail(int id) => '/trade/inquiry/$id';
+  static const String adminTradeInquiry = '/trade/inquiry';
+  static String adminTradeInquiryAccept(int id) => '/trade/inquiry/$id/accept';
+  static String adminTradeInquiryReject(int id) => '/trade/inquiry/$id/reject';
+  static String adminTradeInquiryClose(int id) => '/trade/inquiry/$id/close';
+  // 作品确权状态（无版权作品：发起询盘不选授权类型，成交后跳过合同直达付款）
+  static const String tradeInquiryCopyrightStatus = '/trade/inquiry/copyright-status';
+  // 报价/议价（PC管理端）
+  static const String adminTradeQuoteList = '/admin/trade/quote/list';
+  static const String adminTradeQuote = '/admin/trade/quote';
+  static const String adminTradeQuoteCounterOffer = '/admin/trade/quote/counter-offer';
+  static String adminTradeQuoteById(int id) => '/admin/trade/quote/$id';
+  static String adminTradeQuoteAccept(int id) => '/admin/trade/quote/$id/accept';
+  static String adminTradeQuoteReject(int id) => '/admin/trade/quote/$id/reject';
+  static String adminTradeQuoteSellerAccept(int id) => '/admin/trade/quote/$id/seller-accept';
+  static String adminTradeQuoteSellerReject(int id) => '/admin/trade/quote/$id/seller-reject';
+  // 报价/议价（APP端）
+  static const String appQuoteList = '/trade/quote/list';
+  static const String appQuoteCreate = '/trade/quote';
+  static const String appQuoteCounterOffer = '/trade/quote/counter-offer';
+  static String appQuoteById(int id) => '/trade/quote/$id';
+  static String appQuoteModify(int id) => '/trade/quote/$id';
+  static String appQuoteAccept(int id) => '/trade/quote/$id/accept';
+  static String appQuoteReject(int id) => '/trade/quote/$id/reject';
+  static const String appQuoteLatest = '/trade/quote/latest';
+  // 订单
+  static const String adminTradeOrders = '/admin/trade/orders';
+  static String adminTradeOrderById(int id) => '/admin/trade/orders/$id';
+  static const String appOrderList = '/trade/order/list';
+  static String appOrderById(int orderId) => '/trade/order/$orderId';
+  static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
+  static String appOrderComplete(int orderId) => '/trade/order/$orderId/complete';
+  static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
+  /// 版权交割（交易域）
+  static const String appDeliveryList = '/trade/delivery/list';
+  static String appDeliveryById(int deliveryId) => '/trade/delivery/$deliveryId';
+  static String appDeliveryByOrder(int orderId) => '/trade/delivery/by-order/$orderId';
+  static String appDeliveryUpload(int deliveryId) => '/trade/delivery/$deliveryId/upload';
+  static String appDeliveryConfirm(int deliveryId) => '/trade/delivery/$deliveryId/confirm';
+  /// 买方购买获得的版权材料（交割 cert，确认收货后可见）
+  static const String appTradeCopyrightList = '/trade/copyright/list';
+  static String appTradeCopyrightById(int fileId) => '/trade/copyright/$fileId';
+  // 合同
+  static const String appContractList = '/trade/contracts/list';
+  static String appContractByOrder(int orderId) => '/trade/contracts/$orderId';
+  static String appContractSign(int contractId) => '/trade/contracts/$contractId/sign';
+  // 合同模板目录（GET，可带 contractId）与正文条款编辑（PUT）
+  static const String appContractTemplates = '/trade/contracts/templates';
+  static String appContractContent(int contractId) => '/trade/contracts/$contractId/content';
+  // 上传 PDF 替换模板（POST multipart）与从上传件切回平台模板（PUT）
+  static String appContractSourcePdf(int contractId) => '/trade/contracts/$contractId/source-pdf';
+  static String appContractSourcePdfOff(int contractId) => '/trade/contracts/$contractId/source-pdf/off';
+  // 财务（资金托管 / 收益 / 待结算 / 提现）
+  static const String appFinanceIncomeOverview = '/trade/finance/income/overview';
+  static const String appFinanceIncomeDetail = '/trade/finance/income/detail';
+  static const String appFinanceIncomeStats = '/trade/finance/income/stats';
+  static String appFinanceIncomeBillDetail(int billId) =>
+      '/trade/finance/income/detail/$billId';
+  static const String appFinanceSettleList = '/trade/finance/income/settle/list';
+  static String appFinanceSettleById(int settleId) =>
+      '/trade/finance/income/settle/$settleId';
+  static String appFinanceSettleConfirm(int settleId) =>
+      '/trade/finance/income/settle/$settleId/confirm';
+  static String appFinanceSettleDispute(int settleId) =>
+      '/trade/finance/income/settle/$settleId/dispute';
+  static const String appFinanceWithdrawApply = '/trade/finance/withdraw/apply';
+  static const String appFinanceWithdrawList = '/trade/finance/withdraw/list';
+  static const String appFinanceEscrowList = '/trade/finance/escrow/list';
+  static String appFinanceEscrowById(int escrowId) => '/trade/finance/escrow/$escrowId';
+  // 合作记录
+  static const String adminTradeCooperationList = '/admin/trade/cooperation/list';
+  static const String adminTradeCooperation = '/admin/trade/cooperation';
+  // 商务跟进
+  static const String adminTradeFollowUps = '/admin/trade/partners/follow-ups';
+  // 需求标签
+  static const String adminTradeDemandTags = '/admin/trade/partners/tags';
+
+  // ===== 任务广场（需求悬赏） =====
+  static const String demandList = '/trade/demand/list';
+  /// 任务广场轻量统计（可接单数 / 奖金池 / 今日新增 / 题材角标）。
+  static const String demandStats = '/trade/demand/stats';
+  static String demandDetail(int demandId) => '/trade/demand/$demandId';
+  static String demandClaim(int demandId) => '/trade/demand/$demandId/claim';
+  /// 任务会话（平台运营 ↔ 创作者，POST；创作者发起即与接单任务沟通）。
+  static String demandChatSession(int demandId) => '/trade/demand/$demandId/chat/session';
+  // 验收轮次
+  static String demandStages(int demandId) => '/trade/demand/$demandId/stages';
+  static String demandStageDeliver(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliver';
+  // 可交付作品（本人、非已上架售卖）
+  static const String demandDeliverableWorks = '/trade/demand/deliverable-works';
+  /// 查看分镜任务的源剧本（接单前评估，任何登录用户可读）。
+  static String demandSourceScript(int demandId) => '/trade/demand/$demandId/source-script';
+  // 延时：创作者申请 / 延时记录（审批与自主延时已收归管理端）
+  static String demandStageExtendRequest(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/extend/request';
+  // 延时记录（申请延时 + 运营自主延时，每条一行，通过/驳回均保留）
+  static String demandExtendHistory(int demandId) => '/trade/demand/$demandId/extend/history';
 }

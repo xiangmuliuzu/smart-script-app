@@ -1,10 +1,37 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
 import 'api_exception.dart';
 import 'api_response.dart';
+import 'friendly_error.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'session_events.dart';
+
+/// 日志拦截器（仅显式开启时使用；禁止打印 Token/密码/验证码）。
+class AppLogInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    // 仅记录方法与路径，不记录 header/body。
+    // ignore: avoid_print
+    print('--> ${options.method} ${options.uri.path}');
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    // ignore: avoid_print
+    print('<-- ${response.statusCode} ${response.requestOptions.uri.path}');
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    // ignore: avoid_print
+    print('<-- ERROR ${err.type} ${err.requestOptions.uri.path}');
+    handler.next(err);
+  }
+}
 
 /// 网络客户端封装（框架层唯一出口）。
 ///
@@ -16,6 +43,9 @@ class ApiClient {
 
   final Dio _dio;
 
+  /// 直接访问底层 Dio（下载文件等特殊场景用；业务请求请走 get/post 等方法）。
+  Dio get dio => _dio;
+
   /// 构造一个绑定了拦截器的 Dio（供 provider 调用）。
   static Dio buildDio(AuthInterceptor authInterceptor) {
     final dio = Dio(
@@ -24,8 +54,9 @@ class ApiClient {
         connectTimeout: AppConfig.connectTimeout,
         receiveTimeout: AppConfig.receiveTimeout,
         contentType: Headers.jsonContentType,
-        // 让所有状态码都进入统一处理，不自动抛异常
-        validateStatus: (status) => status != null && status < 500,
+        // 让业务 4xx 进入统一处理；401 抛给 AuthInterceptor 做单飞刷新
+        validateStatus: (status) =>
+            status != null && status < 500 && status != 401,
       ),
     );
     dio.interceptors.add(authInterceptor);
@@ -42,26 +73,69 @@ class ApiClient {
     Map<String, dynamic>? headers,
     T Function(dynamic raw)? parser,
   }) =>
-      _send<T>(_dio.get<dynamic>(path,
-          queryParameters: query, options: Options(headers: headers)),
+      _send<T>(
+          _dio.get<dynamic>(path,
+              queryParameters: query, options: Options(headers: headers)),
           parser);
 
   /// POST 请求（JSON）。
   ///
-  /// 需要幂等的接口（如发票 2.3.16）请在 [headers] 传 `{'Idempotency-Key': '...'}`。
+  /// 需要幂等的接口请在 [headers] 传 `{'Idempotency-Key': '...'}`。
+  /// AI 生成等长耗时接口可传 [receiveTimeout] 覆盖全局 30s 接收超时，避免生成中途被中断。
   Future<T?> post<T>(
     String path, {
     dynamic data,
     Map<String, dynamic>? query,
     Map<String, dynamic>? headers,
+    Duration? receiveTimeout,
     T Function(dynamic raw)? parser,
   }) =>
       _send<T>(
           _dio.post<dynamic>(path,
               data: data,
               queryParameters: query,
-              options: Options(headers: headers)),
+              options: Options(headers: headers, receiveTimeout: receiveTimeout)),
           parser);
+
+  /// SSE 流式 POST（用于 AI 打字机输出）。
+  ///
+  /// 返回原始 [ResponseBody]，由调用方逐块解析 `event/data` 行；
+  /// 登录态失效（401）与网络错误仍按统一规则抛 [ApiException]。
+  Future<ResponseBody> postStream(
+    String path, {
+    dynamic data,
+    Duration? receiveTimeout,
+  }) async {
+    try {
+      final resp = await _dio.post<ResponseBody>(
+        path,
+        data: data,
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: const {'Accept': 'text/event-stream'},
+          receiveTimeout: receiveTimeout,
+        ),
+      );
+      if (resp.statusCode == 401) {
+        SessionEvents.instance.sessionExpired();
+        throw ApiException(FriendlyError.loginExpired, code: 401);
+      }
+      final body = resp.data;
+      if (body == null) {
+        throw ApiException(
+          FriendlyError.messageForStatus(resp.statusCode) ?? FriendlyError.serverBusy,
+          code: resp.statusCode,
+        );
+      }
+      return body;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 &&
+          e.requestOptions.extra['skipSessionExpiry'] != true) {
+        SessionEvents.instance.sessionExpired();
+      }
+      throw ApiException(_mapDioError(e), code: e.response?.statusCode);
+    }
+  }
 
   /// PUT 请求（JSON）。
   Future<T?> put<T>(
@@ -71,7 +145,8 @@ class ApiClient {
     T Function(dynamic raw)? parser,
   }) =>
       _send<T>(
-          _dio.put<dynamic>(path, data: data, options: Options(headers: headers)),
+          _dio.put<dynamic>(path,
+              data: data, options: Options(headers: headers)),
           parser);
 
   /// DELETE 请求。
@@ -116,12 +191,15 @@ class ApiClient {
       // HTTP 层 401：登录态失效
       if (resp.statusCode == 401) {
         SessionEvents.instance.sessionExpired();
-        throw ApiException('登录状态已过期，请重新登录', code: 401);
+        throw ApiException(FriendlyError.loginExpired, code: 401);
       }
 
       final body = resp.data;
       if (body is! Map) {
-        throw ApiException('响应格式错误', code: resp.statusCode);
+        throw ApiException(
+          FriendlyError.messageForStatus(resp.statusCode) ?? FriendlyError.serverBusy,
+          code: resp.statusCode,
+        );
       }
 
       final apiResp = ApiResponse<T>.fromJson(
@@ -130,17 +208,34 @@ class ApiClient {
       );
 
       if (!apiResp.isSuccess) {
-        // 业务层 401：同样视为登录态失效
-        if (apiResp.code == 401) SessionEvents.instance.sessionExpired();
+        // 会话不可恢复：40100/40102/40103 需重新登录，40301 为账号被禁用。
+        final code = apiResp.code;
+        if (code == AppAuthErrorCodes.accountDisabled &&
+            resp.requestOptions.extra['skipSessionExpiry'] != true) {
+          SessionEvents.instance
+              .sessionExpired(SessionExpiryReason.accountDisabled);
+        } else if (resp.requestOptions.extra['skipSessionExpiry'] != true &&
+            (code == AppAuthErrorCodes.unauthorized ||
+                code == AppAuthErrorCodes.refreshInvalid ||
+                code == AppAuthErrorCodes.refreshReplay)) {
+          SessionEvents.instance.sessionExpired();
+        }
         throw ApiException(
-          apiResp.message.isEmpty ? '请求失败' : apiResp.message,
+          FriendlyError.message(
+            ApiException(apiResp.message, code: apiResp.code),
+            status: resp.statusCode,
+            code: apiResp.code,
+          ),
           code: apiResp.code,
           data: apiResp.data,
         );
       }
       return apiResp.data;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 401) SessionEvents.instance.sessionExpired();
+      if (e.response?.statusCode == 401 &&
+          e.requestOptions.extra['skipSessionExpiry'] != true) {
+        SessionEvents.instance.sessionExpired();
+      }
       throw ApiException(_mapDioError(e), code: e.response?.statusCode);
     }
   }
@@ -150,15 +245,24 @@ class ApiClient {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return '网络超时，请稍后重试';
+        return FriendlyError.timeout;
       case DioExceptionType.connectionError:
-        return '网络连接失败，请检查网络或后端地址';
+        return FriendlyError.network;
       case DioExceptionType.badCertificate:
-        return '安全证书校验失败';
+        return FriendlyError.network;
       case DioExceptionType.cancel:
-        return '请求已取消';
+        return '操作已取消';
+      case DioExceptionType.badResponse:
+        final data = e.response?.data;
+        if (data is Map) {
+          final raw = data['msg'] ?? data['message'];
+          final safe = FriendlyError.sanitizeOrNull(raw?.toString());
+          if (safe != null) return safe;
+        }
+        return FriendlyError.messageForStatus(e.response?.statusCode)
+            ?? FriendlyError.serverBusy;
       default:
-        return '网络异常，请稍后重试';
+        return FriendlyError.network;
     }
   }
 }

@@ -13,8 +13,27 @@ class AppConstants {
   static const int defaultPageSize = 10;
 
   /// 本地存储 key（集中管理，避免散落）。
-  static const String spToken = 'auth_token';
-  static const String spRefreshToken = 'auth_refresh_token';
-  static const String spUserType = 'auth_user_type';
+  /// SharedPreferences 仅允许非敏感缓存，禁止存放 Token。
   static const String spUserCache = 'auth_user_cache';
+
+  /// Secure storage keys (A3 credentials).
+  static const String kAccessToken = 'a3_access_token';
+  static const String kRefreshToken = 'a3_refresh_token';
+}
+
+/// A3 认证业务错误码（逐项对齐后端 `AppAuthErrorCodes`，客户端只读不推断）。
+///
+/// 用途：网络层据此判定「会话不可恢复」并发 [SessionEvents] 信号；
+/// 页面层据此把服务端英文码文案收敛为中文提示（如 40301 -> 账号禁用）。
+class AppAuthErrorCodes {
+  AppAuthErrorCodes._();
+
+  static const int invalidRequest = 40000;
+  static const int smsCodeInvalid = 40001;
+  static const int smsCodeExpired = 40002;
+  static const int smsCodeUsed = 40901;
+  static const int unauthorized = 40100;
+  static const int refreshInvalid = 40102;
+  static const int refreshReplay = 40103;
+  static const int accountDisabled = 40301;
 }

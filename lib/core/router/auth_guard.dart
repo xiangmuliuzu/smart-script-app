@@ -1,0 +1,138 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../providers/auth_providers.dart';
+import 'route_intent.dart';
+import 'route_paths.dart';
+
+/// 登录请求期间的认证页 redirect 放行开关。
+///
+/// 登录接口成功的一瞬间鉴权状态切到已登录，全局 redirect 会把仍停在
+/// `/login`（包括账号密码登录、注册子页）的导航改写到首页；那会重建整条
+/// 导航栈，丢掉登录页下方的原浏览栈——表现为登录回跳后按返回键直接退出
+/// 应用，或登录页残留、返回时又回到登录页。
+///
+/// 登录提交开始时打开、请求结束（成功由 [resolvePostLoginTarget] 完成回跳，
+/// 失败或页面销毁在 finally 中关闭）时关闭；期间 redirect 对认证页放行，
+/// 由登录页自己把目标页替换进原浏览栈。
+class PostLoginNavigationPass {
+  PostLoginNavigationPass._();
+
+  static bool _open = false;
+
+  static bool get isOpen => _open;
+
+  static void open() => _open = true;
+
+  static void close() => _open = false;
+}
+
+/// A5 统一登录守卫（规格 §8.1）。
+///
+/// 唯一职责边界：
+///   - 页面**不得**自行判断 Token 字符串，也不得自行构造登录页跳转；
+///     需要登录的入口一律调用 [requireLogin]。
+///   - 游客确认登录后保存结构化 [RouteIntent]，进入登录页；
+///   - 登录成功后由登录页消费一次意图并回跳（见 [consumeAndResolve]）。
+///
+/// 「会话恢复中」（[AuthStatus.unknown]）不视为未登录：此时用户可能已登录，
+/// 只是 /auth/me 尚未返回；跳登录页会造成已登录用户被误踢，因此交给启动页等待。
+class AuthGuard {
+  AuthGuard._();
+
+  /// 是否为已登录状态。
+  static bool isLoggedIn(WidgetRef ref) =>
+      ref.read(authControllerProvider).status == AuthStatus.authenticated;
+
+  /// 已登录返回 true；游客确认后进入登录页，取消则留在当前页面。
+  ///
+  /// [target] 传当前页面的定位串（含查询参数），用于登录成功后原样回跳。
+  static bool requireLogin(
+    BuildContext context,
+    WidgetRef ref, {
+    required String target,
+  }) {
+    if (isLoggedIn(ref)) return true;
+    if (ref.read(authControllerProvider).status == AuthStatus.unknown) return false;
+    _confirmLogin(context, ref, target);
+    return false;
+  }
+
+  static bool _promptOpen = false;
+
+  static Future<void> _confirmLogin(BuildContext context, WidgetRef ref, String target) async {
+    if (_promptOpen) return;
+    _promptOpen = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => loginConfirmationDialog(dialogContext),
+      );
+      if (confirmed != true || !context.mounted || !ref.context.mounted) return;
+      if (ref.read(authControllerProvider).status != AuthStatus.unauthenticated) return;
+      goLogin(context, ref, target: target);
+    } finally {
+      _promptOpen = false;
+    }
+  }
+
+  static Widget loginConfirmationDialog(BuildContext context, {VoidCallback? onCancel, VoidCallback? onConfirm}) => AlertDialog(
+        title: const Text('需要登录'),
+        content: const Text('使用此功能需要登录，是否现在登录？'),
+        actions: [
+          TextButton(onPressed: onCancel ?? () => Navigator.of(context).pop(false), child: const Text('暂不登录')),
+          TextButton(onPressed: onConfirm ?? () => Navigator.of(context).pop(true), child: const Text('去登录')),
+        ],
+      );
+
+  static void goLogin(BuildContext context, WidgetRef ref, {required String target}) {
+    context.push(loginLocation(ref, target));
+  }
+
+  static String loginLocation(WidgetRef ref, String target) {
+    final store = ref.read(routeIntentStoreProvider);
+    if (!ProtectedRoutes.canResume(target)) {
+      // 敏感提交页（换绑、账号安全）不参与自动回跳
+      store.clear();
+    } else {
+      final intent = RouteIntent.fromParam(Uri.encodeComponent(target));
+      if (intent != null) store.save(intent);
+    }
+    final encoded = store.pending?.encoded;
+    return encoded == null ? RoutePath.login : '${RoutePath.login}?${RouteIntent.paramName}=$encoded';
+  }
+
+  /// 打开受保护的应用内页面。
+  ///
+  /// 用 `push` 而不是 `go`：用户中心的子页面需要真实的历史栈，
+  /// 这样 AppBar 返回箭头与系统返回键都能自然回到上一页。
+  /// 用 `go` 打开根级页面会让历史栈只剩当前一条，按返回键会直接退出应用。
+  ///
+  /// 已登录：直接 push；游客确认后保存意图并进入登录页，登录成功再由
+  /// [consumeAndResolve] 交回目标并跳转。
+  static void pushProtected(BuildContext context, WidgetRef ref, {required String target}) {
+    if (requireLogin(context, ref, target: target)) {
+      context.push(target);
+    }
+  }
+
+  /// 消费回跳意图并给出最终目标，供登录页在登录成功后调用。
+  ///
+  /// 无意图、意图非法或目标不允许恢复时返回 null，由调用方走安全默认首页。
+  /// 返回的定位串由调用方按栈情况回跳（见 resolvePostLoginTarget）：
+  /// 用户点击路径替换/弹出登录页保原栈，redirect 路径补首页底栈，
+  /// 保证登录回跳后按返回键能回到上一页而不是退出应用。
+  static String? consumeAndResolve(WidgetRef ref) {
+    final intent = ref.read(routeIntentStoreProvider).consume();
+    if (intent == null) return null;
+    if (!ProtectedRoutes.canResume(intent.target)) return null;
+    return intent.target;
+  }
+
+  /// 主动退出登录：清空回跳意图（规格 §8.1）。
+  static void clearOnLogout(WidgetRef ref) {
+    ref.read(routeIntentStoreProvider).clear();
+  }
+
+}
