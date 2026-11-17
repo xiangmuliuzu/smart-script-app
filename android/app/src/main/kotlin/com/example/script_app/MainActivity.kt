@@ -13,7 +13,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -231,7 +230,7 @@ class MainActivity : FlutterActivity() {
      *
      * 普通应用无法静默安装：Android 只允许系统 / OEM 应用以程序方式安装。
      * 因此这里只做两件事：检查「安装未知应用」授权，未授权时把用户引导到系统设置页；
-     * 已授权则用 FileProvider 生成 content:// 并打开系统安装确认框。
+     * 已授权则用 [ApkContentProvider] 生成 content:// 并打开系统安装确认框。
      *
      * 入参：path(String)，ApkInstaller 下载好的文件绝对路径。
      * 返回：true 表示已拉起安装器；false 表示已跳到授权页（用户返回后应重新点击更新）。
@@ -264,7 +263,7 @@ class MainActivity : FlutterActivity() {
             return
         }
         try {
-            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val uri = ApkContentProvider.uriFor(this, file)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

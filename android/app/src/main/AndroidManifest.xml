@@ -50,16 +50,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <!-- 应用内更新：把下载到应用目录的 APK 以 content:// 交给系统安装器。
-             路径范围见 res/xml/file_paths.xml（仅 external-files 下的 updates/ 与 cache）。 -->
+             不用 androidx FileProvider：它在 Android 16 的 release 构建里启动即 SIGSEGV
+             （debug 正常），改为最小实现的 ApkContentProvider（只读根级文件）。 -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".ApkContentProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+            android:grantUriPermissions="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility?hl=en and
