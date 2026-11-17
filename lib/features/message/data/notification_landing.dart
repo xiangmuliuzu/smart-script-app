@@ -1,26 +1,34 @@
 import '../../../core/router/route_paths.dart';
 import '../../user_center/data/user_center_models.dart';
 
-/// 站内交易/任务通知 → App 业务页落点。
+/// 站内交易/关注动态通知 → App 业务页落点。
 ///
 /// 同一份映射服务两个入口：系统通知横幅点击后直达业务页（notification_navigation），
 /// 消息详情页的「去处理」按钮也走这里，避免两处各写一张表而口径漂移。
 ///
-/// businessType / businessId 由后端 TradeNotifyService 统一给出，约定是
-/// **businessId 就是落地页的主键**：
+/// businessType / businessId 由后端统一给出，约定是 **businessId 就是落地页的主键**：
 ///   - INQUIRY → 询盘 id
 ///   - ORDER   → 订单 id
 ///   - CONTRACT→ 订单 id（App 合同页按订单定位，`GET /trade/contracts/{orderId}`）
 ///   - DEMAND  → 需求 id
 ///   - WITHDRAW→ 无落点参数，提现列表页本身即是动作页
+///   - WORK    → 作品 id（关注动态，type=FOLLOW）
 typedef NotificationLanding = ({String label, String location});
 
-/// 非交易通知、公告，或缺少可定位主键时返回 null（只打开 App，不做跳转）。
+/// 非交易/关注通知、公告，或缺少可定位主键时返回 null（只打开 App，不做跳转）。
 NotificationLanding? notificationLandingOf(MessageItem message) {
-  if (message.source != 'NOTIFICATION' || message.type != 'TRANSACTION') {
+  if (message.source != 'NOTIFICATION') {
     return null;
   }
   final bizId = (message.businessId ?? '').trim();
+  if (message.type == 'FOLLOW') {
+    return message.businessType == 'WORK' && bizId.isNotEmpty
+        ? (label: '查看作品', location: '${RoutePath.workDetail}?id=$bizId')
+        : null;
+  }
+  if (message.type != 'TRANSACTION') {
+    return null;
+  }
   switch (message.businessType) {
     case 'INQUIRY':
       return bizId.isEmpty

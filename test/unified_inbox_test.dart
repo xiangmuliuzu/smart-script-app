@@ -6,13 +6,13 @@ import 'package:script_app/features/message/pages/message_list_page.dart';
 import 'support/scripted_api.dart';
 
 void main() {
-  testWidgets('同编号的公告和通知在单一列表显示，公告归入系统分类', (tester) async {
+  testWidgets('同编号的公告和通知在单一列表显示，关注动态独立分类', (tester) async {
     final api = ScriptedApi();
     api.reply(
         '/messages/unread-count',
         Envelope.ok({
           'total': 3,
-          'byType': {'SYSTEM': 2, 'REVIEW': 1}
+          'byType': {'SYSTEM': 2, 'FOLLOW': 1}
         }));
     final rows = [
       {
@@ -32,9 +32,11 @@ void main() {
       {
         'messageId': 18,
         'source': 'NOTIFICATION',
-        'type': 'REVIEW',
-        'title': '审核结果',
-        'summary': '审核内容'
+        'type': 'FOLLOW',
+        'title': '关注的创作者发布了新作品',
+        'summary': '作品《新作》',
+        'businessType': 'WORK',
+        'businessId': '301',
       },
     ];
     api.handle('/messages', (request) {
@@ -51,12 +53,41 @@ void main() {
     expect(find.byType(TabBar), findsNothing);
     expect(find.text('服务升级公告'), findsOneWidget);
     expect(find.text('管理员通知'), findsOneWidget);
-    expect(find.text('审核结果'), findsOneWidget);
+    expect(find.text('关注的创作者发布了新作品'), findsOneWidget);
     await tester.tap(find.text('系统 2'));
     await tester.pumpAndSettle();
     expect(find.text('服务升级公告'), findsOneWidget);
     expect(find.text('管理员通知'), findsOneWidget);
-    expect(find.text('审核结果'), findsNothing);
+    expect(find.text('关注的创作者发布了新作品'), findsNothing);
+    await tester.tap(find.text('关注 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('关注的创作者发布了新作品'), findsOneWidget);
+    expect(find.text('服务升级公告'), findsNothing);
+    expect(find.text('管理员通知'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('关注动态详情提供查看作品入口', (tester) async {
+    final api = ScriptedApi();
+    api.reply(
+        '/messages/18',
+        Envelope.ok({
+          'messageId': 18,
+          'type': 'FOLLOW',
+          'title': '「作者甲」发布了新作品',
+          'content': '您关注的创作者「作者甲」发布了新作品。\n· 作品：《新作》',
+          'read': true,
+          'businessType': 'WORK',
+          'businessId': '301',
+        }));
+    await tester.pumpWidget(ProviderScope(
+        overrides: [api.override],
+        child: const MaterialApp(home: MessageDetailPage(messageId: 18))));
+    await tester.pumpAndSettle();
+    expect(find.text('关注'), findsOneWidget);
+    expect(find.text('「作者甲」发布了新作品'), findsOneWidget);
+    expect(find.text('查看作品'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

@@ -14,8 +14,8 @@ import '../../user_center/widgets/user_center_scaffold.dart';
 /// 消息详情（规格 §8.6，契约 §1.5）。
 ///
 /// 进入即标记已读（幂等）；标记失败不回滚展示，用户仍可看到正文。
-/// 交易域通知（TRANSACTION）底部提供「去处理」按钮，直达对应询盘/订单/合同/任务/提现页，
-/// 落点口径与系统通知横幅点击后一致。
+/// 交易域通知（TRANSACTION）底部提供「去处理」按钮，直达对应询盘/订单/合同/任务/提现页；
+/// 关注动态（FOLLOW + WORK）提供「查看作品」，落点口径与系统通知横幅点击后一致。
 class MessageDetailPage extends ConsumerStatefulWidget {
   const MessageDetailPage(
       {super.key, required this.messageId, this.source = 'NOTIFICATION'});
@@ -32,7 +32,7 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
   String? _error;
   bool _loading = true;
 
-  /// 交易通知跳转目标：映射表与系统通知横幅共用 notificationLandingOf。
+  /// 通知跳转目标：映射表与系统通知横幅共用 notificationLandingOf。
   NotificationLanding? _jumpOf(MessageItem m) => notificationLandingOf(m);
 
   void _jump(NotificationLanding jump) => context.push(jump.location);
