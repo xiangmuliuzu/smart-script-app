@@ -34,9 +34,40 @@ class MainActivity : FlutterActivity() {
     private var pendingResult: MethodChannel.Result? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
 
+    /**
+     * 最近一次被点击的通知落点（业务页定位串）。
+     * 冷启动取自 getIntent()，热启动取自 onNewIntent()；Dart 侧就绪后拉走并清空。
+     */
+    private var pendingNotifyRoute: String? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         ensureNotificationChannel()
+        captureNotifyRoute(intent)
+    }
+
+    /** 通知点击在 App 存活时走这里（singleTop），不会重建 Activity。 */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureNotifyRoute(intent)
+    }
+
+    private fun captureNotifyRoute(intent: Intent?) {
+        val route = intent?.getStringExtra(EXTRA_NOTIFY_ROUTE)
+        if (!route.isNullOrEmpty()) {
+            pendingNotifyRoute = route
+        }
+    }
+
+    /**
+     * 冷启动时 Dart 侧尚未注册回调，原生推不过去；改成 Dart 主动拉取，
+     * 取后即清，保证同一次点击只被消费一次、不会在下次启动重放。
+     */
+    private fun takePendingNotifyRoute(result: MethodChannel.Result) {
+        val route = pendingNotifyRoute
+        pendingNotifyRoute = null
+        result.success(route)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -54,6 +85,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "showNotification" -> showNotification(call, result)
                     "ensureNotificationPermission" -> ensureNotificationPermission(result)
+                    "takePendingRoute" -> takePendingNotifyRoute(result)
                     else -> result.notImplemented()
                 }
             }
@@ -137,14 +169,16 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * 弹出系统通知。入参：id(Int)、title(String)、body(String)。
-     * 点击通知回到本 App（单实例，singleTop）。
+     * 弹出系统通知。入参：id(Int)、title(String)、body(String)、route(String?)。
+     * 点击通知回到本 App（单实例，singleTop）；带 route 时把它塞进 Intent，
+     * Dart 侧取到后直接跳到对应业务页。
      */
     private fun showNotification(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
         try {
             val id = call.argument<Int>("id") ?: (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
             val title = call.argument<String>("title") ?: "新消息"
             val body = call.argument<String>("body") ?: ""
+            val route = call.argument<String>("route")
             val manager = getSystemService(NotificationManager::class.java)
             if (manager == null) {
                 result.success(false)
@@ -159,6 +193,7 @@ class MainActivity : FlutterActivity() {
             }
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                if (!route.isNullOrEmpty()) putExtra(EXTRA_NOTIFY_ROUTE, route)
             }
             val pendingIntent = PendingIntent.getActivity(
                 this, id, intent,
@@ -336,5 +371,6 @@ class MainActivity : FlutterActivity() {
         private const val CHANNEL_FILE = "smartscript/native_file"
         private const val REQUEST_NOTIFICATION_PERMISSION = 4102
         private const val NOTIFICATION_CHANNEL_ID = "smartscript_messages"
+        private const val EXTRA_NOTIFY_ROUTE = "smartscript_notify_route"
     }
 }

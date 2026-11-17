@@ -7,6 +7,7 @@ import 'features/message/widgets/announcement_popup_dialog.dart';
 import 'features/splash/splash_ad_overlay.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
+import 'core/services/notification_navigation.dart';
 import 'core/services/notification_poller.dart';
 import 'core/services/realtime_socket.dart';
 import 'core/theme/app_page_background.dart';
@@ -73,8 +74,14 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
     ref.watch(realtimeSocketProvider);
     // 会话期消息通知轮询：随登录启动、退出停止（本地通知，非离线推送）。
     ref.watch(notificationPollerProvider);
+    // 通知点击落点交接：冷/热启动与登录态恢复后，把用户送到对应业务页。
+    ref.watch(notificationNavigationProvider);
 
     ref.listen(authControllerProvider, (previous, next) {
+      if (next.status != AuthStatus.unknown) {
+        // 会话状态一定下来就补跳：启动期攒下的通知落点不能被首页重定向吃掉。
+        ref.read(notificationNavigationProvider).flush();
+      }
       if (next.isAuthenticated && !(previous?.isAuthenticated ?? false)) {
         _scheduleAnnouncementCheck();
       } else if (!next.isAuthenticated) {
