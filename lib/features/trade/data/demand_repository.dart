@@ -52,7 +52,7 @@ class DemandRepository {
   }
 
   /// 任务广场轻量统计（原始 map，由 provider 解析为 [DemandStats]）。
-  /// 返回含 availableCount / prizePoolFen(分) / todayNewCount / genreCounts:[{genreId,count}]。
+  /// 返回含 availableCount / todayNewCount / genreCounts:[{genreId,count}] / typeCounts:[{taskType,count}]。
   /// 均为"公开可接单"口径（status=open），与广场列表一致，与登录无关。
   Future<Map<String, dynamic>> demandStats() async {
     final data = await _api.get<Map<String, dynamic>>(

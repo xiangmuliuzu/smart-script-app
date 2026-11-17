@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/demand_providers.dart';
 
-/// 任务广场页头：引导文案 + 三项统计。
+/// 任务广场页头：引导文案 + 两项统计。
 ///
 /// 视觉与首页/我的页对齐：页头直接落在全局冰蓝渐变上，统计数字收进
 /// 白色圆角卡片（12 圆角 + 轻阴影），不再使用深蓝渐变大色块。
@@ -47,20 +47,9 @@ class DemandHeroBanner extends StatelessWidget {
   }
 
   static String _fmt(int? v) => v == null ? '--' : '$v';
-
-  /// 奖金池（整元）：空→占位；≥ 1 万→"x.y万"；否则直接元数。
-  static String _fmtYuan(int? v) {
-    if (v == null) return '--';
-    if (v >= 10000) {
-      final w = v / 10000;
-      final s = w >= 10 ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
-      return '¥$s万';
-    }
-    return '¥$v';
-  }
 }
 
-/// 三项统计：白卡三栏，栏间细竖线分隔。
+/// 两项统计：白卡两栏，栏间细竖线分隔。
 class _StatsCard extends StatelessWidget {
   const _StatsCard({required this.stats});
 
@@ -80,12 +69,6 @@ class _StatsCard extends StatelessWidget {
         children: [
           _StatCell(label: '可接单', value: DemandHeroBanner._fmt(stats?.openCount)),
           const _CellDivider(),
-          _StatCell(
-            label: '奖金池',
-            value: DemandHeroBanner._fmtYuan(stats?.prizePoolYuan),
-            highlight: true,
-          ),
-          const _CellDivider(),
           _StatCell(label: '今日新增', value: DemandHeroBanner._fmt(stats?.todayNewCount)),
         ],
       ),
@@ -94,13 +77,10 @@ class _StatsCard extends StatelessWidget {
 }
 
 class _StatCell extends StatelessWidget {
-  const _StatCell({required this.label, required this.value, this.highlight = false});
+  const _StatCell({required this.label, required this.value});
 
   final String label;
   final String value;
-
-  /// 金额用强调橙，是本页唯一的暖色重点，其余数字统一主色。
-  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -109,11 +89,11 @@ class _StatCell extends StatelessWidget {
         children: [
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w800,
               height: 1.1,
-              color: highlight ? AppColors.accent : AppColors.text1,
+              color: AppColors.text1,
             ),
           ),
           const SizedBox(height: 4),
