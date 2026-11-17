@@ -3,6 +3,9 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
+  // ===== App 版本检查（匿名可达：登录前就要判断是否需要更新）=====
+  static const String appVersion = '/app/version';
+
   // ===== A3 认证契约 =====
   static const String smsSend = '/auth/sms/send';
   static const String smsLogin = '/auth/sms/login';

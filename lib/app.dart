@@ -5,6 +5,8 @@ import 'core/constants/app_constants.dart';
 import 'features/message/data/announcement_entry_checker.dart';
 import 'features/message/widgets/announcement_popup_dialog.dart';
 import 'features/splash/splash_ad_overlay.dart';
+import 'features/update/data/app_update_providers.dart';
+import 'features/update/widgets/update_dialog.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/services/notification_navigation.dart';
@@ -35,10 +37,33 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
   @override
   void initState() {
     super.initState();
-    // 已登录状态下冷启动：首帧后检查一次未读公告。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // 冷启动：首帧后检查一次新版本（匿名接口，登录页也可见），
+    // 再检查一次未读公告（需已登录）。
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // 先处理版本更新（未登录也要弹），再弹公告，避免两个弹窗叠在一起。
+      await _checkForUpdate();
       if (mounted) _checkAnnouncements();
     });
+  }
+
+  /// 冷启动版本检查：有更新就弹「立即更新 / 稍后」，用户选择稍后不再打扰。
+  Future<void> _checkForUpdate() async {
+    if (rootNavigatorKey.currentContext == null) return;
+    try {
+      final prompt =
+          await ref.read(appUpdateCheckerProvider).checkForLaunch();
+      if (prompt == null || !mounted) return;
+      final dialogContext = rootNavigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      await showUpdateDialog(
+        context: dialogContext,
+        prompt: prompt,
+        repository: ref.read(appUpdateRepositoryProvider),
+      );
+    } catch (_) {
+      // 版本检查失败不能阻塞启动，用户仍可从「我的」手动检查。
+    }
   }
 
   void _scheduleAnnouncementCheck() {
@@ -108,9 +133,69 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       scaffoldMessengerKey: _messengerKey,
-      builder: (context, child) => SplashAdOverlay(
-          child: AppPageBackground(child: child ?? const SizedBox.shrink())),
+      builder: (context, child) => AppLifecycleUpdateCheck(
+        child: SplashAdOverlay(
+            child: AppPageBackground(child: child ?? const SizedBox.shrink())),
+      ),
       routerConfig: ref.watch(routerProvider),
     );
   }
+}
+
+/// 从后台切回前台时再查一次版本：用户可能长时间停留在旧版本上，
+/// 冷启动那一轮已经错过新包。与冷启动共用 [AppUpdateChecker]（同一版本不重复弹）。
+class AppLifecycleUpdateCheck extends ConsumerStatefulWidget {
+  const AppLifecycleUpdateCheck({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<AppLifecycleUpdateCheck> createState() =>
+      _AppLifecycleUpdateCheckState();
+}
+
+class _AppLifecycleUpdateCheckState
+    extends ConsumerState<AppLifecycleUpdateCheck>
+    with WidgetsBindingObserver {
+  bool _promptVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || _promptVisible) return;
+    _check();
+  }
+
+  Future<void> _check() async {
+    try {
+      final prompt = await ref.read(appUpdateCheckerProvider).checkManually();
+      if (prompt == null || !mounted) return;
+      final dialogContext = rootNavigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      _promptVisible = true;
+      await showUpdateDialog(
+        context: dialogContext,
+        prompt: prompt,
+        repository: ref.read(appUpdateRepositoryProvider),
+      );
+    } catch (_) {
+      // 静默失败：下次切回前台再试。
+    } finally {
+      _promptVisible = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
