@@ -23,6 +23,8 @@ class AuthInterceptor extends Interceptor {
           '/auth/agreements',
           '/captchaImage',
           '/ad/splash',
+          // 版本检查：冷启动登录前就要拿到版本信息，失败也不应触发「登录已过期」。
+          '/app/version',
         ].contains(normalized);
   }
 

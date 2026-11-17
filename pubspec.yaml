@@ -58,6 +58,8 @@ dependencies:
   http: ^1.1.0
   # 开屏素材落到应用缓存目录；复用锁文件中已有版本。
   path_provider: ^2.1.4
+  # 应用内更新：兜底读取本机 build 号（Android 优先走原生 BuildConfig.VERSION_CODE）。
+  package_info_plus: ^8.0.0
   # 合同签署：手写签名画布
   signature: ^5.5.0
   qr_flutter: ^4.1.0

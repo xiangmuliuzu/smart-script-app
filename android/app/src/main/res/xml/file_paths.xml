@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider 可共享的路径（应用内更新用的 APK）。
+     只开放应用专属目录，不暴露其他私有文件。 -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- getExternalFilesDir(null)/updates，即 ApkInstaller 的下载目录 -->
+    <external-files-path name="updates" path="updates/" />
+    <!-- 兜底：外部目录不可用时下载到临时目录 -->
+    <cache-path name="cache" path="." />
+</paths>
