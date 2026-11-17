@@ -26,6 +26,7 @@ class _QrScanPageState extends ConsumerState<QrScanPage> {
     formats: const [BarcodeFormat.qrCode],
   );
   bool _handling = false;
+  bool _notLoginCode = false;
 
   @override
   void dispose() {
@@ -35,13 +36,25 @@ class _QrScanPageState extends ConsumerState<QrScanPage> {
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handling) return;
-    final raw = capture.barcodes
+    final values = capture.barcodes
         .map((barcode) => barcode.rawValue)
         .whereType<String>()
-        .firstWhere((value) => parseQrLoginToken(value) != null, orElse: () => '');
-    if (raw.isEmpty) return;
-    final token = parseQrLoginToken(raw);
-    if (token == null) return;
+        .toList();
+    if (values.isEmpty) return;
+    String? token;
+    for (final value in values) {
+      token = parseQrLoginToken(value);
+      if (token != null) break;
+    }
+    if (token == null) {
+      // 扫到了码但不是登录码（付款码、名片、普通网址等）：必须给出反馈，
+      // 否则用户无从判断是扫错了还是 App 卡住了。
+      if (!_notLoginCode && mounted) {
+        setState(() => _notLoginCode = true);
+        _toast('这不是登录二维码，请在网页登录页点右上角切换后再扫');
+      }
+      return;
+    }
 
     setState(() => _handling = true);
     await _controller.stop();
@@ -65,7 +78,10 @@ class _QrScanPageState extends ConsumerState<QrScanPage> {
       if (mounted) _toast('扫码失败，请稍后重试');
     } finally {
       if (mounted) {
-        setState(() => _handling = false);
+        setState(() {
+          _handling = false;
+          _notLoginCode = false;
+        });
         // 用户从确认页返回（取消 / 失败）时恢复取景，可以直接重扫。
         try {
           await _controller.start();
