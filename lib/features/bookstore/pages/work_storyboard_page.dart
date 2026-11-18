@@ -8,10 +8,8 @@ import '../../../shared/widgets/common_views.dart';
 /// 作品分镜目录。
 ///
 /// 入口位置：作品详情页「章节目录」下方，与章节目录同级，始终展示。
-/// 预留契约（由后续接入方实现，页面签名保持不变）：
-///   GET /content/works/{workId}/storyboards/summary
-///   GET /content/works/{workId}/storyboards?pageNum=&pageSize=
-/// 数据范围：当前作品关联的分镜成果；后端接入前先展示稳定的空目录状态。
+/// 数据范围：已上架作品中的审核通过分镜；正文是否可读由服务端按关联章节的
+/// 试读设置和当前授权状态计算，客户端不自行放开内容。
 class WorkStoryboardPage extends ConsumerWidget {
   const WorkStoryboardPage({super.key, required this.workId, this.title});
 
@@ -58,10 +56,11 @@ class _StoryboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = (item['title'] ?? item['name'] ?? '未命名分镜').toString();
+    final title = (item['chapterTitle'] ?? item['title'] ?? item['name'] ?? '未命名分镜').toString();
     final chapter = (item['chapterTitle'] ?? (item['chapterNo'] == null ? '作品级分镜' : '第 ${item['chapterNo']} 章')).toString();
     final shots = item['shotCount'] ?? item['totalShots'] ?? '—';
-    final status = (item['status'] ?? '待整理').toString();
+    final status = _statusLabel((item['status'] ?? '').toString());
+    final readable = item['readable'] != false;
     final content = (item['content'] ?? item['description'] ?? '').toString().trim();
     return Card(
       elevation: 0,
@@ -73,9 +72,20 @@ class _StoryboardCard extends StatelessWidget {
           child: Text('${index + 1}', style: const TextStyle(color: AppColors.primary)),
         ),
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text('$chapter  ·  $shots 镜头  ·  $status'),
+        trailing: readable
+            ? const Icon(Icons.expand_more)
+            : const Icon(Icons.lock_outline, size: 19, color: AppColors.text3),
+        subtitle: Text('$chapter  ·  $shots 镜头  ·  $status${readable ? ' · 可试读' : ' · 暂未开放'}'),
         children: [
-          if (content.isNotEmpty)
+          if (!readable)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('该分镜暂未开放试读，请先完成授权或购买。', style: TextStyle(color: AppColors.text3)),
+              ),
+            )
+          else if (content.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: SelectableText(content, style: const TextStyle(height: 1.6, color: AppColors.text2)),
@@ -88,5 +98,20 @@ class _StoryboardCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _statusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return '待人工审核';
+      case 'ai_reviewing':
+        return 'AI审核中';
+      case 'approved':
+        return '审核通过';
+      case 'rejected':
+        return '审核驳回';
+      default:
+        return '待审核';
+    }
   }
 }
