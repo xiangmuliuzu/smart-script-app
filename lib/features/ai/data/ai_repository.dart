@@ -455,6 +455,7 @@ class AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -464,10 +465,25 @@ class AiRepository {
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (workId != null) 'workId': workId,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
     return await _consumeSseWrite(body.stream, onDelta);
+  }
+
+  /// 将已生成的分镜保存到作品分镜目录；未选择作品时不调用此接口，AI 记录仍会保留。
+  Future<void> saveStoryboard({
+    required int workId,
+    required String title,
+    required String content,
+    String source = 'ai',
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/content/works/$workId/storyboards',
+      data: <String, dynamic>{'title': title, 'content': content, 'source': source},
+      parser: _map,
+    );
   }
 
   /// 渠道模型列表（管理员端配置，App 端「模型选择」下拉数据源）。

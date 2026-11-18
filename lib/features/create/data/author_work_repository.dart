@@ -45,7 +45,7 @@ class AuthorWorkRepository {
   ///
   /// 标签墙体系下作品不再设置分类（后端也不再接收 genreId）。
   /// 空值字段不下发（后端按「字段缺失 = 不更新」处理）；仅审核中锁定，
-  /// 其余状态（含已发布）可改，否则后端按 400 拒绝并在 message 中说明当前状态。
+  /// 其余状态（含审核通过）可改，否则后端按 400 拒绝并在 message 中说明当前状态。
   ///
   /// [tagIds] 按接口文档 2.3.3 为**全量覆盖**语义（主分类 1 + 主题 2 + 角色 2 + 情节 2，最多 7 个）：
   /// 传 null 表示不改标签，传空列表表示清空标签（因此不能被 [_compact] 过滤掉）。
@@ -79,7 +79,7 @@ class AuthorWorkRepository {
 
   /// 提交审核（draft/revision/rejected/published → reviewing）。
   ///
-  /// 已发布作品改动后重新提交也走此接口；审核中重复提交由后端按 400 拒绝。
+  /// 审核通过作品改动后重新提交也走此接口；审核中重复提交由后端按 400 拒绝。
   Future<void> submitReview(int workId) async {
     await _api.post<Map<String, dynamic>>(
       ApiEndpoints.authorWorkSubmit(workId),

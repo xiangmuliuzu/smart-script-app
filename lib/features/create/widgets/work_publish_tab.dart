@@ -13,7 +13,7 @@ import '../data/author_work_providers.dart';
 /// 展示作品状态/章节数/总字数 + 提交审核按钮 + 审核历史列表 + 版本管理入口。
 /// 提交审核调 A 套 POST /users/me/works/{workId}/submit；
 /// 审核记录调 A 套 GET /users/me/works/{workId}/review-records。
-/// 已发布作品改动后可再次提交审核（提交按钮常驻，文案改为「提交更新审核」）。
+/// 审核通过作品改动后可再次提交审核（提交按钮常驻，文案改为「提交更新审核」）。
 class WorkPublishTab extends ConsumerStatefulWidget {
   const WorkPublishTab({super.key, required this.workId, required this.detail});
 
@@ -26,6 +26,7 @@ class WorkPublishTab extends ConsumerStatefulWidget {
 
 class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
   bool _submitting = false;
+  bool _shelfing = false;
 
   Future<void> _submitReview() async {
     final work = widget.detail.work;
@@ -55,12 +56,10 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
 
     setState(() => _submitting = true);
     try {
-      await ref
-          .read(authorWorkRepositoryProvider)
-          .submitReview(widget.workId);
+      await ref.read(authorWorkRepositoryProvider).submitReview(widget.workId);
       ref.invalidate(authorWorkDetailProvider(widget.workId));
       ref.invalidate(authorReviewRecordsProvider(widget.workId));
-      // 失效整个 family，覆盖 all/draft/reviewing/revision/rejected/published。
+      // 失效整个 family，覆盖 all/draft/reviewing/revision/rejected/published（审核通过）。
       ref.invalidate(myWorksProvider);
       if (!mounted) return;
       _toast('已提交审核');
@@ -70,6 +69,49 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
       _toast('提交失败，请稍后重试');
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _toggleShelf() async {
+    final work = widget.detail.work;
+    if (work.status != 'published' || _shelfing) return;
+    final onShelf = widget.detail.shelfStatus == 'on_shelf' ||
+        work.shelfStatus == 'on_shelf';
+    final nextStatus = onShelf ? 'off_shelf' : 'on_shelf';
+    final action = onShelf ? '下架作品' : '上架到书城';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(action),
+        content: Text(onShelf
+            ? '下架后读者将暂时无法在书城看到《${work.title}》，是否继续？'
+            : '审核已通过。确认后《${work.title}》才会展示在书城，是否继续？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('确认')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _shelfing = true);
+    try {
+      await ref
+          .read(authorWorkRepositoryProvider)
+          .changeShelfStatus(widget.workId, nextStatus);
+      ref.invalidate(authorWorkDetailProvider(widget.workId));
+      ref.invalidate(myWorksProvider);
+      if (!mounted) return;
+      _toast(onShelf ? '作品已下架' : '作品已上架到书城');
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } catch (_) {
+      _toast('$action失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _shelfing = false);
     }
   }
 
@@ -84,16 +126,18 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
   Widget build(BuildContext context) {
     final work = widget.detail.work;
     final editable = work.editable;
-    final isPublished = work.status == 'published';
+    final isApproved = work.status == 'published';
+    final isOnShelf = widget.detail.shelfStatus == 'on_shelf' ||
+        work.shelfStatus == 'on_shelf';
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
-        // 已发布作品的重新提交提示
-        if (isPublished) ...[
+        // 审核通过后的上架提示
+        if (isApproved) ...[
           const _Notice(
-            icon: Icons.info_outline,
-            text: '作品已发布。修改章节或作品信息后，需重新提交审核以更新线上内容。',
+            icon: Icons.check_circle_outline,
+            text: '作品已通过审核，但不会自动上架。请确认作品信息后，手动上架到书城。',
           ),
           const SizedBox(height: 12),
         ],
@@ -104,11 +148,63 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
             children: [
               _InfoRow(label: '作品状态', value: work.statusLabel),
               _InfoRow(
+                  label: '书城状态',
+                  value: isOnShelf
+                      ? '已上架'
+                      : isApproved
+                          ? '待手动上架'
+                          : '未上架'),
+              _InfoRow(
                   label: '章节数', value: '${widget.detail.chapters.length} 章'),
               _InfoRow(label: '总字数', value: '${work.wordCount} 字'),
             ],
           ),
         ),
+        if (isApproved) ...[
+          const SizedBox(height: 12),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isOnShelf
+                  ? AppColors.card
+                  : AppColors.primary.withOpacity(.08),
+              border: Border.all(
+                  color: isOnShelf
+                      ? AppColors.divider
+                      : AppColors.primary.withOpacity(.35)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isOnShelf ? '作品已上架到书城' : '审核已通过，等待你上架',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.text1)),
+                        const SizedBox(height: 4),
+                        Text(isOnShelf ? '读者现在可以在书城浏览作品。' : '点击按钮后作品才会对读者展示。',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.text2)),
+                      ]),
+                ),
+                const SizedBox(width: 12),
+                FilledButton(
+                  onPressed: _shelfing ? null : _toggleShelf,
+                  child: _shelfing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(isOnShelf ? '下架作品' : '上架到书城'),
+                ),
+              ],
+            ),
+          ),
+        ],
         // 提交审核
         if (editable) ...[
           const SizedBox(height: 12),
@@ -127,7 +223,7 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(isPublished ? '提交更新审核' : '提交审核'),
+                        : Text(isApproved ? '提交更新审核' : '提交审核'),
                   ),
                 ),
               ],
@@ -142,14 +238,12 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
         Material(
           color: AppColors.card,
           child: ListTile(
-            leading:
-                const Icon(Icons.history_outlined, color: AppColors.text2),
+            leading: const Icon(Icons.history_outlined, color: AppColors.text2),
             title: const Text('版本管理'),
             subtitle: const Text('查看与创建作品版本'),
-            trailing:
-                const Icon(Icons.chevron_right, color: AppColors.text3),
-            onTap: () => context
-                .push(RoutePath.workVersionsUrl(widget.workId, title: work.title)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.text3),
+            onTap: () => context.push(
+                RoutePath.workVersionsUrl(widget.workId, title: work.title)),
           ),
         ),
       ],
@@ -206,16 +300,14 @@ class _ReviewHistorySection extends ConsumerWidget {
             data: (records) {
               if (records.isEmpty) {
                 return const Text('尚未提交审核',
-                    style:
-                        TextStyle(color: AppColors.text3, fontSize: 13));
+                    style: TextStyle(color: AppColors.text3, fontSize: 13));
               }
               return Column(
                 children: [
                   for (int i = 0; i < records.length; i++) ...[
                     _ReviewRecordTile(record: records[i]),
                     if (i < records.length - 1)
-                      const Divider(
-                          height: 0.5, color: AppColors.divider),
+                      const Divider(height: 0.5, color: AppColors.divider),
                   ],
                 ],
               );
@@ -248,8 +340,7 @@ class _ReviewRecordTile extends StatelessWidget {
               if (record.createdAt != null)
                 Text(
                   record.createdAt!,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.text3),
+                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
                 ),
             ],
           ),
@@ -306,15 +397,14 @@ class _InfoRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: const BoxDecoration(
-        border: Border(
-            bottom: BorderSide(color: AppColors.divider, width: 0.5)),
+        border:
+            Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
       ),
       child: Row(
         children: [
           SizedBox(
             width: 84,
-            child:
-                Text(label, style: const TextStyle(color: AppColors.text2)),
+            child: Text(label, style: const TextStyle(color: AppColors.text2)),
           ),
           Expanded(
             child: Text(value.isEmpty ? '-' : value,
@@ -326,7 +416,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// 顶部提示条（用于已发布作品的重新提交说明）。
+/// 顶部提示条（用于审核通过作品的重新提交说明）。
 class _Notice extends StatelessWidget {
   const _Notice({required this.icon, required this.text});
 
@@ -352,5 +442,3 @@ class _Notice extends StatelessWidget {
     );
   }
 }
-
-

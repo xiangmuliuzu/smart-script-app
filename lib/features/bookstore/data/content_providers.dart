@@ -24,6 +24,12 @@ final tagsProvider = FutureProvider.autoDispose<List<TagItem>>(
   (ref) => ref.watch(contentRepositoryProvider).listTags(),
 );
 
+/// 作品分镜目录；与章节目录同级，作品没有分镜时也保留入口并显示空态。
+final workStoryboardsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, int>(
+  (ref, workId) => ref.watch(contentRepositoryProvider).listWorkStoryboards(workId),
+);
+
 /// 分类页导航：频道 + 热门标签 / 主题 / 角色 / 情节四维度分组。
 ///
 /// 入参为频道ID；null 时由后端回落第一个频道。
@@ -117,9 +123,10 @@ final workRatingProvider = FutureProvider.autoDispose.family<WorkRating, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).workRating(workId),
 );
 
-/// 作品分镜目录摘要：>0 表示当前用户在该作品下已有分镜成果，详情页才展示入口。
+/// 作品分镜目录摘要。
 ///
-/// 接口为预留契约，后端未接入时 repository 静默返回 0，入口自动隐藏。
+/// 分镜目录入口与章节目录同级，始终展示；摘要只用于显示当前已关联的分镜数量。
+/// 后端尚未接入时由 repository 静默返回 0，目录页仍保留稳定的空状态。
 final workStoryboardSummaryProvider = FutureProvider.autoDispose.family<int, int>(
   (ref, workId) => ref.watch(contentRepositoryProvider).storyboardSummary(workId),
 );

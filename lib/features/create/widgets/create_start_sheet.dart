@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// 「新建作品」方式选择底部弹层（作品列表「新建」与底部导航「创作」共用）。
+/// 「开始创作」方式选择底部弹层（作品列表「新建」与底部导航「创作」共用）。
 ///
-/// 返回 `'ai'`（AI 创作）/ `'editor'`（自己编辑）；关闭弹层返回 null。
+/// 返回 `'ai'`（AI 创作）/ `'storyboard'`（基于已有作品的 AI 分镜）/
+/// `'editor'`（自己编辑）；关闭弹层返回 null。
 Future<String?> showCreateChoice(BuildContext context) {
   return showModalBottomSheet<String>(
     context: context,
@@ -17,7 +18,8 @@ Future<String?> showCreateChoice(BuildContext context) {
             padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('开始创作', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              child: Text('开始创作',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
           ),
           ListTile(
@@ -25,6 +27,13 @@ Future<String?> showCreateChoice(BuildContext context) {
             title: const Text('AI 创作'),
             subtitle: const Text('描述灵感，先生成大纲；确认后逐章成文，插入作品继续改。'),
             onTap: () => Navigator.of(sheetContext).pop('ai'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.movie_creation_outlined,
+                color: AppColors.primary),
+            title: const Text('创作分镜'),
+            subtitle: const Text('选择已有作品生成分镜，保存到该作品的分镜目录，不创建新作品。'),
+            onTap: () => Navigator.of(sheetContext).pop('storyboard'),
           ),
           ListTile(
             leading: const Icon(Icons.edit_outlined, color: AppColors.text2),

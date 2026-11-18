@@ -20,7 +20,7 @@ import 'work_delete_dialog.dart';
 /// 其中标签为全量覆盖（主分类 1 + 主题 2 + 角色 2 + 情节 2，最多 7 个）；标签墙体系下作品不再设置分类。
 /// 定价走 B 套 `PUT /content/works/{workId}`（updateWork，2.9.3 仅放行 price）。
 /// 封面从本地选图，先经 2.9.1 上传拿到 url，保存在「保存」时随基本信息提交。
-/// 编辑闸门：仅审核中锁定，其余状态（含已发布）均可保存；已发布改动后需重新提交审核。
+/// 编辑闸门：仅审核中锁定，其余状态（含审核通过）均可保存；审核通过作品改动后需重新提交审核。
 class WorkSettingsTab extends ConsumerStatefulWidget {
   const WorkSettingsTab({super.key, required this.detail});
 
@@ -134,7 +134,7 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
         }
       }
       ref.invalidate(authorWorkDetailProvider(workId));
-      // 失效整个 family，覆盖 all/draft/reviewing/revision/rejected/published。
+      // 失效整个 family，覆盖 all/draft/reviewing/revision/rejected/published（审核通过）。
       ref.invalidate(myWorksProvider);
       if (!mounted) return;
       _toast('保存成功');
@@ -251,7 +251,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildChannelBtn(
@@ -275,7 +276,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.fill,
+          color:
+              isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.fill,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -310,7 +312,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
           child: Column(
             children: [
               GestureDetector(
-                onTap: (editable && !_uploading && !_saving) ? _pickCover : null,
+                onTap:
+                    (editable && !_uploading && !_saving) ? _pickCover : null,
                 child: Container(
                   width: 120,
                   height: 160,
@@ -321,7 +324,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: _pendingCover != null && _pendingCover!.isNotEmpty
-                        ? WorkCover(url: _pendingCover!, width: 120, height: 160)
+                        ? WorkCover(
+                            url: _pendingCover!, width: 120, height: 160)
                         : const _CoverPlaceholder(),
                   ),
                 ),
@@ -401,7 +405,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
             children: [
               // 目标读者行
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     const Text('目标读者', style: TextStyle(fontSize: 14)),
@@ -415,7 +420,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
               const Divider(height: 1, indent: 16),
               // 阅读标签行
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     const Text('阅读标签', style: TextStyle(fontSize: 14)),
@@ -423,11 +429,15 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                     Expanded(
                       child: tagsAsync.when(
                         loading: () => const Text('加载中…',
-                            style: TextStyle(color: AppColors.text3, fontSize: 13)),
+                            style: TextStyle(
+                                color: AppColors.text3, fontSize: 13)),
                         error: (_, __) => const Text('标签加载失败',
-                            style: TextStyle(color: AppColors.text3, fontSize: 13)),
+                            style: TextStyle(
+                                color: AppColors.text3, fontSize: 13)),
                         data: (tags) {
-                          final selectedTags = tags.where((t) => _tagIds.contains(t.tagId)).toList();
+                          final selectedTags = tags
+                              .where((t) => _tagIds.contains(t.tagId))
+                              .toList();
                           return GestureDetector(
                             onTap: editable ? () => _openTagPicker(tags) : null,
                             child: Row(
@@ -437,16 +447,21 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                                   child: Text(
                                     selectedTags.isEmpty
                                         ? '请选择阅读标签'
-                                        : selectedTags.map((t) => t.tagName).join('、'),
+                                        : selectedTags
+                                            .map((t) => t.tagName)
+                                            .join('、'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.right,
                                     style: TextStyle(
-                                        color: selectedTags.isEmpty ? AppColors.text3 : AppColors.text2,
+                                        color: selectedTags.isEmpty
+                                            ? AppColors.text3
+                                            : AppColors.text2,
                                         fontSize: 13),
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right, size: 18, color: AppColors.text3),
+                                const Icon(Icons.chevron_right,
+                                    size: 18, color: AppColors.text3),
                               ],
                             ),
                           );
@@ -459,7 +474,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
               const Divider(height: 1, indent: 16),
               // 定价行
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     const Text('定价', style: TextStyle(fontSize: 14)),
@@ -468,7 +484,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
                       child: TextField(
                         controller: _priceCtrl,
                         enabled: editable,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         decoration: const InputDecoration(
                           hintText: '0 表示免费',
                           border: InputBorder.none,
@@ -500,7 +517,8 @@ class _WorkSettingsTabState extends ConsumerState<WorkSettingsTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: TextButton.icon(
-            onPressed: (_saving || _uploading || _deleting) ? null : _deleteWork,
+            onPressed:
+                (_saving || _uploading || _deleting) ? null : _deleteWork,
             style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             icon: const Icon(Icons.delete_outline),
             label: const Text('删除作品'),
@@ -613,13 +631,18 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
       } else {
         // 主分类是单选，选新的自动替换旧的
         if (tag.tagType == 'hot') {
-          _selected.removeWhere((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot');
+          _selected.removeWhere((id) =>
+              widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot');
           _selected.add(tag.tagId);
           _overflow = false;
           return;
         }
         // 其他维度是多选，按数量限制
-        final selectedInType = _selected.where((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == tag.tagType).length;
+        final selectedInType = _selected
+            .where((id) =>
+                widget.tags.firstWhere((t) => t.tagId == id).tagType ==
+                tag.tagType)
+            .length;
         final config = _dimConfigs.firstWhere((c) => c['type'] == tag.tagType);
         if (selectedInType >= config['max']) {
           _overflow = true;
@@ -632,7 +655,10 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
   }
 
   bool get _canSubmit {
-    final hotSelected = _selected.where((id) => widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot').length;
+    final hotSelected = _selected
+        .where((id) =>
+            widget.tags.firstWhere((t) => t.tagId == id).tagType == 'hot')
+        .length;
     return hotSelected >= 1;
   }
 
@@ -644,7 +670,8 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
             t.tagType == currentDim['type'] &&
             (t.channelId == _currentChannelId || t.channelId == null))
         .toList();
-    final selectedInDim = _selected.where((id) => tagsInDim.any((t) => t.tagId == id)).length;
+    final selectedInDim =
+        _selected.where((id) => tagsInDim.any((t) => t.tagId == id)).length;
 
     return SafeArea(
       child: SizedBox(
@@ -665,7 +692,10 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                           color: AppColors.text1)),
                   const Spacer(),
                   GestureDetector(
-                    onTap: _canSubmit ? () => Navigator.of(context).pop(_TagPickerResult(tagIds: _selected, channelId: _currentChannelId)) : null,
+                    onTap: _canSubmit
+                        ? () => Navigator.of(context).pop(_TagPickerResult(
+                            tagIds: _selected, channelId: _currentChannelId))
+                        : null,
                     child: Text(
                       '确认',
                       style: TextStyle(
@@ -717,19 +747,28 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                           onTap: () => setState(() => _currentDimIndex = index),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 20),
-                            color: isSelected ? AppColors.card : Colors.transparent,
+                            color: isSelected
+                                ? AppColors.card
+                                : Colors.transparent,
                             child: Column(
                               children: [
                                 Text(
                                   dim['title'],
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                    color: isSelected ? AppColors.text1 : AppColors.text2,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? AppColors.text1
+                                        : AppColors.text2,
                                   ),
                                 ),
                                 if (dim['required'])
-                                  const Text('*', style: TextStyle(fontSize: 12, color: AppColors.warning)),
+                                  const Text('*',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.warning)),
                               ],
                             ),
                           ),
@@ -753,7 +792,8 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                                       color: AppColors.text1)),
                               const Spacer(),
                               Text('$selectedInDim/${currentDim['max']}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.text3)),
+                                  style: const TextStyle(
+                                      fontSize: 12, color: AppColors.text3)),
                             ],
                           ),
                           const SizedBox(height: 16),
@@ -763,7 +803,11 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                             children: [
                               for (final tag in tagsInDim)
                                 SizedBox(
-                                  width: (MediaQuery.of(context).size.width - 80 - 32 - 20) / 3,
+                                  width: (MediaQuery.of(context).size.width -
+                                          80 -
+                                          32 -
+                                          20) /
+                                      3,
                                   child: _TagChip(
                                     label: tag.tagName,
                                     selected: _selected.contains(tag.tagId),
@@ -784,7 +828,6 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
       ),
     );
   }
-
 }
 
 /// 可选中标签胶囊（样式对齐分类页胶囊，增加选中态）。
@@ -802,9 +845,7 @@ class _TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? AppColors.primary.withOpacity(0.12)
-          : AppColors.fill,
+      color: selected ? AppColors.primary.withOpacity(0.12) : AppColors.fill,
       borderRadius: BorderRadius.circular(AppRadius.rSmall),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.rSmall),
@@ -871,7 +912,8 @@ class _Field extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
+        border:
+            Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -880,7 +922,8 @@ class _Field extends StatelessWidget {
             width: 64,
             child: Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(label, style: const TextStyle(color: AppColors.text2)),
+              child:
+                  Text(label, style: const TextStyle(color: AppColors.text2)),
             ),
           ),
           Expanded(child: child),
@@ -903,8 +946,7 @@ class _CoverPlaceholder extends StatelessWidget {
         color: AppColors.pageBackground,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: const Icon(Icons.image_outlined,
-          size: 24, color: AppColors.text3),
+      child: const Icon(Icons.image_outlined, size: 24, color: AppColors.text3),
     );
   }
 }

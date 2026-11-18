@@ -67,7 +67,7 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
           );
       // 上传作品成功：上报上传任务行为进度（fire-and-forget，失败静默）
       unawaited(reportTaskProgressByType(ref, 'UPLOAD'));
-      // 失效整个 family（all/draft/reviewing/revision/rejected/published），
+      // 失效整个 family（all/draft/reviewing/revision/rejected/published，审核通过），
       // 避免只刷 'all' 而其它状态 Tab 的列表仍为旧数据。
       ref.invalidate(myWorksProvider);
       if (!mounted) return;
@@ -85,7 +85,8 @@ class _WorkUploadPageState extends ConsumerState<WorkUploadPage> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -174,7 +175,9 @@ class _Labeled extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.text1, fontWeight: FontWeight.w600)),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.text1, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           child,
         ],

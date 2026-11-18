@@ -85,10 +85,10 @@ class ContentRepository {
     return PagedData.parse<BookItem>(data, BookItem.fromJson);
   }
 
-  /// 作品分镜目录摘要（预留接口）：仅当前登录用户本人在该作品下的分镜数量。
+  /// 作品分镜目录摘要。
   ///
-  /// 详情页入口按「已有成果才展示」控制，因此任何异常（未接入 404、未登录 401、
-  /// 网络失败）都静默返回 0，入口保持隐藏，不影响作品详情主链路。
+  /// 该摘要只用于作品详情页显示分镜数量。分镜目录入口与章节目录同级，
+  /// 不会因为接口暂未接入、游客访问或网络异常而隐藏。
   Future<int> storyboardSummary(int workId) async {
     if (workId <= 0) return 0;
     try {
@@ -103,6 +103,25 @@ class ContentRepository {
     } catch (_) {
       return 0;
     }
+  }
+
+  /// 作品分镜目录；与章节目录同级展示。后端尚未返回数据时由页面展示空目录。
+  Future<List<Map<String, dynamic>>> listWorkStoryboards(int workId) async {
+    final raw = await _api.get<dynamic>(
+      ApiEndpoints.contentWorkStoryboards(workId),
+      query: const {'pageNum': 1, 'pageSize': 100},
+      parser: (value) => value,
+    );
+    final list = raw is List
+        ? raw
+        : raw is Map
+            ? (raw['rows'] ?? raw['list'] ?? const <dynamic>[])
+            : const <dynamic>[];
+    if (list is! List) return const [];
+    return list
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
   /// 作品详情；未上架或不存在时后端按 404 拒绝，由 [ApiClient] 抛 [ApiException]。

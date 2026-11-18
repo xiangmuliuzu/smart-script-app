@@ -13,7 +13,7 @@ import '../data/author_work_providers.dart';
 ///
 /// 数据源为工作台详情的章节列表（随 A 套作品详情一次下发，含正文与 isFree/status）；
 /// 点击章节进入全屏写作编辑器；可编辑状态下支持滑动删除（删除走 B 套章节接口）。
-/// 章节行展示「试读」「草稿」徽标，便于作者核对免费试读与章节发布状态。
+/// 章节行展示「试读」「草稿」徽标，便于作者核对免费试读与章节状态。
 class WorkChapterTab extends ConsumerWidget {
   const WorkChapterTab({
     super.key,
@@ -25,7 +25,7 @@ class WorkChapterTab extends ConsumerWidget {
   final int workId;
   final List<AuthorChapterItem> chapters;
 
-  /// 是否可编辑（草稿 / 待修改 / 已驳回）；审核中与已发布为只读。
+  /// 是否可编辑（草稿 / 待修改 / 已驳回）；审核中为只读。
   final bool editable;
 
   @override
@@ -166,9 +166,7 @@ class _ChapterTile extends StatelessWidget {
         : '第 ${chapter.chapterNo} 章 · ${chapter.chapterTitle}';
     return Dismissible(
       key: ValueKey(chapter.chapterId),
-      direction: editable
-          ? DismissDirection.endToStart
-          : DismissDirection.none,
+      direction: editable ? DismissDirection.endToStart : DismissDirection.none,
       background: Container(
         color: AppColors.danger,
         alignment: Alignment.centerRight,
@@ -180,8 +178,7 @@ class _ChapterTile extends StatelessWidget {
         onTap: onTap,
         child: Container(
           color: AppColors.card,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -202,8 +199,8 @@ class _ChapterTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${chapter.wordCount} 字',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.text3),
+                      style:
+                          const TextStyle(fontSize: 12, color: AppColors.text3),
                     ),
                   ],
                 ),

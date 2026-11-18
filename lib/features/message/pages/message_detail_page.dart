@@ -32,13 +32,15 @@ class _MessageDetailPageState extends ConsumerState<MessageDetailPage> {
   String? _error;
   bool _loading = true;
 
-  /// 交易通知跳转目标：与 PC 端 TRADE_JUMP 映射同一契约（INQUIRY/ORDER/CONTRACT/DEMAND）。
+  /// 交易域通知和作品审核通知的跳转目标。
   ({String label, String path})? _jumpOf(MessageItem m) {
-    if (m.source != 'NOTIFICATION' ||
-        m.type != 'TRANSACTION' ||
-        (m.businessId ?? '').isEmpty) {
+    if (m.source != 'NOTIFICATION' || (m.businessId ?? '').isEmpty) {
       return null;
     }
+    if (m.type == 'REVIEW' && m.businessType == 'WORK') {
+      return (label: '去上架：打开作品', path: RoutePath.workWorkspace);
+    }
+    if (m.type != 'TRANSACTION') return null;
     switch (m.businessType) {
       case 'INQUIRY':
         return (label: '去处理：查看询盘', path: RoutePath.inquiryDetail);

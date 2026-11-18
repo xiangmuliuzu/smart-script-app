@@ -25,12 +25,22 @@ class HomeShell extends ConsumerWidget {
     _TabItem('我的', Icons.person_outline, Icons.person),
   ];
 
-  /// 从底部导航进入新建作品：与「我的作品」右上角「新建」一致，先选方式。
+  /// 从底部导航进入创作工具：与「我的作品」右上角「新建」共用入口面板。
+  ///
+  /// 「创作分镜」是基于已有作品的 AI 工具，不是新建作品，因此必须进入
+  /// AI 分镜页，不能落到作品新建表单。
   Future<void> _startCreate(BuildContext context, WidgetRef ref) async {
-    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.workUpload)) return;
+    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.workUpload))
+      return;
     final choice = await showCreateChoice(context);
     if (choice == null || !context.mounted) return;
-    context.push(choice == 'ai' ? RoutePath.aiCreate : RoutePath.workUpload);
+    context.push(
+      choice == 'ai'
+          ? RoutePath.aiCreate
+          : choice == 'storyboard'
+              ? RoutePath.aiStoryboard
+              : RoutePath.workUpload,
+    );
   }
 
   void _onTap(BuildContext context, WidgetRef ref, int index) {
@@ -40,7 +50,8 @@ class HomeShell extends ConsumerWidget {
       return;
     }
     if (index == 4 && !AuthGuard.isLoggedIn(ref)) {
-      if (ref.read(authControllerProvider).status == AuthStatus.unauthenticated) {
+      if (ref.read(authControllerProvider).status ==
+          AuthStatus.unauthenticated) {
         context.go(AuthGuard.loginLocation(ref, RoutePath.profile));
       }
       return;
@@ -133,8 +144,9 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-/// 中间「创作」按钮：立体渐变圆形凸起样式，作为**新建作品**的快捷入口，点击直接
-/// 进入新建表单（workUpload），不占用底部 tab 分支，故无常驻选中态。
+/// 中间「创作」按钮：立体渐变圆形凸起样式，作为创作工具的快捷入口。
+/// 点击后可选择 AI 创作、创作分镜或自己编辑；创作分镜进入已有作品的 AI 分镜页，
+/// 不创建新作品。不占用底部 tab 分支，故无常驻选中态。
 ///
 /// 造型：44×44 圆形（内含 2.5px 纯白护圈与深湖蓝立体渐变），用 [Stack] + [Positioned]
 /// 让其顶部高出底栏上沿 10px（`top: -10`），配柔和弥散投影；label 贴底对齐，
@@ -188,7 +200,8 @@ class _CenterTab extends StatelessWidget {
                   color: AppColors.card,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(active ? 0.32 : 0.20),
+                      color:
+                          AppColors.primary.withOpacity(active ? 0.32 : 0.20),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),

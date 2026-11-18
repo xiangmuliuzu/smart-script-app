@@ -8,8 +8,9 @@
 ///
 /// 作品状态口径（A 套由最新审核记录派生，服务端下发）：
 ///   draft（无记录）/ reviewing（pending、ai_reviewing）/ revision（待修改）
-///   rejected（已驳回）/ published（approved，已发布）。
-/// 编辑闸门：仅 reviewing（审核中）锁定，其余状态均可编辑；已发布作品改动后需重新提交审核。
+///   rejected（已驳回）/ published（approved，审核通过；是否上架由 shelfStatus 决定）。
+/// 前端将 published 展示为「审核通过」，不将其当作发布状态；是否进入书城只由 shelfStatus 决定。
+/// 编辑闸门：仅 reviewing（审核中）锁定，其余状态均可编辑；审核通过作品改动后需重新提交审核。
 library;
 
 import '../../bookstore/data/bookstore_models.dart';
@@ -50,7 +51,7 @@ String workStatusLabel(String status) {
     case 'rejected':
       return '已驳回';
     case 'published':
-      return '已发布';
+      return '审核通过';
     default:
       return status;
   }
@@ -118,8 +119,8 @@ class AuthorWorkItem {
   /// 状态中文标签。
   String get statusLabel => workStatusLabel(status);
 
-  /// 仅「审核中」锁定，其余状态（含已发布）均可编辑；
-  /// 已发布作品改动后需重新提交审核（与后端 requireEditable 一致）。
+  /// 仅「审核中」锁定，其余状态（含审核通过）均可编辑；
+  /// 审核通过作品改动后需重新提交审核（与后端 requireEditable 一致）。
   bool get editable => status != 'reviewing';
 
   factory AuthorWorkItem.fromJson(Map<String, dynamic> json) => AuthorWorkItem(
@@ -163,7 +164,7 @@ class AuthorChapterItem {
   final int wordCount;
   final bool isFree;
 
-  /// 章节状态："0"=已发布（读者可见），"1"=草稿（仅作者可见）。
+  /// 章节状态："0"=已生效（读者可见），"1"=草稿（仅作者可见）。
   final String status;
 
   /// 是否为草稿（未发布）。保留历史命名 isHidden 以减少连带改动。

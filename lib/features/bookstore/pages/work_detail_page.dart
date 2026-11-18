@@ -494,10 +494,11 @@ class _ChapterEntry extends StatelessWidget {
   }
 }
 
-/// 分镜目录入口（预留）：仅当当前用户在当前作品下已有分镜成果时展示。
+/// 分镜目录入口。
 ///
-/// 常规作品详情不出现；摘要接口失败或后端未接入时返回 0，同样隐藏，
-/// 避免出现空入口与加载闪烁。入口进入的页面为占位页，供后续接入方替换。
+/// 分镜与章节目录是同一级内容，无论当前作品是否已有章节或分镜成果，
+/// 作品详情都要展示入口。数据为空时由目录页展示空状态，不能通过隐藏入口
+/// 让用户误以为作品没有分镜能力。
 class _StoryboardEntry extends ConsumerWidget {
   const _StoryboardEntry({required this.workId, required this.title});
 
@@ -506,9 +507,7 @@ class _StoryboardEntry extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!AuthGuard.isLoggedIn(ref)) return const SizedBox.shrink();
     final count = ref.watch(workStoryboardSummaryProvider(workId)).valueOrNull ?? 0;
-    if (count <= 0) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
@@ -537,7 +536,7 @@ class _StoryboardEntry extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '$count 个分镜',
+                  count > 0 ? '$count 个分镜' : '查看分镜目录',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.text3),

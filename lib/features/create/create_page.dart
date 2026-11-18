@@ -32,7 +32,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   static const List<({String value, String label})> _filters = [
     (value: 'all', label: '全部'),
     (value: 'draft', label: '草稿'),
-    (value: 'published', label: '已发布'),
+    (value: 'published', label: '审核通过'),
     (value: 'reviewing', label: '审核中'),
     (value: 'revision', label: '待修改'),
     (value: 'rejected', label: '已驳回'),
@@ -47,7 +47,11 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   Future<void> _showStartChoice(BuildContext context) async {
     final choice = await showCreateChoice(context);
     if (!context.mounted || choice == null) return;
-    context.push(choice == 'ai' ? RoutePath.aiCreate : RoutePath.workUpload);
+    context.push(choice == 'ai'
+        ? RoutePath.aiCreate
+        : choice == 'storyboard'
+            ? RoutePath.aiStoryboard
+            : RoutePath.workUpload);
   }
 
   @override
@@ -61,7 +65,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     final canCreate = auth.user?.authorCapability == true;
     final loggedIn = authStatus == AuthStatus.authenticated;
     // 未登录或未开通能力时不请求作者作品列表。
-    final worksAsync = loggedIn && canCreate ? ref.watch(myWorksProvider(_status)) : null;
+    final worksAsync =
+        loggedIn && canCreate ? ref.watch(myWorksProvider(_status)) : null;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -80,48 +85,50 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       body: Stack(
         children: [
           switch (authStatus) {
-        // 会话恢复中：不请求、不引导，等 /auth/me 定论。
-        AuthStatus.unknown => const LoadingView(message: '加载中'),
-        // 游客：页内登录引导，不离开创作 tab；登录成功由 RouteIntent 回跳本页。
-        AuthStatus.unauthenticated => _LoginPrompt(
-            onLogin: () =>
-                AuthGuard.requireLogin(context, ref, target: RoutePath.create),
-          ),
-        // 未开通或被关闭能力：阻断创作并引导申请。
-        AuthStatus.authenticated when !canCreate => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('请先申请开通创作者能力'),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => context.push(RoutePath.creatorApply),
-                  child: const Text('去申请'),
-                ),
-              ],
-            ),
-          ),
-        AuthStatus.authenticated => Column(
-            children: [
-              _FilterBar(
-                filters: _filters,
-                selected: _status,
-                onChanged: (value) => setState(() => _status = value),
+            // 会话恢复中：不请求、不引导，等 /auth/me 定论。
+            AuthStatus.unknown => const LoadingView(message: '加载中'),
+            // 游客：页内登录引导，不离开创作 tab；登录成功由 RouteIntent 回跳本页。
+            AuthStatus.unauthenticated => _LoginPrompt(
+                onLogin: () => AuthGuard.requireLogin(context, ref,
+                    target: RoutePath.create),
               ),
-              Expanded(
-                child: worksAsync!.when(
-                  loading: () => const LoadingView(message: '加载中'),
-                  error: (error, _) => ErrorView(
-                    message: error is ApiException ? error.message : '加载失败，请稍后重试',
-                    onRetry: () => ref.invalidate(myWorksProvider(_status)),
+            // 未开通或被关闭能力：阻断创作并引导申请。
+            AuthStatus.authenticated when !canCreate => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('请先申请开通创作者能力'),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => context.push(RoutePath.creatorApply),
+                      child: const Text('去申请'),
+                    ),
+                  ],
+                ),
+              ),
+            AuthStatus.authenticated => Column(
+                children: [
+                  _FilterBar(
+                    filters: _filters,
+                    selected: _status,
+                    onChanged: (value) => setState(() => _status = value),
                   ),
-                  data: _buildGrid,
-                ),
+                  Expanded(
+                    child: worksAsync!.when(
+                      loading: () => const LoadingView(message: '加载中'),
+                      error: (error, _) => ErrorView(
+                        message: error is ApiException
+                            ? error.message
+                            : '加载失败，请稍后重试',
+                        onRetry: () => ref.invalidate(myWorksProvider(_status)),
+                      ),
+                      data: _buildGrid,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        },
-      ],
+          },
+        ],
       ),
     );
   }
@@ -269,7 +276,8 @@ class _WorkCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         // 标签墙体系下作品不再有分类，此处只展示审核派生状态角标。
-                        _StatusBadge(status: work.status),
+                        _StatusBadge(
+                            status: work.status, shelfStatus: work.shelfStatus),
                       ],
                     ),
                   ),
@@ -285,14 +293,19 @@ class _WorkCard extends StatelessWidget {
 
 /// 状态角标（审核派生状态）：不同状态用语义色区分，便于一眼掌握作品进度。
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, this.shelfStatus = ''});
 
   final String status;
+  final String shelfStatus;
 
   @override
   Widget build(BuildContext context) {
+    final onShelf = status == 'published' && shelfStatus == 'on_shelf';
+    final label = status == 'published'
+        ? (onShelf ? '已上架' : '审核通过，待上架')
+        : workStatusLabel(status);
     final color = switch (status) {
-      'published' => AppColors.success,
+      'published' => onShelf ? AppColors.success : AppColors.warning,
       'reviewing' => AppColors.warning,
       'revision' => AppColors.warning,
       'rejected' => AppColors.danger,
@@ -307,7 +320,7 @@ class _StatusBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
-          workStatusLabel(status),
+          label,
           style: TextStyle(fontSize: 10, color: color),
         ),
       ),
