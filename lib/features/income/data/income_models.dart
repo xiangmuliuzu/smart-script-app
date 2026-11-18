@@ -373,7 +373,8 @@ class IncomeSettleItem {
   }
 
   bool get canConfirm => status == 'pending' || status == 'disputed';
-  bool get canDispute => status == 'pending';
+  /// 异议入口已下线，保留字段避免历史 disputed 单无法确认。
+  bool get canDispute => false;
 }
 
 /// 提现记录。金额单位：分。

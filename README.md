@@ -33,6 +33,21 @@ flutter build apk --debug
 
 测试安装包输出到 `build/app/outputs/flutter-apk/app-debug.apk`。切换接口地址后需重新运行或安装新构建的 APK。
 
+## 应用内更新（不上架）
+
+App 启动 / 切回前台 / 「我的 → 检查更新」时请求后端公开接口 `GET /api/v1/app/version`，
+按 `versionCode`（build 号）判断是否有新版本：有更新弹窗，可在应用内下载 APK，
+下载完成后调用系统安装器（首次需在系统设置允许「安装未知应用」）。
+
+- 版本信息全部来自管理端「系统管理 → 参数设置」（`sys_config`），改完立即生效：
+  `app.version.android.versionName / versionCode / url / size / notes / minVersionCode / enabled`；
+  `minVersionCode` 大于手机当前 build 号时弹窗不可跳过（强制更新），`enabled=false` 可临时关闭提示。
+- 发布：`bash scripts/publish_apk.sh 1.0.1 2`（build 号必须递增），脚本会打 release 包、核对签名指纹、
+  把 APK 复制到后端 `uploadPath/app/` 并打印要填的参数。服务器启用 MinIO 时需把 APK 同步到公开桶
+  （`mc cp ... smartscript/smartscript-profile/app/`），否则 `/profile/app/xxx.apk` 会 404。
+- 覆盖安装要求新旧包同一签名，详见 `android/SIGNING.md`；缺签名配置时 release 构建会直接失败。
+- 平台限制：普通应用无法静默安装，最后一步的安装确认框由系统弹出；iOS 不支持这种方式。
+
 ## 本地后端联调
 
 需要连接本机后端时，显式覆盖地址；`10.0.2.2` 只会访问 Android 模拟器所在电脑，真机需改用电脑的局域网 IP。

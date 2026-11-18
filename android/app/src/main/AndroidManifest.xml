@@ -13,6 +13,9 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"/>
+    <!-- 应用内更新：拉起系统安装器安装已下载的 APK（targetSdk 26+ 必须声明，
+         用户仍需在系统设置里允许本应用安装未知应用）。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- 后端本地联调走 http 明文；debug 变体已有同样配置。
          如需上架生产环境请改用 https 并移除此项。 -->
     <application
@@ -46,6 +49,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- 应用内更新：把下载到应用目录的 APK 以 content:// 交给系统安装器。
+             不用 androidx FileProvider：它在 Android 16 的 release 构建里启动即 SIGSEGV
+             （debug 正常），改为最小实现的 ApkContentProvider（只读根级文件）。 -->
+        <provider
+            android:name=".ApkContentProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility?hl=en and

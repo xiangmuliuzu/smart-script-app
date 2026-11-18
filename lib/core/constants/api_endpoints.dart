@@ -3,6 +3,9 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
+  // ===== App 版本检查（匿名可达：登录前就要判断是否需要更新）=====
+  static const String appVersion = '/app/version';
+
   // ===== A3 认证契约 =====
   static const String smsSend = '/auth/sms/send';
   static const String smsLogin = '/auth/sms/login';
@@ -338,7 +341,7 @@ class ApiEndpoints {
 
   // ===== 任务广场（需求悬赏） =====
   static const String demandList = '/trade/demand/list';
-  /// 任务广场轻量统计（可接单数 / 奖金池 / 今日新增 / 题材角标）。
+  /// 任务广场轻量统计（可接单数 / 今日新增 / 题材角标）。
   static const String demandStats = '/trade/demand/stats';
   static String demandDetail(int demandId) => '/trade/demand/$demandId';
   static String demandClaim(int demandId) => '/trade/demand/$demandId/claim';

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/chat/data/chat_providers.dart';
+import '../../features/message/data/notification_landing.dart';
 import '../../features/user_center/data/user_center_providers.dart';
 import '../providers/auth_providers.dart';
 import 'local_notifier.dart';
@@ -111,6 +112,8 @@ class NotificationPoller {
           id: id,
           title: item.title.isEmpty ? '新消息' : item.title,
           body: item.summary.isNotEmpty ? item.summary : (item.content ?? ''),
+          // 点击横幅直达业务页；无落点的消息（公告等）只把 App 拉到前台。
+          route: notificationLandingOf(item)?.location,
         );
       }
     } catch (_) {

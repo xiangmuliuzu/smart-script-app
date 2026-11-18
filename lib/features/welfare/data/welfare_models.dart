@@ -56,6 +56,8 @@ class WelfareTask {
   String get typeLabel {
     switch (taskType) {
       case 'DAILY':
+      case 'READING':
+      case 'UPLOAD':
         return '每日任务';
       case 'AD':
         return '广告任务';
@@ -66,9 +68,9 @@ class WelfareTask {
     }
   }
 
-  /// 是否今日可领（每日任务按 periodDate 当天判断，其余按已领取判断）。
+  /// 是否今日可领（后端已对跨日进度归零，此处只看当日完成态）。
   bool get claimable =>
-      isClaimed == 0 && (taskType != 'DAILY' || isCompleted >= 1 || progress >= targetCount);
+      isClaimed == 0 && (isCompleted >= 1 || progress >= targetCount);
 
   factory WelfareTask.fromJson(Map<String, dynamic> json) => WelfareTask(
         taskId: _int(json['taskId']),
@@ -186,8 +188,12 @@ class AdTask {
     }
   }
 
-  /// 今日还可观看次数（watchLimit - watchedToday，不小于 0）。
-  int get remainingToday => (watchLimit - watchedToday) < 0 ? 0 : watchLimit - watchedToday;
+  /// 今日还可观看次数（优先 watchLimit，否则 frequencyLimit）。
+  int get remainingToday {
+    final cap = watchLimit > 0 ? watchLimit : frequencyLimit;
+    final left = cap - watchedToday;
+    return left < 0 ? 0 : left;
+  }
 
   factory AdTask.fromJson(Map<String, dynamic> json) => AdTask(
         adId: _int(json['adId']),

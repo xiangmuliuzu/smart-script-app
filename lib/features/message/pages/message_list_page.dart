@@ -309,8 +309,9 @@ class _MessageTile extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                         ),
-                      // 交易通知可直达业务页：列表先行提示
-                      if (item.type == 'TRANSACTION' &&
+                      // 交易通知可直达业务页、关注动态可直达作品：列表先行提示
+                      if ((item.type == 'TRANSACTION' ||
+                              item.type == 'FOLLOW') &&
                           (item.businessId ?? '').isNotEmpty)
                         const Padding(
                           padding: EdgeInsets.only(left: 6),

@@ -5,7 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/income_providers.dart';
 
-/// 待结算详情：确认入账 / 提出异议。
+/// 待结算详情：确认入账。
 class MyIncomeSettleDetailPage extends ConsumerStatefulWidget {
   const MyIncomeSettleDetailPage({super.key, required this.settleId});
 
@@ -52,57 +52,6 @@ class _MyIncomeSettleDetailPageState
       ref.invalidate(settleDetailProvider(widget.settleId));
       ref.invalidate(myIncomeOverviewProvider);
       ref.invalidate(settleListProvider(const SettleListParams(status: 'pending')));
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _dispute() async {
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('提出异议'),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          maxLength: 500,
-          decoration: const InputDecoration(
-            hintText: '请说明异议原因（必填）',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('提交'),
-          ),
-        ],
-      ),
-    );
-    if (reason == null) return;
-    if (reason.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请填写异议原因')),
-      );
-      return;
-    }
-
-    setState(() => _busy = true);
-    try {
-      await ref.read(incomeRepositoryProvider).disputeSettle(widget.settleId, reason);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已提交异议')),
-      );
-      ref.invalidate(settleDetailProvider(widget.settleId));
-      ref.invalidate(myIncomeOverviewProvider);
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -180,13 +129,6 @@ class _MyIncomeSettleDetailPageState
                         '作者实得 = 订单总额 − 平台抽成。仅在卖家确认无误后入账。',
                 style: const TextStyle(fontSize: 12, color: AppColors.text3, height: 1.4),
               ),
-              if (d.status == 'disputed' && d.disputeReason != null) ...[
-                const SizedBox(height: 12),
-                _card('异议信息', [
-                  _kv('异议原因', d.disputeReason!),
-                  _kv('异议时间', d.disputeTime ?? '-'),
-                ]),
-              ],
               if (d.status == 'confirmed') ...[
                 const SizedBox(height: 12),
                 _card('入账信息', [
@@ -205,20 +147,9 @@ class _MyIncomeSettleDetailPageState
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(d.status == 'disputed' ? '异议已处理，确认入账' : '确认无误，收款到账'),
+                    child: const Text('确认无误，收款到账'),
                   ),
                 ),
-              if (d.canDispute) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _dispute,
-                    child: const Text('有异议'),
-                  ),
-                ),
-              ],
             ],
           ),
           loading: () => const Center(child: CircularProgressIndicator()),

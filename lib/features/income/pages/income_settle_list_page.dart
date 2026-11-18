@@ -7,7 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../data/income_models.dart';
 import '../data/income_providers.dart';
 
-/// 待结算列表（到账前确认/异议）。
+/// 待结算列表（到账前确认入账）。
 class MyIncomeSettleListPage extends ConsumerStatefulWidget {
   const MyIncomeSettleListPage({super.key});
 
@@ -64,7 +64,6 @@ class _MyIncomeSettleListPageState extends ConsumerState<MyIncomeSettleListPage>
                   children: [
                     for (final e in <(String?, String)>[
                       ('pending', '待确认'),
-                      ('disputed', '有异议'),
                       ('confirmed', '已入账'),
                       (null, '全部'),
                     ])

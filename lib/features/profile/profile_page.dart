@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/providers/auth_providers.dart';
+import '../../core/router/app_router.dart' show rootNavigatorKey;
 import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
@@ -14,6 +15,8 @@ import '../../models/user.dart';
 import '../bookstore/data/bookstore_models.dart';
 import '../bookstore/data/content_providers.dart';
 import '../bookstore/data/content_repository.dart';
+import '../update/data/app_update_providers.dart';
+import '../update/widgets/update_dialog.dart';
 import '../user_center/data/user_center_models.dart';
 import '../user_center/data/user_center_providers.dart';
 import '../user_center/data/user_social_models.dart';
@@ -409,6 +412,14 @@ class _ProfileDrawer extends StatelessWidget {
               label: '意见反馈',
               onTap: () => _push(context, RoutePath.feedback),
             ),
+            _DrawerItem(
+              icon: Icons.system_update_alt,
+              label: '检查更新',
+              onTap: () {
+                Navigator.pop(context);
+                _checkForUpdate(context);
+              },
+            ),
             // 申请入口只取决于当前能力，关闭后即使账号类型仍是创作者也可重新申请。
             if (!user.authorCapability)
               _DrawerItem(
@@ -458,6 +469,27 @@ class _ProfileDrawer extends StatelessWidget {
   void _push(BuildContext context, String target) {
     Navigator.pop(context);
     AuthGuard.pushProtected(context, ref, target: target);
+  }
+
+  /// 手动检查更新：已是最新给轻提示，有更新走统一的更新弹窗（在应用内下载安装）。
+  Future<void> _checkForUpdate(BuildContext context) async {
+    try {
+      final prompt = await ref.read(appUpdateCheckerProvider).checkManually();
+      if (!context.mounted) return;
+      if (prompt == null) {
+        showAppToast(context, '当前已是最新版本');
+        return;
+      }
+      final dialogContext = rootNavigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      await showUpdateDialog(
+        context: dialogContext,
+        prompt: prompt,
+        repository: ref.read(appUpdateRepositoryProvider),
+      );
+    } catch (_) {
+      if (context.mounted) showAppToast(context, '检查更新失败，请稍后重试');
+    }
   }
 }
 
