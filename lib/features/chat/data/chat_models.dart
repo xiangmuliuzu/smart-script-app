@@ -205,6 +205,11 @@ class ChatMessage {
     this.content = '',
     this.msgType = MessageType.text,
     this.isRead = false,
+    this.recalled = false,
+    this.quoteMessageId,
+    this.quoteSender,
+    this.quoteText,
+    this.quoteRecalled = false,
     this.createdAt,
   });
 
@@ -216,6 +221,11 @@ class ChatMessage {
   final String content;
   final String msgType;   // TEXT / SYSTEM
   final bool isRead;
+  final bool recalled;    // 是否已被发送者撤回
+  final int? quoteMessageId;  // 被引用（回复）的消息ID，null=普通消息
+  final String? quoteSender;  // 被引消息发送者昵称快照
+  final String? quoteText;    // 被引消息内容快照；原文撤回后后端不再下发
+  final bool quoteRecalled;   // 被引原文是否已被撤回
   final DateTime? createdAt;
 
   bool get isSystem => msgType == MessageType.system;
@@ -232,6 +242,11 @@ class ChatMessage {
     content: json['content'] as String? ?? '',
     msgType: json['msgType'] as String? ?? MessageType.text,
     isRead: json['isRead'] as bool? ?? false,
+    recalled: json['recalled'] as bool? ?? false,
+    quoteMessageId: (json['quoteMessageId'] as num?)?.toInt(),
+    quoteSender: json['quoteSender'] as String?,
+    quoteText: json['quoteText'] as String?,
+    quoteRecalled: json['quoteRecalled'] as bool? ?? false,
     createdAt: _parseDateTime(json['createdAt']),
   );
 }

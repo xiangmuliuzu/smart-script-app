@@ -167,10 +167,10 @@ class _PeerGroup {
   DateTime get latestTime {
     DateTime? latest;
     for (final s in sessions) {
-      if (s.session.lastMessageTime != null) {
-        if (latest == null || s.session.lastMessageTime!.isAfter(latest)) {
-          latest = s.session.lastMessageTime;
-        }
+      // 无消息的新会话以创建时间参与排序
+      final t = s.session.lastMessageTime ?? s.session.createdAt;
+      if (t != null && (latest == null || t.isAfter(latest))) {
+        latest = t;
       }
     }
     return latest ?? DateTime(2000);
@@ -339,8 +339,8 @@ class _SessionSubItem extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (session.session.lastMessageTime != null)
-                  Text(_formatTime(session.session.lastMessageTime!),
+                if ((session.session.lastMessageTime ?? session.session.createdAt) != null)
+                  Text(_formatTime(session.session.lastMessageTime ?? session.session.createdAt!),
                       style: const TextStyle(fontSize: 11, color: AppColors.text3)),
                 if (session.unread > 0) ...[
                   const SizedBox(height: 4),

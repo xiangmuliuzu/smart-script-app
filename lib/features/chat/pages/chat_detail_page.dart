@@ -42,6 +42,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   int? _lastSentAmount; // 上次发送的报价金额（分），用于判断金额是否变化
   _TradeContext? _tradeContext; // 交易会话上下文
   Quote? _latestQuote; // 最新报价（顶部议价栏展示的金额来源）
+  ChatMessage? _quotedMessage; // 待引用的消息（输入框上方引用条展示）
 
   @override
   void initState() {
@@ -87,6 +88,67 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       ref.invalidate(chatUnreadCountProvider);
     } catch (_) {
       // 静默处理
+    }
+  }
+
+  /// 长按消息在按点浮出 QQ/微信式气泡菜单：引用（任意未撤回普通消息）+ 撤回（本人 2 分钟内文本）。
+  /// 撤回窗口客户端预判，最终以后端裁决为准。
+  Future<void> _showMessageMenu(Offset position, ChatMessage message) async {
+    final createdAt = message.createdAt;
+    final within = createdAt != null &&
+        DateTime.now().difference(createdAt) <= const Duration(minutes: 2);
+    final canRecall = message.isMine(_currentUserId()) &&
+        message.msgType == MessageType.text &&
+        !message.recalled;
+    final Size screen = MediaQuery.of(context).size;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy - 12,
+        screen.width - position.dx,
+        screen.height - position.dy,
+      ),
+      items: [
+        const PopupMenuItem<String>(
+          value: 'quote',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.reply, size: 18),
+              SizedBox(width: 8),
+              Text('引用'),
+            ],
+          ),
+        ),
+        if (canRecall)
+          PopupMenuItem<String>(
+            value: within ? 'recall' : null,
+            enabled: within,
+            child: Text(within ? '撤回' : '撤回(超2分钟)'),
+          ),
+      ],
+    );
+    if (!mounted || selected == null) return;
+    if (selected == 'quote') {
+      setState(() => _quotedMessage = message);
+    } else if (selected == 'recall') {
+      _recallMessage(message);
+    }
+  }
+
+  int _currentUserId() =>
+      ref.read(authControllerProvider).user?.userId ?? 0;
+
+  Future<void> _recallMessage(ChatMessage message) async {
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .recallMessage(widget.sessionId, message.messageId);
+      ref.invalidate(messagesProvider(widget.sessionId));
+      if (mounted) showAppToast(context, '消息已撤回');
+    } catch (e) {
+      if (mounted) showAppToast(context, '撤回失败：$e');
     }
   }
 
@@ -148,8 +210,10 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
 
       if (content.isNotEmpty) {
         final chatRepo = ref.read(chatRepositoryProvider);
-        await chatRepo.sendMessage(widget.sessionId, content);
+        await chatRepo.sendMessage(widget.sessionId, content,
+            quoteMessageId: _quotedMessage?.messageId);
         _inputController.clear();
+        if (_quotedMessage != null) setState(() => _quotedMessage = null);
         // 刷新消息列表
         ref.invalidate(messagesProvider(widget.sessionId));
         // 标记已读
@@ -364,9 +428,18 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             if (QuoteMessageBubble.isQuoteMessage(message)) {
               return QuoteMessageBubble(message: message);
             }
-            return _MessageBubble(
+            final bubble = _MessageBubble(
               message: message,
               isMine: message.isMine(currentUserId),
+            );
+            // 普通未撤回消息长按可引用；本人文本另含撤回
+            if (message.isSystem || message.recalled) {
+              return bubble;
+            }
+            return GestureDetector(
+              onLongPressStart: (details) =>
+                  _showMessageMenu(details.globalPosition, message),
+              child: bubble,
             );
           },
         );
@@ -397,9 +470,48 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       child: SafeArea(
         child: isClosed
             ? _buildClosedSessionBar()
-            : isTrade
-                ? _buildTradeInputArea(inquiryId, isBuyer, isSeller, licenseType)
-                : _buildInputRow(),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_quotedMessage != null) _buildQuoteBar(),
+                  if (isTrade)
+                    _buildTradeInputArea(inquiryId, isBuyer, isSeller, licenseType)
+                  else
+                    _buildInputRow(),
+                ],
+              ),
+      ),
+    );
+  }
+
+  /// 输入框上方的引用预览条：展示被引消息摘要，可点 X 取消。
+  Widget _buildQuoteBar() {
+    final q = _quotedMessage!;
+    final who = q.isMine(_currentUserId()) ? '我' : (q.senderName ?? '对方');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.fill,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$who：${q.content}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: AppColors.text2),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: '取消引用',
+            onPressed: () => setState(() => _quotedMessage = null),
+          ),
+        ],
       ),
     );
   }
@@ -535,10 +647,33 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.recalled) {
+      return _buildRecalledNotice();
+    }
     if (message.isSystem) {
       return _buildSystemMessage();
     }
     return _buildChatBubble(context);
+  }
+
+  /// 已撤回消息：双方可见的居中占位提示，不展示原内容
+  Widget _buildRecalledNotice() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.fill,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            isMine ? '你撤回了一条消息' : '对方撤回了一条消息',
+            style: const TextStyle(fontSize: 12, color: AppColors.text3),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSystemMessage() {
@@ -581,18 +716,52 @@ class _MessageBubble extends StatelessWidget {
                   bottomRight: Radius.circular(isMine ? 4 : 12),
                 ),
               ),
-              child: Text(
-                message.content,
-                style: TextStyle(
-                  color: isMine ? Colors.white : AppColors.text1,
-                  fontSize: 15,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (message.quoteMessageId != null) _buildQuoteBlock(),
+                  if (message.quoteMessageId != null) const SizedBox(height: 6),
+                  Text(
+                    message.content,
+                    style: TextStyle(
+                      color: isMine ? Colors.white : AppColors.text1,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
           const SizedBox(width: 8),
           if (isMine) _buildAvatar(context),
         ],
+      ),
+    );
+  }
+
+  /// 气泡内引用块：昵称+摘要一行；被引原文已撤回时只显示占位文案。
+  Widget _buildQuoteBlock() {
+    final text = message.quoteRecalled
+        ? '原消息已撤回'
+        : '${message.quoteSender ?? '引用'}：${message.quoteText ?? ''}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: (isMine ? Colors.white : AppColors.card).withOpacity(0.25),
+        borderRadius: BorderRadius.circular(6),
+        border: Border(left: BorderSide(
+            color: isMine ? Colors.white70 : AppColors.text3, width: 2)),
+      ),
+      child: Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 12,
+          color: isMine ? Colors.white70 : AppColors.text2,
+        ),
       ),
     );
   }

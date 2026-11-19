@@ -219,6 +219,8 @@ class ApiEndpoints {
   static const String chatSessions = '/users/me/chat/sessions';
   static String chatSessionDetail(int sessionId) => '/users/me/chat/sessions/$sessionId';
   static String chatMessages(int sessionId) => '/users/me/chat/sessions/$sessionId/messages';
+  static String chatRecallMessage(int sessionId, int messageId) =>
+      '/users/me/chat/sessions/$sessionId/messages/$messageId/recall';
   static String chatMarkRead(int sessionId) => '/users/me/chat/sessions/$sessionId/read';
   static const String chatUnreadCount = '/users/me/chat/unread-count';
   static String chatChangeStatus(int sessionId) => '/users/me/chat/sessions/$sessionId/status';

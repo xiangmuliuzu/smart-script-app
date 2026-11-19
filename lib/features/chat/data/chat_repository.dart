@@ -90,15 +90,23 @@ class ChatRepository {
     return PagedData.parse<ChatMessage>(data, ChatMessage.fromJson);
   }
 
-  /// 发送文字消息。
-  Future<ChatMessage> sendMessage(int sessionId, String content) async {
+  /// 发送文字消息；quoteMessageId 非空时随消息落一条引用快照。
+  Future<ChatMessage> sendMessage(int sessionId, String content, {int? quoteMessageId}) async {
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.chatMessages(sessionId),
-      data: {'content': content},
+      data: {'content': content, if (quoteMessageId != null) 'quoteMessageId': quoteMessageId},
       parser: _mapParser,
     );
     if (data == null) throw ApiException('发送消息失败');
     return ChatMessage.fromJson(data);
+  }
+
+  /// 撤回自己 2 分钟内发送的文字消息（超时等由后端裁决报错）。
+  Future<void> recallMessage(int sessionId, int messageId) async {
+    await _api.put<Map<String, dynamic>>(
+      ApiEndpoints.chatRecallMessage(sessionId, messageId),
+      parser: _mapParser,
+    );
   }
 
   // ==================== 已读/未读 ====================
