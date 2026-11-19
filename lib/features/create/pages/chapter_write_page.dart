@@ -17,7 +17,7 @@ import '../data/author_work_providers.dart';
 /// - 编辑模式下从 [authorWorkDetailProvider] 读取章节标题与正文回填，
 ///   不通过路由参数传长文本（URL 长度有限）。
 /// - 保存策略：输入停顿 3 秒自动保存（debounce）；返回 / 点「完成」时立即保存。
-/// - 支持「设为试读章节」开关，随保存一并提交 isFree（走 B 套章节接口）。
+/// - 审核通过的章节可独立设置试读。
 /// - 不提供手动发布开关：设置为试读后由服务端直接应用，保存后即可试读。
 /// - 作品处于审核中时 TextField 禁用，只读浏览。
 class ChapterWritePage extends ConsumerStatefulWidget {
@@ -71,8 +71,38 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// 上一次静默自动保存是否失败（底部栏展示「保存失败，点击重试」）。
   bool _saveFailed = false;
 
-  /// 是否设为免费试读章节（随保存提交 isFree）。
+  /// 审核通过后可单独设置试读。
   bool _isFree = false;
+  bool _trialSaving = false;
+
+  bool get _canSetTrial {
+    if (!_editable || _dirty || _chapterId == 0) return false;
+    final detail =
+        ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
+    return detail?.work.status == 'published' &&
+        detail!.chapters.any(
+            (chapter) => chapter.chapterId == _chapterId && chapter.isApproved);
+  }
+
+  Future<void> _setTrial(bool value) async {
+    if (!_canSetTrial || _trialSaving || _saving) return;
+    setState(() => _trialSaving = true);
+    try {
+      await ref
+          .read(authorWorkRepositoryProvider)
+          .updateChapter(_chapterId, isFree: value);
+      if (!mounted) return;
+      setState(() => _isFree = value);
+      ref.invalidate(authorWorkDetailProvider(widget.workId));
+      _toast(value ? '已开启章节试读' : '已关闭章节试读');
+    } on ApiException catch (e) {
+      if (mounted) _toast(e.message);
+    } catch (_) {
+      if (mounted) _toast('试读设置未保存，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _trialSaving = false);
+    }
+  }
 
   @override
   void initState() {
@@ -107,9 +137,13 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
       }
     }
     if (chapter == null) return;
+    _titleCtrl.removeListener(_onChanged);
+    _contentCtrl.removeListener(_onChanged);
     _titleCtrl.text = chapter.chapterTitle;
     _contentCtrl.text = chapter.content;
     _isFree = chapter.isFree;
+    _titleCtrl.addListener(_onChanged);
+    _contentCtrl.addListener(_onChanged);
     _initialized = true;
   }
 
@@ -132,7 +166,8 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
         ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
     final chapters = detail?.chapters ?? const <AuthorChapterItem>[];
     if (chapters.isEmpty) return '';
-    final limitNo = _chapterId == 0 ? _nextChapterNo() : _currentChapterNo(chapters);
+    final limitNo =
+        _chapterId == 0 ? _nextChapterNo() : _currentChapterNo(chapters);
     if (limitNo == null) return '';
     AuthorChapterItem? previous;
     for (final chapter in chapters) {
@@ -234,22 +269,21 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
           chapterNo: _nextChapterNo(),
           chapterTitle: title,
           content: content,
-          isFree: _isFree,
         );
         _chapterId = newId;
         // 新建章首次保存成功即视为已初始化：后续详情回包不得再回填覆盖
         // 请求飞行窗口内用户继续输入的内容。
         _initialized = true;
       } else {
-        // 保存正文与试读标记；设置试读后由服务端直接切为可读状态。
+        // 正文与试读设置分别保存。
         await repo.updateChapter(
           _chapterId,
           chapterTitle: title,
           content: content,
-          isFree: _isFree,
         );
       }
-      _dirty = false;
+      _dirty = _titleCtrl.text.trim() != title || _contentCtrl.text != content;
+      _isFree = false;
       _saveFailed = false;
       if (!silent) _toast('已保存');
       // 刷新工作台数据源
@@ -410,8 +444,7 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                     ),
                   ),
                   const Divider(height: 0.5, color: AppColors.divider),
-                  // 试读开关（仅可编辑状态可切换）
-                  if (_editable) ...[
+                  if (_canSetTrial) ...[
                     Container(
                       color: AppColors.card,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -431,10 +464,8 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                             value: _isFree,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
-                            onChanged: (value) {
-                              _isFree = value;
-                              _onChanged();
-                            },
+                            onChanged:
+                                _trialSaving || _saving ? null : _setTrial,
                           ),
                         ],
                       ),
@@ -443,7 +474,7 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                     const Padding(
                       padding: EdgeInsets.fromLTRB(16, 6, 16, 10),
                       child: Text(
-                        '开启试读后立即生效，无需单独审核或手动发布。',
+                        '设置立即保存，作品上架后读者可见。',
                         style: TextStyle(fontSize: 11, color: AppColors.text3),
                       ),
                     ),
@@ -468,8 +499,9 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                           GestureDetector(
                             onTap: () {
                               // 收起时先收起键盘，避免残留焦点。
-                              if (_aiPanelOpen)
+                              if (_aiPanelOpen) {
                                 FocusScope.of(context).unfocus();
+                              }
                               setState(() => _aiPanelOpen = !_aiPanelOpen);
                             },
                             child: Container(
@@ -550,7 +582,7 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                     dirty: _dirty,
                     failed: _saveFailed,
                     editable: _editable,
-                    isFree: _isFree,
+                    isFree: _canSetTrial && _isFree,
                     onRetry: () {
                       _autoSave();
                     },

@@ -141,7 +141,7 @@ class AuthorWorkItem {
 
 /// 作者视角章节条目（A 套章节接口，含正文全文）。
 ///
-/// isFree/status 为 tinyint，契约以字符串 "0"/"1" 下发（若依字典风格）。
+/// isFree/status 为 tinyint，契约以字符串状态值下发（若依字典风格）。
 class AuthorChapterItem {
   const AuthorChapterItem({
     required this.chapterId,
@@ -151,7 +151,7 @@ class AuthorChapterItem {
     this.summary = '',
     this.wordCount = 0,
     this.isFree = false,
-    this.status = '0',
+    this.status = '1',
   });
 
   final int chapterId;
@@ -164,11 +164,23 @@ class AuthorChapterItem {
   final int wordCount;
   final bool isFree;
 
-  /// 章节状态："0"=已生效（读者可见），"1"=草稿（仅作者可见）。
+  /// 章节状态："0"=审核通过，"1"=草稿，"2"=未通过审核。
   final String status;
 
-  /// 是否为草稿（未发布）。保留历史命名 isHidden 以减少连带改动。
-  bool get isHidden => status == '1';
+  /// 未通过审核的章节不对读者展示。
+  bool get isApproved => status == '0';
+  bool get isHidden => !isApproved;
+
+  String get statusLabel {
+    switch (status) {
+      case '0':
+        return '审核通过';
+      case '2':
+        return '未通过审核';
+      default:
+        return '草稿';
+    }
+  }
 
   factory AuthorChapterItem.fromJson(Map<String, dynamic> json) =>
       AuthorChapterItem(
@@ -179,7 +191,7 @@ class AuthorChapterItem {
         summary: _text(json['summary']),
         wordCount: _int(json['wordCount']),
         isFree: _flag(json['isFree']),
-        status: _text(json['status']).isEmpty ? '0' : _text(json['status']),
+        status: _text(json['status']).isEmpty ? '1' : _text(json['status']),
       );
 }
 
