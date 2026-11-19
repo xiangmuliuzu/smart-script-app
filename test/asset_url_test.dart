@@ -16,7 +16,7 @@ void main() {
         path,
         'http://localhost:8080$path',
         'http://10.0.2.2:8080$path',
-        'https://www.eyhereal.site/prod-api$path',
+        'http://192.168.100.3:1100/prod-api$path',
       ]) {
         expect(resolve(raw), '$storage$path');
       }

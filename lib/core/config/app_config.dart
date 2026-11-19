@@ -54,7 +54,7 @@ class AppConfig {
   /// 留空则退回接口所在 origin（单机部署时的旧行为）。
   static const String mediaBaseUrl = String.fromEnvironment(
     'MEDIA_BASE_URL',
-    defaultValue: 'https://www.eyhereal.site',
+    defaultValue: 'http://192.168.100.3:1100',
   );
 
   /// 带签名参数、必须由签发方后端提供的媒体路径
