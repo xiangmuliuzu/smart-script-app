@@ -48,3 +48,6 @@ app.*.map.json
 
 # 本地设计/安装验证截图
 .impeccable/
+
+# 一键发版的状态记录（build 号 + 上次发布 commit），每台机器各自维护
+.release-state

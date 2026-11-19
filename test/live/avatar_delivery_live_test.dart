@@ -11,9 +11,9 @@ void main() {
   final sessionPath = Platform.environment['AVATAR_SESSION_FILE'] ?? '';
   test('App真实仓库上传保存站内路径，PC与App会话获取同一头像', () async {
     final session = jsonDecode(await File(sessionPath).readAsString()) as Map;
-    // 会话必须针对开发服务生成（默认 https://www.eyhereal.site/api/v1）
+    // 会话必须针对开发服务生成（默认 http://192.168.100.3:1100/api/v1）
     expect(session['baseUrl'],
-        Platform.environment['LIVE_BASE_URL'] ?? 'https://www.eyhereal.site/api/v1');
+        Platform.environment['LIVE_BASE_URL'] ?? 'http://192.168.100.3:1100/api/v1');
     ApiClient client(String token) => ApiClient(Dio(BaseOptions(
           baseUrl: session['baseUrl'] as String,
           headers: {'Authorization': 'Bearer $token'},

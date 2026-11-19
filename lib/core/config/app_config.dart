@@ -10,11 +10,11 @@ class AppConfig {
 
   /// 接口基础地址。
   ///
-  /// 默认连接服务器统一 HTTPS 入口，契约前缀为 `/api/v1`。
-  /// 本地联调可通过 `--dart-define=BASE_URL=...` 覆盖。
+  /// 默认连接公司内网 P06 部署（`http://192.168.100.3:1100`），契约前缀为 `/api/v1`。
+  /// 不在公司网络或需要换环境时，可用 `--dart-define=BASE_URL=...` 覆盖。
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'https://www.eyhereal.site/api/v1',
+    defaultValue: 'http://192.168.100.3:1100/api/v1',
   );
 
   /// 连接超时。

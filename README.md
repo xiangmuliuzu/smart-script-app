@@ -11,7 +11,7 @@ flutter pub get
 flutter run
 ```
 
-App 默认连接服务器统一入口 `https://www.eyhereal.site/api/v1`，模拟器和真机均无需在本机启动后端。构建 Android 时按 `rules.md` 使用 JDK 17。
+App 默认连接公司内网 P06 部署 `http://192.168.100.3:1100/api/v1`，模拟器和真机均无需在本机启动后端。构建 Android 时按 `rules.md` 使用 JDK 17。
 
 ## AI 创作与 AI 记录
 

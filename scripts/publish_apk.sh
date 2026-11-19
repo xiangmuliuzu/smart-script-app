@@ -18,8 +18,8 @@ BUILD_NUMBER="${2:?用法: scripts/publish_apk.sh <versionName> <buildNumber>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 UPLOAD_DIR="${UPLOAD_DIR:-$APP_DIR/../smart-script-backend/uploadPath/app}"
-# 服务器地址：换成实际域名即可（App 会从这里下载 APK）
-SERVER_ORIGIN="${SERVER_ORIGIN:-https://www.eyhereal.site}"
+# 服务器地址：换成实际地址即可（App 会从这里下载 APK）
+SERVER_ORIGIN="${SERVER_ORIGIN:-http://192.168.100.3:1100}"
 FILE_NAME="script-app-${VERSION_NAME}-${BUILD_NUMBER}.apk"
 
 cd "$APP_DIR"

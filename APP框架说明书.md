@@ -47,7 +47,7 @@ lib/
 ├── app.dart              # 根组件：MaterialApp.router + 全局主题
 │
 ├── core/                 # 【框架层·公共地基，改动需对齐】
-│   ├── config/app_config.dart        # 后端地址(默认 https://www.eyhereal.site/api/v1)、超时、日志开关
+│   ├── config/app_config.dart        # 后端地址(默认 http://192.168.100.3:1100/api/v1)、超时、日志开关
 │   ├── constants/
 │   │   ├── api_endpoints.dart        # 接口路径唯一出处（2.1~2.10 全登记），页面禁止手写 URL
 │   │   └── app_constants.dart        # 存储 key、成功码 200、分页默认值
@@ -113,7 +113,7 @@ lib/
    - 正常流程（进登录页）：`flutter run`
    - **演示导航（免后端直接进底部导航）**：`flutter run --dart-define=DEMO_SESSION=true`
      该开关在 `auth_providers.dart`，仅调试用；不带参数时行为不变。给负责人看导航效果用带参数的方式。
-4. 后端地址：默认统一使用 `https://www.eyhereal.site/api/v1`，模拟器和真机均无需本机后端。本地联调时可用 `--dart-define=BASE_URL=http://10.0.2.2:8080/api/v1` 覆盖，真机改用电脑的局域网 IP。
+4. 后端地址：默认统一使用 `http://192.168.100.3:1100/api/v1`（公司内网 P06 部署），模拟器和真机均无需本机后端。不在公司网络时可用 `--dart-define=BASE_URL=...` 覆盖；本机联调可用 `--dart-define=BASE_URL=http://10.0.2.2:8080/api/v1`，真机改用电脑的局域网 IP。
 5. 校验：`flutter analyze`、`flutter test`。
 6. 换图标/改桌面名后需**重新构建安装**才生效：`flutter build apk --debug` 后 `adb install -r`。
 
