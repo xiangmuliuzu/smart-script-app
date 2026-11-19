@@ -388,7 +388,7 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
       case 'selected': return '已选定';
       case 'closed': return '已关闭';
       case 'failed': return '已失败';
-      default: return status ?? '未知';
+      default: return '未知';
     }
   }
 

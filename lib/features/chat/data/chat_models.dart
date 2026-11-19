@@ -18,7 +18,7 @@ class SessionType {
       case trade: return '交易会话';
       case demand: return '任务会话';
       case chat: return '咨询会话';  // 旧 CHAT 类型归入咨询
-      default: return type ?? '未知';
+      default: return '未知';
     }
   }
 

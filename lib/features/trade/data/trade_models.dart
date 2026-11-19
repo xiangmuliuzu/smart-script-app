@@ -40,7 +40,7 @@ class InquiryStatus {
       case closed:
         return '已关闭';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 }
@@ -66,7 +66,7 @@ class QuoteStatus {
       case expired:
         return '已过期';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 }
@@ -99,7 +99,7 @@ class OrderStatus {
       case refunded:
         return '已退款';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 }
@@ -122,7 +122,7 @@ class ContractStatus {
       case cancelled:
         return '已取消';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 }
@@ -161,7 +161,7 @@ class QuoteRole {
       case seller:
         return '卖方出价';
       default:
-        return role ?? '未知';
+        return '未知';
     }
   }
 }
@@ -455,7 +455,7 @@ class BillRecord {
       case 'settle':
         return '结算';
       default:
-        return billType ?? '未知';
+        return '未知';
     }
   }
 
@@ -645,7 +645,7 @@ class DemandStatus {
       case failed:
         return '已失败';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 }
@@ -729,7 +729,7 @@ class DemandTask {
       case 'failed':
         return '已失败';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 

@@ -163,7 +163,7 @@ class IncomeDetailItem {
       case 'settle':
         return '分成结算';
       default:
-        return billType ?? '未知';
+        return '未知';
     }
   }
 }
@@ -368,7 +368,7 @@ class IncomeSettleItem {
       case 'disputed':
         return '有异议';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 
@@ -448,7 +448,7 @@ class WithdrawRecord {
       case 'paid':
         return '已打款';
       default:
-        return status ?? '未知';
+        return '未知';
     }
   }
 
