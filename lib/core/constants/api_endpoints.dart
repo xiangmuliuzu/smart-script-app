@@ -104,11 +104,11 @@ class ApiEndpoints {
   /// 作品读者评分：查询评分态 / 提交评分（需 App Token；POST body {score}）
   static String contentWorkRating(int workId) => '/content/works/$workId/rating';
 
-  /// 作品分镜目录摘要（预留）：仅统计当前用户本人在该作品下生成的分镜数量。
+  /// 作品分镜目录摘要：只统计已上架作品中审核通过的分镜数量。
   static String contentWorkStoryboardSummary(int workId) =>
       '/content/works/$workId/storyboards/summary';
 
-  /// 作品分镜目录列表（预留）：按章节归属展示本人分镜成果。
+  /// 作品分镜目录列表：公开返回审核通过分镜；正文按关联章节试读权限裁剪。
   static String contentWorkStoryboards(int workId) =>
       '/content/works/$workId/storyboards';
   /// 内容文件上传（需 App Token，multipart 字段 file；type=cover/script，接口 2.9.1）

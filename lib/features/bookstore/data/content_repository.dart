@@ -85,10 +85,10 @@ class ContentRepository {
     return PagedData.parse<BookItem>(data, BookItem.fromJson);
   }
 
-  /// 作品分镜目录摘要。
+  /// 作品分镜目录摘要；只统计已上架作品中审核通过的分镜。
   ///
   /// 该摘要只用于作品详情页显示分镜数量。分镜目录入口与章节目录同级，
-  /// 不会因为接口暂未接入、游客访问或网络异常而隐藏。
+  /// 不会因为作品暂时没有分镜而隐藏。
   Future<int> storyboardSummary(int workId) async {
     if (workId <= 0) return 0;
     try {
@@ -105,7 +105,7 @@ class ContentRepository {
     }
   }
 
-  /// 作品分镜目录；与章节目录同级展示。后端尚未返回数据时由页面展示空目录。
+  /// 作品分镜目录；与章节目录同级展示。服务端按审核状态和试读权限返回 readable。
   Future<List<Map<String, dynamic>>> listWorkStoryboards(int workId) async {
     final raw = await _api.get<dynamic>(
       ApiEndpoints.contentWorkStoryboards(workId),

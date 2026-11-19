@@ -364,6 +364,30 @@ class AiRepository {
     };
   }
 
+  /// 作品时间线事件（只追加）：每集摘要一并产出，续写前按集号注入上下文。
+  ///
+  /// 后端 `GET /api/v1/content/works/{workId}/timeline?limit=100`。
+  Future<List<Map<String, dynamic>>> workTimeline(int workId) async {
+    if (workId <= 0) return const [];
+    final data = await _api.get<List<dynamic>>(
+      '/content/works/$workId/timeline',
+      query: {'limit': 100},
+      parser: (raw) {
+        if (raw is List) return raw;
+        if (raw is Map) {
+          final list = raw['list'] ?? raw['rows'] ?? raw['data'];
+          if (list is List) return list;
+        }
+        return const <dynamic>[];
+      },
+    );
+    if (data == null) return const [];
+    return data
+        .whereType<Map>()
+        .map((item) => item.map((key, value) => MapEntry('$key', value)))
+        .toList();
+  }
+
   /// 保存创作台账（App 端「AI 剧本续写」把简介/人物增补写回后端，与 PC 端共用一份）。
   ///
   /// 后端 `PUT /api/v1/content/works/{workId}/ledger`，整份写入；

@@ -12,7 +12,7 @@ import '../../user_center/data/user_center_models.dart';
 ///   - CONTRACT→ 订单 id（App 合同页按订单定位，`GET /trade/contracts/{orderId}`）
 ///   - DEMAND  → 需求 id
 ///   - WITHDRAW→ 无落点参数，提现列表页本身即是动作页
-///   - WORK    → 作品 id（关注动态 type=FOLLOW；审核通过 type=REVIEW）
+///   - WORK    → 作品 id（关注动态 type=FOLLOW；审核通过通知已并入 SYSTEM）
 typedef NotificationLanding = ({String label, String location});
 
 /// 非交易/关注/审核通知、公告，或缺少可定位主键时返回 null（只打开 App，不做跳转）。
@@ -21,21 +21,21 @@ NotificationLanding? notificationLandingOf(MessageItem message) {
     return null;
   }
   final bizId = (message.businessId ?? '').trim();
-  if (message.type == 'FOLLOW') {
-    return message.businessType == 'WORK' && bizId.isNotEmpty
-        ? (label: '查看作品', location: '${RoutePath.workDetail}?id=$bizId')
-        : null;
-  }
-  // 作品审核通过：打开该作品的工作台，由作者确认后再手动上架，与后端
-  // ReviewApprovedNotificationListener 的「不代替作者上架」口径一致。
-  if (message.type == 'REVIEW' && message.businessType == 'WORK') {
-    final workId = int.tryParse(bizId);
-    return workId == null
-        ? null
-        : (
-            label: '去上架：打开作品',
-            location: RoutePath.workWorkspaceUrl(workId: workId)
-          );
+  // 作品业务引用：关注动态打开作品详情；审核通过通知（审核分类已并入系统）打开
+  // 作品工作台，由作者确认后再手动上架，与后端 ReviewApprovedNotificationListener 一致。
+  if (message.businessType == 'WORK' && bizId.isNotEmpty) {
+    if (message.type == 'FOLLOW') {
+      return (label: '查看作品', location: '${RoutePath.workDetail}?id=$bizId');
+    }
+    if (message.type == 'SYSTEM' || message.type == 'REVIEW') {
+      final workId = int.tryParse(bizId);
+      return workId == null
+          ? null
+          : (
+              label: '去上架：打开作品',
+              location: RoutePath.workWorkspaceUrl(workId: workId)
+            );
+    }
   }
   if (message.type != 'TRANSACTION') {
     return null;

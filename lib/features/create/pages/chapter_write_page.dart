@@ -126,34 +126,33 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
 
   /// 上一章正文末尾（≤800 字）：AI 续写把它作为承接锚点，避免本集开头接不上。
   /// 取太长的上一章会吃掉模型输出额度（曾在 8192 max_tokens 下把输出挤到半句截断）。
+  /// 与后台队列同口径：跳过空占位章，取「集号小于本集、正文非空、集号最大」的那一章。
   String _previousChapterTail() {
     final detail =
         ref.read(authorWorkDetailProvider(widget.workId)).valueOrNull;
     final chapters = detail?.chapters ?? const <AuthorChapterItem>[];
     if (chapters.isEmpty) return '';
+    final limitNo = _chapterId == 0 ? _nextChapterNo() : _currentChapterNo(chapters);
+    if (limitNo == null) return '';
     AuthorChapterItem? previous;
-    if (_chapterId == 0) {
-      // 新建章节：上一章取作品内序号最大的一章。
-      previous = chapters.reduce((a, b) => a.chapterNo >= b.chapterNo ? a : b);
-    } else {
-      int? currentNo;
-      for (final chapter in chapters) {
-        if (chapter.chapterId == _chapterId) {
-          currentNo = chapter.chapterNo;
-          break;
-        }
-      }
-      if (currentNo == null) return '';
-      for (final chapter in chapters) {
-        if (chapter.chapterNo == currentNo - 1) {
-          previous = chapter;
-          break;
-        }
+    for (final chapter in chapters) {
+      if (chapter.chapterNo >= limitNo) continue;
+      if (chapter.content.trim().isEmpty) continue;
+      if (previous == null || chapter.chapterNo > previous.chapterNo) {
+        previous = chapter;
       }
     }
     final text = (previous?.content ?? '').trim();
     if (text.isEmpty) return '';
     return text.length > 800 ? text.substring(text.length - 800) : text;
+  }
+
+  /// 当前正在编辑的章节序号；找不到时返回 null。
+  int? _currentChapterNo(List<AuthorChapterItem> chapters) {
+    for (final chapter in chapters) {
+      if (chapter.chapterId == _chapterId) return chapter.chapterNo;
+    }
+    return null;
   }
 
   /// 前情摘要（当前集之前最近 6 章、合计 ≤1800 字）：补上「前几章摘要」这一环，
