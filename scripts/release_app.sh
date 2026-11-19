@@ -168,7 +168,9 @@ UPDATE sys_config SET config_value='$VERSION_NAME' WHERE config_key='app.version
 UPDATE sys_config SET config_value='$SERVER_ORIGIN/profile/app/$FILE_NAME' WHERE config_key='app.version.android.url';
 UPDATE sys_config SET config_value='$SIZE' WHERE config_key='app.version.android.size';
 UPDATE sys_config SET config_value='$NOTES_SQL' WHERE config_key='app.version.android.notes';"
-  "$MYSQL_BIN" -h "$DB_HOST_V" -u "$DB_USER_V" -p"$DB_PASS_V" -D "$DB_NAME_V" -e "$SQL" 2>&1 \
+  # 中文更新说明不能走 -e 参数：Windows 上 mysql.exe 会按系统代码页（GBK）解释命令行，
+  # 把 UTF-8 的 notes 写成乱码。SQL 从标准输入喂进去，并显式声明 utf8mb4 连接字符集。
+  printf '%s\n' "$SQL" | "$MYSQL_BIN" --default-character-set=utf8mb4 -h "$DB_HOST_V" -u "$DB_USER_V" -p"$DB_PASS_V" -D "$DB_NAME_V" 2>&1 \
     | grep -v 'Using a password' || true
   echo "sys_config 已更新"
 
