@@ -15,26 +15,53 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-  test('platform avatars use current host and retain gateway prefix', () {
-    const path = '/profile/upload/2026/10/09/avatar.png';
+  test('public media comes from remote storage, not the local backend', () {
+    const path = '/profile/upload/2026-10-09/avatar.png';
     for (final value in [
       path,
       'http://localhost:8080$path',
       'http://10.0.2.2:8080$path',
       'https://old.test/gateway$path'
     ]) {
-      expect(avatarUrl(value, baseUrl: 'http://10.0.2.2:8080/api/v1'),
-          'http://10.0.2.2:8080$path');
-      expect(avatarUrl(value, baseUrl: 'https://api.test/gateway/api/v1/'),
+      expect(
+          avatarUrl(value,
+              baseUrl: 'http://10.0.2.2:8080/api/v1',
+              mediaBaseUrl: 'https://storage.test'),
+          'https://storage.test$path');
+      // 未配置远端存储时退回接口 origin（单机部署旧行为），网关前缀保留
+      expect(
+          avatarUrl(value,
+              baseUrl: 'https://api.test/gateway/api/v1/', mediaBaseUrl: ''),
           'https://api.test/gateway$path');
     }
     expect(
-        avatarUrl('/profile/avatar/a.jpg', baseUrl: 'https://api.test/api/v1'),
+        avatarUrl('/profile/avatar/a.jpg',
+            baseUrl: 'https://api.test/api/v1', mediaBaseUrl: ''),
         'https://api.test/profile/avatar/a.jpg');
     expect(
         avatarUrl('http://old.test/profile/upload/a%20b.png',
-            baseUrl: 'https://api.test/api/v1'),
+            baseUrl: 'https://api.test/api/v1', mediaBaseUrl: ''),
         'https://api.test/profile/upload/a%20b.png');
+  });
+
+  test('signed contract material stays on the backend that issued it', () {
+    const material = '/profile/upload/contract/2026/11/c16/page_0.png';
+    for (final value in [
+      '$material?sig=abc&exp=1',
+      'http://10.0.2.2:8080$material?sig=abc&exp=1',
+      'https://old.test/gateway$material?sig=abc&exp=1'
+    ]) {
+      expect(
+          avatarUrl(value,
+              baseUrl: 'http://10.0.2.2:8080/api/v1',
+              mediaBaseUrl: 'https://storage.test'),
+          'http://10.0.2.2:8080$material?sig=abc&exp=1');
+    }
+    expect(
+        avatarUrl('/profile/contract/12/signed.pdf?sig=k',
+            baseUrl: 'https://api.test/gateway/api/v1',
+            mediaBaseUrl: 'https://storage.test'),
+        'https://api.test/gateway/profile/contract/12/signed.pdf?sig=k');
   });
 
   test('external avatars stay unchanged and unsafe protocols are rejected', () {
@@ -49,6 +76,26 @@ void main() {
     ]) {
       expect(avatarUrl(value), '');
     }
+  });
+
+  test('traversal is normalized away before the storage host is attached', () {
+    // Uri.parse 已折叠 `\..\`，锚点仍在，按归一后的路径挂到远端存储
+    expect(
+        avatarUrl(r'http://10.0.2.2:8080/profile/upload\..\x.png',
+            mediaBaseUrl: 'https://storage.test'),
+        'https://storage.test/profile/x.png');
+    // `../../` 被折叠后 /profile 锚点消失，原样返回，不会拼到存储域名
+    for (final value in [
+      '/profile/upload/../../etc/passwd',
+      'http://10.0.2.2:8080/profile/upload/../../etc/x.png'
+    ]) {
+      expect(avatarUrl(value, mediaBaseUrl: 'https://storage.test'),
+          isNot(contains('storage.test')));
+    }
+    expect(
+        avatarUrl('http://10.0.2.2:8080/profile/upload/a..b.png',
+            mediaBaseUrl: 'https://storage.test'),
+        'https://storage.test/profile/upload/a..b.png');
   });
 
   test('picker cancellation does not produce an image', () async {

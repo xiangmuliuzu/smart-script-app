@@ -56,6 +56,10 @@ App 启动 / 切回前台 / 「我的 → 检查更新」时请求后端公开�
 flutter run --dart-define=BASE_URL=http://10.0.2.2:8080/api/v1
 ```
 
+图片/印章/作品封面这类公开媒体不取本机 `uploadPath`，一律从远端存储读（口径同 PC 端 vite dev 的 `VITE_REMOTE_MEDIA_BASE`），
+所以连本机后端联调也能看到别人上传的原件。要换存储地址用 `--dart-define=MEDIA_BASE_URL=https://your.host`；
+留空则退回接口所在 origin（单机部署）。合同签章材料带后端签名，仍回到签发它的那个后端，不受此项影响。
+
 ## 校验
 
 ```powershell
