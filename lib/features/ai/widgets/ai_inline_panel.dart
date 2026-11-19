@@ -544,7 +544,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                 '结果或反转：……\n结尾钩子：……\n'
                 '「开场承接」写清上一集停在哪、本集从哪个动作接起、隔了多久；换场要写明理由。\n'
                 '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋；'
-                '不写场景头、镜号、景别、运镜。',
+                '不写场景头、镜号、景别、运镜；事件卡只写叙事摘要，不写成「角色名：台词」的剧本体。',
             genre: '',
             style: '续写 $episodeCount 集，每集 $minuteLabel',
             skillId: _skillId,
