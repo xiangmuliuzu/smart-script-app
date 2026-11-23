@@ -9,6 +9,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -392,15 +393,9 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     }
   }
 
-  static String _fmtDate(DateTime? dt) {
-    if (dt == null) return '-';
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-  }
+  static String _fmtDate(DateTime? dt) => AppTime.formatDate(dt);
 
-  static String _fmtDateTime(DateTime? dt) {
-    if (dt == null) return '-';
-    return '${_fmtDate(dt)} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
+  static String _fmtDateTime(DateTime? dt) => AppTime.formatDateTime(dt);
 }
 
 /// 进行中倒计时条：只展示当前活动轮的剩余时间（后续轮次时限见下方验收面板）。

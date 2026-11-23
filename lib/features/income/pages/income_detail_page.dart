@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../data/income_models.dart';
 import '../data/income_providers.dart';
 
@@ -342,15 +343,7 @@ class _DetailTile extends StatelessWidget {
     );
   }
 
-  String _fmtDate(DateTime? dt) {
-    if (dt == null) return '';
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    final h = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '$y-$m-$d $h:$min';
-  }
+  String _fmtDate(DateTime? dt) => dt == null ? '' : AppTime.formatDateTime(dt);
 }
 
 class _EmptyHint extends StatelessWidget {

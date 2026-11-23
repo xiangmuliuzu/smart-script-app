@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../user_center/data/paged_data.dart';
 import '../data/trade_models.dart';
 import '../data/trade_providers.dart';
@@ -308,6 +309,7 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '';
-    return '${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    final b = AppTime.beijing(dt);
+    return '${b.month}/${b.day} ${AppTime.two(b.hour)}:${AppTime.two(b.minute)}';
   }
 }

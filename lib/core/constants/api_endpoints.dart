@@ -305,6 +305,7 @@ class ApiEndpoints {
   static const String appOrderList = '/trade/order/list';
   static String appOrderById(int orderId) => '/trade/order/$orderId';
   static String appOrderPay(int orderId) => '/trade/order/$orderId/pay';
+  static String appOrderDirectPay(int orderId) => '/trade/order/$orderId/pay/direct-pay';
   static String appOrderCancel(int orderId) => '/trade/order/$orderId/cancel';
   /// 版权交割（交易域）
   static const String appDeliveryList = '/trade/delivery/list';

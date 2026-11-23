@@ -6,6 +6,8 @@
 ///   - 支付 ← /trade/promotion/{applyId}/pay、/confirm
 library;
 
+import '../../../core/utils/app_time.dart';
+
 double _toDouble(dynamic value) {
   if (value is num) return value.toDouble();
   if (value is String) return double.tryParse(value) ?? 0;
@@ -30,10 +32,7 @@ String _toText(dynamic value) => value == null ? '' : value.toString();
 
 String? _toTextOrNull(dynamic value) => value?.toString();
 
-DateTime? _parseDate(String? value) {
-  if (value == null || value.isEmpty) return null;
-  return DateTime.tryParse(value.replaceFirst(' ', 'T'));
-}
+DateTime? _parseDate(String? value) => AppTime.parse(value);
 
 /// 资源位总览（当前用户视角只关心空闲 / 锁坑 / 投放）。
 class PromotionOverview {

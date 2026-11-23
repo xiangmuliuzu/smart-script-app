@@ -1,6 +1,8 @@
 /// 我的收益模块数据模型（独立于交易管理「作者收益」页）。
 library;
 
+import '../../../core/utils/app_time.dart';
+
 /// 收益总览。
 ///
 /// 金额字段单位：元（后端 overview 返回 BigDecimal 元）。
@@ -478,8 +480,4 @@ String formatSplitRate(num? rate) {
   return '${pct.toStringAsFixed(2)}%';
 }
 
-DateTime? _parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is DateTime) return value;
-  return DateTime.tryParse(value.toString());
-}
+DateTime? _parseDateTime(dynamic value) => AppTime.parse(value);

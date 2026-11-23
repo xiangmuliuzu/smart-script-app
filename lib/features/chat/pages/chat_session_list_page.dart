@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/utils/avatar_url.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -462,15 +463,13 @@ class _SessionSubItem extends ConsumerWidget {
 
 /// 每行都带钟点：今天 11:20 / 昨天 15:04 / 11-17 09:33
 String _formatSessionTime(DateTime time) {
-  final now = DateTime.now();
-  final hhmm = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  // 按自然日比较，不按 24 小时滚动，否则昨晚的消息今早会掉回「昨天」前缀
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(time.year, time.month, time.day);
-  final diff = today.difference(day).inDays;
+  final b = AppTime.beijing(time);
+  final hhmm = '${AppTime.two(b.hour)}:${AppTime.two(b.minute)}';
+  // 按北京自然日比较，不按 24 小时滚动，否则昨晚的消息今早会掉回「昨天」前缀
+  final diff = AppTime.dayDiffBeijing(time);
   if (diff <= 0) return '今天 $hhmm';
   if (diff == 1) return '昨天 $hhmm';
-  return '${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} $hhmm';
+  return '${AppTime.two(b.month)}-${AppTime.two(b.day)} $hhmm';
 }
 
 class _BizTypeOption {
