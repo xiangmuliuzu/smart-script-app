@@ -977,6 +977,8 @@ class _InfoBlock extends StatelessWidget {
           // 作者已上移到头部作者行（可点击进个人主页），信息区不再重复。
           _InfoRow(label: '字数', value: '${work.wordCount}'),
           _InfoRow(label: '集数', value: '${work.episodeCount}'),
+          if (work.copyrightRegistrationLabel != null)
+            _InfoRow(label: '版权登记状态', value: work.copyrightRegistrationLabel!),
           _InfoRow(
             label: '试读',
             value: work.previewEnabled

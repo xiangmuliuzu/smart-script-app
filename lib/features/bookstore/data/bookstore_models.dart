@@ -66,6 +66,7 @@ class BookItem {
     this.uploadType = '',
     this.lengthType = '',
     this.summary = '',
+    this.copyrightRegistrationStatus,
     this.price = 0,
     this.tradeEnabled = false,
     this.wordCount = 0,
@@ -103,6 +104,13 @@ class BookItem {
   final String uploadType;
   final String lengthType;
   final String summary;
+  final String? copyrightRegistrationStatus;
+
+  String? get copyrightRegistrationLabel => switch (copyrightRegistrationStatus) {
+        'registered' => '已登记',
+        'unregistered' => '未登记',
+        _ => null,
+      };
   final double price;
   final bool tradeEnabled;
   final int wordCount;
@@ -155,6 +163,7 @@ class BookItem {
         uploadType: _text(json['uploadType']),
         lengthType: _text(json['lengthType']),
         summary: _text(json['summary']),
+        copyrightRegistrationStatus: json['copyrightRegistrationStatus'] as String?,
         price: _decimal(json['price']),
         tradeEnabled: _flag(json['tradeEnabled']),
         wordCount: _int(json['wordCount']),

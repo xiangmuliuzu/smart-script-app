@@ -13,11 +13,13 @@ import '../ai/ai_quota_dialog.dart';
 import '../ai/data/ai_providers.dart';
 import '../ai/widgets/ai_model_selector.dart';
 import '../ai/widgets/ai_skill_selector.dart';
+import '../bookstore/data/content_providers.dart';
 import '../welfare/data/welfare_providers.dart';
 import 'data/ai_create_session.dart';
 import 'data/author_work_providers.dart';
 import 'data/create_providers.dart';
 import 'pages/ai_chapter_read_page.dart';
+import 'widgets/work_storyboard_tab.dart';
 
 /// AI 创作页（创作者端）：设定 → 大纲 → 章节三步，与 PC 创作者端流程一致。
 ///
@@ -951,6 +953,11 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
 
   Widget _chapterTile(int index) {
     final task = _chapters[index];
+    final saved = _workId > 0 && task.remote && task.chapterId > 0;
+    final storyboards = saved
+        ? ref.watch(workStoryboardsProvider(_workId)).valueOrNull
+        : null;
+    final storyboard = storyboardForChapter(storyboards, task.chapterId);
     final tone = switch (task.state) {
       'generating' => AppColors.warning,
       'generated' => AppColors.success,
@@ -1028,7 +1035,6 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                 ),
               ),
             if (task.state == 'generated')
-              if (task.state == 'generated')
                 InkWell(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -1047,6 +1053,29 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                     ),
                   ),
                 ),
+            if (saved)
+              Wrap(
+                spacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (storyboard != null)
+                    TextButton(
+                      onPressed: () =>
+                          openAuthorStoryboard(context, _workId, storyboard),
+                      child: Text('查看分镜 · ${authorStoryboardStatus(storyboard['status'])}'),
+                    ),
+                  TextButton.icon(
+                    onPressed: _running || _saving
+                        ? null
+                        : () => context.push(RoutePath.aiStoryboardUrl(
+                              workId: _workId,
+                              chapterId: task.chapterId,
+                            )),
+                    icon: const Icon(Icons.movie_filter_outlined, size: 16),
+                    label: const Text('为本章创作分镜'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

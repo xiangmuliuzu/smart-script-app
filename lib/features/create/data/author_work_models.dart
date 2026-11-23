@@ -87,6 +87,7 @@ class AuthorWorkItem {
     this.price,
     this.status = 'draft',
     this.shelfStatus = '',
+    this.copyrightRegistrationStatus,
     this.channelId,
     this.createTime,
     this.updateTime,
@@ -110,6 +111,13 @@ class AuthorWorkItem {
   /// 上架开关（后端 sys_work.status：on_shelf / off_shelf）。
   /// 列表接口未下发时为空字符串，调用方按审核状态兜底。
   final String shelfStatus;
+  final String? copyrightRegistrationStatus;
+
+  String? get copyrightRegistrationLabel => switch (copyrightRegistrationStatus) {
+        'registered' => '已登记',
+        'unregistered' => '未登记',
+        _ => null,
+      };
 
   /// 所属频道（146 男频 / 147 女频）；后端未设置时为 null。
   final int? channelId;
@@ -133,6 +141,7 @@ class AuthorWorkItem {
         price: _doubleOrNull(json['price']),
         status: _text(json['status']).isEmpty ? 'draft' : _text(json['status']),
         shelfStatus: _text(json['shelfStatus']),
+        copyrightRegistrationStatus: _textOrNull(json['copyrightRegistrationStatus']),
         channelId: _intOrNull(json['channelId']),
         createTime: _textOrNull(json['createTime']),
         updateTime: _textOrNull(json['updateTime']),

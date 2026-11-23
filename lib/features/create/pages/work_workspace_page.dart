@@ -10,8 +10,9 @@ import '../data/author_work_providers.dart';
 import '../widgets/work_chapter_tab.dart';
 import '../widgets/work_publish_tab.dart';
 import '../widgets/work_settings_tab.dart';
+import '../widgets/work_storyboard_tab.dart';
 
-/// 作品工作台（写作范式：章节 / 设置 / 发布 三 Tab）。
+/// 作品工作台（章节 / 分镜 / 设置 / 发布）。
 ///
 /// 单一数据源为 [authorWorkDetailProvider]（A 套作品详情，含章节与最近审核）；
 /// 默认落在「章节」Tab，符合「作品=章节集合」的写作心智。
@@ -38,7 +39,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -82,6 +83,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
             indicatorSize: TabBarIndicatorSize.label,
             tabs: const [
               Tab(text: '章节'),
+              Tab(text: '分镜'),
               Tab(text: '设置'),
               Tab(text: '发布'),
             ],
@@ -95,6 +97,11 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
                 workId: widget.workId,
                 chapters: detail.chapters,
                 editable: detail.work.editable,
+              ),
+              WorkStoryboardTab(
+                workId: widget.workId,
+                editable: detail.work.editable,
+                hasChapters: detail.chapters.isNotEmpty,
               ),
               WorkSettingsTab(detail: detail),
               WorkPublishTab(workId: widget.workId, detail: detail),

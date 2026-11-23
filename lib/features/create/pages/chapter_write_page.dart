@@ -5,11 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../ai/widgets/ai_inline_panel.dart';
+import '../../bookstore/data/content_providers.dart';
 import '../data/author_work_models.dart';
 import '../data/author_work_providers.dart';
+import '../widgets/work_storyboard_tab.dart';
 
 /// 全屏章节写作编辑器（番茄作家助手式）。
 ///
@@ -74,6 +77,34 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
   /// 审核通过后可单独设置试读。
   bool _isFree = false;
   bool _trialSaving = false;
+  bool _openingStoryboard = false;
+
+  Future<void> _openStoryboardCreator() async {
+    if (!_editable || _openingStoryboard) return;
+    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty) {
+      _toast('请先填写章节标题和正文');
+      return;
+    }
+    setState(() => _openingStoryboard = true);
+    FocusScope.of(context).unfocus();
+    _autoSaveTimer?.cancel();
+    try {
+      if (_dirty || _chapterId == 0 || _savingFuture != null) {
+        if (!await _save() || !mounted) return;
+      }
+      if (!mounted) return;
+      if (_dirty || _chapterId <= 0) {
+        _toast('当前章节有未保存的修改，请先保存后重试');
+        return;
+      }
+      await context.push(RoutePath.aiStoryboardUrl(
+        workId: widget.workId,
+        chapterId: _chapterId,
+      ));
+    } finally {
+      if (mounted) setState(() => _openingStoryboard = false);
+    }
+  }
 
   bool get _canSetTrial {
     if (!_editable || _dirty || _chapterId == 0) return false;
@@ -387,6 +418,10 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
 
     final isNew = _chapterId == 0;
     final appTitle = isNew ? '新建章节' : '编辑章节';
+    final storyboards = !isNew && detail != null
+        ? ref.watch(workStoryboardsProvider(widget.workId))
+        : null;
+    final storyboard = storyboardForChapter(storyboards?.valueOrNull, _chapterId);
 
     return PopScope(
       canPop: false,
@@ -444,6 +479,50 @@ class _ChapterWritePageState extends ConsumerState<ChapterWritePage> {
                     ),
                   ),
                   const Divider(height: 0.5, color: AppColors.divider),
+                  if (_editable || storyboard != null || storyboards?.hasError == true)
+                    Container(
+                      color: AppColors.card,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.movie_filter_outlined,
+                              size: 17, color: AppColors.text3),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              storyboard != null
+                                  ? '分镜：${authorStoryboardStatus(storyboard['status'])}'
+                                  : storyboards?.hasError == true
+                                      ? '分镜状态读取失败'
+                                      : storyboards?.isLoading == true
+                                          ? '正在读取分镜'
+                                          : '本章分镜',
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppColors.text2),
+                            ),
+                          ),
+                          if (storyboard != null)
+                            TextButton(
+                              onPressed: () => openAuthorStoryboard(
+                                  context, widget.workId, storyboard),
+                              child: const Text('查看'),
+                            )
+                          else if (storyboards?.hasError == true)
+                            TextButton(
+                              onPressed: () => ref.invalidate(
+                                  workStoryboardsProvider(widget.workId)),
+                              child: const Text('重试'),
+                            ),
+                          if (_editable)
+                            TextButton(
+                              onPressed: _openingStoryboard || _saving
+                                  ? null
+                                  : _openStoryboardCreator,
+                              child: const Text('AI 分镜'),
+                            ),
+                        ],
+                      ),
+                    ),
                   if (_canSetTrial) ...[
                     Container(
                       color: AppColors.card,

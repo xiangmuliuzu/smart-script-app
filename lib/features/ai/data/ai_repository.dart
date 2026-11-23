@@ -480,6 +480,7 @@ class AiRepository {
     int? skillId,
     String? model,
     int? workId,
+    String? chapterTitle,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -490,6 +491,8 @@ class AiRepository {
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
         if (workId != null) 'workId': workId,
+        if (chapterTitle != null && chapterTitle.isNotEmpty)
+          'chapterTitle': chapterTitle,
       },
       receiveTimeout: _aiReceiveTimeout,
     );

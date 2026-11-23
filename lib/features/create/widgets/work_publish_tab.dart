@@ -147,6 +147,8 @@ class _WorkPublishTabState extends ConsumerState<WorkPublishTab> {
           child: Column(
             children: [
               _InfoRow(label: '作品状态', value: work.statusLabel),
+              if (work.copyrightRegistrationLabel != null)
+                _InfoRow(label: '版权登记状态', value: work.copyrightRegistrationLabel!),
               _InfoRow(
                   label: '书城状态',
                   value: isOnShelf

@@ -251,7 +251,7 @@ class RoutePath {
   /// 内容举报 URL（接口 2.8.17）；举报对象为外部视频。
   static String dramaReportUrl(int dramaId) => '$dramaReport?id=$dramaId';
 
-  /// 作品工作台 URL（写作范式：章节 / 设置 / 发布 三 Tab）。
+  /// 作品工作台 URL（章节 / 分镜 / 设置 / 发布）。
   ///
   /// 工作台内部以 A 套 `GET /users/me/works/{workId}` 为单一数据源，
   /// 只需 workId；[title] 仅用于详情加载完成前的 AppBar 占位。
@@ -371,6 +371,13 @@ class RoutePath {
   static const String aiCreate = '/ai/create';
   static const String aiPolish = '/ai/polish';
   static const String aiStoryboard = '/ai/storyboard';
+  static String aiStoryboardUrl({required int workId, int? chapterId}) => Uri(
+        path: aiStoryboard,
+        queryParameters: {
+          'workId': '$workId',
+          if (chapterId != null && chapterId > 0) 'chapterId': '$chapterId',
+        },
+      ).toString();
   static const String aiRecords = '/ai/records';
   static const String aiOpportunity = '/ai/opportunity';
 }

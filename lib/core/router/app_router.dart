@@ -603,7 +603,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePath.aiStoryboard,
         name: RouteName.aiStoryboard,
-        builder: (_, __) => const AiStoryboardPage(),
+        builder: (_, state) {
+          final query = state.uri.queryParameters;
+          return AiStoryboardPage(
+            workId: int.tryParse(query['workId'] ?? ''),
+            chapterId: int.tryParse(query['chapterId'] ?? ''),
+          );
+        },
       ),
       GoRoute(
         path: RoutePath.aiRecords,
