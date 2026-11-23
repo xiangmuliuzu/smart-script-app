@@ -484,15 +484,24 @@ class CopyrightPayOrder {
 
 /// 版权沙箱支付下单结果
 class CopyrightPaymentQr {
-  const CopyrightPaymentQr({required this.qrCode, this.sandbox = true});
+  const CopyrightPaymentQr({
+    required this.qrCode,
+    this.sandbox = true,
+    this.alreadyPaid = false,
+    this.applyId,
+  });
 
   final String qrCode;
   final bool sandbox;
+  final bool alreadyPaid;
+  final int? applyId;
 
   factory CopyrightPaymentQr.fromJson(Map<String, dynamic> json) =>
       CopyrightPaymentQr(
         qrCode: _text(json['qrCode']),
         sandbox: json['sandbox'] == true,
+        alreadyPaid: json['paid'] == true,
+        applyId: json['applyId'] == null ? null : _int(json['applyId']),
       );
 }
 

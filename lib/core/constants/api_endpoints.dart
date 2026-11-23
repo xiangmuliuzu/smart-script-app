@@ -198,6 +198,12 @@ class ApiEndpoints {
   static String tradePromotionConfirm(int applyId) =>
       '/trade/promotion/$applyId/confirm';
 
+  /// 版权登记费沙箱支付（返回 qrCode）/ 查询支付结果
+  static String tradeCopyrightPay(int payOrderId) =>
+      '/trade/copyright/$payOrderId/pay';
+  static String tradeCopyrightConfirm(int payOrderId) =>
+      '/trade/copyright/$payOrderId/confirm';
+
   /// App 域头像上传（multipart，字段名 `file`）。
   ///
   /// 不走平台原生的 `/common/upload`：该端点属于 PC 凭证链，App Token 无法通过鉴权，
