@@ -977,6 +977,12 @@ class _InfoBlock extends StatelessWidget {
           // 作者已上移到头部作者行（可点击进个人主页），信息区不再重复。
           _InfoRow(label: '字数', value: '${work.wordCount}'),
           _InfoRow(label: '集数', value: '${work.episodeCount}'),
+          // 版权状态：以已签发的版权证书为准（列表/无证书的作品显示未登记）。
+          _InfoRow(
+            label: '版权',
+            value: work.hasCopyright ? '已登记' : '未登记',
+            valueColor: work.hasCopyright ? AppColors.primary : AppColors.text3,
+          ),
           _InfoRow(
             label: '试读',
             value: work.previewEnabled
@@ -994,10 +1000,13 @@ class _InfoBlock extends StatelessWidget {
 
 /// 「标签 - 值」信息行（信息区通用）。
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+  const _InfoRow({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;
+
+  /// 值文字颜色；为空时使用正文色。用于版权等需要强调的状态。
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1013,7 +1022,10 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               value.isEmpty ? '—' : value,
-              style: const TextStyle(fontSize: 13, color: AppColors.text1),
+              style: TextStyle(
+                fontSize: 13,
+                color: valueColor ?? AppColors.text1,
+              ),
             ),
           ),
         ],
