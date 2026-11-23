@@ -207,9 +207,14 @@ class TradeRepository {
     return data ?? const <String, dynamic>{'paid': false};
   }
 
-  /// APP取消订单（仅 confirmed 可取消，双方签署完成前；买卖双方任一方可发起）。
+  /// APP取消订单（仅买方可发起，付款前有效：confirmed 或未付款的 paying）。
   Future<void> appCancelOrder(int orderId) async {
     await _api.post<void>(ApiEndpoints.appOrderCancel(orderId));
+  }
+
+  /// 测试直付：跳过支付宝沙箱，订单直接按已付款进入交割（与版权零元直付同性质）。
+  Future<void> appDirectPayOrder(int orderId) async {
+    await _api.post<void>(ApiEndpoints.appOrderDirectPay(orderId));
   }
 
   // ==================== 财务域（收益） ====================
