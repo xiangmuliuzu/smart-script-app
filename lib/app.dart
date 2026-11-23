@@ -47,15 +47,21 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
     });
   }
 
-  /// 冷启动版本检查：有更新就弹「立即更新 / 稍后」，用户选择稍后不再打扰。
+  /// 冷启动版本检查：有更新就弹「立即更新 / 稍后」。
+  ///
+  /// 自动弹窗一天只弹一次（见 [AppUpdateChecker]），用户选择稍后当天不再打扰。
   Future<void> _checkForUpdate() async {
     if (rootNavigatorKey.currentContext == null) return;
     try {
-      final prompt =
-          await ref.read(appUpdateCheckerProvider).checkForLaunch();
+      final checker = ref.read(appUpdateCheckerProvider);
+      final prompt = await checker.checkForLaunch();
       if (prompt == null || !mounted) return;
       final dialogContext = rootNavigatorKey.currentContext;
       if (dialogContext == null || !dialogContext.mounted) return;
+      // 先记下「今天已弹过」再弹：弹窗期间 App 可能被切后台再回来，
+      // 记录落盘后那条 resumed 就不会重复弹出同一个更新。
+      await checker.markPromptShown();
+      if (!dialogContext.mounted) return;
       await showUpdateDialog(
         context: dialogContext,
         prompt: prompt,
@@ -143,7 +149,10 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
 }
 
 /// 从后台切回前台时再查一次版本：用户可能长时间停留在旧版本上，
-/// 冷启动那一轮已经错过新包。与冷启动共用 [AppUpdateChecker]（同一版本不重复弹）。
+/// 冷启动那一轮已经错过新包。
+///
+/// 但下拉通知栏、回桌面再回来都会触发 `resumed`，所以这条路径与冷启动共用
+/// 「一天只弹一次」的限制（[AppUpdateChecker.checkOnResume]）；当次运行内也只弹一次。
 class AppLifecycleUpdateCheck extends ConsumerStatefulWidget {
   const AppLifecycleUpdateCheck({super.key, required this.child});
 
@@ -179,18 +188,22 @@ class _AppLifecycleUpdateCheckState
 
   Future<void> _check() async {
     try {
-      final prompt = await ref.read(appUpdateCheckerProvider).checkManually();
+      final checker = ref.read(appUpdateCheckerProvider);
+      final prompt = await checker.checkOnResume();
       if (prompt == null || !mounted) return;
       final dialogContext = rootNavigatorKey.currentContext;
       if (dialogContext == null || !dialogContext.mounted) return;
       _promptVisible = true;
+      // 与冷启动一致：先记下「今天已弹过」，避免弹窗期间切后台再回来重复弹出。
+      await checker.markPromptShown();
+      if (!dialogContext.mounted) return;
       await showUpdateDialog(
         context: dialogContext,
         prompt: prompt,
         repository: ref.read(appUpdateRepositoryProvider),
       );
     } catch (_) {
-      // 静默失败：下次切回前台再试。
+      // 静默失败：下次切回前台再试（当天已弹过时不会再打断用户）。
     } finally {
       _promptVisible = false;
     }

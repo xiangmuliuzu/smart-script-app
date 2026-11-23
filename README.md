@@ -38,6 +38,9 @@ flutter build apk --debug
 App 启动 / 切回前台 / 「我的 → 检查更新」时请求后端公开接口 `GET /api/v1/app/version`，
 按 `versionCode`（build 号）判断是否有新版本：有更新弹窗，可在应用内下载 APK，
 下载完成后调用系统安装器（首次需在系统设置允许「安装未知应用」）。
+自动弹窗（启动与切回前台）一天最多一次，采用本地日期记录（`SharedPreferences` 的
+`app_update_prompt_day`），下拉通知栏、回桌面再回来不会重复弹出；强制更新不受此限制，
+「我的 → 检查更新」也始终可手动触发。
 
 - 版本信息全部来自管理端「系统管理 → 参数设置」（`sys_config`），改完立即生效：
   `app.version.android.versionName / versionCode / url / size / notes / minVersionCode / enabled`；
