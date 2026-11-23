@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/services/native_file_picker.dart';
 import '../data/copyright_models.dart';
 import '../data/copyright_providers.dart';
@@ -139,9 +140,9 @@ class _CopyrightFormPageState extends ConsumerState<CopyrightFormPage> {
   Future<void> _selectCompleteTime() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _completeTime ?? DateTime.now(),
+      initialDate: _completeTime ?? AppTime.nowBeijing(),
       firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
+      lastDate: AppTime.nowBeijing(),
     );
     
     if (picked != null) {

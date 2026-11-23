@@ -8,6 +8,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/services/native_file_picker.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../bookstore/widgets/bookstore_widgets.dart';
 import '../../create/data/author_work_models.dart';
@@ -54,7 +55,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
+    final now = AppTime.nowBeijing();
     _startDate = DateTime(now.year, now.month, now.day);
   }
 
@@ -679,7 +680,7 @@ class _PromotionCreatePageState extends ConsumerState<PromotionCreatePage> {
   }
 
   Widget _buildDateChip(int index) {
-    final now = DateTime.now();
+    final now = AppTime.nowBeijing();
     final base = DateTime(now.year, now.month, now.day);
     final date = base.add(Duration(days: index));
     final selected = _startDate.year == date.year &&

@@ -2,6 +2,7 @@
 ///
 /// 字段对齐后端 domain：ChatSession / ChatMessage。
 /// 会话类型：ADMIN（用户与管理员沟通）/ TRADE（买卖双方交易沟通）/ DEMAND（平台运营与创作者就某任务沟通）。
+import '../../../core/utils/app_time.dart';
 
 // ==================== 会话类型 ====================
 
@@ -253,16 +254,7 @@ class ChatMessage {
 
 // ==================== 工具函数 ====================
 
-DateTime? _parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is String && value.isNotEmpty) {
-    return DateTime.tryParse(value);
-  }
-  if (value is int) {
-    return DateTime.fromMillisecondsSinceEpoch(value);
-  }
-  return null;
-}
+DateTime? _parseDateTime(dynamic value) => AppTime.parse(value);
 
 // ==================== 交易会话定型文模板 ====================
 

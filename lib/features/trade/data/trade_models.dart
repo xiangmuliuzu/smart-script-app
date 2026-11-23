@@ -5,6 +5,8 @@
 /// 金额单位：分（后端 BigDecimal 序列化后为 double，前端展示时 /100）。
 library;
 
+import '../../../core/utils/app_time.dart';
+
 // ==================== 时长展示 ====================
 
 /// 时长统一按小时存储/填写，展示时自动折算为「X 天 Y 小时」（兼容历史天+小时数据）。
@@ -838,29 +840,13 @@ class SourceScript {
 
 // ==================== 工具函数 ====================
 
-DateTime? _parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is String) {
-    if (value.isEmpty) return null;
-    return DateTime.tryParse(value);
-  }
-  if (value is int) {
-    return DateTime.fromMillisecondsSinceEpoch(value);
-  }
-  return null;
-}
+DateTime? _parseDateTime(dynamic value) => AppTime.parse(value);
 
 /// 格式化日期
-String formatDate(DateTime? dt) {
-  if (dt == null) return '-';
-  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-}
+String formatDate(DateTime? dt) => AppTime.formatDate(dt);
 
 /// 格式化日期时间
-String formatDateTime(DateTime? dt) {
-  if (dt == null) return '-';
-  return '${formatDate(dt)} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-}
+String formatDateTime(DateTime? dt) => AppTime.formatDateTime(dt);
 
 // ==================== 验收轮次模型 ====================
 
@@ -992,7 +978,7 @@ class DemandStage {
   /// 绝对截止文案：“X月X日 HH:mm”；未激活返回 null。
   String? get absoluteDueText {
     if (dueAt == null) return null;
-    final dt = dueAt!.toLocal();
+    final dt = AppTime.beijing(dueAt!);
     return '${dt.month}月${dt.day}日 '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
@@ -1106,7 +1092,7 @@ class DemandExtendApply {
 
   /// 申请时间文案“X月X日 HH:mm”。
   String get appliedText {
-    final dt = appliedAt?.toLocal();
+    final dt = appliedAt != null ? AppTime.beijing(appliedAt!) : null;
     if (dt == null) return '';
     return '${dt.month}月${dt.day}日 '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -1114,7 +1100,7 @@ class DemandExtendApply {
 
   /// 顺延后新截止文案“X月X日 HH:mm”（待处理/驳回无值，返回空串）。
   String get dueAfterText {
-    final dt = dueAfter?.toLocal();
+    final dt = dueAfter != null ? AppTime.beijing(dueAfter!) : null;
     if (dt == null) return '';
     return '${dt.month}月${dt.day}日 '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

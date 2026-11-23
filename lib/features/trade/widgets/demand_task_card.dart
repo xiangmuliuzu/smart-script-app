@@ -7,6 +7,7 @@ import '../../../core/constants/demand_genre.dart';
 import '../../../core/constants/demand_task_type.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../data/trade_models.dart';
 
 /// 任务广场门户卡片。
@@ -301,15 +302,13 @@ class _DeadlineBadgeState extends State<_DeadlineBadge> {
     // 待接单（open）：基于发布截止日 deadline
     final dt = task.deadline;
     if (dt == null) return const _DeadlineInfo('长期', _DeadlineTone.neutral);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final target = DateTime(dt.year, dt.month, dt.day);
-    final diff = target.difference(today).inDays;
+    final b = AppTime.beijing(dt);
+    final diff = -AppTime.dayDiffBeijing(dt);
     if (diff < 0) return const _DeadlineInfo('已过期', _DeadlineTone.overdue);
     if (diff == 0) return const _DeadlineInfo('今天到期', _DeadlineTone.urgent);
     if (diff == 1) return const _DeadlineInfo('明天到期', _DeadlineTone.urgent);
     if (diff <= 3) return _DeadlineInfo('剩 $diff 天', _DeadlineTone.urgent);
-    return _DeadlineInfo('${dt.month}月${dt.day}日截止', _DeadlineTone.neutral);
+    return _DeadlineInfo('${b.month}月${b.day}日截止', _DeadlineTone.neutral);
   }
 
   @override
