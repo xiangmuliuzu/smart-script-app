@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/app_time.dart';
 import 'apk_installer.dart';
 import 'app_update_repository.dart';
 import 'app_version_models.dart';
@@ -88,12 +89,9 @@ class AppUpdateChecker {
     }
   }
 
-  static String _today() {
-    final now = DateTime.now();
-    final month = now.month.toString().padLeft(2, '0');
-    final day = now.day.toString().padLeft(2, '0');
-    return '${now.year}-$month-$day';
-  }
+  /// 当天日期按北京自然日取：设备时区不可信（见 [AppTime]），跨时区或改系统时间
+  /// 都不应让「一天一次」提前失效或重复触发。
+  static String _today() => AppTime.formatDate(AppTime.nowBeijing());
 }
 
 final appUpdateCheckerProvider = Provider<AppUpdateChecker>(

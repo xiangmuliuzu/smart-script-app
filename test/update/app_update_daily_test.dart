@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:script_app/core/network/api_client.dart';
+import 'package:script_app/core/utils/app_time.dart';
 import 'package:script_app/features/update/data/apk_installer.dart';
 import 'package:script_app/features/update/data/app_update_providers.dart';
 import 'package:script_app/features/update/data/app_update_repository.dart';
@@ -37,10 +38,13 @@ const _forcedUpdate = AppVersionInfo(
   notes: '必要更新',
 );
 
+// 「一天」按北京自然日计算（与检查器内 AppTime.formatDate 同一口径）。
 String _dayText(DateTime day) {
   final month = day.month.toString().padLeft(2, '0');
   return '${day.year}-$month-${day.day.toString().padLeft(2, '0')}';
 }
+
+String _today() => _dayText(AppTime.nowBeijing());
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -73,7 +77,7 @@ void main() {
 
   test('当天已记录弹窗日期时，重新启动进程也不再弹', () async {
     await prefs.setString(
-        AppUpdateChecker.promptDayKey, _dayText(DateTime.now()));
+        AppUpdateChecker.promptDayKey, _today());
 
     final relaunched = await checker(_normalUpdate);
     expect(await relaunched.checkForLaunch(), isNull);
@@ -81,7 +85,7 @@ void main() {
 
   test('记录的是昨天时，第二天照常弹一次', () async {
     await prefs.setString(AppUpdateChecker.promptDayKey,
-        _dayText(DateTime.now().subtract(const Duration(days: 1))));
+        _dayText(AppTime.nowBeijing().subtract(const Duration(days: 1))));
 
     final tomorrow = await checker(_normalUpdate);
     expect(await tomorrow.checkForLaunch(), isNotNull);
@@ -96,7 +100,7 @@ void main() {
 
   test('强制更新不受每日限制，切回前台仍会提醒', () async {
     await prefs.setString(
-        AppUpdateChecker.promptDayKey, _dayText(DateTime.now()));
+        AppUpdateChecker.promptDayKey, _today());
 
     final update = await checker(_forcedUpdate);
     final prompt = await update.checkForLaunch();
@@ -107,7 +111,7 @@ void main() {
 
   test('手动「检查更新」不受每日限制', () async {
     await prefs.setString(
-        AppUpdateChecker.promptDayKey, _dayText(DateTime.now()));
+        AppUpdateChecker.promptDayKey, _today());
 
     final update = await checker(_normalUpdate);
     expect(await update.checkManually(), isNotNull);
