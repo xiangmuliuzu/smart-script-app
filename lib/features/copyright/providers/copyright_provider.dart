@@ -152,9 +152,22 @@ class CopyrightProvider extends ChangeNotifier {
     );
   }
 
-  /// 临时直付：跳过支付宝沙箱，履约并提交第三方
+  /// 临时直付：跳过支付宝沙箱，履约并提交第三方（开发默认开启）
   Future<CopyrightPaymentConfirm> directPay(int payOrderId) async {
     final result = await _apiService.directPay(payOrderId);
+    if (result.paid) {
+      await refreshApplications();
+    }
+    return result;
+  }
+
+  /// 创建支付宝沙箱收款码
+  Future<CopyrightPaymentQr> createPayment(int payOrderId) =>
+      _apiService.createPayment(payOrderId);
+
+  /// 查询沙箱支付结果；成功后刷新申请列表
+  Future<CopyrightPaymentConfirm> confirmPayment(int payOrderId) async {
+    final result = await _apiService.confirmPayment(payOrderId);
     if (result.paid) {
       await refreshApplications();
     }

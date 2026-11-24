@@ -91,6 +91,13 @@ class SealRepository {
     );
   }
 
+  /// 启用印章（审核通过且停用中）。
+  Future<void> enableSeal(int sealId) async {
+    await _api.put<Map<String, dynamic>>(
+      '/content/copyright-seals/$sealId/enable',
+    );
+  }
+
   /// 更新印章信息（编辑印章名称、图片、材料，修改后重置审核状态为 pending）。
   Future<void> updateSeal({
     required int sealId,

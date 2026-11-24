@@ -7,6 +7,7 @@
 ///   POST /api/v1/content/copyright-seals/{sealId}/materials → 补充审核材料
 ///   PUT  /api/v1/content/copyright-seals/{sealId}/resubmit  → 重新提交印章
 ///   PUT  /api/v1/content/copyright-seals/{sealId}/disable   → 停用印章
+///   PUT  /api/v1/content/copyright-seals/{sealId}/enable    → 启用印章
 ///
 /// 全部为标准若依信封 {code, message, data}。
 library;
@@ -77,6 +78,9 @@ class SealItem {
 
   /// 是否可以停用（启用中即可；含「审核中但仍启用」的异常数据）。
   bool get canDisable => sealStatus == 'enabled';
+
+  /// 是否可以启用（审核通过且停用中）。
+  bool get canEnable => reviewStatus == 'approved' && sealStatus == 'disabled';
 
   /// 启用中须先停用才能提交编辑。
   bool get needsDisableBeforeEdit => sealStatus == 'enabled';

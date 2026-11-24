@@ -51,5 +51,38 @@ void main() {
       expect(notificationLandingOf(_tx('ORDER', '88'))?.label, '去处理：查看订单');
       expect(notificationLandingOf(_tx('CONTRACT', '88'))?.label, '去处理：签署合同');
     });
+
+    test('印章与版权通知直达对应业务页', () {
+      expect(
+        notificationLandingOf(MessageItem(
+          messageId: 1,
+          type: 'SEAL',
+          title: '印章审核已通过',
+          businessType: 'SEAL',
+          businessId: '9',
+        ))?.location,
+        RoutePath.sealDetailUrl(9),
+      );
+      expect(
+        notificationLandingOf(MessageItem(
+          messageId: 2,
+          type: 'COPYRIGHT',
+          title: '版权申请需补正',
+          businessType: 'COPYRIGHT_APPLY',
+          businessId: '15',
+        ))?.location,
+        RoutePath.copyrightApplicationDetailUrl(15),
+      );
+      expect(
+        notificationLandingOf(MessageItem(
+          messageId: 3,
+          type: 'COPYRIGHT',
+          title: '版权证书已颁发',
+          businessType: 'COPYRIGHT_CERT',
+          businessId: '42',
+        ))?.location,
+        RoutePath.copyrightCertificateDetailUrl(42),
+      );
+    });
   });
 }

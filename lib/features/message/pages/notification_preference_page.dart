@@ -127,6 +127,8 @@ class _NotificationPreferencePageState extends ConsumerState<NotificationPrefere
         PreferenceType.order => '订单生成、付款、完成及取消',
         PreferenceType.contract => '合同签署和签署完成',
         PreferenceType.system => '平台消息、公告和审核结果',
+        PreferenceType.copyright => '补正、驳回、发证与补正超时',
+        PreferenceType.seal => '印章审核通过与未通过',
         PreferenceType.follow => '关注的创作者发布新作品',
         PreferenceType.benefit => '福利相关消息',
         PreferenceType.transaction => '询盘、订单及合同通知',
