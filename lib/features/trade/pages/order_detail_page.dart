@@ -708,10 +708,14 @@ class OrderDetailPage extends ConsumerWidget {
       if (!context.mounted) return;
       // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
       bool paid = data['paid'] == true;
+      final qrCode = data['qrCode'];
+      if (!paid && (data['sandbox'] != true || qrCode is! String || qrCode.isEmpty)) {
+        throw StateError('支付宝沙箱暂不可用');
+      }
       if (!paid) {
         paid = await showDialog<bool>(
           context: context,
-          builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: data['qrCode'] as String),
+          builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: qrCode),
         ) ??
             false;
       }
@@ -721,7 +725,25 @@ class OrderDetailPage extends ConsumerWidget {
         ref.invalidate(deliveryByOrderProvider(id));
       }
     } catch (e) {
-      if (context.mounted) showAppToast(context, '发起沙箱支付失败：$e');
+      if (!context.mounted) return;
+      final message = e.toString();
+      if (!RegExp(r'沙箱.*(未配置|尚未配置|不可用|失败)').hasMatch(message)) {
+        showAppToast(context, '发起沙箱支付失败：$e');
+        return;
+      }
+      final paid = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => _SandboxPaymentDialog(
+          orderId: id,
+          qrCode: '',
+          sandboxAvailable: false,
+        ),
+      ) ?? false;
+      if (paid && context.mounted) {
+        showAppToast(context, '付款完成，订单进入交割');
+        ref.invalidate(appOrderDetailProvider(id));
+        ref.invalidate(deliveryByOrderProvider(id));
+      }
     }
   }
 
@@ -872,9 +894,14 @@ class _ContractContentViewState extends State<_ContractContentView> {
 }
 
 class _SandboxPaymentDialog extends ConsumerStatefulWidget {
-  const _SandboxPaymentDialog({required this.orderId, required this.qrCode});
+  const _SandboxPaymentDialog({
+    required this.orderId,
+    required this.qrCode,
+    this.sandboxAvailable = true,
+  });
   final int orderId;
   final String qrCode;
+  final bool sandboxAvailable;
   @override
   ConsumerState<_SandboxPaymentDialog> createState() => _SandboxPaymentDialogState();
 }
@@ -891,6 +918,7 @@ class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
   @override
   void initState() {
     super.initState();
+    if (!widget.sandboxAvailable) return;
     _pollTimer = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _check(silent: true),
@@ -970,41 +998,53 @@ class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('支付宝沙箱支付'),
+    title: Text(widget.sandboxAvailable ? '支付宝沙箱支付' : '订单支付'),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Text('测试支付，不会产生真实资金。请使用另一台设备上的支付宝沙箱钱包扫码。'),
+      Text(
+        widget.sandboxAvailable
+            ? '测试支付，不会产生真实资金。请使用另一台设备上的支付宝沙箱钱包扫码。'
+            : '支付宝沙箱暂不可用，可点击下方「跳过支付」继续交易流程。',
+        style: const TextStyle(fontSize: 13, height: 1.5),
+      ),
       const SizedBox(height: 12),
-      // QrImageView 内部用 LayoutBuilder，AlertDialog 量固有宽度时会抛异常导致弹窗不显示，
-      // 这里直接用 QrPainter 绘制固定尺寸。
-      Container(
-        width: 200,
-        height: 200,
-        color: Colors.white,
-        child: CustomPaint(
-          painter: QrPainter(
-            data: _qrCode,
-            version: QrVersions.auto,
-            gapless: true,
+      if (widget.sandboxAvailable) ...[
+        // QrImageView 内部用 LayoutBuilder，AlertDialog 量固有宽度时会抛异常导致弹窗不显示，
+        // 这里直接用 QrPainter 绘制固定尺寸。
+        Container(
+          width: 200,
+          height: 200,
+          color: Colors.white,
+          child: CustomPaint(
+            painter: QrPainter(
+              data: _qrCode,
+              version: QrVersions.auto,
+              gapless: true,
+            ),
           ),
         ),
-      ),
-      TextButton.icon(
-        onPressed: (_busy || _refreshing) ? null : _refresh,
-        icon: const Icon(Icons.refresh, size: 16),
-        label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.text1,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          visualDensity: VisualDensity.compact,
+        TextButton.icon(
+          onPressed: (_busy || _refreshing) ? null : _refresh,
+          icon: const Icon(Icons.refresh, size: 16),
+          label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.text1,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            visualDensity: VisualDensity.compact,
+          ),
         ),
-      ),
-      Text(_message ?? '等待支付结果…扫码完成后会自动确认',
-          style: TextStyle(fontSize: 12, color: _message == null ? Colors.grey.shade600 : Colors.red.shade600)),
+      ],
+      if (_message != null)
+        Text(_message!,
+            style: TextStyle(fontSize: 12, color: Colors.red.shade600))
+      else if (widget.sandboxAvailable)
+        const Text('等待支付结果…扫码完成后会自动确认',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
     ])),
     actions: [
       TextButton(onPressed: _checking ? null : () => Navigator.pop(context, false), child: const Text('关闭')),
       TextButton(onPressed: _busy ? null : _directPay, child: const Text('跳过支付（测试直付）')),
-      TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '我已完成支付')),
+      if (widget.sandboxAvailable)
+        TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '我已完成支付')),
     ],
   );
 }

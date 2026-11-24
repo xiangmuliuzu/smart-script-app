@@ -15,6 +15,7 @@ import '../../user_center/data/paged_data.dart';
 import '../data/chat_models.dart';
 import '../data/chat_providers.dart';
 import '../widgets/negotiation_status_bar.dart';
+import '../widgets/order_message_bubble.dart';
 import '../widgets/quote_input_card.dart';
 import '../widgets/quote_message_bubble.dart';
 import '../widgets/trade_template_sheet.dart';
@@ -427,6 +428,11 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             // 报价/议价类系统消息渲染为卡片
             if (QuoteMessageBubble.isQuoteMessage(message)) {
               return QuoteMessageBubble(message: message);
+            }
+            // 成交订单系统消息：可点击跳转订单详情（JSON 无效时回落为普通系统消息）
+            if (OrderMessageBubble.isOrderMessage(message) &&
+                OrderMessageBubble.parse(message) != null) {
+              return OrderMessageBubble(message: message);
             }
             final bubble = _MessageBubble(
               message: message,
