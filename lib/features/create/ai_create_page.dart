@@ -450,7 +450,12 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
     try {
       if (!mounted) return;
       final router = GoRouter.of(context);
-      await router.push(RoutePath.workWorkspaceUrl(workId: _workId, title: _titleCtrl.text.trim()));
+      // AI 起稿已经完成，作品工作台应替换当前 AI 流程页。
+      // 这样点击工作台左上角返回或使用系统返回时，会回到「我的作品」，
+      // 不会重新回到设定、大纲、章节这几个已完成的步骤。
+      await router.pushReplacement(
+        RoutePath.workWorkspaceUrl(workId: _workId, title: _titleCtrl.text.trim()),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
