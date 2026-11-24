@@ -186,6 +186,15 @@ class TradeRepository {
     return Order.fromJson(data);
   }
 
+  /// 按询盘查关联订单（会话页「查看订单」跳转用）；无订单返回 null。
+  Future<Map<String, dynamic>?> appOrderByInquiry(int inquiryId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appOrderByInquiry(inquiryId),
+      parser: _mapParser,
+    );
+    return (data == null || data.isEmpty) ? null : data;
+  }
+
   /// APP买方付款（paying → delivering）。
   /// [refresh] 为 true 时服务端换新商户单号重新预下单，用于收款码失效后换码。
   Future<Map<String, dynamic>> appPayOrder(int orderId, {bool refresh = false}) async {
