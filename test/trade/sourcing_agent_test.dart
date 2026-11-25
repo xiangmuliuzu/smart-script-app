@@ -201,6 +201,91 @@ void main() {
     expect(find.textContaining('抱歉，目前书城里暂时还没有找到', findRichText: true),
         findsOneWidget);
   });
+
+  testWidgets('有推荐作品与对比卡片时，冗长报告收敛为一两行简洁导语', (tester) async {
+    final adapter = _AgentAdapter();
+    await _mount(tester, adapter);
+    await tester.enterText(find.byType(TextField), '长文对比');
+    await tester.pump();
+    await tester.tap(find.text('发送'));
+    await tester.pumpAndSettle();
+    expect(find.text('作品推荐'), findsOneWidget);
+    expect(find.text('作品对比'), findsOneWidget);
+    expect(find.textContaining('workId'), findsNothing);
+    expect(find.textContaining('五维对比小结'), findsNothing);
+    expect(find.textContaining('为你筛选出 2 部推荐作品', findRichText: true),
+        findsOneWidget);
+  });
+
+  testWidgets('退出后 3 分钟内重进恢复上次对话，超过 3 分钟重置为默认欢迎页', (tester) async {
+    var now = DateTime(2026, 11, 25, 20, 0, 0);
+    final cache = SourcingAgentResumeCache(clock: () => now);
+    final adapter = _AgentAdapter();
+
+    tester.view.physicalSize = const Size(430, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = GoRouter(
+      initialLocation: '/home',
+      routes: [
+        GoRoute(
+          path: '/home',
+          builder: (context, _) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => context.push(RoutePath.sourcingAgent),
+                child: const Text('打开智能体'),
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: RoutePath.sourcingAgent,
+          builder: (_, __) => const SourcingAgentPage(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        apiClientProvider.overrideWithValue(_api(adapter)),
+        sourcingAgentResumeCacheProvider.overrideWithValue(cache),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ));
+    await tester.pumpAndSettle();
+
+    // 首次进入并发起一轮对话
+    await tester.tap(find.text('打开智能体'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('预算 5 万以内'));
+    await tester.pumpAndSettle();
+    expect(find.text('作品推荐'), findsOneWidget);
+
+    // 退出智能体页面
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('打开智能体'), findsOneWidget);
+
+    // 2 分 59 秒后重新进入：仍恢复上次对话
+    now = now.add(const Duration(minutes: 2, seconds: 59));
+    await tester.tap(find.text('打开智能体'));
+    await tester.pumpAndSettle();
+    expect(find.text('作品推荐'), findsOneWidget);
+    expect(find.textContaining('雾港回声', findRichText: true), findsWidgets);
+
+    // 再次退出，超过 3 分钟后重新进入：回到默认欢迎页
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    now = now.add(const Duration(minutes: 3, seconds: 1));
+    await tester.tap(find.text('打开智能体'));
+    await tester.pumpAndSettle();
+    expect(find.text('作品推荐'), findsNothing);
+    expect(find.text('你可以直接问我'), findsOneWidget);
+  });
 }
 
 Future<void> _mount(WidgetTester tester, _AgentAdapter adapter) async {
@@ -305,6 +390,21 @@ class _AgentAdapter implements HttpClientAdapter {
           unawaited(stream.close());
         }));
         return ResponseBody(stream.stream, 200, headers: _sseHeaders);
+      }
+      if (message == '长文对比') {
+        final works = [
+          _work,
+          {..._work, 'workId': 19, 'title': '云端来信'},
+        ];
+        return _sse([
+          _event('card', _card('work_list', {'works': works})),
+          _event('card', _card('work_comparison', {'works': works})),
+          _event('delta', {
+            'text':
+                '甜宠出海选本结论\n先说检索边界\n首选：雾港回声（workId 18），tradeType: exclusive，requiresLicenseType: true。\n\n五维对比小结\n| 维度 | 雾港回声 |\n| --- | --- |\n| 契合度 | 高 |\n需要你确认的字段非常多……'
+          }),
+          _event('done', {'messageId': 22, 'sessionTitle': '长文对比', 'tokens': 500}),
+        ]);
       }
       if (message.contains('甜宠')) {
         return _sse([

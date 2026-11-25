@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../core/network/friendly_error.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_page_background.dart';
@@ -14,6 +15,69 @@ import '../ai/data/ai_sse_parser.dart';
 import '../chat/data/chat_providers.dart';
 import 'sourcing_agent_cards.dart';
 import 'sourcing_agent_repository.dart';
+
+/// 退出 AI 选本页面后的短时会话恢复缓存（默认 3 分钟内重进恢复上次对话，超时重置为欢迎页）。
+final sourcingAgentResumeCacheProvider = Provider<SourcingAgentResumeCache>(
+  (ref) => SourcingAgentResumeCache(),
+);
+
+class SourcingAgentResumeCache {
+  SourcingAgentResumeCache({DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
+
+  static const Duration resumeWindow = Duration(minutes: 3);
+
+  final DateTime Function() _clock;
+  _ResumeSnapshot? _snapshot;
+
+  void _save({
+    required int? userId,
+    required int? sessionId,
+    required List<SourcingSession> sessions,
+    required List<_Entry> messages,
+  }) {
+    _snapshot = _ResumeSnapshot(
+      userId: userId,
+      sessionId: sessionId,
+      sessions: List<SourcingSession>.unmodifiable(sessions),
+      messages: messages.map(_Entry.clone).toList(growable: false),
+      leftAt: _clock(),
+    );
+  }
+
+  _ResumeSnapshot? _restore({required int? userId}) {
+    final snapshot = _snapshot;
+    if (snapshot == null) return null;
+    if (snapshot.userId != userId) {
+      _snapshot = null;
+      return null;
+    }
+    final elapsed = _clock().difference(snapshot.leftAt);
+    if (elapsed.isNegative || elapsed > resumeWindow) {
+      _snapshot = null;
+      return null;
+    }
+    return snapshot;
+  }
+
+  void clear() => _snapshot = null;
+}
+
+class _ResumeSnapshot {
+  const _ResumeSnapshot({
+    required this.userId,
+    required this.sessionId,
+    required this.sessions,
+    required this.messages,
+    required this.leftAt,
+  });
+
+  final int? userId;
+  final int? sessionId;
+  final List<SourcingSession> sessions;
+  final List<_Entry> messages;
+  final DateTime leftAt;
+}
 
 class SourcingAgentPage extends ConsumerStatefulWidget {
   const SourcingAgentPage({super.key});
@@ -34,6 +98,8 @@ class _SourcingAgentPageState extends ConsumerState<SourcingAgentPage> {
 
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  late final SourcingAgentResumeCache _resumeCache;
+  int? _ownerUserId;
   List<SourcingSession> _sessions = [];
   List<_Entry> _messages = [];
   int? _sessionId;
@@ -47,15 +113,55 @@ class _SourcingAgentPageState extends ConsumerState<SourcingAgentPage> {
       ref.read(sourcingAgentRepositoryProvider);
   bool get _busy => _loadingMessages || _turn != null;
 
+  int? _tryCurrentUserId() {
+    try {
+      return ref.read(authControllerProvider).user?.userId;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _resumeCache = ref.read(sourcingAgentResumeCacheProvider);
+    _ownerUserId = _tryCurrentUserId();
+    final snapshot = _resumeCache._restore(userId: _ownerUserId);
+    if (snapshot != null) {
+      _sessionId = snapshot.sessionId;
+      _sessions = List<SourcingSession>.of(snapshot.sessions);
+      _messages = snapshot.messages.map(_Entry.clone).toList();
+    }
     unawaited(_refreshSessions());
   }
 
   @override
   void dispose() {
+    final wasGenerating = _turn != null;
     _turn?.cancel();
+    if (_sessionId != null || _messages.isNotEmpty) {
+      final saved = <_Entry>[];
+      for (final entry in _messages) {
+        final copy = _Entry.clone(entry);
+        if (wasGenerating && !copy.isUser && copy.status != null) {
+          copy.status = null;
+          if (copy.content.isEmpty &&
+              copy.cards.isEmpty &&
+              copy.notice == null) {
+            copy.notice = '已停止生成';
+          }
+        }
+        saved.add(copy);
+      }
+      _resumeCache._save(
+        userId: _ownerUserId,
+        sessionId: _sessionId,
+        sessions: _sessions,
+        messages: saved,
+      );
+    } else {
+      _resumeCache.clear();
+    }
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -273,6 +379,7 @@ class _SourcingAgentPageState extends ConsumerState<SourcingAgentPage> {
           _messages = [];
           _loadError = null;
           _input.clear();
+          _resumeCache.clear();
         }
       });
     } catch (error) {
@@ -284,6 +391,7 @@ class _SourcingAgentPageState extends ConsumerState<SourcingAgentPage> {
 
   void _newSession() {
     _input.clear();
+    _resumeCache.clear();
     setState(() {
       _sessionId = null;
       _messages = [];
@@ -869,27 +977,63 @@ class _Entry {
       {this.isUser = false,
       this.content = '',
       this.status,
+      this.notice,
+      this.limited = false,
       List<SourcingCard>? cards})
       : cards = List<SourcingCard>.of(cards ?? const []);
   final bool isUser;
   String content;
   String? status;
   String? notice;
-  bool limited = false;
+  bool limited;
   final List<SourcingCard> cards;
 
   factory _Entry.fromHistory(SourcingMessage row) =>
       _Entry(isUser: row.isUser, content: row.content, cards: row.cards);
+
+  factory _Entry.clone(_Entry source) => _Entry(
+        isUser: source.isUser,
+        content: source.content,
+        status: source.status,
+        notice: source.notice,
+        limited: source.limited,
+        cards: source.cards,
+      );
 }
 
 final _retrievalTraceSignal = RegExp(
-  r'scanLimited|扫描上限|按以下路径检索|真实标签\s*ID|无标签宽检索|工具要求必须|标签体系|检索方式\s*\||检索结论',
+  r'scanLimited|扫描上限|按以下路径检索|真实标签\s*ID|无标签宽检索|工具要求必须|标签体系|检索方式\s*\||检索结论|检索边界|workId|tradeType|requiresLicenseType',
   caseSensitive: false,
 );
 
 const _gentleNotFoundReply =
     '抱歉，目前书城里暂时还没有找到特别符合你要求的现成剧本呢。\n\n'
     '你可以试试换一个相近的题材，或适当放宽预算和集数条件再找找；如果有明确想法，也可以告诉我，我来帮你整理一份定制需求交给平台运营跟进。';
+
+String _conciseWorksLeadIn(List<SourcingCard> cards) {
+  final workListCard =
+      cards.where((card) => card.type == 'work_list').firstOrNull;
+  final hasComparison = cards.any((card) => card.type == 'work_comparison');
+  final count = workListCard == null
+      ? 0
+      : sourcingRows(workListCard.payload['works']).length;
+  if (count > 0 && hasComparison) {
+    return '为你筛选出 $count 部推荐作品，下方可左右滑动查看书籍卡片与多作品对比，点击封面即可进入详情页。';
+  }
+  if (count > 0) {
+    return '为你找到了 $count 部推荐作品，下方可左右滑动查看，点击任意书籍卡片即可进入详情主页。';
+  }
+  return '已为你整理好候选作品对比，点击下方封面或按钮可查看详情或发起询盘。';
+}
+
+bool _isVerboseOrTechnical(String text) {
+  if (text.isEmpty) return false;
+  if (_retrievalTraceSignal.hasMatch(text)) return true;
+  if (text.contains('|') && text.contains('---')) return true;
+  final nonEmptyLines =
+      text.split('\n').where((line) => line.trim().isNotEmpty).length;
+  return nonEmptyLines > 2 || text.runes.length > 90;
+}
 
 /// 过滤大模型偶发泄露的工具调用标记（DeepSeek DSML / XML）与内部检索过程表格/术语。
 String sanitizeAgentDisplayText(String raw) {
@@ -946,13 +1090,34 @@ String sanitizeAgentDisplayText(String raw) {
 }
 
 /// 面向用户展示的最终文案：
-/// - 若模型在未找到作品时输出了检索过程/标签编号/scanLimited 等思考链式排查报告，
-///   自动收敛为温和友好的未找到提示。
+/// - 若已返回推荐作品 / 作品对比卡片：上方文字仅保留 1～2 行简洁导语，
+///   当服务端返回长篇报告或内部技术字段时自动收敛为一两行温和引导；
+/// - 若未找到作品且返回内部排查报告：自动收敛为温和友好的未找到提示。
 String resolveAgentDisplayText(
   String raw, {
   required List<SourcingCard> cards,
   required bool isStreaming,
 }) {
+  final hasWorkCards = cards.any(
+    (card) => card.type == 'work_list' || card.type == 'work_comparison',
+  );
+  final hasDemandBrief = cards.any((card) => card.type == 'demand_brief');
+  final cleaned = sanitizeAgentDisplayText(raw);
+
+  if (hasWorkCards && !hasDemandBrief) {
+    if (isStreaming) {
+      return _isVerboseOrTechnical(raw) || _isVerboseOrTechnical(cleaned)
+          ? ''
+          : cleaned;
+    }
+    if (cleaned.isEmpty ||
+        _isVerboseOrTechnical(raw) ||
+        _isVerboseOrTechnical(cleaned)) {
+      return _conciseWorksLeadIn(cards);
+    }
+    return cleaned;
+  }
+
   final hasStructuredResult = cards.isNotEmpty;
   final isTraceDump = _retrievalTraceSignal.hasMatch(raw);
   if (isStreaming && isTraceDump && !hasStructuredResult) {
@@ -961,7 +1126,7 @@ String resolveAgentDisplayText(
   if (!isStreaming && !hasStructuredResult && isTraceDump) {
     return _gentleNotFoundReply;
   }
-  return sanitizeAgentDisplayText(raw);
+  return cleaned;
 }
 
 class _MessageView extends StatelessWidget {
