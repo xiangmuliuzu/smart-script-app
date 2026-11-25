@@ -11,19 +11,25 @@ import 'package:script_app/core/network/api_client.dart';
 import 'package:script_app/core/network/api_exception.dart';
 import 'package:script_app/core/providers/app_providers.dart';
 import 'package:script_app/core/router/route_paths.dart';
+import 'package:script_app/features/bookstore/widgets/bookstore_widgets.dart';
 import 'package:script_app/features/sourcing_agent/sourcing_agent_page.dart';
 import 'package:script_app/features/sourcing_agent/sourcing_agent_repository.dart';
 
 const _work = {
   'workId': 18,
   'title': '雾港回声',
+  'cover': '',
   'authorName': '测试作者',
   'episodeCount': 60,
+  'wordCount': 62000,
+  'rating': 9.2,
   'price': 32000,
   'budgetMatch': true,
   'canInquire': true,
   'copyrightRegistrationStatus': 'registered',
   'exclusiveStatus': '待核实',
+  'tags': ['悬疑', '反转'],
+  'summary': '高能悬疑反转短剧，节奏紧凑。',
 };
 const _brief = {
   'title': '古装权谋定制短剧',
@@ -49,8 +55,17 @@ void main() {
       events.add(event.event);
       if (event.event == 'delta') expect(event.text('text'), contains('候选'));
     });
-    expect(events,
-        ['step', 'tool_call', 'tool_result', 'card', 'card', 'delta', 'done']);
+    expect(events, [
+      'step',
+      'tool_call',
+      'tool_result',
+      'card',
+      'card',
+      'card',
+      'card',
+      'delta',
+      'done'
+    ]);
     expect(adapter.agentSends, ['找悬疑短剧']);
   });
 
@@ -69,19 +84,34 @@ void main() {
     );
   });
 
-  testWidgets('原生会话推荐和对比可跳转试读及询盘确认，历史可删除', (tester) async {
+  testWidgets('进入展示默认欢迎语，过滤乱码且不展示思考链，推荐书籍单行横滑且点击直达详情', (tester) async {
     final adapter = _AgentAdapter();
     await _mount(tester, adapter);
     expect(find.text('这次想找什么样的剧本？'), findsOneWidget);
+    expect(find.textContaining('你好呀，我是 AI 选本顾问'), findsOneWidget);
     await tester.tap(find.textContaining('预算 5 万以内'));
     await tester.pumpAndSettle();
-    expect(find.text('查询过程'), findsOneWidget);
+    // 不展示思考链/查询过程，也不显示 DSML 乱码或空的“未找到”卡片
+    expect(find.text('查询过程'), findsNothing);
+    expect(find.textContaining('DSML'), findsNothing);
+    expect(find.textContaining('get_work_detail'), findsNothing);
+    expect(find.textContaining('未找到符合条件'), findsNothing);
     expect(find.text('作品对比'), findsOneWidget);
     expect(find.text('作品推荐'), findsOneWidget);
+    // 多张 work_list 卡片已按 workId 去重合并为共 2 部，单行横向 ListView 展示
+    expect(find.text('共 2 部'), findsOneWidget);
+    expect(find.text('左右滑动'), findsOneWidget);
+    final horizontalLists = tester
+        .widgetList<ListView>(find.byType(ListView))
+        .where((view) => view.scrollDirection == Axis.horizontal);
+    expect(horizontalLists, isNotEmpty);
+    expect(find.byType(WorkCover), findsWidgets);
+    expect(find.text('查看书籍详情'), findsWidgets);
 
-    final preview = find.widgetWithText(TextButton, '查看 · 试读').first;
-    await tester.ensureVisible(preview);
-    await tester.tap(preview);
+    // 点击带封面的推荐书籍卡片直接跳转书籍详情页
+    final bookCard = find.text('查看书籍详情').first;
+    await tester.ensureVisible(bookCard);
+    await tester.tap(bookCard);
     await tester.pumpAndSettle();
     expect(find.text('作品试读 18'), findsOneWidget);
     await tester.pageBack();
@@ -104,6 +134,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('历史选本答复', findRichText: true), findsOneWidget);
     expect(find.text('作品推荐'), findsOneWidget);
+    expect(find.byType(WorkCover), findsWidgets);
     await tester.tap(find.byTooltip('历史会话'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('删除会话'));
@@ -112,6 +143,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(adapter.deletedSession, 501);
     expect(find.text('这次想找什么样的剧本？'), findsOneWidget);
+    expect(find.textContaining('你好呀，我是 AI 选本顾问'), findsOneWidget);
   });
 
   testWidgets('需求草案由按钮确认后发送给平台客服', (tester) async {
@@ -131,13 +163,16 @@ void main() {
     expect(adapter.platformMessages.single, contains('- 分镜目录'));
   });
 
-  testWidgets('停止生成后可再次发送，429 只提示并提供客服入口', (tester) async {
+  testWidgets('加载中仅转圈提示，停止生成后可再次发送，429 只提示并提供客服入口', (tester) async {
     final adapter = _AgentAdapter();
     await _mount(tester, adapter);
     await tester.enterText(find.byType(TextField), '等待');
     await tester.pump();
     await tester.tap(find.text('发送'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('查询过程'), findsNothing);
     expect(find.text('停止生成'), findsOneWidget);
     await tester.tap(find.text('停止生成'));
     await tester.pumpAndSettle();
@@ -153,6 +188,18 @@ void main() {
     expect(find.text(sourcingLimitMessage), findsOneWidget);
     expect(find.text('联系平台客服'), findsOneWidget);
     expect(find.textContaining('剩余'), findsNothing);
+  });
+
+  testWidgets('未找到作品时屏蔽检索路径表与技术术语，以温和语气提示', (tester) async {
+    final adapter = _AgentAdapter();
+    await _mount(tester, adapter);
+    await tester.tap(find.textContaining('甜宠爽剧'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('scanLimited'), findsNothing);
+    expect(find.textContaining('检索方式'), findsNothing);
+    expect(find.textContaining('标签 181'), findsNothing);
+    expect(find.textContaining('抱歉，目前书城里暂时还没有找到', findRichText: true),
+        findsOneWidget);
   });
 }
 
@@ -259,6 +306,17 @@ class _AgentAdapter implements HttpClientAdapter {
         }));
         return ResponseBody(stream.stream, 200, headers: _sseHeaders);
       }
+      if (message.contains('甜宠')) {
+        return _sse([
+          _event('step', {'message': '正在检索'}),
+          _event('card', _card('work_list', {'works': []})),
+          _event('delta', {
+            'text':
+                '检索结论：当前无可推荐作品\n我按以下路径检索，结果全部为空：\n| 检索方式 | 参数 | 结果 |\n| --- | --- | --- |\n| 标签 181 甜宠 | 按销量排序 | 0 部 |\n所有标签检索均返回 0 且 `scanLimited` 均为 false。'
+          }),
+          _event('done', {'messageId': 21, 'sessionTitle': '甜宠选本', 'tokens': 300}),
+        ]);
+      }
       final drafting = message.contains('起草');
       return _sse([
         _event('step', {'message': '正在分析采购诉求'}),
@@ -267,6 +325,7 @@ class _AgentAdapter implements HttpClientAdapter {
         if (drafting)
           _event('card', _card('demand_brief', _brief))
         else ...[
+          _event('card', _card('work_list', {'works': []})),
           _event(
               'card',
               _card('work_list', {
@@ -274,11 +333,26 @@ class _AgentAdapter implements HttpClientAdapter {
               })),
           _event(
               'card',
+              _card('work_list', {
+                'works': [
+                  _work,
+                  {
+                    ..._work,
+                    'workId': 19,
+                    'title': '云端来信',
+                  },
+                ]
+              })),
+          _event(
+              'card',
               _card('work_comparison', {
                 'works': [_work]
               })),
         ],
-        _event('delta', {'text': '## 候选\n- **雾港回声**'}),
+        _event('delta', {
+          'text':
+              '## 候选\n- **雾港回声**\n<｜DSML｜function_calls>\n<｜DSML｜invoke name="get_work_detail">\n<｜DSML｜parameter name="workId" string="false">129</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜function_calls>'
+        }),
         _event(
             'done', {'messageId': 20, 'sessionTitle': '悬疑选本', 'tokens': 1230}),
       ], fragmented: fragmented);

@@ -67,12 +67,12 @@ class BookstorePage extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         heroTag: 'bookstore-sourcing-agent',
         tooltip: 'AI 选本顾问',
-        shape: CircleBorder(
-          side: BorderSide(color: AppColors.card.withOpacity(0.9), width: 1.5),
+        shape: const CircleBorder(
+          side: BorderSide(color: AppColors.divider, width: 1),
         ),
-        backgroundColor: AppColors.card.withOpacity(0.58),
-        elevation: 2,
-        highlightElevation: 4,
+        backgroundColor: AppColors.card.withOpacity(0.94),
+        elevation: 3,
+        highlightElevation: 5,
         onPressed: () => AuthGuard.pushProtected(
           context,
           ref,

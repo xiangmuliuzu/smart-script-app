@@ -6,8 +6,68 @@ import 'package:go_router/go_router.dart';
 import '../../core/network/friendly_error.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
+import '../bookstore/widgets/bookstore_widgets.dart';
 import '../chat/data/chat_providers.dart';
 import 'sourcing_agent_repository.dart';
+
+/// 合并同一条智能体回复中的多张 `work_list` 卡片：
+/// - 自动过滤空的检索过程卡片，避免刷屏；
+/// - 按 `workId` 去重，同一本书只保留信息更完整的一张；
+/// - 将所有推荐书籍合并为一张卡片，供单行横向滑动展示。
+List<SourcingCard> mergeSourcingCards(List<SourcingCard> cards) {
+  final mergedWorks = <int, Map<String, dynamic>>{};
+  final nonIdWorks = <Map<String, dynamic>>[];
+  final otherCards = <SourcingCard>[];
+  var scanLimited = false;
+
+  for (final card in cards) {
+    if (card.type != 'work_list') {
+      otherCards.add(card);
+      continue;
+    }
+    if (card.payload['scanLimited'] == true) scanLimited = true;
+    for (final work in sourcingRows(card.payload['works'])) {
+      final id = sourcingInt(work['workId']);
+      if (id <= 0) {
+        nonIdWorks.add(work);
+        continue;
+      }
+      final existing = mergedWorks[id];
+      if (existing == null) {
+        mergedWorks[id] = Map<String, dynamic>.from(work);
+      } else {
+        mergedWorks[id] = _mergeWorkFields(existing, work);
+      }
+    }
+  }
+
+  final allWorks = [...mergedWorks.values, ...nonIdWorks];
+  return [
+    if (allWorks.isNotEmpty)
+      SourcingCard('work_list', {
+        'works': allWorks,
+        if (scanLimited) 'scanLimited': true,
+      }),
+    ...otherCards,
+  ];
+}
+
+Map<String, dynamic> _mergeWorkFields(
+  Map<String, dynamic> base,
+  Map<String, dynamic> incoming,
+) {
+  final merged = Map<String, dynamic>.from(base);
+  for (final entry in incoming.entries) {
+    final current = merged[entry.key];
+    final next = entry.value;
+    if (current == null ||
+        (current is String && current.trim().isEmpty) ||
+        (current is List && current.isEmpty)) {
+      merged[entry.key] = next;
+    }
+  }
+  return merged;
+}
 
 class SourcingCardView extends StatelessWidget {
   const SourcingCardView({super.key, required this.card});
@@ -17,63 +77,388 @@ class SourcingCardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (card.type) {
-      'work_list' || 'work_comparison' => _WorksCard(
-          payload: card.payload,
-          comparison: card.type == 'work_comparison',
-        ),
+      'work_list' => _WorkCarouselSection(payload: card.payload),
+      'work_comparison' => _WorkComparisonCard(payload: card.payload),
       'demand_brief' => _DemandCard(brief: card.payload),
       _ => const SizedBox.shrink(),
     };
   }
 }
 
-class _WorksCard extends StatelessWidget {
-  const _WorksCard({required this.payload, required this.comparison});
+/// 智能体返回的推荐书籍：同一行横向滑动切换，每本书带封面与书籍信息，点击直达详情主页。
+class _WorkCarouselSection extends StatelessWidget {
+  const _WorkCarouselSection({required this.payload});
 
   final Map<String, dynamic> payload;
-  final bool comparison;
+
+  @override
+  Widget build(BuildContext context) {
+    final works = sourcingRows(payload['works']);
+    if (works.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 13,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                '作品推荐',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text1,
+                ),
+              ),
+              const SizedBox(width: 6),
+              _MetaPill(
+                label: '共 ${works.length} 部',
+                foreground: AppColors.text2,
+                background: AppColors.fill,
+              ),
+              const Spacer(),
+              if (works.length > 1)
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '左右滑动',
+                      style: TextStyle(fontSize: 11, color: AppColors.text3),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 14,
+                      color: AppColors.text3,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 184,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            clipBehavior: Clip.none,
+            itemCount: works.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, index) => SizedBox(
+              width: works.length == 1 ? 304 : 268,
+              child: _WorkBookCard(work: works[index]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 单本推荐书籍卡片：左侧封面 + 右侧书籍信息，点击整卡直接跳转作品详情主页。
+class _WorkBookCard extends StatelessWidget {
+  const _WorkBookCard({required this.work});
+
+  final Map<String, dynamic> work;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = sourcingInt(work['workId']);
+    final title = _text(work['title'], '作品待确认');
+    final cover = _text(work['cover']);
+    final author = _text(work['authorName'], '作者待确认');
+    final tags = _strings(work['tags']).take(2).toList();
+    final reason = _text(work['recommendationReason']);
+    final summary = _text(work['summary']);
+    final description = summary.isNotEmpty ? summary : reason;
+    final canInquire = id > 0 && work['canInquire'] == true;
+
+    final metaParts = <String>[
+      author,
+      _episodes(work),
+      if (work['rating'] is num && (work['rating'] as num) > 0)
+        '${(work['rating'] as num).toStringAsFixed(1)}分',
+    ];
+
+    void openDetail() {
+      if (id > 0) context.push(RoutePath.workDetailUrl(id));
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        border: Border.all(color: AppColors.divider.withOpacity(0.75)),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: id > 0 ? openDetail : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(11, 11, 11, 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppRadius.rSmall),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x14000000),
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: WorkCover(
+                          url: cover,
+                          title: title,
+                          width: 66,
+                          height: 90,
+                          radius: AppRadius.rSmall,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.text1,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _priceLabel(work),
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _isFree(work)
+                                        ? AppColors.success
+                                        : AppColors.warning,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              metaParts.join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.text3,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              height: 20,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  _MetaPill(
+                                    label: _copyright(work),
+                                    foreground:
+                                        work['copyrightRegistrationStatus'] ==
+                                                'registered'
+                                            ? AppColors.success
+                                            : AppColors.text2,
+                                    background:
+                                        work['copyrightRegistrationStatus'] ==
+                                                'registered'
+                                            ? AppColors.success
+                                                .withOpacity(0.10)
+                                            : AppColors.warmGray,
+                                  ),
+                                  if (work['budgetMatch'] == true) ...[
+                                    const SizedBox(width: 4),
+                                    const _MetaPill(
+                                      label: '预算内',
+                                      foreground: AppColors.text1,
+                                      background: AppColors.primaryTint,
+                                    ),
+                                  ],
+                                  for (final tag in tags) ...[
+                                    const SizedBox(width: 4),
+                                    _MetaPill(
+                                      label: tag,
+                                      foreground: AppColors.text2,
+                                      background: AppColors.fill,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (description.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Expanded(
+                                child: Text(
+                                  description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: AppColors.text2,
+                                    height: 1.38,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                color: AppColors.divider.withOpacity(0.8),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.menu_book_outlined,
+                      size: 13.5,
+                      color: AppColors.text3,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '查看书籍详情',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.text2,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 15,
+                      color: AppColors.text3,
+                    ),
+                    const Spacer(),
+                    if (canInquire)
+                      OutlinedButton(
+                        onPressed: () => context.push(
+                          Uri(
+                            path: RoutePath.inquiryCreate,
+                            queryParameters: {
+                              'workId': '$id',
+                              'title': title,
+                            },
+                          ).toString(),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 28),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          side: const BorderSide(color: AppColors.primary),
+                          foregroundColor: AppColors.text1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        child: const Text('发起询盘'),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 多作品对比卡片：表头带迷你封面且可点击进入书籍详情。
+class _WorkComparisonCard extends StatelessWidget {
+  const _WorkComparisonCard({required this.payload});
+
+  final Map<String, dynamic> payload;
 
   @override
   Widget build(BuildContext context) {
     final works = sourcingRows(payload['works']);
     final criterion = _text(payload['criteria']);
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(comparison ? '作品对比' : '作品推荐',
-                style: Theme.of(context).textTheme.titleMedium),
-            if (criterion.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(criterion, style: const TextStyle(color: AppColors.text2)),
-            ],
-            if (payload['scanLimited'] == true)
-              const Text('已达本次检索范围，可缩小条件后重试。'),
-            const SizedBox(height: 8),
-            if (works.isEmpty)
-              const Text('本次检索未找到符合条件的作品。')
-            else if (comparison)
-              _comparison(works)
-            else
-              for (final work in works) _WorkRow(work: work),
-          ],
-        ),
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        border: Border.all(color: AppColors.divider.withOpacity(0.7)),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionCaption(
+            title: '作品对比',
+            badge: works.isNotEmpty ? '${works.length} 部候选' : null,
+            subtitle: criterion,
+          ),
+          const SizedBox(height: 10),
+          if (works.isEmpty)
+            const Text(
+              '暂无可对比的作品。',
+              style: TextStyle(fontSize: 13, color: AppColors.text2),
+            )
+          else
+            _comparisonTable(context, works),
+        ],
       ),
     );
   }
 
-  Widget _comparison(List<Map<String, dynamic>> works) {
+  Widget _comparisonTable(
+    BuildContext context,
+    List<Map<String, dynamic>> works,
+  ) {
     final rows = <(String, String Function(Map<String, dynamic>))>[
       (
-        '作者和题材',
+        '作者 / 题材',
         (work) => [_text(work['authorName']), _tags(work['tags'])]
             .where((value) => value.isNotEmpty)
             .join(' · ')
       ),
-      ('参考价与预算', _budget),
+      ('参考价', _budget),
       (
         '集数 / 字数',
         (work) => '${_episodes(work)} / ${_unit(work['wordCount'], '字')}'
@@ -84,69 +469,133 @@ class _WorksCard extends StatelessWidget {
               _copyright(work),
               if (_text(work['copyrightCertNo']).isNotEmpty)
                 _text(work['copyrightCertNo']),
-              '独家状态${_text(work['exclusiveStatus'], '待核实')}',
+              '独家${_text(work['exclusiveStatus'], '待核实')}',
             ].join(' · ')
       ),
       ('商业化看点', (work) => _text(work['commercialHighlights'], '待评估')),
       ('风险提示', (work) => _text(work['riskNotes'], '待核实')),
     ];
-    Widget cell(Widget child) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+
+    Widget cell(Widget child, {Color? bg}) => Container(
+          color: bg,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: child,
         );
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Table(
-        defaultColumnWidth: const FixedColumnWidth(150),
-        columnWidths: const {0: FixedColumnWidth(90)},
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        border: TableBorder.all(color: AppColors.divider),
-        children: [
-          TableRow(children: [
-            cell(const Text('对比维度')),
-            for (final work in works) cell(Text(_text(work['title'], '作品待确认'))),
-          ]),
-          for (final (label, content) in rows)
-            TableRow(children: [
-              cell(Text(label)),
-              for (final work in works) cell(Text(content(work))),
-            ]),
-          TableRow(children: [
-            cell(const Text('操作')),
-            for (final work in works) cell(_WorkActions(work: work)),
-          ]),
-        ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.rSmall),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultColumnWidth: const FixedColumnWidth(156),
+          columnWidths: const {0: FixedColumnWidth(84)},
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          border: TableBorder.all(color: AppColors.divider, width: 0.7),
+          children: [
+            TableRow(
+              decoration: const BoxDecoration(color: AppColors.fill),
+              children: [
+                cell(
+                  const Text(
+                    '对比维度',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text2,
+                    ),
+                  ),
+                ),
+                for (final work in works)
+                  cell(_ComparisonWorkHeader(work: work)),
+              ],
+            ),
+            for (final (label, content) in rows)
+              TableRow(
+                children: [
+                  cell(
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.text2,
+                      ),
+                    ),
+                    bg: AppColors.warmGray.withOpacity(0.55),
+                  ),
+                  for (final work in works)
+                    cell(
+                      Text(
+                        content(work).isEmpty ? '—' : content(work),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.text1,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            TableRow(
+              children: [
+                cell(
+                  const Text(
+                    '操作',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.text2,
+                    ),
+                  ),
+                  bg: AppColors.warmGray.withOpacity(0.55),
+                ),
+                for (final work in works) cell(_WorkActions(work: work)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _WorkRow extends StatelessWidget {
-  const _WorkRow({required this.work});
+class _ComparisonWorkHeader extends StatelessWidget {
+  const _ComparisonWorkHeader({required this.work});
 
   final Map<String, dynamic> work;
 
   @override
   Widget build(BuildContext context) {
-    final tags = _tags(work['tags']);
-    final reason = _text(work['recommendationReason']);
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final id = sourcingInt(work['workId']);
+    final title = _text(work['title'], '作品待确认');
+    final cover = _text(work['cover']);
+
+    return InkWell(
+      onTap: id > 0 ? () => context.push(RoutePath.workDetailUrl(id)) : null,
+      borderRadius: BorderRadius.circular(6),
+      child: Row(
         children: [
-          Text(_text(work['title'], '作品待确认'),
-              style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-              '${_text(work['authorName'], '作者待确认')} · ${_episodes(work)} · ${_budget(work)}'),
-          Text(_copyright(work),
-              style: const TextStyle(color: AppColors.text2)),
-          if (tags.isNotEmpty) Text(tags),
-          if (reason.isNotEmpty) Text(reason),
-          if (_text(work['summary']).isNotEmpty) Text(_text(work['summary'])),
-          _WorkActions(work: work),
+          WorkCover(
+            url: cover,
+            title: title,
+            width: 32,
+            height: 44,
+            radius: 5,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text1,
+                height: 1.3,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -163,24 +612,50 @@ class _WorkActions extends StatelessWidget {
     final id = sourcingInt(work['workId']);
     return Wrap(
       spacing: 6,
+      runSpacing: 6,
       children: [
         TextButton(
           onPressed:
               id > 0 ? () => context.push(RoutePath.workDetailUrl(id)) : null,
-          child: const Text('查看 · 试读'),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, 30),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            backgroundColor: AppColors.fill,
+            foregroundColor: AppColors.text1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            textStyle:
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+          child: const Text('查看详情'),
         ),
-        OutlinedButton(
-          onPressed: id > 0 && work['canInquire'] == true
-              ? () => context.push(Uri(
-                    path: RoutePath.inquiryCreate,
-                    queryParameters: {
-                      'workId': '$id',
-                      'title': _text(work['title'])
-                    },
-                  ).toString())
-              : null,
-          child: const Text('发起询盘'),
-        ),
+        if (work['canInquire'] == true)
+          OutlinedButton(
+            onPressed: id > 0
+                ? () => context.push(Uri(
+                      path: RoutePath.inquiryCreate,
+                      queryParameters: {
+                        'workId': '$id',
+                        'title': _text(work['title']),
+                      },
+                    ).toString())
+                : null,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 30),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              side: const BorderSide(color: AppColors.primary),
+              foregroundColor: AppColors.text1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              textStyle:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+            child: const Text('发起询盘'),
+          ),
       ],
     );
   }
@@ -239,41 +714,228 @@ class _DemandCardState extends ConsumerState<_DemandCard> {
   @override
   Widget build(BuildContext context) {
     final brief = widget.brief;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('采购需求草案', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(_text(brief['title']),
-                style: Theme.of(context).textTheme.titleSmall),
-            for (final line in _briefFacts(brief)) Text(line),
-            const SizedBox(height: 8),
-            Text('商业化诉求：${_text(brief['commercialGoal'])}'),
-            Text('详细要求：${_text(brief['requirement'])}'),
-            const SizedBox(height: 8),
-            const Text('交付验收清单'),
-            for (final item in _strings(brief['deliveryChecklist']))
-              Text('• $item'),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
+    final checklist = _strings(brief['deliveryChecklist']).toList();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        border: Border.all(color: AppColors.divider.withOpacity(0.7)),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionCaption(title: '采购需求草案'),
+          const SizedBox(height: 8),
+          Text(
+            _text(brief['title']),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.warmGray,
+              borderRadius: BorderRadius.circular(AppRadius.rSmall),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OutlinedButton(onPressed: _copy, child: const Text('复制需求单')),
-                FilledButton(
+                for (final line in _briefFacts(brief))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      line,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.text2,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '商业化诉求：${_text(brief['commercialGoal'])}',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.text1,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '详细要求：${_text(brief['requirement'])}',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.text2,
+              height: 1.5,
+            ),
+          ),
+          if (checklist.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Text(
+              '交付验收清单',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final item in checklist)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '• $item',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.text2,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: _copy,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 38),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  side: const BorderSide(color: AppColors.divider),
+                  foregroundColor: AppColors.text1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.rSmall),
+                  ),
+                  textStyle: const TextStyle(fontSize: 13),
+                ),
+                child: const Text('复制需求单'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
                   onPressed: _sent || _sending ? null : _send,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 38),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.rSmall),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   child: Text(_sent
                       ? '已发给平台运营'
                       : _sending
                           ? '正在发送…'
                           : '发给平台运营立项'),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCaption extends StatelessWidget {
+  const _SectionCaption({
+    required this.title,
+    this.badge,
+    this.subtitle = '',
+  });
+
+  final String title;
+  final String? badge;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 3,
+              height: 13,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text1,
+              ),
+            ),
+            if (badge != null) ...[
+              const SizedBox(width: 6),
+              _MetaPill(
+                label: badge!,
+                foreground: AppColors.text2,
+                background: AppColors.fill,
+              ),
+            ],
           ],
+        ),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: AppColors.text3),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({
+    required this.label,
+    required this.foreground,
+    required this.background,
+  });
+
+  final String label;
+  final Color foreground;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w500,
+          color: foreground,
+          height: 1.2,
         ),
       ),
     );
@@ -310,17 +972,35 @@ List<String> _briefFacts(Map<String, dynamic> brief) => [
     ];
 
 String _text(dynamic value, [String fallback = '']) =>
-    value is String && value.trim().isNotEmpty ? value : fallback;
+    value is String && value.trim().isNotEmpty ? value.trim() : fallback;
 
 String _oneLine(String value) => value.replaceAll(RegExp(r'\s+'), ' ');
 
 Iterable<String> _strings(dynamic value) =>
     value is List ? value.whereType<String>() : const [];
+
 String _tags(dynamic value) => _strings(value).join(' · ');
+
 String _unit(dynamic value, String unit) =>
     value is num ? '$value $unit' : '待确认';
+
 String _episodes(Map<String, dynamic> work) => _unit(work['episodeCount'], '集');
+
 String _yuan(dynamic value) => value is num ? '¥$value' : '待确认';
+
+bool _isFree(Map<String, dynamic> work) {
+  final price = work['price'];
+  return price is num && price <= 0;
+}
+
+String _priceLabel(Map<String, dynamic> work) {
+  final price = work['price'];
+  if (price is num) {
+    if (price <= 0) return '免费';
+    return '¥${price == price.truncateToDouble() ? price.toInt() : price}';
+  }
+  return '议价';
+}
 
 String _budget(Map<String, dynamic> work) {
   final price = _yuan(work['price']);
