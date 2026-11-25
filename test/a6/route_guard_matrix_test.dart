@@ -325,6 +325,31 @@ void main() {
       expect(container.read(routeIntentStoreProvider).pending?.target, RoutePath.messages);
     });
 
+    testWidgets('首页右下角 AI 选本气泡登录后回跳原生选本页', (tester) async {
+      await _pumpApp(tester);
+      final container = _containerOf(tester);
+      final bubble = find.byType(FloatingActionButton);
+      expect(find.byTooltip('AI 选本顾问'), findsOneWidget);
+      expect(find.descendant(of: bubble, matching: find.byType(Image)),
+          findsOneWidget);
+      expect(find.text('AI 选本'), findsNothing);
+      final position = tester.getRect(bubble);
+      final viewport = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(viewport.width - position.right, lessThan(32));
+      expect(position.top, greaterThan(viewport.height / 2));
+      expect(position.bottom, lessThan(tester.getTopLeft(find.text('首页')).dy));
+      await tester.tap(bubble);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('需要登录'), findsOneWidget);
+      await tester.tap(find.text('去登录'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(container.read(routeIntentStoreProvider).pending?.target,
+          RoutePath.sourcingAgent);
+    });
+
     testWidgets('公开入口不产生回跳意图', (tester) async {
       await _pumpApp(tester);
       final container = _containerOf(tester);

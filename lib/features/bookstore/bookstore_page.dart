@@ -15,8 +15,7 @@ import 'widgets/bookstore_widgets.dart';
 
 /// 书城首页（B 模块：内容与作品）。
 ///
-/// 浏览链路全部为公开接口，游客可读；顶部「消息」是受保护入口，
-/// 由 [AuthGuard.pushProtected] 统一拦截（未登录先登录，登录后回到消息页）。
+/// 游客可以浏览书城，消息和 AI 选本通过 [AuthGuard.pushProtected] 保留登录回跳。
 class BookstorePage extends ConsumerWidget {
   const BookstorePage({super.key});
 
@@ -64,6 +63,29 @@ class BookstorePage extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'bookstore-sourcing-agent',
+        tooltip: 'AI 选本顾问',
+        shape: CircleBorder(
+          side: BorderSide(color: AppColors.card.withOpacity(0.9), width: 1.5),
+        ),
+        backgroundColor: AppColors.card.withOpacity(0.58),
+        elevation: 2,
+        highlightElevation: 4,
+        onPressed: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.sourcingAgent,
+        ),
+        child: Image.asset(
+          'assets/images/sourcing_agent_bubble.png',
+          width: 52,
+          height: 52,
+          cacheWidth: 192,
+          excludeFromSemantics: true,
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(bannersProvider);
@@ -72,7 +94,8 @@ class BookstorePage extends ConsumerWidget {
         },
         child: ListView(
           // 顶部不再留白：搜索栏已在透明 AppBar 内，渐变直接落到 Banner。
-          padding: const EdgeInsets.only(bottom: 16),
+          // 末尾作品可以滚动到悬浮气泡上方。
+          padding: const EdgeInsets.only(bottom: 88),
           children: [
             const SizedBox(height: 16),
             const _BannerCarousel(position: 'home_top'),

@@ -320,6 +320,7 @@ class RoutePath {
   static const String financeOrders = '/trade/finance/orders';
   static const String financeContracts = '/trade/finance/contracts';
   // 询盘
+  static const String sourcingAgent = '/trade/agent';
   static const String inquiryCreate = '/trade/inquiry/create';
   static const String inquiryList = '/trade/inquiry/list';
   static const String inquiryDetail = '/trade/inquiry/detail';
@@ -487,6 +488,7 @@ class RouteName {
   static const String incomeOverview = 'incomeOverview';
   static const String financeOrders = 'financeOrders';
   static const String financeContracts = 'financeContracts';
+  static const String sourcingAgent = 'sourcingAgent';
   static const String inquiryCreate = 'inquiryCreate';
   static const String inquiryList = 'inquiryList';
   static const String inquiryDetail = 'inquiryDetail';
@@ -556,6 +558,7 @@ class ProtectedRoutes {
     RoutePath.dramaSubscriptions,
     RoutePath.dramaReport,
     // C 交易域（询盘/报价/订单/合作，需登录）
+    RoutePath.sourcingAgent,
     RoutePath.inquiryCreate,
     RoutePath.inquiryList,
     RoutePath.inquiryDetail,

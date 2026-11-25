@@ -234,6 +234,7 @@ class ApiEndpoints {
   static const String chatTradeTemplates = '/users/me/chat/trade-templates';
   // TRADE 类型会话创建（通过询盘）
   static const String tradeChatSessions = '/trade/inquiry/chat/sessions';
+  static const String sourcingAgentSessions = '/trade/agent/sessions';
   static const String orders = '/orders';
   static String orderCancel(int orderId) => '/orders/$orderId/cancel';
   static String workTradeConfig(int workId) => '/works/$workId/trade-config';

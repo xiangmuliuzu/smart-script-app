@@ -18,7 +18,7 @@ class _StreamApi extends ApiClient {
   final Stream<Uint8List> stream;
   @override
   Future<ResponseBody> postStream(String path,
-          {dynamic data, Duration? receiveTimeout}) async =>
+          {dynamic data, Duration? receiveTimeout, CancelToken? cancelToken}) async =>
       ResponseBody(stream, 200);
 }
 

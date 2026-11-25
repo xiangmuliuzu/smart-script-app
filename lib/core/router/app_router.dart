@@ -12,6 +12,7 @@ import '../../features/auth/pages/qr_confirm_page.dart';
 import '../../features/auth/pages/qr_scan_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
+import '../../features/sourcing_agent/sourcing_agent_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
 import '../../features/bookstore/pages/chapter_list_page.dart';
 import '../../features/bookstore/pages/work_storyboard_page.dart';
@@ -687,6 +688,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.incomeOverview,
         name: RouteName.incomeOverview,
         builder: (_, __) => const IncomeOverviewPage(),
+      ),
+      GoRoute(
+        path: RoutePath.sourcingAgent,
+        name: RouteName.sourcingAgent,
+        builder: (_, __) => const SourcingAgentPage(),
       ),
       GoRoute(
         path: RoutePath.inquiryCreate,

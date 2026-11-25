@@ -50,25 +50,27 @@ class AiSseEvent {
 /// 其余事件交回 [onEvent] 处理。
 Future<void> consumeSseEvents(
   Stream<Uint8List> stream,
-  void Function(AiSseEvent event) onEvent,
-) async {
+  void Function(AiSseEvent event) onEvent, {
+  void Function(AiSseEvent event)? onErrorEvent,
+}) async {
   final lines = stream.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter());
   final block = StringBuffer();
   await for (final line in lines) {
     if (line.isEmpty) {
-      if (_dispatch(block.toString(), onEvent)) return;
+      if (_dispatch(block.toString(), onEvent, onErrorEvent)) return;
       block.clear();
     } else {
       block.writeln(line);
     }
   }
-  if (block.isNotEmpty) _dispatch(block.toString(), onEvent);
+  if (block.isNotEmpty) _dispatch(block.toString(), onEvent, onErrorEvent);
 }
 
 /// 解析并分发单个 SSE 事件块（event:xxx + data:xxx，可多行 data）。
 bool _dispatch(
   String block,
   void Function(AiSseEvent event) onEvent,
+  void Function(AiSseEvent event)? onErrorEvent,
 ) {
   String event = 'message';
   final dataLines = <String>[];
@@ -84,6 +86,7 @@ bool _dispatch(
   // 无法解析的 data 行（非 JSON）视为中间噪声，直接跳过不发事件。
   if (payload == null) return false;
   if (event == 'error') {
+    onErrorEvent?.call(AiSseEvent(event, payload));
     final message = payload['message']?.toString() ?? '';
     throw ApiException(
       message.isEmpty ? 'AI 生成失败，请稍后重试' : message,
@@ -91,7 +94,7 @@ bool _dispatch(
     );
   }
   onEvent(AiSseEvent(event, payload));
-  return payload['done'] == true;
+  return event == 'done' || payload['done'] == true;
 }
 
 /// 尝试解析 JSON；失败返回 null。
