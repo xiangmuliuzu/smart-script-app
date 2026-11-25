@@ -11,13 +11,14 @@ import '../data/trade_models.dart';
 import '../../user_center/data/paged_data.dart';
 import '../widgets/demand_task_card.dart';
 
-/// 任务广场·我的任务分段：我接取的任务。
+/// 任务广场·我的任务分段：内层再分「我发布的 / 我接取的」。
 ///
-/// - mine=claimed，展示当前用户作为创作者抢到的全部任务（含各状态）；
-/// - 发布方已收归平台运营，普通用户不再有"我发布的"视角。
-/// 支持状态筛选 + 触底加载更多（补齐广场只曝光 open 的全状态视图）。
+/// - 我发布的：mine=published，展示当前用户作为需求方发布的全部任务
+///   （含待审核 / 审核未通过——这两态不进广场，只有这里看得全）；
+/// - 我接取的：mine=claimed，展示当前用户作为创作者抢到的全部任务（含各状态）。
+/// 每个分段支持状态筛选 + 触底加载更多（补齐广场只曝光 open 的全状态视图）。
 ///
-/// 本组件只输出正文：外层 AppBar 由宿主提供（tab 根 `TaskSquarePage`、
+/// 本组件只输出正文：外层 AppBar 与发布入口由宿主提供（tab 根 `TaskSquarePage`、
 /// 深链薄壳 [DemandMyTasksPage]）。宿主须保证只在已登录时构建本组件——
 /// 游客拉 mine 列表会拿到 401，而 App 的 ApiClient 对 401 一律按会话过期处理。
 class DemandMyTasksSection extends ConsumerStatefulWidget {
@@ -29,14 +30,55 @@ class DemandMyTasksSection extends ConsumerStatefulWidget {
 }
 
 class DemandMyTasksSectionState extends ConsumerState<DemandMyTasksSection> {
-  /// 交付/接单流程 pop 返回后由宿主触发重拉。
-  final _claimedKey = GlobalKey<_MyTaskListState>();
+  /// 两个分段的句柄：发布/交付流程 pop 返回后由宿主触发重拉。
+  final _publishedTabKey = GlobalKey<_MyTaskListTabState>();
+  final _claimedTabKey = GlobalKey<_MyTaskListTabState>();
 
-  void reload() => _claimedKey.currentState?.reload();
+  void reload() {
+    _publishedTabKey.currentState?.reload();
+    _claimedTabKey.currentState?.reload();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return _MyTaskListTab(key: _claimedKey);
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Container(
+            color: AppColors.card,
+            child: const TabBar(
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 2.5,
+              labelColor: AppColors.text1,
+              unselectedLabelColor: AppColors.text3,
+              labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: TextStyle(fontSize: 13),
+              tabs: [
+                Tab(text: '我发布的'),
+                Tab(text: '我接取的'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _MyTaskListTab(
+                  key: _publishedTabKey,
+                  mine: 'published',
+                  emptyHint: '还没有发布过任务',
+                ),
+                _MyTaskListTab(
+                  key: _claimedTabKey,
+                  mine: 'claimed',
+                  emptyHint: '还没有接取过任务',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -50,6 +92,8 @@ class DemandMyTasksPage extends ConsumerStatefulWidget {
 }
 
 class _DemandMyTasksPageState extends ConsumerState<DemandMyTasksPage> {
+  final _sectionKey = GlobalKey<DemandMyTasksSectionState>();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,20 +109,34 @@ class _DemandMyTasksPageState extends ConsumerState<DemandMyTasksPage> {
         ),
         centerTitle: true,
       ),
-      body: const DemandMyTasksSection(),
+      body: DemandMyTasksSection(key: _sectionKey),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        onPressed: () async {
+          await context.push(RoutePath.demandPost);
+          if (!mounted) return;
+          ref.invalidate(demandStatsProvider);
+          _sectionKey.currentState?.reload();
+        },
+        icon: const Icon(Icons.edit_outlined, color: Colors.white),
+        label: const Text('发布任务'),
+      ),
     );
   }
 }
 
-/// 我接取的任务列表（状态筛选 + 分页）。
+/// 单个分段的任务列表；[mine] 决定查询"我发布"还是"我接取"。
 class _MyTaskListTab extends ConsumerStatefulWidget {
-  const _MyTaskListTab({super.key});
+  const _MyTaskListTab({super.key, required this.mine, required this.emptyHint});
+  final String mine;
+  final String emptyHint;
 
   @override
-  ConsumerState<_MyTaskListTab> createState() => _MyTaskListState();
+  ConsumerState<_MyTaskListTab> createState() => _MyTaskListTabState();
 }
 
-class _MyTaskListState extends ConsumerState<_MyTaskListTab>
+class _MyTaskListTabState extends ConsumerState<_MyTaskListTab>
     with AutomaticKeepAliveClientMixin {
   static const int _pageSize = 20;
 
@@ -86,15 +144,20 @@ class _MyTaskListState extends ConsumerState<_MyTaskListTab>
   final ScrollController _scrollCtrl = ScrollController();
   String? _status;
 
-  /// 状态筛选顺序（null=全部）。selected 为遗留态，不单列。
-  static const List<String?> _statusOptions = [
-    null,
-    DemandStatus.open,
-    DemandStatus.inProgress,
-    DemandStatus.completed,
-    DemandStatus.failed,
-    DemandStatus.closed,
-  ];
+  /// 状态筛选顺序（null=全部）。selected 为遗留态，不单列；
+  /// 待审核 / 审核未通过只在「我发布的」里出现——广场永远拿不到这两态。
+  List<String?> get _statusOptions => <String?>[
+        null,
+        if (widget.mine == 'published') ...[
+          DemandStatus.pendingReview,
+          DemandStatus.rejected,
+        ],
+        DemandStatus.open,
+        DemandStatus.inProgress,
+        DemandStatus.completed,
+        DemandStatus.failed,
+        DemandStatus.closed,
+      ];
 
   @override
   bool get wantKeepAlive => true;
@@ -131,7 +194,7 @@ class _MyTaskListState extends ConsumerState<_MyTaskListTab>
 
   Future<PagedData<DemandTask>> _loadPage(int pageNum) {
     return ref.read(demandRepositoryProvider).pageDemands(
-          mine: 'claimed',
+          mine: widget.mine,
           status: _status,
           pageNum: pageNum,
           pageSize: _pageSize,
@@ -270,6 +333,6 @@ class _MyTaskListState extends ConsumerState<_MyTaskListTab>
     if (_status != null) {
       return '该状态下暂无任务（${DemandStatus.label(_status)}）';
     }
-    return '还没有接取过任务';
+    return widget.emptyHint;
   }
 }

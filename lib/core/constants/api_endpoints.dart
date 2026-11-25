@@ -354,14 +354,25 @@ class ApiEndpoints {
   /// 任务广场轻量统计（可接单数 / 今日新增 / 题材角标）。
   static const String demandStats = '/trade/demand/stats';
   static String demandDetail(int demandId) => '/trade/demand/$demandId';
+  /// 发布任务（买方建单）：建完落 pending_review，平台审核通过才进广场曝光。
+  static const String demandCreate = '/trade/demand';
+  /// 编辑任务（PUT）：仅发布者，且仅 pending_review / rejected 可改；
+  /// 改 rejected 的单即重新送审并清空审核意见。
+  static String demandUpdate(int demandId) => '/trade/demand/$demandId';
   static String demandClaim(int demandId) => '/trade/demand/$demandId/claim';
   /// 任务会话（平台运营 ↔ 创作者，POST；创作者发起即与接单任务沟通）。
   static String demandChatSession(int demandId) => '/trade/demand/$demandId/chat/session';
   // 验收轮次
   static String demandStages(int demandId) => '/trade/demand/$demandId/stages';
   static String demandStageDeliver(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliver';
+  /// 最终作品查阅：需求方只在整单 completed 且查最后一轮（已通过验收）时可取。
+  static String demandStageDeliverableWork(int demandId, int stageId) => '/trade/demand/$demandId/stage/$stageId/deliverable-work';
   // 可交付作品（本人、非已上架售卖）
   static const String demandDeliverableWorks = '/trade/demand/deliverable-works';
+  /// 发布分镜任务的源剧本候选：本人未删除作品（不排除已上架，仅作参考不转移版权）。
+  static const String demandSourceWorks = '/trade/demand/source-works';
+  /// 源剧本文件上传（交易域端点，发布者未必有创作者资格，不能走 content/upload）。
+  static const String demandUploadScript = '/trade/demand/upload-script';
   /// 查看分镜任务的源剧本（接单前评估，任何登录用户可读）。
   static String demandSourceScript(int demandId) => '/trade/demand/$demandId/source-script';
   // 延时：创作者申请 / 延时记录（审批与自主延时已收归管理端）

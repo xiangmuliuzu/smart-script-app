@@ -1041,7 +1041,7 @@ class _CreatorBentoSection extends StatelessWidget {
   }
 }
 
-/// 甲方专属 Bento 区：展示我的选品、任务广场、短剧管理、我的印章。
+/// 甲方专属 Bento 区：展示我的选品、需求发布、短剧管理、我的印章。
 class _ClientBentoSection extends StatelessWidget {
   const _ClientBentoSection({required this.ref});
 
@@ -1071,10 +1071,10 @@ class _ClientBentoSection extends StatelessWidget {
                   icon: Icons.campaign_outlined,
                   iconColor: const Color(0xFFC96A1B),
                   iconBg: const Color(0xFFFEF3E8),
-                  title: '任务广场',
-                  subtitle: '接平台任务赚收益',
-                  // 任务广场已升级为底部导航第二个分支：切 tab 而不是压栈
-                  onTap: () => context.go(RoutePath.demandTab),
+                  title: '需求发布',
+                  subtitle: '发布任务送平台审核',
+                  // 直接进发布页；广场是切 tab 的入口，发布要走压栈
+                  onTap: () => context.push(RoutePath.demandPost),
                 ),
               ),
             ],

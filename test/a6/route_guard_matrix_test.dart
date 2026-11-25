@@ -363,16 +363,19 @@ void main() {
 
   // ================================================================
   group('G6-E 任务广场板块：游客可浏览，动作要登录', () {
-    test('广场浏览路径不受保护，我的任务/交付路径受保护', () {
+    test('广场浏览路径不受保护，发布/我的任务/交付路径受保护', () {
       expect(ProtectedRoutes.isProtected('${RoutePath.demandDetail}?id=7'), isFalse);
-      // 发布与验收查阅已收归管理端，APP 不再有对应路由
       for (final path in const [
+        RoutePath.demandPost,
         RoutePath.demandMyTasks,
         RoutePath.demandStageDeliver,
+        RoutePath.demandDeliverableWork,
         RoutePath.demandSourceScript,
       ]) {
         expect(ProtectedRoutes.isProtected(path), isTrue, reason: '$path 必须登录');
       }
+      // 编辑走同一发布页，带 id 的深链也要被前缀规则覆盖
+      expect(ProtectedRoutes.isProtected('${RoutePath.demandPost}?id=3'), isTrue);
     });
 
     testWidgets('游客进入任务 tab 落在广场分段，不弹登录也不跳登录页', (tester) async {
@@ -408,6 +411,26 @@ void main() {
       expect(container.read(routeIntentStoreProvider).pending, isNull);
       // 游客态该分段只渲染登录引导，绝不发起 mine 请求（否则 401 会被当会话过期踢走）
       expect(find.textContaining('登录后即可查看'), findsOneWidget);
+    });
+
+    testWidgets('游客点「发布任务」确认后带回收跳意图', (tester) async {
+      await _pumpApp(tester);
+      final container = _containerOf(tester);
+      container.read(routerProvider).go(RoutePath.demandTab);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 顶栏常驻的发布入口（Hero 里还有一个同款 CTA，这里点的是顶栏图标）
+      await tester.tap(find.byTooltip('发布任务'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('需要登录'), findsOneWidget);
+      await tester.tap(find.text('去登录'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(container.read(routeIntentStoreProvider).pending?.target,
+          RoutePath.demandPost);
     });
 
     testWidgets('游客进详情页只看白名单字段，点接单动作要先登录', (tester) async {

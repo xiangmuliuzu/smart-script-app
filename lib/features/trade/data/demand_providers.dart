@@ -15,7 +15,10 @@ final demandRepositoryProvider = Provider<DemandRepository>(
 
 // ==================== 详情 ====================
 
-/// 任务详情
+/// 任务详情。
+///
+/// 审核态（pending_review / rejected）与已过截止的 open 单只有参与方（发布方 clientId
+/// 或接单人 acceptedCreatorId）读得到，其他人后端直接回 404——页面按「任务不存在/已下架」渲染。
 final demandDetailProvider = FutureProvider.autoDispose.family<DemandTask, int>(
   (ref, demandId) => ref.watch(demandRepositoryProvider).demandDetail(demandId),
 );
@@ -79,7 +82,10 @@ final demandStatsProvider = FutureProvider.autoDispose<DemandStats>((ref) async 
 
 // ==================== 验收轮次 ====================
 
-/// 某任务的验收轮次列表
+/// 某任务的验收轮次列表（金额为分）。
+///
+/// 任务双方拿到完整字段；广场可见任务的陌生人只拿到进度骨架（交付字段被后端剥掉）；
+/// 审核态等非广场状态下的非参与方拿不到（后端报错）。
 final demandStagesProvider = FutureProvider.autoDispose.family<List<DemandStage>, int>(
   (ref, demandId) => ref.watch(demandRepositoryProvider).demandStages(demandId),
 );

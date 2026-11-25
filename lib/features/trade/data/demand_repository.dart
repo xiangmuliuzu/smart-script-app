@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -13,8 +15,8 @@ class DemandRepository {
   // ==================== 征集任务 ====================
 
   /// 任务列表（分页）。
-  /// [mine] 为空时为任务广场（仅可接取：后端强制 status=open）；
-  /// claimed=我接取的（返回全部状态，仅本人可见）。
+  /// [mine] 为空时为任务广场（仅可接取：后端强制 status=open，且不曝光审核态）；
+  /// published=我发布的（含待审核/审核未通过等全部状态），claimed=我接取的，两者仅本人可见。
   Future<PagedData<DemandTask>> pageDemands({
     String? status,
     int? genreId,
@@ -72,6 +74,97 @@ class DemandRepository {
     return DemandTask.fromJson(data);
   }
 
+  /// 发布任务（买方建单）。建完落 `pending_review`，平台审核通过才进广场（open）。
+  ///
+  /// [taskType] 取 script / script_storyboard / storyboard；
+  /// storyboard 必须同时提供源剧本（[sourceWorkId] 选本人作品 或 [sourceScriptUrl] 上传文件，可并存）。
+  /// 金额口径注意：[budget] 为**分**，[stages] 每行的 amount 为**元**
+  /// （`[{stageOrder, episodeTo, amount(元), durationDays, durationHours}]`），后端同口径校验。
+  Future<DemandTask> createDemand({
+    required String title,
+    int? genreId,
+    int? budget, // 分
+    String? deadline, // yyyy-MM-dd
+    String? requirement,
+    String? contactInfo,
+    String? tags,
+    int? totalEpisodes,
+    int? durationHours,
+    String? taskType,
+    int? sourceWorkId,
+    String? sourceScriptUrl,
+    String? sourceScriptName,
+    List<Map<String, dynamic>>? stages,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.demandCreate,
+      data: _compact({
+        'title': title,
+        'genreId': genreId,
+        'budget': budget,
+        'deadline': deadline,
+        'requirement': requirement,
+        'contactInfo': contactInfo,
+        'tags': tags,
+        'totalEpisodes': totalEpisodes,
+        'durationHours': durationHours,
+        'taskType': taskType,
+        'sourceWorkId': sourceWorkId,
+        'sourceScriptUrl': sourceScriptUrl,
+        'sourceScriptName': sourceScriptName,
+        'stages': stages,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('发布任务失败');
+    return DemandTask.fromJson(data);
+  }
+
+  /// 编辑任务（仅发布者，且仅待审核/审核未通过可改）。参数与 [createDemand] 一致。
+  ///
+  /// 改审核未通过的单即自动重新送审并清空审核意见；
+  /// 已审核通过（open 及之后）的单后端拒改，message 为「任务已通过审核，如需调整请联系平台客服」。
+  Future<DemandTask> updateDemand({
+    required int demandId,
+    required String title,
+    int? genreId,
+    int? budget, // 分
+    String? deadline, // yyyy-MM-dd
+    String? requirement,
+    String? contactInfo,
+    String? tags,
+    int? totalEpisodes,
+    int? durationHours,
+    String? taskType,
+    int? sourceWorkId,
+    String? sourceScriptUrl,
+    String? sourceScriptName,
+    List<Map<String, dynamic>>? stages,
+  }) async {
+    final data = await _api.put<Map<String, dynamic>>(
+      ApiEndpoints.demandUpdate(demandId),
+      data: _compact({
+        'title': title,
+        'genreId': genreId,
+        'budget': budget,
+        'deadline': deadline,
+        'requirement': requirement,
+        'contactInfo': contactInfo,
+        'tags': tags,
+        'totalEpisodes': totalEpisodes,
+        'durationHours': durationHours,
+        'taskType': taskType,
+        'sourceWorkId': sourceWorkId,
+        'sourceScriptUrl': sourceScriptUrl,
+        'sourceScriptName': sourceScriptName,
+        'stages': stages,
+      }),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('保存修改失败');
+    return DemandTask.fromJson(data);
+  }
+
   /// 抢单（创作者先到先得接单，无需押金）。
   Future<DemandTask> claimDemand(int demandId) async {
     final data = await _api.post<Map<String, dynamic>>(
@@ -121,6 +214,42 @@ class DemandRepository {
         .toList();
   }
 
+  /// 发布分镜任务时可选的源剧本作品（本人作品，不限上下架状态）。
+  Future<List<DeliverableWork>> sourceWorks() async {
+    final data = await _api.get<List<dynamic>>(
+      ApiEndpoints.demandSourceWorks,
+      parser: (raw) => raw is List ? raw : <dynamic>[],
+    );
+    if (data == null) return [];
+    return data
+        .whereType<Map>()
+        .map((e) => DeliverableWork.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// 上传源剧本文件（发布分镜任务用）。返回 {url, fileName}，url 为相对路径。
+  Future<Map<String, dynamic>> uploadSourceScript({
+    required List<int> bytes,
+    required String fileName,
+    String? contentType,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes,
+          filename: fileName,
+          contentType:
+              contentType == null ? null : DioMediaType.parse(contentType)),
+    });
+    final data = await _api.upload<Map<String, dynamic>>(
+      ApiEndpoints.demandUploadScript,
+      formData: formData,
+      parser: _mapParser,
+    );
+    if (data == null || (data['url'] as String? ?? '').isEmpty) {
+      throw ApiException('源剧本上传失败');
+    }
+    return data;
+  }
+
   /// 查看任务的源剧本（分镜类任务）：作品源给全本正文，文件源给下载地址。
   /// 任何登录用户可读——潜在接单者要先评估剧本再决定接单。
   Future<SourceScript> sourceScript(int demandId) async {
@@ -130,6 +259,22 @@ class DemandRepository {
     );
     if (data == null || data.isEmpty) throw ApiException('源剧本加载失败');
     return SourceScript.fromMap(data);
+  }
+
+  /// 需求方查看最终交付作品（最后一轮、整单验收完成后）。
+  ///
+  /// 交付作品一定未上架，读者接口（content 域）取不到；正文只下发本轮 episodeTo 内的集，
+  /// 之后的章节只有标题、readable=false。
+  /// 门槛由后端把关：仅 `demand.status == completed` 且 [stageId] 为最后一轮且该轮已通过验收，
+  /// 其余情况返回业务错误（如「任务尚未完成验收，暂不可查看交付作品」），
+  /// 页面须把后端 message 原样透出，不在端上另判一套。
+  Future<StageDeliverableView> deliverableWork(int demandId, int stageId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.demandStageDeliverableWork(demandId, stageId),
+      parser: _mapParser,
+    );
+    if (data == null || data.isEmpty) throw ApiException('交付内容加载失败');
+    return StageDeliverableView.fromJson(data);
   }
 
   /// 创作者提交本轮交付物。

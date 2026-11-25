@@ -13,14 +13,21 @@ import '../../../core/widgets/app_toast.dart';
 import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
 
-/// 验收轮次面板：竖向时间线展示，供创作者提交交付 / 申请延时。
-/// 审核、延时审批与自主延时已收归平台运营端（管理端）。
+/// 验收轮次面板：竖向时间线展示。
+///
+/// 交付与申请延时是接单创作者的动作，须由宿主显式打开 [canDeliver]；
+/// 需求方（发布方）拿到的是同一份时间线但只读——验收、延时审批与自主延时
+/// 已收归平台运营端（管理端），两端都不提供这些按钮。
 class DemandStagePanel extends ConsumerStatefulWidget {
   final int demandId;
+
+  /// 当前用户是否为可本轮交付的接单人。需求方传 false，面板退化为只读进度。
+  final bool canDeliver;
 
   const DemandStagePanel({
     super.key,
     required this.demandId,
+    this.canDeliver = false,
   });
 
   @override
@@ -87,6 +94,7 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
               ...stages.asMap().entries.map((e) => _StageTimelineItem(
                     stage: e.value,
                     demandId: widget.demandId,
+                    canDeliver: widget.canDeliver,
                     isLast: e.key == stages.length - 1,
                     extendApplies: history
                         .where((a) =>
@@ -108,6 +116,9 @@ class _StageTimelineItem extends ConsumerStatefulWidget {
   final DemandStage stage;
   final int demandId;
 
+  /// 仅接单人可交付/申请延时；需求方看同一时间线但只读。
+  final bool canDeliver;
+
   /// 是否最后一轮：末轮不再画向下延伸的连接线
   final bool isLast;
 
@@ -117,6 +128,7 @@ class _StageTimelineItem extends ConsumerStatefulWidget {
   const _StageTimelineItem({
     required this.stage,
     required this.demandId,
+    this.canDeliver = false,
     this.isLast = false,
     this.extendApplies = const <DemandExtendApply>[],
   });
@@ -514,8 +526,9 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     return s.startedAt != null && s.status != 'approved';
   }
 
-  /// 创作者可交付：活动轮且处于待交付/已驳回。
+  /// 创作者可交付：活动轮且处于待交付/已驳回；需求方只读，拿不到交付动作。
   bool get _canDeliver =>
+      widget.canDeliver &&
       _isActiveRound &&
       (widget.stage.status == 'pending' || widget.stage.status == 'rejected');
 

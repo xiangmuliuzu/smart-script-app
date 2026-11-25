@@ -625,6 +625,9 @@ class ContractTemplate {
 
 /// 征集状态
 class DemandStatus {
+  // 审核态：买方建单后先落 pending_review，审核通过才进广场（open），不通过为 rejected。
+  static const String pendingReview = 'pending_review';
+  static const String rejected = 'rejected';
   static const String open = 'open';
   static const String inProgress = 'in_progress';
   static const String completed = 'completed';
@@ -632,8 +635,16 @@ class DemandStatus {
   static const String selected = 'selected';
   static const String failed = 'failed';
 
+  /// 审核态（未公开）：广场不曝光、只有任务参与方读得到，游客不得发起请求。
+  static bool isAuditState(String? status) =>
+      status == pendingReview || status == rejected;
+
   static String label(String? status) {
     switch (status) {
+      case pendingReview:
+        return '待审核';
+      case rejected:
+        return '审核未通过';
       case open:
         return '待接单';
       case inProgress:
@@ -683,6 +694,9 @@ class DemandTask {
   final String? acceptedCreatorName;
   final String? failReason;
   final DateTime? failAt;
+  // 平台审核（买方建单 → 运营审核）：rejected 时 auditRemark 即驳回原因
+  final String? auditRemark;
+  final DateTime? auditAt;
 
   const DemandTask({
     this.demandId,
@@ -712,10 +726,20 @@ class DemandTask {
     this.acceptedCreatorName,
     this.failReason,
     this.failAt,
+    this.auditRemark,
+    this.auditAt,
   });
 
-  /// 接单制状态文案；逾期优先于进行中展示。
+  /// 审核态（待审核 / 审核未通过）：不在广场曝光，仅参与方可见。
+  bool get isInAudit => DemandStatus.isAuditState(status);
+
+  /// 买方能否编辑重交：仅审核态可改，审核通过后只能走平台（后端同口径再校验）。
+  bool get isEditableByPublisher => isInAudit;
+
+  /// 接单制状态文案；审核态优先，其次逾期优先于进行中展示。
   String get statusLabel {
+    // 审核态先于逾期判定：未通过审核的单根本没进广场，谈不上逾期
+    if (isInAudit) return DemandStatus.label(status);
     if (isOverdue == 1) return '已逾期';
     switch (status) {
       case 'open':
@@ -765,6 +789,8 @@ class DemandTask {
       acceptedCreatorName: json['acceptedCreatorName'] as String?,
       failReason: json['failReason'] as String?,
       failAt: _parseDateTime(json['failAt']),
+      auditRemark: json['auditRemark'] as String?,
+      auditAt: _parseDateTime(json['auditAt']),
     );
   }
 
@@ -772,9 +798,7 @@ class DemandTask {
         'title': title,
         'genreId': genreId,
         'budget': budget,
-        'deadline': deadline != null
-            ? '${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}'
-            : null,
+        'deadline': deadline != null ? AppTime.formatDate(deadline) : null,
         'requirement': requirement,
         'contactInfo': contactInfo,
         'tags': tags,
@@ -1184,4 +1208,68 @@ class DeliverableChapter {
   String get displayTitle => (chapterTitle?.isNotEmpty ?? false)
       ? chapterTitle!
       : '第${chapterNo ?? '?'}集';
+}
+
+/// 最终作品：需求方查看最后一轮交付的作品（正文仍只到本轮 episodeTo）。
+///
+/// 后端只在 `demand.status == completed` 且查的是最后一轮且该轮已验收通过时下发，
+/// 其余情况直接报错（文案由页面原样透出，不在端上另编一套规则）。
+class StageDeliverableView {
+  final int workId;
+  final String? title;
+  final String? authorName;
+  final int? episodeCount;
+  final int? wordCount;
+  final String? summary;
+  final int? stageOrder;
+  final int? episodeTo;
+  final String? stageStatus;
+  final String? deliverableDesc;
+  final String? deliverableUrl;
+  final int? aiScore;
+  final List<DeliverableChapter> chapters;
+
+  const StageDeliverableView({
+    required this.workId,
+    this.title,
+    this.authorName,
+    this.episodeCount,
+    this.wordCount,
+    this.summary,
+    this.stageOrder,
+    this.episodeTo,
+    this.stageStatus,
+    this.deliverableDesc,
+    this.deliverableUrl,
+    this.aiScore,
+    this.chapters = const [],
+  });
+
+  factory StageDeliverableView.fromJson(Map<String, dynamic> json) {
+    final raw = json['chapters'];
+    return StageDeliverableView(
+      workId: (json['workId'] as num?)?.toInt() ?? 0,
+      title: json['title'] as String?,
+      authorName: json['authorName'] as String?,
+      episodeCount: (json['episodeCount'] as num?)?.toInt(),
+      wordCount: (json['wordCount'] as num?)?.toInt(),
+      summary: json['summary'] as String?,
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
+      episodeTo: (json['episodeTo'] as num?)?.toInt(),
+      stageStatus: json['stageStatus'] as String?,
+      deliverableDesc: json['deliverableDesc'] as String?,
+      deliverableUrl: json['deliverableUrl'] as String?,
+      aiScore: (json['aiScore'] as num?)?.toInt(),
+      chapters: raw is List
+          ? raw
+              .whereType<Map>()
+              .map(
+                  (e) => DeliverableChapter.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+    );
+  }
+
+  /// 可见（已下发正文）的集数。
+  int get readableCount => chapters.where((c) => c.readable).length;
 }
