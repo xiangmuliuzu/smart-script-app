@@ -10,8 +10,9 @@ import '../data/author_work_providers.dart';
 import '../widgets/work_chapter_tab.dart';
 import '../widgets/work_publish_tab.dart';
 import '../widgets/work_settings_tab.dart';
+import '../widgets/work_storyboard_tab.dart';
 
-/// 作品工作台（写作范式：章节 / 设置 / 发布 三 Tab）。
+/// 作品工作台（章节 / 分镜 / 设置 / 发布）。
 ///
 /// 单一数据源为 [authorWorkDetailProvider]（A 套作品详情，含章节与最近审核）；
 /// 默认落在「章节」Tab，符合「作品=章节集合」的写作心智。
@@ -38,7 +39,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -71,7 +72,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
   Widget _buildBody(AuthorWorkDetail detail) {
     return Column(
       children: [
-        _WorkHeader(work: detail.work, chapterCount: detail.chapters.length),
+        _WorkHeader(work: detail.work, shelfStatus: detail.shelfStatus, chapterCount: detail.chapters.length),
         Material(
           color: AppColors.card,
           child: TabBar(
@@ -82,6 +83,7 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
             indicatorSize: TabBarIndicatorSize.label,
             tabs: const [
               Tab(text: '章节'),
+              Tab(text: '分镜'),
               Tab(text: '设置'),
               Tab(text: '发布'),
             ],
@@ -96,6 +98,11 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
                 chapters: detail.chapters,
                 editable: detail.work.editable,
               ),
+              WorkStoryboardTab(
+                workId: widget.workId,
+                editable: detail.work.editable,
+                hasChapters: detail.chapters.isNotEmpty,
+              ),
               WorkSettingsTab(detail: detail),
               WorkPublishTab(workId: widget.workId, detail: detail),
             ],
@@ -108,9 +115,10 @@ class _WorkWorkspacePageState extends ConsumerState<WorkWorkspacePage>
 
 /// 顶部作品卡：封面缩略图 + 标题 + 状态徽标 + 字数 / 章节数。
 class _WorkHeader extends StatelessWidget {
-  const _WorkHeader({required this.work, required this.chapterCount});
+  const _WorkHeader({required this.work, required this.shelfStatus, required this.chapterCount});
 
   final AuthorWorkItem work;
+  final String? shelfStatus;
   final int chapterCount;
 
   @override
@@ -146,7 +154,7 @@ class _WorkHeader extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _StatusBadge(status: work.status),
+                    _StatusBadge(status: work.status, shelfStatus: shelfStatus ?? work.shelfStatus),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -164,16 +172,19 @@ class _WorkHeader extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, this.shelfStatus = ''});
 
   final String status;
+  final String shelfStatus;
 
   @override
   Widget build(BuildContext context) {
+    final onShelf = status == 'published' && shelfStatus == 'on_shelf';
+    final label = status == 'published' ? (onShelf ? '已上架' : '审核通过，待上架') : workStatusLabel(status);
     final color = switch (status) {
       'draft' => AppColors.text3,
       'reviewing' => AppColors.warning,
-      'published' => AppColors.success,
+      'published' => onShelf ? AppColors.success : AppColors.warning,
       'revision' || 'rejected' => AppColors.danger,
       _ => AppColors.text3,
     };
@@ -184,7 +195,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        workStatusLabel(status),
+        label,
         style: const TextStyle(fontSize: 11, color: Colors.white),
       ),
     );

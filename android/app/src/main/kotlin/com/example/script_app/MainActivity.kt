@@ -34,9 +34,40 @@ class MainActivity : FlutterActivity() {
     private var pendingResult: MethodChannel.Result? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
 
+    /**
+     * 最近一次被点击的通知落点（业务页定位串）。
+     * 冷启动取自 getIntent()，热启动取自 onNewIntent()；Dart 侧就绪后拉走并清空。
+     */
+    private var pendingNotifyRoute: String? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         ensureNotificationChannel()
+        captureNotifyRoute(intent)
+    }
+
+    /** 通知点击在 App 存活时走这里（singleTop），不会重建 Activity。 */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureNotifyRoute(intent)
+    }
+
+    private fun captureNotifyRoute(intent: Intent?) {
+        val route = intent?.getStringExtra(EXTRA_NOTIFY_ROUTE)
+        if (!route.isNullOrEmpty()) {
+            pendingNotifyRoute = route
+        }
+    }
+
+    /**
+     * 冷启动时 Dart 侧尚未注册回调，原生推不过去；改成 Dart 主动拉取，
+     * 取后即清，保证同一次点击只被消费一次、不会在下次启动重放。
+     */
+    private fun takePendingNotifyRoute(result: MethodChannel.Result) {
+        val route = pendingNotifyRoute
+        pendingNotifyRoute = null
+        result.success(route)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -54,6 +85,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "showNotification" -> showNotification(call, result)
                     "ensureNotificationPermission" -> ensureNotificationPermission(result)
+                    "takePendingRoute" -> takePendingNotifyRoute(result)
                     else -> result.notImplemented()
                 }
             }
@@ -62,6 +94,16 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "saveToPublicDownloads" -> saveToPublicDownloads(call, result)
+                    else -> result.notImplemented()
+                }
+            }
+        // 应用内更新：安装已下载的 APK。无法静默安装，此处只负责拉起系统安装器；
+        // 用户未授权「安装未知应用」时先引导到系统设置页。
+        MethodChannel(messenger, CHANNEL_UPDATE)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "installApk" -> installApk(call, result)
+                    "buildNumber" -> result.success(BuildConfig.VERSION_CODE)
                     else -> result.notImplemented()
                 }
             }
@@ -137,14 +179,16 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * 弹出系统通知。入参：id(Int)、title(String)、body(String)。
-     * 点击通知回到本 App（单实例，singleTop）。
+     * 弹出系统通知。入参：id(Int)、title(String)、body(String)、route(String?)。
+     * 点击通知回到本 App（单实例，singleTop）；带 route 时把它塞进 Intent，
+     * Dart 侧取到后直接跳到对应业务页。
      */
     private fun showNotification(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
         try {
             val id = call.argument<Int>("id") ?: (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
             val title = call.argument<String>("title") ?: "新消息"
             val body = call.argument<String>("body") ?: ""
+            val route = call.argument<String>("route")
             val manager = getSystemService(NotificationManager::class.java)
             if (manager == null) {
                 result.success(false)
@@ -159,6 +203,7 @@ class MainActivity : FlutterActivity() {
             }
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                if (!route.isNullOrEmpty()) putExtra(EXTRA_NOTIFY_ROUTE, route)
             }
             val pendingIntent = PendingIntent.getActivity(
                 this, id, intent,
@@ -215,8 +260,58 @@ class MainActivity : FlutterActivity() {
         pending?.success(granted)
     }
 
-    private fun pickImage(result: MethodChannel.Result) {
-        if (pendingResult != null) {
+    /**
+     * 拉起系统安装器安装已下载的 APK（应用内更新）。
+     *
+     * 普通应用无法静默安装：Android 只允许系统 / OEM 应用以程序方式安装。
+     * 因此这里只做两件事：检查「安装未知应用」授权，未授权时把用户引导到系统设置页；
+     * 已授权则用 [ApkContentProvider] 生成 content:// 并打开系统安装确认框。
+     *
+     * 入参：path(String)，ApkInstaller 下载好的文件绝对路径。
+     * 返回：true 表示已拉起安装器；false 表示已跳到授权页（用户返回后应重新点击更新）。
+     */
+    private fun installApk(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        if (path.isNullOrBlank()) {
+            result.error("invalid_argument", "缺少安装包路径", null)
+            return
+        }
+        val file = File(path)
+        if (!file.exists() || file.length() == 0L) {
+            result.error("missing_file", "安装包不存在，请重新下载", null)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            try {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+                result.success(false)
+            } catch (e: Exception) {
+                result.error("no_settings", "请先在系统设置中允许本应用安装未知应用", null)
+            }
+            return
+        }
+        try {
+            val uri = ApkContentProvider.uriFor(this, file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("install_failed", "无法启动安装，请稍后重试", null)
+        }
+    }
+
+    private fun pickImage(result: MethodChannel.Result) {        if (pendingResult != null) {
             // 已有选择器在前台，避免并发回调错位
             result.error("busy", "image picker already active", null)
             return
@@ -279,8 +374,7 @@ class MainActivity : FlutterActivity() {
         }.start()
     }
 
-    /** 限量复制，并根据实际文件头保留格式；任何失败都删除部分缓存。 */
-    private fun copyToCache(uri: Uri): String {
+    /** 限量复制，并根据实际文件头保留格式；任何失败都删除部分缓存。 */    private fun copyToCache(uri: Uri): String {
         val dir = File(cacheDir, "avatar_pick")
         if (!dir.exists() && !dir.mkdirs()) {
             throw ImagePickException("copy_failed", "无法读取所选图片，请重试")
@@ -334,7 +428,10 @@ class MainActivity : FlutterActivity() {
         private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024L
         private const val CHANNEL_NOTIFY = "smartscript/native_notify"
         private const val CHANNEL_FILE = "smartscript/native_file"
+        // 应用内更新：安装已下载的 APK / 读取本机 versionCode。
+        private const val CHANNEL_UPDATE = "smartscript/native_update"
         private const val REQUEST_NOTIFICATION_PERMISSION = 4102
         private const val NOTIFICATION_CHANNEL_ID = "smartscript_messages"
+        private const val EXTRA_NOTIFY_ROUTE = "smartscript_notify_route"
     }
 }

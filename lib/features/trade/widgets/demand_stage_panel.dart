@@ -13,14 +13,21 @@ import '../../../core/widgets/app_toast.dart';
 import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
 
-/// 验收轮次面板：竖向时间线展示，供创作者提交交付 / 申请延时。
-/// 审核、延时审批与自主延时已收归平台运营端（管理端）。
+/// 验收轮次面板：竖向时间线展示。
+///
+/// 交付与申请延时是接单创作者的动作，须由宿主显式打开 [canDeliver]；
+/// 需求方（发布方）拿到的是同一份时间线但只读——验收、延时审批与自主延时
+/// 已收归平台运营端（管理端），两端都不提供这些按钮。
 class DemandStagePanel extends ConsumerStatefulWidget {
   final int demandId;
+
+  /// 当前用户是否为可本轮交付的接单人。需求方传 false，面板退化为只读进度。
+  final bool canDeliver;
 
   const DemandStagePanel({
     super.key,
     required this.demandId,
+    this.canDeliver = false,
   });
 
   @override
@@ -72,9 +79,10 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
           );
         }
         // 延时记录（创作者申请 + 运营自主）：整单取一次，按轮分发到各条目（每条一行，不互相覆盖）
-        final history =
-            ref.watch(demandExtendHistoryProvider(widget.demandId)).valueOrNull ??
-                const <DemandExtendApply>[];
+        final history = ref
+                .watch(demandExtendHistoryProvider(widget.demandId))
+                .valueOrNull ??
+            const <DemandExtendApply>[];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
@@ -86,9 +94,11 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
               ...stages.asMap().entries.map((e) => _StageTimelineItem(
                     stage: e.value,
                     demandId: widget.demandId,
+                    canDeliver: widget.canDeliver,
                     isLast: e.key == stages.length - 1,
                     extendApplies: history
-                        .where((a) => a.stageId != null && a.stageId == e.value.stageId)
+                        .where((a) =>
+                            a.stageId != null && a.stageId == e.value.stageId)
                         .toList(),
                   )),
               // 整单延时记录汇总（跨轮，标第几轮），默认只展示最近几条
@@ -105,14 +115,20 @@ class _DemandStagePanelState extends ConsumerState<DemandStagePanel> {
 class _StageTimelineItem extends ConsumerStatefulWidget {
   final DemandStage stage;
   final int demandId;
+
+  /// 仅接单人可交付/申请延时；需求方看同一时间线但只读。
+  final bool canDeliver;
+
   /// 是否最后一轮：末轮不再画向下延伸的连接线
   final bool isLast;
+
   /// 本轮延时记录（创作者申请延时与运营自主延时同表保留，按发生时间倒序）
   final List<DemandExtendApply> extendApplies;
 
   const _StageTimelineItem({
     required this.stage,
     required this.demandId,
+    this.canDeliver = false,
     this.isLast = false,
     this.extendApplies = const <DemandExtendApply>[],
   });
@@ -185,21 +201,31 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
 
   Color get _statusColor {
     switch (widget.stage.status) {
-      case 'approved': return Colors.green;
-      case 'ai_reviewing': return Colors.purple;
-      case 'submitted': return AppColors.text2;
-      case 'rejected': return Colors.red;
-      default: return Colors.grey;
+      case 'approved':
+        return Colors.green;
+      case 'ai_reviewing':
+        return Colors.purple;
+      case 'submitted':
+        return AppColors.text2;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 
   IconData get _statusIcon {
     switch (widget.stage.status) {
-      case 'approved': return Icons.check_circle;
-      case 'ai_reviewing': return Icons.pending_actions;
-      case 'submitted': return Icons.pending;
-      case 'rejected': return Icons.cancel;
-      default: return Icons.radio_button_unchecked;
+      case 'approved':
+        return Icons.check_circle;
+      case 'ai_reviewing':
+        return Icons.pending_actions;
+      case 'submitted':
+        return Icons.pending;
+      case 'rejected':
+        return Icons.cancel;
+      default:
+        return Icons.radio_button_unchecked;
     }
   }
 
@@ -223,7 +249,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
               children: [
                 Icon(_statusIcon, color: _statusColor, size: 22),
                 if (!widget.isLast)
-                  Expanded(child: Container(width: 2, color: Colors.grey.shade300)),
+                  Expanded(
+                      child: Container(width: 2, color: Colors.grey.shade300)),
               ],
             ),
           ),
@@ -244,33 +271,41 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                   Row(
                     children: [
                       Text('第${s.stageOrder}轮',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       const SizedBox(width: 8),
                       Text('到第${s.episodeTo}集',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                          style: TextStyle(
+                              fontSize: 13, color: Colors.grey.shade700)),
                       const Spacer(),
                       // 轮次金额与下方「已放款」同一位（两位），同一面板内不能一个 ¥150 一个 ¥150.00
                       Text('¥${amountYuan.toStringAsFixed(2)}',
                           style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600, color: _statusColor)),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _statusColor)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                             color: _statusColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(4)),
                         child: Text(s.statusLabel,
-                            style: TextStyle(fontSize: 11, color: _statusColor)),
+                            style:
+                                TextStyle(fontSize: 11, color: _statusColor)),
                       ),
                       if (s.releaseFlag == 1) ...[
                         const SizedBox(width: 6),
                         Flexible(
-                          child: Text('已放款¥${amountYuan.toStringAsFixed(2)}（已入创作者待结算）',
-                              style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
+                          child: Text(
+                              '已放款¥${amountYuan.toStringAsFixed(2)}（已入创作者待结算）',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.green.shade700)),
                         ),
                       ],
                     ],
@@ -279,19 +314,21 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.schedule, size: 13, color: Colors.grey.shade600),
+                      Icon(Icons.schedule,
+                          size: 13, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           '时限 ${s.durationText}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade700),
                         ),
                       ),
                       if (extendedHours > 0) ...[
                         const SizedBox(width: 10),
                         Text('已延时 ${formatDurationHours(extendedHours)}',
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.green.shade700)),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.green.shade700)),
                       ],
                       if (s.startedAt != null) ...[
                         const SizedBox(width: 10),
@@ -310,7 +347,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                           Padding(
                             padding: const EdgeInsets.only(left: 6),
                             child: Text('⚠ 已超时',
-                                style: TextStyle(fontSize: 12, color: Colors.red.shade700)),
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.red.shade700)),
                           ),
                       ],
                     ],
@@ -319,15 +357,24 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                   if (s.workId != null) ...[
                     const SizedBox(height: 6),
                     Text('交付作品：${s.workTitle ?? '作品${s.workId}'}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade700)),
+                    if (s.status == 'approved')
+                      Text('任务交付已验收通过；作品不会自动上架，如需进入书城请到作品详情手动上架',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green.shade700,
+                              height: 1.4)),
                   ] else if (_hasLooseDeliverable) ...[
                     // 分镜类任务允许不关联作品，只交文件链接/说明
                     const SizedBox(height: 6),
                     Text('交付内容：本轮未关联作品（分镜文件与说明）',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade700)),
                   ],
                   // 交付物链接（分镜/外部文件），创作者可点开自检
-                  if (s.deliverableUrl != null && s.deliverableUrl!.isNotEmpty) ...[
+                  if (s.deliverableUrl != null &&
+                      s.deliverableUrl!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,7 +382,9 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                         Expanded(
                           child: Text('交付物链接：${s.deliverableUrl}',
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey.shade600, height: 1.4)),
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                  height: 1.4)),
                         ),
                         GestureDetector(
                           behavior: HitTestBehavior.opaque,
@@ -353,16 +402,19 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                     ),
                   ],
                   // 交付说明
-                  if (s.deliverableDesc != null && s.deliverableDesc!.isNotEmpty) ...[
+                  if (s.deliverableDesc != null &&
+                      s.deliverableDesc!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text('交付说明：${s.deliverableDesc}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600)),
                   ],
                   // 驳回原因
                   if (s.rejectReason != null && s.rejectReason!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text('驳回原因：${s.rejectReason}',
-                        style: TextStyle(fontSize: 12, color: Colors.red.shade600)),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.red.shade600)),
                   ],
                   // AI 审核结论（分数与去向）
                   if (s.aiVerdictText != null) ...[
@@ -383,9 +435,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                           : '验收中，计时已暂停（审核耗时不计入本轮时限）',
                       style: TextStyle(
                           fontSize: 12,
-                          color: s.isAiReviewing
-                              ? Colors.purple
-                              : AppColors.text2,
+                          color:
+                              s.isAiReviewing ? Colors.purple : AppColors.text2,
                           height: 1.4),
                     ),
                   ],
@@ -407,13 +458,15 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                                 child: Text(
                                   _extendRecordLine(a),
                                   style: TextStyle(
-                                      fontSize: 12, color: _extendRecordColor(a.status), height: 1.4),
+                                      fontSize: 12,
+                                      color: _extendRecordColor(a.status),
+                                      height: 1.4),
                                 ),
                               )),
                           if (widget.extendApplies.length > _extendPreviewCount)
                             GestureDetector(
-                              onTap: () =>
-                                  setState(() => _extendExpanded = !_extendExpanded),
+                              onTap: () => setState(
+                                  () => _extendExpanded = !_extendExpanded),
                               child: Text(
                                 _extendExpanded
                                     ? '收起'
@@ -430,20 +483,23 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         '申请延时 ${s.extendAskText}${(s.extendReason != null && s.extendReason!.isNotEmpty) ? '：${s.extendReason}' : ''}（待平台处理）',
-                        style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.orange.shade800),
                       ),
                     )
                   else if (s.extendStatus == 'approved')
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text('延时申请已同意，截止时间已顺延',
-                          style: TextStyle(fontSize: 12, color: Colors.green.shade700)),
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.green.shade700)),
                     )
                   else if (s.extendStatus == 'rejected')
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text('延时申请已拒绝',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600)),
                     ),
                   // 操作区
                   ..._buildActions(context),
@@ -470,9 +526,11 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
     return s.startedAt != null && s.status != 'approved';
   }
 
-  /// 创作者可交付：活动轮且处于待交付/已驳回。
+  /// 创作者可交付：活动轮且处于待交付/已驳回；需求方只读，拿不到交付动作。
   bool get _canDeliver =>
-      _isActiveRound && (widget.stage.status == 'pending' || widget.stage.status == 'rejected');
+      widget.canDeliver &&
+      _isActiveRound &&
+      (widget.stage.status == 'pending' || widget.stage.status == 'rejected');
 
   /// 创作者可申请延时：可交付状态且无待处理申请。
   bool get _canRequestExtend => _canDeliver && !widget.stage.hasPendingExtend;
@@ -488,7 +546,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
             child: ElevatedButton(
               onPressed: _acting ? null : () => _deliver(context),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white),
               child: const Text('提交交付物'),
             ),
           ),
@@ -497,7 +556,8 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _acting ? null : () => _requestExtend(context),
-                style: OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
+                style:
+                    OutlinedButton.styleFrom(foregroundColor: AppColors.text1),
                 child: const Text('申请延时'),
               ),
             ),
@@ -570,16 +630,14 @@ class _StageTimelineItemState extends ConsumerState<_StageTimelineItem> {
                 controller: hoursCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                    labelText: '延长小时数',
-                    suffixText: '小时',
-                    isDense: true),
+                    labelText: '延长小时数', suffixText: '小时', isDense: true),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                    labelText: '延时原因（可选）', isDense: true),
+                decoration:
+                    const InputDecoration(labelText: '延时原因（可选）', isDense: true),
               ),
               const SizedBox(height: 4),
               Text('按小时填写，展示时自动折算为天。',
@@ -629,10 +687,14 @@ String _extendRecordLine(DemandExtendApply a, {bool withRound = false}) {
 /// 延时记录状态颜色：待处理橙色 / 已同意与自主生效绿色 / 已驳回灰色。
 Color _extendRecordColor(String? status) {
   switch (status) {
-    case 'pending': return Colors.orange.shade800;
-    case 'approved': return Colors.green.shade700;
-    case 'rejected': return Colors.grey.shade600;
-    default: return Colors.grey.shade700;
+    case 'pending':
+      return Colors.orange.shade800;
+    case 'approved':
+      return Colors.green.shade700;
+    case 'rejected':
+      return Colors.grey.shade600;
+    default:
+      return Colors.grey.shade700;
   }
 }
 
@@ -688,7 +750,9 @@ class _ExtendRecordSummaryState extends State<_ExtendRecordSummary> {
                 child: Text(
                   _extendRecordLine(a, withRound: true),
                   style: TextStyle(
-                      fontSize: 12, color: _extendRecordColor(a.status), height: 1.4),
+                      fontSize: 12,
+                      color: _extendRecordColor(a.status),
+                      height: 1.4),
                 ),
               )),
         ],

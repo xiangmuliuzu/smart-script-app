@@ -258,7 +258,7 @@ void main() {
         if (page == '1' && type.isEmpty) {
           return Envelope.ok({'total': 15, 'list': _messages(1, 10)});
         }
-        if (page == '1' && type == 'REVIEW') {
+        if (page == '1' && type == 'FOLLOW') {
           return Envelope.ok({'total': 1, 'list': _messages(200, 1)});
         }
         return Envelope.fail(50000, '服务暂时不可用');
@@ -272,7 +272,7 @@ void main() {
       await tester.pump();
       expect(find.textContaining('加载更多失败'), findsNothing);
 
-      await tester.tap(find.text('审核'));
+      await tester.tap(find.text('关注'));
       await tester.pump();
       api.release();
       await tester.pumpAndSettle();

@@ -58,9 +58,13 @@ dependencies:
   http: ^1.1.0
   # 开屏素材落到应用缓存目录；复用锁文件中已有版本。
   path_provider: ^2.1.4
+  # 应用内更新：兜底读取本机 build 号（Android 优先走原生 BuildConfig.VERSION_CODE）。
+  package_info_plus: ^8.0.0
   # 合同签署：手写签名画布
   signature: ^5.5.0
   qr_flutter: ^4.1.0
+  # 扫码登录：App 端扫一扫（扫码登录需求实现时引入）。
+  mobile_scanner: ^4.0.1
   web_socket_channel: ^3.0.3
 
 dev_dependencies:
@@ -93,6 +97,7 @@ flutter:
   # 认证页品牌资源。
   assets:
     - assets/images/logo_script.png
+    - assets/images/sourcing_agent_bubble.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

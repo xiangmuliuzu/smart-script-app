@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/providers/auth_providers.dart';
+import '../../core/router/app_router.dart' show rootNavigatorKey;
 import '../../core/router/auth_guard.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
@@ -14,6 +15,8 @@ import '../../models/user.dart';
 import '../bookstore/data/bookstore_models.dart';
 import '../bookstore/data/content_providers.dart';
 import '../bookstore/data/content_repository.dart';
+import '../update/data/app_update_providers.dart';
+import '../update/widgets/update_dialog.dart';
 import '../user_center/data/user_center_models.dart';
 import '../user_center/data/user_center_providers.dart';
 import '../user_center/data/user_social_models.dart';
@@ -380,6 +383,11 @@ class _ProfileDrawer extends StatelessWidget {
             ),
             const Divider(height: 1, color: AppColors.divider),
             _DrawerItem(
+              icon: Icons.qr_code_scanner,
+              label: '扫一扫',
+              onTap: () => _push(context, RoutePath.qrScan),
+            ),
+            _DrawerItem(
               icon: Icons.lock_outline,
               label: '账号安全',
               onTap: () => _push(context, RoutePath.accountSecurity),
@@ -403,6 +411,14 @@ class _ProfileDrawer extends StatelessWidget {
               icon: Icons.feedback_outlined,
               label: '意见反馈',
               onTap: () => _push(context, RoutePath.feedback),
+            ),
+            _DrawerItem(
+              icon: Icons.system_update_alt,
+              label: '检查更新',
+              onTap: () {
+                Navigator.pop(context);
+                _checkForUpdate(context);
+              },
             ),
             // 申请入口只取决于当前能力，关闭后即使账号类型仍是创作者也可重新申请。
             if (!user.authorCapability)
@@ -453,6 +469,27 @@ class _ProfileDrawer extends StatelessWidget {
   void _push(BuildContext context, String target) {
     Navigator.pop(context);
     AuthGuard.pushProtected(context, ref, target: target);
+  }
+
+  /// 手动检查更新：已是最新给轻提示，有更新走统一的更新弹窗（在应用内下载安装）。
+  Future<void> _checkForUpdate(BuildContext context) async {
+    try {
+      final prompt = await ref.read(appUpdateCheckerProvider).checkManually();
+      if (!context.mounted) return;
+      if (prompt == null) {
+        showAppToast(context, '当前已是最新版本');
+        return;
+      }
+      final dialogContext = rootNavigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      await showUpdateDialog(
+        context: dialogContext,
+        prompt: prompt,
+        repository: ref.read(appUpdateRepositoryProvider),
+      );
+    } catch (_) {
+      if (context.mounted) showAppToast(context, '检查更新失败，请稍后重试');
+    }
   }
 }
 
@@ -1004,7 +1041,7 @@ class _CreatorBentoSection extends StatelessWidget {
   }
 }
 
-/// 甲方专属 Bento 区：展示我的选品、任务广场、短剧管理、我的印章。
+/// 甲方专属 Bento 区：展示我的选品、需求发布、短剧管理、我的印章。
 class _ClientBentoSection extends StatelessWidget {
   const _ClientBentoSection({required this.ref});
 
@@ -1034,10 +1071,10 @@ class _ClientBentoSection extends StatelessWidget {
                   icon: Icons.campaign_outlined,
                   iconColor: const Color(0xFFC96A1B),
                   iconBg: const Color(0xFFFEF3E8),
-                  title: '任务广场',
-                  subtitle: '接平台任务赚收益',
-                  // 任务广场已升级为底部导航第二个分支：切 tab 而不是压栈
-                  onTap: () => context.go(RoutePath.demandTab),
+                  title: '需求发布',
+                  subtitle: '发布任务送平台审核',
+                  // 直接进发布页；广场是切 tab 的入口，发布要走压栈
+                  onTap: () => context.push(RoutePath.demandPost),
                 ),
               ),
             ],

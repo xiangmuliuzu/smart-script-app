@@ -8,8 +8,9 @@
 ///
 /// 作品状态口径（A 套由最新审核记录派生，服务端下发）：
 ///   draft（无记录）/ reviewing（pending、ai_reviewing）/ revision（待修改）
-///   rejected（已驳回）/ published（approved，已发布）。
-/// 编辑闸门：仅 reviewing（审核中）锁定，其余状态均可编辑；已发布作品改动后需重新提交审核。
+///   rejected（已驳回）/ published（approved，审核通过；是否上架由 shelfStatus 决定）。
+/// 前端将 published 展示为「审核通过」，不将其当作发布状态；是否进入书城只由 shelfStatus 决定。
+/// 编辑闸门：仅 reviewing（审核中）锁定，其余状态均可编辑；审核通过作品改动后需重新提交审核。
 library;
 
 import '../../bookstore/data/bookstore_models.dart';
@@ -50,7 +51,7 @@ String workStatusLabel(String status) {
     case 'rejected':
       return '已驳回';
     case 'published':
-      return '已发布';
+      return '审核通过';
     default:
       return status;
   }
@@ -86,6 +87,7 @@ class AuthorWorkItem {
     this.price,
     this.status = 'draft',
     this.shelfStatus = '',
+    this.copyrightRegistrationStatus,
     this.channelId,
     this.createTime,
     this.updateTime,
@@ -109,6 +111,13 @@ class AuthorWorkItem {
   /// 上架开关（后端 sys_work.status：on_shelf / off_shelf）。
   /// 列表接口未下发时为空字符串，调用方按审核状态兜底。
   final String shelfStatus;
+  final String? copyrightRegistrationStatus;
+
+  String? get copyrightRegistrationLabel => switch (copyrightRegistrationStatus) {
+        'registered' => '已登记',
+        'unregistered' => '未登记',
+        _ => null,
+      };
 
   /// 所属频道（146 男频 / 147 女频）；后端未设置时为 null。
   final int? channelId;
@@ -118,8 +127,8 @@ class AuthorWorkItem {
   /// 状态中文标签。
   String get statusLabel => workStatusLabel(status);
 
-  /// 仅「审核中」锁定，其余状态（含已发布）均可编辑；
-  /// 已发布作品改动后需重新提交审核（与后端 requireEditable 一致）。
+  /// 仅「审核中」锁定，其余状态（含审核通过）均可编辑；
+  /// 审核通过作品改动后需重新提交审核（与后端 requireEditable 一致）。
   bool get editable => status != 'reviewing';
 
   factory AuthorWorkItem.fromJson(Map<String, dynamic> json) => AuthorWorkItem(
@@ -132,6 +141,7 @@ class AuthorWorkItem {
         price: _doubleOrNull(json['price']),
         status: _text(json['status']).isEmpty ? 'draft' : _text(json['status']),
         shelfStatus: _text(json['shelfStatus']),
+        copyrightRegistrationStatus: _textOrNull(json['copyrightRegistrationStatus']),
         channelId: _intOrNull(json['channelId']),
         createTime: _textOrNull(json['createTime']),
         updateTime: _textOrNull(json['updateTime']),
@@ -140,7 +150,7 @@ class AuthorWorkItem {
 
 /// 作者视角章节条目（A 套章节接口，含正文全文）。
 ///
-/// isFree/status 为 tinyint，契约以字符串 "0"/"1" 下发（若依字典风格）。
+/// isFree/status 为 tinyint，契约以字符串状态值下发（若依字典风格）。
 class AuthorChapterItem {
   const AuthorChapterItem({
     required this.chapterId,
@@ -150,7 +160,7 @@ class AuthorChapterItem {
     this.summary = '',
     this.wordCount = 0,
     this.isFree = false,
-    this.status = '0',
+    this.status = '1',
   });
 
   final int chapterId;
@@ -163,11 +173,23 @@ class AuthorChapterItem {
   final int wordCount;
   final bool isFree;
 
-  /// 章节状态："0"=已发布（读者可见），"1"=草稿（仅作者可见）。
+  /// 章节状态："0"=审核通过，"1"=草稿，"2"=未通过审核。
   final String status;
 
-  /// 是否为草稿（未发布）。保留历史命名 isHidden 以减少连带改动。
-  bool get isHidden => status == '1';
+  /// 未通过审核的章节不对读者展示。
+  bool get isApproved => status == '0';
+  bool get isHidden => !isApproved;
+
+  String get statusLabel {
+    switch (status) {
+      case '0':
+        return '审核通过';
+      case '2':
+        return '未通过审核';
+      default:
+        return '草稿';
+    }
+  }
 
   factory AuthorChapterItem.fromJson(Map<String, dynamic> json) =>
       AuthorChapterItem(
@@ -178,7 +200,7 @@ class AuthorChapterItem {
         summary: _text(json['summary']),
         wordCount: _int(json['wordCount']),
         isFree: _flag(json['isFree']),
-        status: _text(json['status']).isEmpty ? '0' : _text(json['status']),
+        status: _text(json['status']).isEmpty ? '1' : _text(json['status']),
       );
 }
 

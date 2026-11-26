@@ -16,7 +16,7 @@ import 'material_preview_page.dart';
 /// 1. 查看印章图片、材料 URL
 /// 2. 查看审核状态、驳回原因
 /// 3. 重新提交（驳回后）
-/// 4. 停用印章（审核通过后）
+/// 4. 停用 / 启用印章（审核通过后由用户自行操作）
 class SealDetailPage extends ConsumerWidget {
   const SealDetailPage({
     super.key,
@@ -278,6 +278,35 @@ class _ManagementCard extends ConsumerWidget {
           children: [
             const Text('印章管理', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.text1)),
             const SizedBox(height: 12),
+            // 启用（审核通过且停用）
+            if (detail.canEnable) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _confirmEnable(context, ref),
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('启用印章'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            // 停用（启用中）
+            if (detail.canDisable) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmDisable(context, ref),
+                  icon: const Icon(Icons.block),
+                  label: const Text('停用印章'),
+                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.warning),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             // 编辑按钮（启用中须先停用）
             SizedBox(
               width: double.infinity,
@@ -298,19 +327,6 @@ class _ManagementCard extends ConsumerWidget {
                 style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
               ),
             ),
-            // 停用按钮（仅已审核通过且启用状态）
-            if (detail.canDisable) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _confirmDisable(context, ref),
-                  icon: const Icon(Icons.block),
-                  label: const Text('停用印章'),
-                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.warning),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -325,7 +341,7 @@ class _ManagementCard extends ConsumerWidget {
           title: const Text('请先停用印章'),
           content: const Text(
             '该印章当前为启用状态。请先停用后再编辑修改；'
-            '停用后需重新审核，审核通过后由管理员重新启用。',
+            '停用后编辑需重新审核，审核通过后可自行启用。',
           ),
           actions: [
             TextButton(
@@ -397,7 +413,7 @@ class _ManagementCard extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认停用'),
-        content: const Text('停用后印章将无法使用，是否确认停用？'),
+        content: const Text('停用后印章将无法用于签署，是否确认停用？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -426,6 +442,44 @@ class _ManagementCard extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         showAppToast(context, '停用失败: $e');
+      }
+    }
+  }
+
+  Future<void> _confirmEnable(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认启用'),
+        content: const Text('启用后该印章可用于签署合同，是否确认启用？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.success),
+            child: const Text('确认启用'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !context.mounted) return;
+
+    try {
+      final repo = ref.read(sealRepositoryProvider);
+      await repo.enableSeal(detail.sealId);
+
+      if (context.mounted) {
+        showAppToast(context, '印章已启用');
+        ref.invalidate(sealDetailProvider(detail.sealId));
+        ref.invalidate(mySealsProvider);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showAppToast(context, '启用失败: $e');
       }
     }
   }

@@ -15,8 +15,7 @@ import 'widgets/bookstore_widgets.dart';
 
 /// 书城首页（B 模块：内容与作品）。
 ///
-/// 浏览链路全部为公开接口，游客可读；顶部「消息」是受保护入口，
-/// 由 [AuthGuard.pushProtected] 统一拦截（未登录先登录，登录后回到消息页）。
+/// 游客可以浏览书城，消息和 AI 选本通过 [AuthGuard.pushProtected] 保留登录回跳。
 class BookstorePage extends ConsumerWidget {
   const BookstorePage({super.key});
 
@@ -64,6 +63,29 @@ class BookstorePage extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'bookstore-sourcing-agent',
+        tooltip: 'AI 选本顾问',
+        shape: const CircleBorder(
+          side: BorderSide(color: AppColors.divider, width: 1),
+        ),
+        backgroundColor: AppColors.card.withOpacity(0.94),
+        elevation: 3,
+        highlightElevation: 5,
+        onPressed: () => AuthGuard.pushProtected(
+          context,
+          ref,
+          target: RoutePath.sourcingAgent,
+        ),
+        child: Image.asset(
+          'assets/images/sourcing_agent_bubble.png',
+          width: 52,
+          height: 52,
+          cacheWidth: 192,
+          excludeFromSemantics: true,
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(bannersProvider);
@@ -72,16 +94,11 @@ class BookstorePage extends ConsumerWidget {
         },
         child: ListView(
           // 顶部不再留白：搜索栏已在透明 AppBar 内，渐变直接落到 Banner。
-          padding: const EdgeInsets.only(bottom: 16),
+          // 末尾作品可以滚动到悬浮气泡上方。
+          padding: const EdgeInsets.only(bottom: 88),
           children: [
             const SizedBox(height: 16),
             const _BannerCarousel(position: 'home_top'),
-            const AppCard(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: _CategoryEntries(),
-              ),
-            ),
             const AppCard(
               child: Padding(
                 padding: EdgeInsets.only(bottom: 12),
@@ -297,84 +314,6 @@ class _BannerSkeleton extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.r),
             child: Container(color: AppColors.primaryTint),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 首页功能入口快捷栏：当前仅「任务广场」一项，后续可继续往 Wrap 里添。
-///
-/// 这是 C 模块（交易域）在首页的固定入口，与 B 模块的分类栏无关：
-/// 分类栏已随分类页改版为标签墙被移除，本入口不随之删除。
-/// 图标风格参考「我的」页快捷宫格（圆形浅底图标 + 下方文字）。
-class _CategoryEntries extends StatelessWidget {
-  const _CategoryEntries();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 与「我的」页宫格同宽基准：一行四格，未满的行留白在右侧。
-        final cellWidth = constraints.maxWidth / 4;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Wrap(
-            children: [
-              _QuickCell(
-                width: cellWidth,
-                icon: Icons.emoji_events_outlined,
-                label: '任务广场',
-                // go 而不是 push：任务广场是底部导航第二个分支，切过去即选中该 tab，
-                // 再按返回不会退回一个「看起来在任务 tab、实际栈在首页分支」的错位状态。
-                onTap: () => context.go(RoutePath.demandTab),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 首页快捷栏的单个宫格单元：圆形浅底图标 + 单行文字，整格可点。
-class _QuickCell extends StatelessWidget {
-  const _QuickCell({required this.width, required this.icon, required this.label, required this.onTap});
-
-  final double width;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Column(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryTint,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 20, color: AppColors.primary),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppColors.text2),
-              ),
-            ],
           ),
         ),
       ),

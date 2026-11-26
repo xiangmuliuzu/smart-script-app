@@ -16,7 +16,7 @@ import 'data/seal_providers.dart';
 /// 2. 上传印章图片（首次提交）
 /// 3. 查看审核状态、驳回原因
 /// 4. 重新提交（驳回后）
-/// 5. 停用印章（审核通过后）
+/// 5. 停用 / 启用印章（审核通过后）
 class MySealPage extends ConsumerWidget {
   const MySealPage({super.key});
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/utils/avatar_url.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -196,16 +197,19 @@ class _PeerGroup {
   int get totalUnread => sessions.fold(0, (sum, s) => sum + s.unread);
   
   /// 最新消息时间
-  DateTime get latestTime {
+  DateTime get latestTime => latestTimeOrNull ?? DateTime(2000);
+
+  /// 分组内最新的消息时间；一条时间都没有时为 null（分组头部据此决定显不显示）
+  DateTime? get latestTimeOrNull {
     DateTime? latest;
     for (final s in sessions) {
-      if (s.session.lastMessageTime != null) {
-        if (latest == null || s.session.lastMessageTime!.isAfter(latest)) {
-          latest = s.session.lastMessageTime;
-        }
+      // 无消息的新会话以创建时间参与排序
+      final t = s.session.lastMessageTime ?? s.session.createdAt;
+      if (t != null && (latest == null || t.isAfter(latest))) {
+        latest = t;
       }
     }
-    return latest ?? DateTime(2000);
+    return latest;
   }
   
   /// 最新消息内容
@@ -323,6 +327,12 @@ class _PeerGroupTile extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // 分组头也要显示时间：折叠状态下只能靠它判断新旧
+                if (group.latestTimeOrNull != null)
+                  Text(
+                    _formatSessionTime(group.latestTimeOrNull!),
+                    style: const TextStyle(fontSize: 11, color: AppColors.text3),
+                  ),
                 // 展开/折叠图标
                 Icon(
                   isExpanded ? Icons.expand_less : Icons.expand_more,
@@ -414,9 +424,9 @@ class _SessionSubItem extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (session.session.lastMessageTime != null)
+                if ((session.session.lastMessageTime ?? session.session.createdAt) != null)
                   Text(
-                    _formatTime(session.session.lastMessageTime!),
+                    _formatSessionTime(session.session.lastMessageTime ?? session.session.createdAt!),
                     style: const TextStyle(fontSize: 11, color: AppColors.text3),
                   ),
                 if (session.unread > 0) ...[
@@ -449,21 +459,17 @@ class _SessionSubItem extends ConsumerWidget {
       ),
     );
   }
+}
 
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
-    
-    if (diff.inDays == 0) {
-      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-    } else if (diff.inDays == 1) {
-      return '昨天';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays}天前';
-    } else {
-      return '${time.month}/${time.day}';
-    }
-  }
+/// 每行都带钟点：今天 11:20 / 昨天 15:04 / 11-17 09:33
+String _formatSessionTime(DateTime time) {
+  final b = AppTime.beijing(time);
+  final hhmm = '${AppTime.two(b.hour)}:${AppTime.two(b.minute)}';
+  // 按北京自然日比较，不按 24 小时滚动，否则昨晚的消息今早会掉回「昨天」前缀
+  final diff = AppTime.dayDiffBeijing(time);
+  if (diff <= 0) return '今天 $hhmm';
+  if (diff == 1) return '昨天 $hhmm';
+  return '${AppTime.two(b.month)}-${AppTime.two(b.day)} $hhmm';
 }
 
 class _BizTypeOption {

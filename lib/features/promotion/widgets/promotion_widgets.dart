@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../bookstore/widgets/bookstore_widgets.dart';
 import '../data/promotion_models.dart';
 
@@ -10,15 +11,15 @@ String formatPromotionMoney(double value) {
   return value.toStringAsFixed(2);
 }
 
-/// 日期文案：后端下发 `yyyy-MM-dd HH:mm:ss`，这里只取 MM-dd。
+/// 日期文案：后端下发 `yyyy-MM-dd HH:mm:ss`（北京时间），这里只取 MM-dd。
 String formatPromotionMonthDay(String? value) {
   if (value == null || value.isEmpty) return '';
-  final parsed = DateTime.tryParse(value.replaceFirst(' ', 'T'));
+  final parsed = AppTime.parse(value);
   if (parsed == null) {
     return value.length >= 10 ? value.substring(5, 10) : value;
   }
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${two(parsed.month)}-${two(parsed.day)}';
+  final b = AppTime.beijing(parsed);
+  return '${AppTime.two(b.month)}-${AppTime.two(b.day)}';
 }
 
 /// 申请状态色（按后端派生文案映射，避免状态枚举扩散到各页面）。

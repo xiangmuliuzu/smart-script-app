@@ -5,8 +5,11 @@ import 'core/constants/app_constants.dart';
 import 'features/message/data/announcement_entry_checker.dart';
 import 'features/message/widgets/announcement_popup_dialog.dart';
 import 'features/splash/splash_ad_overlay.dart';
+import 'features/update/data/app_update_providers.dart';
+import 'features/update/widgets/update_dialog.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/router/app_router.dart';
+import 'core/services/notification_navigation.dart';
 import 'core/services/notification_poller.dart';
 import 'core/services/realtime_socket.dart';
 import 'core/theme/app_page_background.dart';
@@ -34,10 +37,39 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
   @override
   void initState() {
     super.initState();
-    // 已登录状态下冷启动：首帧后检查一次未读公告。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // 冷启动：首帧后检查一次新版本（匿名接口，登录页也可见），
+    // 再检查一次未读公告（需已登录）。
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // 先处理版本更新（未登录也要弹），再弹公告，避免两个弹窗叠在一起。
+      await _checkForUpdate();
       if (mounted) _checkAnnouncements();
     });
+  }
+
+  /// 冷启动版本检查：有更新就弹「立即更新 / 稍后」。
+  ///
+  /// 自动弹窗一天只弹一次（见 [AppUpdateChecker]），用户选择稍后当天不再打扰。
+  Future<void> _checkForUpdate() async {
+    if (rootNavigatorKey.currentContext == null) return;
+    try {
+      final checker = ref.read(appUpdateCheckerProvider);
+      final prompt = await checker.checkForLaunch();
+      if (prompt == null || !mounted) return;
+      final dialogContext = rootNavigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      // 先记下「今天已弹过」再弹：弹窗期间 App 可能被切后台再回来，
+      // 记录落盘后那条 resumed 就不会重复弹出同一个更新。
+      await checker.markPromptShown();
+      if (!dialogContext.mounted) return;
+      await showUpdateDialog(
+        context: dialogContext,
+        prompt: prompt,
+        repository: ref.read(appUpdateRepositoryProvider),
+      );
+    } catch (_) {
+      // 版本检查失败不能阻塞启动，用户仍可从「我的」手动检查。
+    }
   }
 
   void _scheduleAnnouncementCheck() {
@@ -73,8 +105,14 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
     ref.watch(realtimeSocketProvider);
     // 会话期消息通知轮询：随登录启动、退出停止（本地通知，非离线推送）。
     ref.watch(notificationPollerProvider);
+    // 通知点击落点交接：冷/热启动与登录态恢复后，把用户送到对应业务页。
+    ref.watch(notificationNavigationProvider);
 
     ref.listen(authControllerProvider, (previous, next) {
+      if (next.status != AuthStatus.unknown) {
+        // 会话状态一定下来就补跳：启动期攒下的通知落点不能被首页重定向吃掉。
+        ref.read(notificationNavigationProvider).flush();
+      }
       if (next.isAuthenticated && !(previous?.isAuthenticated ?? false)) {
         _scheduleAnnouncementCheck();
       } else if (!next.isAuthenticated) {
@@ -101,9 +139,76 @@ class _ScriptAppState extends ConsumerState<ScriptApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       scaffoldMessengerKey: _messengerKey,
-      builder: (context, child) => SplashAdOverlay(
-          child: AppPageBackground(child: child ?? const SizedBox.shrink())),
+      builder: (context, child) => AppLifecycleUpdateCheck(
+        child: SplashAdOverlay(
+            child: AppPageBackground(child: child ?? const SizedBox.shrink())),
+      ),
       routerConfig: ref.watch(routerProvider),
     );
   }
+}
+
+/// 从后台切回前台时再查一次版本：用户可能长时间停留在旧版本上，
+/// 冷启动那一轮已经错过新包。
+///
+/// 但下拉通知栏、回桌面再回来都会触发 `resumed`，所以这条路径与冷启动共用
+/// 「一天只弹一次」的限制（[AppUpdateChecker.checkOnResume]）；当次运行内也只弹一次。
+class AppLifecycleUpdateCheck extends ConsumerStatefulWidget {
+  const AppLifecycleUpdateCheck({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<AppLifecycleUpdateCheck> createState() =>
+      _AppLifecycleUpdateCheckState();
+}
+
+class _AppLifecycleUpdateCheckState
+    extends ConsumerState<AppLifecycleUpdateCheck>
+    with WidgetsBindingObserver {
+  bool _promptVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || _promptVisible) return;
+    _check();
+  }
+
+  Future<void> _check() async {
+    try {
+      final checker = ref.read(appUpdateCheckerProvider);
+      final prompt = await checker.checkOnResume();
+      if (prompt == null || !mounted) return;
+      final dialogContext = rootNavigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      _promptVisible = true;
+      // 与冷启动一致：先记下「今天已弹过」，避免弹窗期间切后台再回来重复弹出。
+      await checker.markPromptShown();
+      if (!dialogContext.mounted) return;
+      await showUpdateDialog(
+        context: dialogContext,
+        prompt: prompt,
+        repository: ref.read(appUpdateRepositoryProvider),
+      );
+    } catch (_) {
+      // 静默失败：下次切回前台再试（当天已弹过时不会再打断用户）。
+    } finally {
+      _promptVisible = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

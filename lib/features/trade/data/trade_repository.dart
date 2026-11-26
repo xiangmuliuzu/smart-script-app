@@ -4,47 +4,15 @@ import '../../../core/network/api_exception.dart';
 import '../../user_center/data/paged_data.dart';
 import 'trade_models.dart';
 
-/// C 交易域数据层。
+/// C 交易域数据层（APP 专用接口 `/api/v1/trade/**`）。
 ///
-/// 当前复用 admin 端点（`/api/v1/admin/trade/*`），后续后端创建 APP 专用接口时
-/// 只需在 [ApiEndpoints] 替换路径，Repository 对外签名不变。
+/// 管理端接口 `/api/v1/admin/trade/**` 需要 trade:* 权限，用户 token 调过去必然 403，
+/// 因此这里只保留 APP 侧可用的端点；历史上误接的管理端方法（交易作品/报价审核/订单/
+/// 合作记录/跟进/托管）已随对应页面下线一并移除。
 class TradeRepository {
   TradeRepository(this._api);
 
   final ApiClient _api;
-
-  // ==================== 交易作品 ====================
-
-  /// 交易作品列表（分页）。
-  Future<PagedData<TradeWork>> pageTradeWorks({
-    String? keyword,
-    bool? tradeEnabled,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeWorks,
-      query: _compact({
-        'keyword': keyword,
-        'tradeEnabled': tradeEnabled,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取交易作品列表失败');
-    return PagedData.parse<TradeWork>(data, TradeWork.fromJson);
-  }
-
-  /// 交易作品详情。
-  Future<TradeWork> tradeWorkDetail(int workId) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeWorkById(workId),
-      parser: _mapParser,
-    );
-    if (data == null || data.isEmpty) throw ApiException('获取交易作品详情失败');
-    return TradeWork.fromJson(data);
-  }
 
   // ==================== 询盘 ====================
 
@@ -59,7 +27,7 @@ class TradeRepository {
     required int pageSize,
   }) async {
     final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeInquiryList,
+      ApiEndpoints.tradeInquiryList,
       query: _compact({
         'role': role,
         'status': status,
@@ -76,7 +44,7 @@ class TradeRepository {
   /// 询盘详情。
   Future<Inquiry> inquiryDetail(int inquiryId) async {
     final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeInquiryDetail(inquiryId),
+      ApiEndpoints.tradeInquiryDetail(inquiryId),
       parser: _mapParser,
     );
     if (data == null || data.isEmpty) throw ApiException('获取询盘详情失败');
@@ -86,7 +54,7 @@ class TradeRepository {
   /// 创建询盘。
   Future<Inquiry> createInquiry(Inquiry inquiry) async {
     final data = await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeInquiry,
+      ApiEndpoints.tradeInquiry,
       data: inquiry.toJson(),
       parser: _mapParser,
     );
@@ -97,21 +65,21 @@ class TradeRepository {
   /// 接受询盘。
   Future<void> acceptInquiry(int inquiryId) async {
     await _api.put<void>(
-      ApiEndpoints.adminTradeInquiryAccept(inquiryId),
+      ApiEndpoints.tradeInquiryAccept(inquiryId),
     );
   }
 
   /// 拒绝询盘。
   Future<void> rejectInquiry(int inquiryId) async {
     await _api.put<void>(
-      ApiEndpoints.adminTradeInquiryReject(inquiryId),
+      ApiEndpoints.tradeInquiryReject(inquiryId),
     );
   }
 
   /// 关闭询盘。
   Future<void> closeInquiry(int inquiryId) async {
     await _api.put<void>(
-      ApiEndpoints.adminTradeInquiryClose(inquiryId),
+      ApiEndpoints.tradeInquiryClose(inquiryId),
     );
   }
 
@@ -126,95 +94,6 @@ class TradeRepository {
       parser: (raw) => raw == true,
     );
     return copyrighted ?? false;
-  }
-
-  // ==================== 报价/议价 ====================
-
-  /// 报价列表（分页）。
-  Future<PagedData<Quote>> pageQuotes({
-    int? inquiryId,
-    String? role,
-    String? status,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeQuoteList,
-      query: _compact({
-        'inquiryId': inquiryId,
-        'role': role,
-        'status': status,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取报价列表失败');
-    return PagedData.parse<Quote>(data, Quote.fromJson);
-  }
-
-  /// 创建报价（卖方出价）。
-  Future<Quote> createQuote(Quote quote) async {
-    final data = await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeQuote,
-      data: quote.toJson(),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('创建报价失败');
-    return Quote.fromJson(data);
-  }
-
-  /// 买方议价。
-  Future<Quote> counterOffer(Quote quote) async {
-    final data = await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeQuoteCounterOffer,
-      data: quote.toJson(),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('发起议价失败');
-    return Quote.fromJson(data);
-  }
-
-  /// 修改报价。
-  Future<void> modifyQuote(int quoteId, Quote quote) async {
-    await _api.put<void>(
-      ApiEndpoints.adminTradeQuoteById(quoteId),
-      data: quote.toJson(),
-    );
-  }
-
-  /// 接受报价（生成订单）。
-  Future<Order> acceptQuote(int quoteId) async {
-    final data = await _api.put<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeQuoteAccept(quoteId),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('接受报价失败');
-    return Order.fromJson(data);
-  }
-
-  /// 拒绝报价。
-  Future<void> rejectQuote(int quoteId) async {
-    await _api.put<void>(
-      ApiEndpoints.adminTradeQuoteReject(quoteId),
-    );
-  }
-
-  /// 卖方接受买方议价。
-  Future<Order> sellerAcceptQuote(int quoteId) async {
-    final data = await _api.put<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeQuoteSellerAccept(quoteId),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('接受议价失败');
-    return Order.fromJson(data);
-  }
-
-  /// 卖方拒绝买方议价。
-  Future<void> sellerRejectQuote(int quoteId) async {
-    await _api.put<void>(
-      ApiEndpoints.adminTradeQuoteSellerReject(quoteId),
-    );
   }
 
   // ==================== 报价/议价（APP端） ====================
@@ -253,14 +132,6 @@ class TradeRepository {
     return Quote.fromJson(data);
   }
 
-  /// 修改报价（APP端）。
-  Future<void> appModifyQuote(int quoteId, Quote quote) async {
-    await _api.put<void>(
-      ApiEndpoints.appQuoteModify(quoteId),
-      data: quote.toJson(),
-    );
-  }
-
   /// 接受报价（APP端）。
   Future<Map<String, dynamic>> appAcceptQuote(int quoteId) async {
     final data = await _api.put<Map<String, dynamic>>(
@@ -269,13 +140,6 @@ class TradeRepository {
     );
     if (data == null) throw ApiException('接受报价失败');
     return data;
-  }
-
-  /// 拒绝报价（APP端）。
-  Future<void> appRejectQuote(int quoteId) async {
-    await _api.put<void>(
-      ApiEndpoints.appQuoteReject(quoteId),
-    );
   }
 
   /// 查询某询盘下最新报价（用于聊天页议价卡片）。
@@ -289,40 +153,7 @@ class TradeRepository {
     return Quote.fromJson(data);
   }
 
-  // ==================== 订单 ====================
-
-  /// 订单列表（分页）。
-  Future<PagedData<Order>> pageOrders({
-    String? role,
-    String? status,
-    String? keyword,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeOrders,
-      query: _compact({
-        'role': role,
-        'status': status,
-        'keyword': keyword,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取订单列表失败');
-    return PagedData.parse<Order>(data, Order.fromJson);
-  }
-
-  /// 订单详情。
-  Future<Order> orderDetail(int orderId) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeOrderById(orderId),
-      parser: _mapParser,
-    );
-    if (data == null || data.isEmpty) throw ApiException('获取订单详情失败');
-    return Order.fromJson(data);
-  }
+  // ==================== 订单（APP端） ====================
 
   /// APP订单列表（分页，按角色）。
   Future<PagedData<Order>> appPageOrders({
@@ -355,6 +186,15 @@ class TradeRepository {
     return Order.fromJson(data);
   }
 
+  /// 按询盘查关联订单（会话页「查看订单」跳转用）；无订单返回 null。
+  Future<Map<String, dynamic>?> appOrderByInquiry(int inquiryId) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      ApiEndpoints.appOrderByInquiry(inquiryId),
+      parser: _mapParser,
+    );
+    return (data == null || data.isEmpty) ? null : data;
+  }
+
   /// APP买方付款（paying → delivering）。
   /// [refresh] 为 true 时服务端换新商户单号重新预下单，用于收款码失效后换码。
   Future<Map<String, dynamic>> appPayOrder(int orderId, {bool refresh = false}) async {
@@ -376,104 +216,17 @@ class TradeRepository {
     return data ?? const <String, dynamic>{'paid': false};
   }
 
-  /// APP买方确认收货（delivering → completed，托管释放+收益入账）。
-  Future<void> appCompleteOrder(int orderId) async {
-    await _api.post<void>(ApiEndpoints.appOrderComplete(orderId));
-  }
-
-  /// APP取消订单（仅 confirmed 可取消，双方签署完成前；买卖双方任一方可发起）。
+  /// APP取消订单（仅买方可发起，付款前有效：confirmed 或未付款的 paying）。
   Future<void> appCancelOrder(int orderId) async {
     await _api.post<void>(ApiEndpoints.appOrderCancel(orderId));
   }
 
-  // ==================== 合作记录 ====================
-
-  /// 合作记录列表（分页）。
-  Future<PagedData<Cooperation>> pageCooperations({
-    String? source,
-    int? workId,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeCooperationList,
-      query: _compact({
-        'source': source,
-        'workId': workId,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取合作记录列表失败');
-    return PagedData.parse<Cooperation>(data, Cooperation.fromJson);
+  /// 测试直付：跳过支付宝沙箱，订单直接按已付款进入交割（与版权零元直付同性质）。
+  Future<void> appDirectPayOrder(int orderId) async {
+    await _api.post<void>(ApiEndpoints.appOrderDirectPay(orderId));
   }
 
-  /// 创建合作记录。
-  Future<Cooperation> createCooperation(Cooperation cooperation) async {
-    final data = await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeCooperation,
-      data: cooperation.toJson(),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('创建合作记录失败');
-    return Cooperation.fromJson(data);
-  }
-
-  // ==================== 商务跟进 ====================
-
-  /// 跟进记录列表（分页）。
-  Future<PagedData<BusinessFollow>> pageFollowUps({
-    int? partnerId,
-    int? workId,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeFollowUps,
-      query: _compact({
-        'partnerId': partnerId,
-        'workId': workId,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取跟进记录列表失败');
-    return PagedData.parse<BusinessFollow>(data, BusinessFollow.fromJson);
-  }
-
-  /// 创建跟进记录。
-  Future<BusinessFollow> createFollowUp(BusinessFollow follow) async {
-    final data = await _api.post<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeFollowUps,
-      data: follow.toJson(),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('创建跟进记录失败');
-    return BusinessFollow.fromJson(data);
-  }
-
-  // ==================== 需求标签 ====================
-
-  /// 需求标签列表（分页）。
-  Future<PagedData<DemandTag>> pageDemandTags({
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.adminTradeDemandTags,
-      query: _compact({
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取需求标签列表失败');
-    return PagedData.parse<DemandTag>(data, DemandTag.fromJson);
-  }
-
-  // ==================== 财务域（收益 / 托管） ====================
+  // ==================== 财务域（收益） ====================
 
   /// 收益总览。
   Future<Map<String, dynamic>> incomeOverview() async {
@@ -502,67 +255,6 @@ class TradeRepository {
     );
     if (data == null) throw ApiException('获取收益明细失败');
     return PagedData.parse<BillRecord>(data, BillRecord.fromJson);
-  }
-
-  /// 资金托管列表。
-  Future<PagedData<Escrow>> pageEscrows({
-    required String role,
-    String? status,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.appFinanceEscrowList,
-      query: _compact({
-        'role': role,
-        'status': status,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取托管列表失败');
-    return PagedData.parse<Escrow>(data, Escrow.fromJson);
-  }
-
-  /// 资金托管列表 + 汇总（含 totalAmount/pendingAmount）。
-  Future<EscrowSummary> fetchEscrowSummary({
-    required String role,
-    String? status,
-    required int pageNum,
-    required int pageSize,
-  }) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.appFinanceEscrowList,
-      query: _compact({
-        'role': role,
-        'status': status,
-        'pageNum': pageNum,
-        'pageSize': pageSize,
-      }),
-      parser: _mapParser,
-    );
-    if (data == null) throw ApiException('获取托管列表失败');
-    final rows = (data['rows'] as List<dynamic>?)
-            ?.map((e) => Escrow.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
-    return EscrowSummary(
-      list: rows,
-      totalAmount: (data['totalAmount'] as num?)?.toInt() ?? 0,
-      pendingAmount: (data['pendingAmount'] as num?)?.toInt() ?? 0,
-      total: (data['total'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  /// 托管详情。
-  Future<Escrow> escrowDetail(int escrowId) async {
-    final data = await _api.get<Map<String, dynamic>>(
-      ApiEndpoints.appFinanceEscrowById(escrowId),
-      parser: _mapParser,
-    );
-    if (data == null || data.isEmpty) throw ApiException('获取托管详情失败');
-    return Escrow.fromJson(data);
   }
 
   // ==================== 工具方法 ====================

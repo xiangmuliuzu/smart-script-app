@@ -7,19 +7,25 @@ import '../../../core/constants/demand_genre.dart';
 import '../../../core/constants/demand_task_type.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../data/trade_models.dart';
 
 /// 任务广场门户卡片。
 ///
 /// 视觉规范：
 /// - 左侧竖色条按题材着色（[DemandGenre.colorOf]），一眼分类型；
-/// - 右上状态 chip：待接单绿 / 进行中蓝 / 已完成 primary / 逾期红 / 已关闭灰；
+/// - 右上状态 chip：待审核橙 / 审核未通过红 / 待接单绿 / 进行中蓝 / 已完成 primary / 逾期红 / 已关闭灰；
 /// - 底部一行三段布局：预算大字 + 剩余时限/截止徽章 + 接单状态·需求方；
 /// - 需求预览与 tags 均"缺省即省略"，卡片高度自适应避免大片留白。
 class DemandTaskCard extends StatelessWidget {
-  const DemandTaskCard({super.key, required this.task, this.onTap});
+  const DemandTaskCard({super.key, required this.task, this.isMine = false, this.onTap});
 
   final DemandTask task;
+
+  /// 当前登录用户是否为该任务的发布方（需求方）：广场卡片要打「我发布的」标，
+  /// 免得自己刷到自建的任务误当成可接单的新单。
+  final bool isMine;
+
   /// 点击行为覆盖：列表页传入后在 navigate pop 返回时刷新分页/统计；
   /// 为 null 时默认直接推入任务详情。
   final VoidCallback? onTap;
@@ -77,6 +83,20 @@ class DemandTaskCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (isMine)
+                Container(
+                  margin: const EdgeInsets.only(right: 6, top: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 0.6),
+                  ),
+                  child: const Text(
+                    '我发布的',
+                    style: TextStyle(fontSize: 10, color: AppColors.text1, fontWeight: FontWeight.w700),
+                  ),
+                ),
               const SizedBox(width: 8),
               _StatusChip(task: task),
             ],
@@ -100,9 +120,9 @@ class DemandTaskCard extends StatelessWidget {
                 text: DemandTaskType.labelOf(task.taskType),
                 color: DemandTaskType.colorOf(task.taskType),
               ),
-              // 分镜类由平台提供源剧本，接单前需先评估剧本，卡片上点出来
+              // 分镜类由需求方提供源剧本，接单前需先评估剧本，卡片上点出来
               if (DemandTaskType.isStoryboard(task.taskType))
-                _TagPill(text: '平台提供源剧本', color: AppColors.text2),
+                const _TagPill(text: '需求方提供源剧本', color: AppColors.text2),
               if (task.genreId != null)
                 _TagPill(text: DemandGenre.labelOf(task.genreId), color: DemandGenre.colorOf(task.genreId)),
               for (final t in tags) _TagPill(text: t, color: AppColors.text2),
@@ -145,6 +165,9 @@ class _StatusChip extends StatelessWidget {
   final DemandTask task;
 
   static Color _color(DemandTask t) {
+    // 审核态先于逾期判定：没进广场的单谈不上逾期，橙=待审核、红=审核未通过
+    if (t.status == DemandStatus.pendingReview) return Colors.orange;
+    if (t.status == DemandStatus.rejected) return AppColors.danger;
     if (t.isOverdue == 1) return AppColors.danger;
     switch (t.status) {
       case DemandStatus.open:
@@ -301,15 +324,13 @@ class _DeadlineBadgeState extends State<_DeadlineBadge> {
     // 待接单（open）：基于发布截止日 deadline
     final dt = task.deadline;
     if (dt == null) return const _DeadlineInfo('长期', _DeadlineTone.neutral);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final target = DateTime(dt.year, dt.month, dt.day);
-    final diff = target.difference(today).inDays;
+    final b = AppTime.beijing(dt);
+    final diff = -AppTime.dayDiffBeijing(dt);
     if (diff < 0) return const _DeadlineInfo('已过期', _DeadlineTone.overdue);
     if (diff == 0) return const _DeadlineInfo('今天到期', _DeadlineTone.urgent);
     if (diff == 1) return const _DeadlineInfo('明天到期', _DeadlineTone.urgent);
     if (diff <= 3) return _DeadlineInfo('剩 $diff 天', _DeadlineTone.urgent);
-    return _DeadlineInfo('${dt.month}月${dt.day}日截止', _DeadlineTone.neutral);
+    return _DeadlineInfo('${b.month}月${b.day}日截止', _DeadlineTone.neutral);
   }
 
   @override

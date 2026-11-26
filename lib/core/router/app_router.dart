@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/data/qr_login_models.dart';
 import '../../features/auth/pages/agreement_page.dart';
 import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_page.dart';
 import '../../features/auth/pages/password_login_page.dart';
 import '../../features/auth/pages/privacy_policy_page.dart';
+import '../../features/auth/pages/qr_confirm_page.dart';
+import '../../features/auth/pages/qr_scan_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/bookstore/bookstore_page.dart';
+import '../../features/sourcing_agent/sourcing_agent_page.dart';
 import '../../features/bookstore/pages/bookshelf_page.dart';
 import '../../features/bookstore/pages/chapter_list_page.dart';
+import '../../features/bookstore/pages/work_storyboard_page.dart';
 import '../../features/bookstore/pages/chapter_read_page.dart';
 import '../../features/bookstore/pages/favorite_list_page.dart';
 import '../../features/bookstore/pages/ranking_page.dart';
@@ -38,7 +43,6 @@ import '../../features/feedback/pages/feedback_detail_page.dart';
 import '../../features/feedback/pages/feedback_list_page.dart';
 import '../../features/ai_creation/ai_creation_page.dart';
 import '../../features/ai/ai_outline_page.dart';
-import '../../features/ai/ai_write_page.dart';
 import '../../features/ai/ai_polish_page.dart';
 import '../../features/ai/ai_storyboard_page.dart';
 import '../../features/ai/ai_record_page.dart';
@@ -97,8 +101,10 @@ import '../../features/trade/pages/contract_sign_page.dart';
 import '../../features/trade/pages/income_overview_page.dart';
 import '../../features/trade/pages/task_square_page.dart';
 import '../../features/trade/pages/demand_detail_page.dart';
+import '../../features/trade/pages/demand_post_page.dart';
 import '../../features/trade/pages/demand_my_tasks_page.dart';
 import '../../features/trade/pages/demand_stage_deliver_page.dart';
+import '../../features/trade/pages/demand_deliverable_work_page.dart';
 import '../../features/trade/pages/demand_source_script_page.dart';
 import '../../features/chat/pages/trade_session_list_page.dart';
 import '../../features/chat/pages/chat_session_list_page.dart';
@@ -219,6 +225,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteName.forgotPassword,
         builder: (_, __) => const ForgotPasswordPage(),
       ),
+      // 扫一扫（扫码登录）：确认页的登录端信息由扫一扫页通过 extra 带入，
+      // 深链直达时信息为空，确认页按创作者端兜底展示但不会自动确认。
+      GoRoute(
+        path: RoutePath.qrScan,
+        name: RouteName.qrScan,
+        builder: (_, __) => const QrScanPage(),
+      ),
+      GoRoute(
+        path: RoutePath.qrConfirm,
+        name: RouteName.qrConfirm,
+        builder: (_, state) => QrConfirmPage(
+          qrToken: state.uri.queryParameters['t'] ?? '',
+          target: state.extra is QrScanTarget ? state.extra as QrScanTarget : null,
+        ),
+      ),
       // 协议正文：登录前即可阅读，由协议勾选区域的两个链接进入
       GoRoute(
         path: RoutePath.agreement,
@@ -334,6 +355,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final query = state.uri.queryParameters;
           return ChapterListPage(
+            workId: int.tryParse(query['id'] ?? '') ?? 0,
+            title: query['title'],
+          );
+        },
+      ),
+      GoRoute(
+        path: RoutePath.workStoryboards,
+        name: RouteName.workStoryboards,
+        builder: (context, state) {
+          final query = state.uri.queryParameters;
+          return WorkStoryboardPage(
             workId: int.tryParse(query['id'] ?? '') ?? 0,
             title: query['title'],
           );
@@ -567,11 +599,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const AiCreatePage(),
       ),
       GoRoute(
-        path: RoutePath.aiWrite,
-        name: RouteName.aiWrite,
-        builder: (_, __) => const AiWritePage(),
-      ),
-      GoRoute(
         path: RoutePath.aiPolish,
         name: RouteName.aiPolish,
         builder: (_, __) => const AiPolishPage(),
@@ -579,7 +606,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePath.aiStoryboard,
         name: RouteName.aiStoryboard,
-        builder: (_, __) => const AiStoryboardPage(),
+        builder: (_, state) {
+          final query = state.uri.queryParameters;
+          return AiStoryboardPage(
+            workId: int.tryParse(query['workId'] ?? ''),
+            chapterId: int.tryParse(query['chapterId'] ?? ''),
+          );
+        },
       ),
       GoRoute(
         path: RoutePath.aiRecords,
@@ -655,6 +688,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.incomeOverview,
         name: RouteName.incomeOverview,
         builder: (_, __) => const IncomeOverviewPage(),
+      ),
+      GoRoute(
+        path: RoutePath.sourcingAgent,
+        name: RouteName.sourcingAgent,
+        builder: (_, __) => const SourcingAgentPage(),
       ),
       GoRoute(
         path: RoutePath.inquiryCreate,
@@ -735,6 +773,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: RoutePath.demandPost,
+        name: RouteName.demandPost,
+        builder: (context, state) => DemandPostPage(
+          demandId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
+        ),
+      ),
+      GoRoute(
         path: RoutePath.demandMyTasks,
         name: RouteName.demandMyTasks,
         builder: (_, __) => const DemandMyTasksPage(),
@@ -743,6 +788,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePath.demandStageDeliver,
         name: RouteName.demandStageDeliver,
         builder: (context, state) => DemandStageDeliverPage(
+          demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
+          stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
+          stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,
+        ),
+      ),
+      // 最终作品查阅：需求方看最后一轮已交集数的正文（整单验收完成后才放行）
+      GoRoute(
+        path: RoutePath.demandDeliverableWork,
+        name: RouteName.demandDeliverableWork,
+        builder: (context, state) => DemandDeliverableWorkPage(
           demandId: int.tryParse(state.uri.queryParameters['demandId'] ?? '') ?? 0,
           stageId: int.tryParse(state.uri.queryParameters['stageId'] ?? '') ?? 0,
           stageOrder: int.tryParse(state.uri.queryParameters['order'] ?? '') ?? 0,

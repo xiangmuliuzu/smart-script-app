@@ -15,34 +15,32 @@ final demandRepositoryProvider = Provider<DemandRepository>(
 
 // ==================== 详情 ====================
 
-/// 任务详情
+/// 任务详情。
+///
+/// 审核态（pending_review / rejected）与已过截止的 open 单只有参与方（发布方 clientId
+/// 或接单人 acceptedCreatorId）读得到，其他人后端直接回 404——页面按「任务不存在/已下架」渲染。
 final demandDetailProvider = FutureProvider.autoDispose.family<DemandTask, int>(
   (ref, demandId) => ref.watch(demandRepositoryProvider).demandDetail(demandId),
 );
 
 // ==================== Hero 统计 ====================
 
-/// Hero 横幅统计：可接单数 / 奖金池(分) / 今日新增 / 各题材与各任务类型待接单数（供 chip 角标）。
+/// Hero 横幅统计：可接单数 / 今日新增 / 各题材与各任务类型待接单数（供 chip 角标）。
 ///
 /// 走后端 `/trade/demand/stats` 轻量聚合接口（口径 status=open），
-/// 不再为拿 total 而发一次整表列表请求；金额与 /list 一致以分交互。
+/// 不再为拿 total 而发一次整表列表请求。
 class DemandStats {
   final int openCount;
-  final int prizePoolFen; // 奖金池（分）
   final int todayNewCount;
   final Map<int, int> genreCounts; // genreId → 待接单数（公开口径 status=open）
   final Map<String, int> typeCounts; // taskType → 待接单数（同上口径）
 
   const DemandStats({
     this.openCount = 0,
-    this.prizePoolFen = 0,
     this.todayNewCount = 0,
     this.genreCounts = const <int, int>{},
     this.typeCounts = const <String, int>{},
   });
-
-  /// 奖金池（整元，供展示）。
-  int get prizePoolYuan => (prizePoolFen / 100).round();
 
   factory DemandStats.fromMap(Map<String, dynamic> m) {
     final gc = <int, int>{};
@@ -70,7 +68,6 @@ class DemandStats {
     final open = (m['availableCount'] as num?)?.toInt() ?? 0;
     return DemandStats(
       openCount: open,
-      prizePoolFen: (m['prizePoolFen'] as num?)?.toInt() ?? 0,
       todayNewCount: (m['todayNewCount'] as num?)?.toInt() ?? 0,
       genreCounts: gc,
       typeCounts: tc,
@@ -85,7 +82,10 @@ final demandStatsProvider = FutureProvider.autoDispose<DemandStats>((ref) async 
 
 // ==================== 验收轮次 ====================
 
-/// 某任务的验收轮次列表
+/// 某任务的验收轮次列表（金额为分）。
+///
+/// 任务双方拿到完整字段；广场可见任务的陌生人只拿到进度骨架（交付字段被后端剥掉）；
+/// 审核态等非广场状态下的非参与方拿不到（后端报错）。
 final demandStagesProvider = FutureProvider.autoDispose.family<List<DemandStage>, int>(
   (ref, demandId) => ref.watch(demandRepositoryProvider).demandStages(demandId),
 );

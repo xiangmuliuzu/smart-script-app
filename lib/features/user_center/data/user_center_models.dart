@@ -153,10 +153,12 @@ class CreatorApplyStatus {
       );
 }
 
-/// 消息类型（与后端 AppAdminConstants 同集合）。
+/// 消息类型（与后端 AppAdminConstants 同集合；审核结果已并入“系统”）。
 enum MessageType {
   system('SYSTEM', '系统'),
-  review('REVIEW', '审核'),
+  copyright('COPYRIGHT', '版权'),
+  seal('SEAL', '印章'),
+  follow('FOLLOW', '关注'),
   transaction('TRANSACTION', '交易'),
   benefit('BENEFIT', '福利');
 
@@ -178,7 +180,9 @@ enum PreferenceType {
   order('ORDER', '订单通知'),
   contract('CONTRACT', '合同通知'),
   system('SYSTEM', '平台通知'),
-  review('REVIEW', '审核通知'),
+  copyright('COPYRIGHT', '版权通知'),
+  seal('SEAL', '印章通知'),
+  follow('FOLLOW', '关注动态'),
   benefit('BENEFIT', '福利通知'),
   transaction('TRANSACTION', '交易');
 

@@ -14,7 +14,7 @@ class ScriptOutlineEpisode {
   /// 事件名（如「直播撞破」）。
   final String title;
 
-  /// 本集事件卡全文（本集事件 / 冲突与推进 / 结果或反转 / 结尾钩子）。
+  /// 本集事件卡全文（开场承接 / 本集事件 / 冲突与推进 / 结果或反转 / 结尾钩子）。
   final String body;
 
   String get label => '第$no集：$title';

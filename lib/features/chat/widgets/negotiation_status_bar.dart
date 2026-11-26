@@ -34,6 +34,7 @@ class NegotiationStatusBar extends ConsumerStatefulWidget {
 
 class _NegotiationStatusBarState extends ConsumerState<NegotiationStatusBar> {
   bool _isAccepting = false;
+  bool _openingOrder = false;
 
   int get inquiryId => widget.inquiryId;
   int get currentUserId => widget.currentUserId;
@@ -77,7 +78,7 @@ class _NegotiationStatusBarState extends ConsumerState<NegotiationStatusBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 第一行：标签 + 金额
+          // 第一行：标签 + 金额（+ 已成交时的订单跳转按钮）
           Row(
             children: [
               // 来源标签
@@ -92,6 +93,22 @@ class _NegotiationStatusBarState extends ConsumerState<NegotiationStatusBar> {
                   color: isAccepted ? AppColors.success : AppColors.text1,
                 ),
               ),
+              if (isAccepted)
+                Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: OutlinedButton.icon(
+                    onPressed: _openingOrder ? null : _openOrder,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.success,
+                      side: BorderSide(color: AppColors.success.withOpacity(0.5)),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 15),
+                    label: const Text('查看订单', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
             ],
           ),
           // 第二行：状态说明 + 接受按钮
@@ -182,6 +199,27 @@ class _NegotiationStatusBarState extends ConsumerState<NegotiationStatusBar> {
     if (quote.status == 'pending' && isSeller) return true;
     if (quote.status == 'pending_seller' && isBuyer) return true;
     return false;
+  }
+
+  /// 已成交后按询盘回查订单并跳详情（与消息流中 [订单] 卡片同一功能）。
+  Future<void> _openOrder() async {
+    if (_openingOrder) return;
+    setState(() { _openingOrder = true; });
+    try {
+      final brief = await ref.read(tradeRepositoryProvider).appOrderByInquiry(inquiryId);
+      final orderId = brief?['orderId'] as int?;
+      if (!mounted) return;
+      if (orderId == null) {
+        showAppToast(context, '订单尚未生成');
+      } else {
+        await context.push('${RoutePath.orderDetail}?id=$orderId');
+        ref.invalidate(latestQuoteProvider(inquiryId));
+      }
+    } catch (e) {
+      if (mounted) showAppToast(context, '获取订单失败：$e');
+    } finally {
+      if (mounted) setState(() { _openingOrder = false; });
+    }
   }
 
   Future<void> _acceptQuote(BuildContext context, int quoteId) async {

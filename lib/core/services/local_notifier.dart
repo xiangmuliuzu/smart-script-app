@@ -28,10 +28,14 @@ class LocalNotifier {
   }
 
   /// 弹出系统通知；[id] 相同会覆盖同一条。返回是否成功弹出。
+  ///
+  /// [route] 是点击通知后要直达的站内定位串（如 `/trade/order/detail?id=12`）；
+  /// 留空则只把 App 拉到前台，不跳转。
   static Future<bool> show({
     required int id,
     required String title,
     String body = '',
+    String? route,
   }) async {
     if (!Platform.isAndroid) return false;
     try {
@@ -39,10 +43,23 @@ class LocalNotifier {
             'id': id,
             'title': title,
             'body': body,
+            'route': route,
           }) ??
           false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// 取走原生暂存的「通知点击落点」，取后即清；没有待处理的点击时返回 null。
+  ///
+  /// 冷启动时 Dart 回调还没注册，原生推不过来，所以由 Dart 主动拉。
+  static Future<String?> takePendingRoute() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _channel.invokeMethod<String>('takePendingRoute');
+    } catch (_) {
+      return null;
     }
   }
 }

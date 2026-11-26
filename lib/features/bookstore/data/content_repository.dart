@@ -85,6 +85,45 @@ class ContentRepository {
     return PagedData.parse<BookItem>(data, BookItem.fromJson);
   }
 
+  /// 作品分镜目录摘要；只统计已上架作品中审核通过的分镜。
+  ///
+  /// 该摘要只用于作品详情页显示分镜数量。分镜目录入口与章节目录同级，
+  /// 不会因为作品暂时没有分镜而隐藏。
+  Future<int> storyboardSummary(int workId) async {
+    if (workId <= 0) return 0;
+    try {
+      final data = await _api.get<Map<String, dynamic>>(
+        ApiEndpoints.contentWorkStoryboardSummary(workId),
+        parser: _mapParser,
+      );
+      final count = data?['count'];
+      if (count is num) return count.toInt();
+      if (count is String) return int.tryParse(count) ?? 0;
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// 作品分镜目录；与章节目录同级展示。服务端按审核状态和试读权限返回 readable。
+  Future<List<Map<String, dynamic>>> listWorkStoryboards(int workId) async {
+    final raw = await _api.get<dynamic>(
+      ApiEndpoints.contentWorkStoryboards(workId),
+      query: const {'pageNum': 1, 'pageSize': 100},
+      parser: (value) => value,
+    );
+    final list = raw is List
+        ? raw
+        : raw is Map
+            ? (raw['rows'] ?? raw['list'] ?? const <dynamic>[])
+            : const <dynamic>[];
+    if (list is! List) return const [];
+    return list
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
   /// 作品详情；未上架或不存在时后端按 404 拒绝，由 [ApiClient] 抛 [ApiException]。
   Future<BookItem> workDetail(int workId) async {
     final data = await _api.get<Map<String, dynamic>>(

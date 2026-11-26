@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../data/chat_models.dart';
 
 /// 报价/议价系统消息气泡。
@@ -151,12 +152,11 @@ class QuoteMessageBubble extends StatelessWidget {
   }
 
   String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    if (isToday) {
-      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    final b = AppTime.beijing(dt);
+    if (AppTime.dayDiffBeijing(dt) == 0) {
+      return '${AppTime.two(b.hour)}:${AppTime.two(b.minute)}';
     }
-    return '${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '${b.month}/${b.day} ${AppTime.two(b.hour)}:${AppTime.two(b.minute)}';
   }
 }
 

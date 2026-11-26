@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// 任务广场（需求悬赏）题材常量：id / 中文名 / 主题色。
 ///
-/// 与后端 sys_genre 保持一致；同时被 demand_post_page 的下拉与
-/// demand_list_page 的分类 chip / 卡片色条使用，避免多处硬编码漂移。
+/// 与后端 sys_genre 保持一致；被任务广场的分类 chip（demand_genre_chip_row）
+/// 与任务卡片色条（demand_task_card）使用，避免多处硬编码漂移。
 class DemandGenre {
   DemandGenre._();
 

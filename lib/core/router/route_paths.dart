@@ -12,6 +12,10 @@ class RoutePath {
   static const String passwordLogin = '/login/password';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
+  /// 扫一扫（扫码登录）：扫网页上的登录码；需登录后使用（App 账号确认登录）。
+  static const String qrScan = '/qr-scan';
+  /// 扫码后的登录确认页；`t` 为票据令牌。
+  static const String qrConfirm = '/qr-confirm';
   // 登录前即可阅读的协议正文（协议勾选区域的两个链接）
   static const String agreement = '/agreement';
   static const String privacyPolicy = '/privacy-policy';
@@ -171,6 +175,9 @@ class RoutePath {
   static const String chapterList = '/chapters';
   static const String chapterRead = '/chapter';
 
+  /// 作品分镜目录（预留入口，仅本人已有分镜成果时从详情页进入）。
+  static const String workStoryboards = '/work/storyboards';
+
   // B 模块漫剧（外部视频）链路（接口 2.8）
   // 详情统一用查询参数：与消息/反馈详情同风格，登录回跳只需还原整串。
   static const String dramaDetail = '/comic/drama'; // 公开：外部视频详情（2.8.15）
@@ -217,6 +224,15 @@ class RoutePath {
         },
       ).toString();
 
+  /// 作品分镜目录 URL；[title] 只用于页面标题展示。
+  static String workStoryboardsUrl(int workId, {String? title}) => Uri(
+        path: workStoryboards,
+        queryParameters: <String, String>{
+          'id': '$workId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
   /// 外部视频详情 URL（接口 2.8.15）。
   static String dramaDetailUrl(int dramaId) => '$dramaDetail?id=$dramaId';
 
@@ -235,7 +251,7 @@ class RoutePath {
   /// 内容举报 URL（接口 2.8.17）；举报对象为外部视频。
   static String dramaReportUrl(int dramaId) => '$dramaReport?id=$dramaId';
 
-  /// 作品工作台 URL（写作范式：章节 / 设置 / 发布 三 Tab）。
+  /// 作品工作台 URL（章节 / 分镜 / 设置 / 发布）。
   ///
   /// 工作台内部以 A 套 `GET /users/me/works/{workId}` 为单一数据源，
   /// 只需 workId；[title] 仅用于详情加载完成前的 AppBar 占位。
@@ -304,6 +320,7 @@ class RoutePath {
   static const String financeOrders = '/trade/finance/orders';
   static const String financeContracts = '/trade/finance/contracts';
   // 询盘
+  static const String sourcingAgent = '/trade/agent';
   static const String inquiryCreate = '/trade/inquiry/create';
   static const String inquiryList = '/trade/inquiry/list';
   static const String inquiryDetail = '/trade/inquiry/detail';
@@ -324,14 +341,21 @@ class RoutePath {
   // 需求
   static const String demandList = '/trade/demand/list';
   static const String demandDetail = '/trade/demand/detail';
+  static const String demandPost = '/trade/demand/post';
   static const String demandMyTasks = '/trade/demand/my-tasks';
   static const String demandStageDeliver = '/trade/demand/stage-deliver';
+  static const String demandDeliverableWork = '/trade/demand/deliverable-work';
   static const String demandSourceScript = '/trade/demand/source-script';
 
   static String demandDetailUrl(int demandId) => '$demandDetail?id=$demandId';
+  /// 编辑已有任务（发布页带 id 进入编辑/重交模式，仅审核态可改）。
+  static String demandPostEditUrl(int demandId) => '$demandPost?id=$demandId';
   /// 提交本轮交付物（全屏页：选作品+说明+提交）。
   static String demandStageDeliverUrl(int demandId, int stageId, int stageOrder) =>
       '$demandStageDeliver?demandId=$demandId&stageId=$stageId&order=$stageOrder';
+  /// 最终作品查阅（全屏页：需求方看最后一轮已交集数的正文）。
+  static String demandDeliverableWorkUrl(int demandId, int stageId, int stageOrder) =>
+      '$demandDeliverableWork?demandId=$demandId&stageId=$stageId&order=$stageOrder';
   /// 源剧本查阅（分镜类任务，接单前评估用；任何登录用户可看全本）。
   static String demandSourceScriptUrl(int demandId) =>
       '$demandSourceScript?demandId=$demandId';
@@ -353,9 +377,15 @@ class RoutePath {
 
   /// AI 创作页（设定 → 大纲 → 章节，创作链路专用）。
   static const String aiCreate = '/ai/create';
-  static const String aiWrite = '/ai/write';
   static const String aiPolish = '/ai/polish';
   static const String aiStoryboard = '/ai/storyboard';
+  static String aiStoryboardUrl({required int workId, int? chapterId}) => Uri(
+        path: aiStoryboard,
+        queryParameters: {
+          'workId': '$workId',
+          if (chapterId != null && chapterId > 0) 'chapterId': '$chapterId',
+        },
+      ).toString();
   static const String aiRecords = '/ai/records';
   static const String aiOpportunity = '/ai/opportunity';
 }
@@ -368,6 +398,8 @@ class RouteName {
   static const String passwordLogin = 'passwordLogin';
   static const String register = 'register';
   static const String forgotPassword = 'forgotPassword';
+  static const String qrScan = 'qrScan';
+  static const String qrConfirm = 'qrConfirm';
   static const String agreement = 'agreement';
   static const String privacyPolicy = 'privacyPolicy';
   static const String home = 'home';
@@ -424,6 +456,7 @@ class RouteName {
   static const String search = 'search';
   static const String chapterList = 'chapterList';
   static const String chapterRead = 'chapterRead';
+  static const String workStoryboards = 'workStoryboards';
   static const String dramaDetail = 'dramaDetail';
   static const String dramaRelatedWork = 'dramaRelatedWork';
   static const String dramaPlay = 'dramaPlay';
@@ -455,6 +488,7 @@ class RouteName {
   static const String incomeOverview = 'incomeOverview';
   static const String financeOrders = 'financeOrders';
   static const String financeContracts = 'financeContracts';
+  static const String sourcingAgent = 'sourcingAgent';
   static const String inquiryCreate = 'inquiryCreate';
   static const String inquiryList = 'inquiryList';
   static const String inquiryDetail = 'inquiryDetail';
@@ -470,8 +504,10 @@ class RouteName {
   static const String followUpList = 'followUpList';
   static const String demandList = 'demandList';
   static const String demandDetail = 'demandDetail';
+  static const String demandPost = 'demandPost';
   static const String demandMyTasks = 'demandMyTasks';
   static const String demandStageDeliver = 'demandStageDeliver';
+  static const String demandDeliverableWork = 'demandDeliverableWork';
   static const String demandSourceScript = 'demandSourceScript';
   static const String tradeChat = 'tradeChat';
   // 聊天
@@ -487,7 +523,6 @@ class RouteName {
   static const String aiCenter = 'aiCenter';
   static const String aiOutline = 'aiOutline';
   static const String aiCreate = 'aiCreate';
-  static const String aiWrite = 'aiWrite';
   static const String aiPolish = 'aiPolish';
   static const String aiStoryboard = 'aiStoryboard';
   static const String aiRecords = 'aiRecords';
@@ -504,6 +539,8 @@ class ProtectedRoutes {
   /// 需要登录的路径前缀。
   static const List<String> prefixes = <String>[
     RoutePath.profile, // 我的及用户中心全部子页面
+    RoutePath.qrScan, // 扫一扫：确认登录必须基于 App 已登录账号
+    RoutePath.qrConfirm,
     RoutePath.bookshelf, // A6 示例（B 模块）受保护入口
     RoutePath.favorites, // B 模块我的收藏列表（需登录）
     // B 模块创作链路（新建作品 / 工作台 / 版本，需登录）；
@@ -521,6 +558,7 @@ class ProtectedRoutes {
     RoutePath.dramaSubscriptions,
     RoutePath.dramaReport,
     // C 交易域（询盘/报价/订单/合作，需登录）
+    RoutePath.sourcingAgent,
     RoutePath.inquiryCreate,
     RoutePath.inquiryList,
     RoutePath.inquiryDetail,
@@ -536,10 +574,12 @@ class ProtectedRoutes {
     RoutePath.followUpList,
     // 任务广场（底部导航大板块）：tab 根 /demand 与广场/详情不登记，游客可逛；
     // /trade/demand/list 只是指向 tab 根的兼容跳转，同样不设闸。
-    // 需要登录的是「动作与个人视角」：我的任务、交付、源剧本。
-    // 发布与验收查阅已收归管理端，APP 不再有对应路由。
+    // 需要登录的是「动作与个人视角」：发布/编辑、我的任务、交付、最终作品、源剧本。
+    // 审核态详情是服务端按参与方鉴权的（非参与方拿 404），路由只做到登录这一层。
+    RoutePath.demandPost,
     RoutePath.demandMyTasks,
     RoutePath.demandStageDeliver,
+    RoutePath.demandDeliverableWork,
     RoutePath.demandSourceScript,
     RoutePath.tradeChat,
     // 聊天（需登录）

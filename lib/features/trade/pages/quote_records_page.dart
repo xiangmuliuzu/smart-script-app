@@ -174,7 +174,7 @@ class QuoteRecordsPage extends ConsumerWidget {
         label = '已过期';
       default:
         color = AppColors.text3;
-        label = status ?? '未知';
+        label = '未知';
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

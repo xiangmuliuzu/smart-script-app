@@ -2,6 +2,7 @@ import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../models/user.dart';
+import 'qr_login_models.dart';
 
 /// A3 AuthRepository — pages never call Dio/Token/Storage directly.
 class AuthRepository {
@@ -180,6 +181,28 @@ class AuthRepository {
           .toList();
     }
     return const [];
+  }
+
+  // ==== 扫码登录（App 扫码，网页登录）====
+
+  /// 扫码：把票据登记为「自己扫的」，返回登录端与浏览器信息供确认页展示。
+  Future<QrScanTarget> scanQrLogin(String qrToken) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.qrLoginScan,
+      data: {'qrToken': qrToken},
+      parser: _mapParser,
+    );
+    return QrScanTarget.fromJson(data ?? const <String, dynamic>{});
+  }
+
+  /// 确认登录。准入失败（如创作者端要求作者能力）由服务端拒绝并给出文案。
+  Future<void> confirmQrLogin(String qrToken) async {
+    await _api.post(ApiEndpoints.qrLoginConfirm, data: {'qrToken': qrToken});
+  }
+
+  /// 取消：把自己扫过、尚未确认的票据作废。
+  Future<void> cancelQrLogin(String qrToken) async {
+    await _api.post(ApiEndpoints.qrLoginCancel, data: {'qrToken': qrToken});
   }
 
   static Map<String, dynamic> _mapParser(dynamic raw) {

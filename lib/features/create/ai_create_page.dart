@@ -13,11 +13,13 @@ import '../ai/ai_quota_dialog.dart';
 import '../ai/data/ai_providers.dart';
 import '../ai/widgets/ai_model_selector.dart';
 import '../ai/widgets/ai_skill_selector.dart';
+import '../bookstore/data/content_providers.dart';
 import '../welfare/data/welfare_providers.dart';
 import 'data/ai_create_session.dart';
 import 'data/author_work_providers.dart';
 import 'data/create_providers.dart';
 import 'pages/ai_chapter_read_page.dart';
+import 'widgets/work_storyboard_tab.dart';
 
 /// AI 创作页（创作者端）：设定 → 大纲 → 章节三步，与 PC 创作者端流程一致。
 ///
@@ -58,7 +60,10 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
   final _titleCtrl = TextEditingController();
   final _ideaCtrl = TextEditingController();
   final _genreCtrl = TextEditingController();
-  final _episodesCtrl = TextEditingController(text: '12');
+  final _episodesCtrl = TextEditingController(text: '10');
+  final _requireCtrl = TextEditingController();
+  // 一集时长（分钟）：AI 起稿时按这个容量规划每集事件量。
+  double _minutes = 1;
   int? _skillId;
   String? _model;
 
@@ -106,6 +111,7 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
     _ideaCtrl.dispose();
     _genreCtrl.dispose();
     _episodesCtrl.dispose();
+    _requireCtrl.dispose();
     _reviseCtrl.dispose();
     super.dispose();
   }
@@ -137,8 +143,8 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       showAppToast(context, '请先输入故事灵感');
       return;
     }
-    if (_episodes < 1 || _episodes > 50) {
-      showAppToast(context, '集数需为 1–50 的整数');
+    if (_episodes < 1 || _episodes > 10) {
+      showAppToast(context, '集数需为 1–10 的整数');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -147,14 +153,16 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
       _outlineBusy = true;
       _outline = '';
     });
+    final minutesLabel = _minutes == 1.5 ? '1.5 分钟' : '${_minutes.toInt()} 分钟';
+    final askText = _requireCtrl.text.trim();
     final inspiration = '书名：${_titleCtrl.text.trim()}\n'
-        '故事灵感：${_ideaCtrl.text.trim()}\n'
-        '请提供 $_episodes 个分集，每集单独一行标题，格式为“第1集：章节名称”，下一行写该集剧情概要。';
+        '故事灵感（已定内容，必须沿用）：${_ideaCtrl.text.trim()}\n'
+        '${askText.isEmpty ? '' : '你的要求：\n$askText\n'}';
     try {
       final result = await ref.read(aiRepositoryProvider).outlineStream(
             inspiration: inspiration,
             genre: _genreCtrl.text.trim(),
-            style: '共 $_episodes 集',
+            style: '共 $_episodes 集，每集 $minutesLabel',
             skillId: _skillId,
             model: _model,
             onDelta: (delta) {
@@ -442,7 +450,12 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
     try {
       if (!mounted) return;
       final router = GoRouter.of(context);
-      await router.push(RoutePath.workWorkspaceUrl(workId: _workId, title: _titleCtrl.text.trim()));
+      // AI 起稿已经完成，作品工作台应替换当前 AI 流程页。
+      // 这样点击工作台左上角返回或使用系统返回时，会回到「我的作品」，
+      // 不会重新回到设定、大纲、章节这几个已完成的步骤。
+      await router.pushReplacement(
+        RoutePath.workWorkspaceUrl(workId: _workId, title: _titleCtrl.text.trim()),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -551,7 +564,31 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
               controller: _episodesCtrl,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(hintText: '1–50'),
+              decoration: const InputDecoration(hintText: '1–10'),
+            ),
+          ),
+          _Labeled(
+            '一集时长',
+            DropdownButtonFormField<double>(
+              value: _minutes,
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('1 分钟')),
+                DropdownMenuItem(value: 1.5, child: Text('1.5 分钟')),
+                DropdownMenuItem(value: 2, child: Text('2 分钟')),
+              ],
+              onChanged: (value) =>
+                  setState(() => _minutes = value ?? 1),
+              decoration: const InputDecoration(isDense: true),
+            ),
+          ),
+          _Labeled(
+            '你的要求',
+            TextField(
+              controller: _requireCtrl,
+              maxLines: 3,
+              minLines: 2,
+              decoration: const InputDecoration(
+                  hintText: '写法上的要求，例如：前三集必须埋一个反转；不要血腥'),
             ),
           ),
           AiSkillSelector(
@@ -921,6 +958,11 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
 
   Widget _chapterTile(int index) {
     final task = _chapters[index];
+    final saved = _workId > 0 && task.remote && task.chapterId > 0;
+    final storyboards = saved
+        ? ref.watch(workStoryboardsProvider(_workId)).valueOrNull
+        : null;
+    final storyboard = storyboardForChapter(storyboards, task.chapterId);
     final tone = switch (task.state) {
       'generating' => AppColors.warning,
       'generated' => AppColors.success,
@@ -998,7 +1040,6 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                 ),
               ),
             if (task.state == 'generated')
-              if (task.state == 'generated')
                 InkWell(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -1017,6 +1058,29 @@ class _AiCreatePageState extends ConsumerState<AiCreatePage> {
                     ),
                   ),
                 ),
+            if (saved)
+              Wrap(
+                spacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (storyboard != null)
+                    TextButton(
+                      onPressed: () =>
+                          openAuthorStoryboard(context, _workId, storyboard),
+                      child: Text('查看分镜 · ${authorStoryboardStatus(storyboard['status'])}'),
+                    ),
+                  TextButton.icon(
+                    onPressed: _running || _saving
+                        ? null
+                        : () => context.push(RoutePath.aiStoryboardUrl(
+                              workId: _workId,
+                              chapterId: task.chapterId,
+                            )),
+                    icon: const Icon(Icons.movie_filter_outlined, size: 16),
+                    label: const Text('为本章创作分镜'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

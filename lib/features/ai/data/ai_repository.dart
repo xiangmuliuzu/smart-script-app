@@ -355,10 +355,52 @@ class AiRepository {
       'timeline',
       'items',
       'threads',
+      'props',
+      'styleGuide',
+      'outline',
     ];
     return {
       for (final key in keys) key: (data[key] ?? '').toString().trim(),
     };
+  }
+
+  /// 作品时间线事件（只追加）：每集摘要一并产出，续写前按集号注入上下文。
+  ///
+  /// 后端 `GET /api/v1/content/works/{workId}/timeline?limit=100`。
+  Future<List<Map<String, dynamic>>> workTimeline(int workId) async {
+    if (workId <= 0) return const [];
+    final data = await _api.get<List<dynamic>>(
+      '/content/works/$workId/timeline',
+      query: {'limit': 100},
+      parser: (raw) {
+        if (raw is List) return raw;
+        if (raw is Map) {
+          final list = raw['list'] ?? raw['rows'] ?? raw['data'];
+          if (list is List) return list;
+        }
+        return const <dynamic>[];
+      },
+    );
+    if (data == null) return const [];
+    return data
+        .whereType<Map>()
+        .map((item) => item.map((key, value) => MapEntry('$key', value)))
+        .toList();
+  }
+
+  /// 保存创作台账（App 端「AI 剧本续写」把简介/人物增补写回后端，与 PC 端共用一份）。
+  ///
+  /// 后端 `PUT /api/v1/content/works/{workId}/ledger`，整份写入；
+  /// 调用方必须传入已读取的完整台账，避免把未改动的字段清空。
+  Future<void> saveWorkLedger(
+      int workId, Map<String, String> ledger) async {
+    if (workId <= 0) return;
+    await _api.put<void>(
+      '/content/works/$workId/ledger',
+      data: <String, dynamic>{
+        for (final entry in ledger.entries) entry.key: entry.value,
+      },
+    );
   }
 
   /// 卷级状态快照（每 10 集一卷）：返回 {卷号: 快照}；未生成时为空。
@@ -437,6 +479,8 @@ class AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
+    String? chapterTitle,
     required void Function(String delta) onDelta,
   }) async {
     final body = await _api.postStream(
@@ -446,10 +490,27 @@ class AiRepository {
         if (style != null && style.isNotEmpty) 'style': style,
         if (skillId != null) 'skillId': skillId,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (workId != null) 'workId': workId,
+        if (chapterTitle != null && chapterTitle.isNotEmpty)
+          'chapterTitle': chapterTitle,
       },
       receiveTimeout: _aiReceiveTimeout,
     );
     return await _consumeSseWrite(body.stream, onDelta);
+  }
+
+  /// 将已生成的分镜保存到作品分镜目录；未选择作品时不调用此接口，AI 记录仍会保留。
+  Future<void> saveStoryboard({
+    required int workId,
+    required String title,
+    required String content,
+    String source = 'ai',
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/content/works/$workId/storyboards',
+      data: <String, dynamic>{'title': title, 'content': content, 'source': source},
+      parser: _map,
+    );
   }
 
   /// 渠道模型列表（管理员端配置，App 端「模型选择」下拉数据源）。

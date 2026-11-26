@@ -66,6 +66,7 @@ class BookItem {
     this.uploadType = '',
     this.lengthType = '',
     this.summary = '',
+    this.copyrightRegistrationStatus,
     this.price = 0,
     this.tradeEnabled = false,
     this.wordCount = 0,
@@ -81,6 +82,7 @@ class BookItem {
     this.saleCount = 0,
     this.rating = 0,
     this.createTime,
+    this.copyrightCertNo = '',
     this.lastReadChapterId,
     this.lastReadChapterNo,
     this.lastReadAt,
@@ -103,6 +105,13 @@ class BookItem {
   final String uploadType;
   final String lengthType;
   final String summary;
+  final String? copyrightRegistrationStatus;
+
+  String? get copyrightRegistrationLabel => switch (copyrightRegistrationStatus) {
+        'registered' => '已登记',
+        'unregistered' => '未登记',
+        _ => null,
+      };
   final double price;
   final bool tradeEnabled;
   final int wordCount;
@@ -122,6 +131,13 @@ class BookItem {
   final int saleCount;
   final double rating;
   final String? createTime;
+
+  /// 已签发的版权证书编号；非空即表示该作品已登记版权。
+  /// 仅作品详情接口下发，列表场景为空。
+  final String copyrightCertNo;
+
+  /// 是否已登记版权（以已签发的版权证书为准）。
+  bool get hasCopyright => copyrightCertNo.isNotEmpty;
 
   /// 最近阅读章节ID（书架列表专属，接口 2.7.12；未读或非书架场景为 null）。
   final int? lastReadChapterId;
@@ -155,6 +171,7 @@ class BookItem {
         uploadType: _text(json['uploadType']),
         lengthType: _text(json['lengthType']),
         summary: _text(json['summary']),
+        copyrightRegistrationStatus: json['copyrightRegistrationStatus'] as String?,
         price: _decimal(json['price']),
         tradeEnabled: _flag(json['tradeEnabled']),
         wordCount: _int(json['wordCount']),
@@ -170,6 +187,7 @@ class BookItem {
         saleCount: _int(json['saleCount']),
         rating: _decimal(json['rating']),
         createTime: json['createTime'] as String?,
+        copyrightCertNo: _text(json['copyrightCertNo']),
         lastReadChapterId: _intOrNull(json['lastReadChapterId']),
         lastReadChapterNo: _intOrNull(json['lastReadChapterNo']),
         lastReadAt: json['lastReadAt'] as String?,

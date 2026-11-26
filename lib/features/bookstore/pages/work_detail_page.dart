@@ -46,6 +46,7 @@ class WorkDetailPage extends ConsumerWidget {
               _Header(work: work),
               _RatingBar(workId: work.workId),
               _ChapterEntry(work: work),
+              _StoryboardEntry(workId: work.workId, title: work.title),
               if (work.summary.isNotEmpty || work.tags.isNotEmpty)
                 _Block(title: '作品简介', content: work.summary, tags: work.tags),
               _InfoBlock(work: work),
@@ -493,6 +494,63 @@ class _ChapterEntry extends StatelessWidget {
   }
 }
 
+/// 分镜目录入口。
+///
+/// 分镜与章节目录是同一级内容，无论当前作品是否已有章节或分镜成果，
+/// 作品详情都要展示入口。数据为空时由目录页展示空状态，不能通过隐藏入口
+/// 让用户误以为作品没有分镜能力。
+class _StoryboardEntry extends ConsumerWidget {
+  const _StoryboardEntry({required this.workId, required this.title});
+
+  final int workId;
+  final String title;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(workStoryboardSummaryProvider(workId)).valueOrNull ?? 0;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: InkWell(
+        onTap: () => context.push(
+          RoutePath.workStoryboardsUrl(workId, title: title),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Row(
+            children: [
+              const Icon(Icons.movie_filter_outlined, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Text(
+                '分镜目录',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  count > 0 ? '$count 个分镜' : '查看分镜目录',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: AppColors.text3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 作品详情底部固定栏（开启/继续试读 / 发起询盘）。
 ///
 /// 固定在页面底部，始终可见。试读与询盘对所有书城作品开放：
@@ -919,6 +977,14 @@ class _InfoBlock extends StatelessWidget {
           // 作者已上移到头部作者行（可点击进个人主页），信息区不再重复。
           _InfoRow(label: '字数', value: '${work.wordCount}'),
           _InfoRow(label: '集数', value: '${work.episodeCount}'),
+          // 版权登记状态：registered/unregistered 由后端按版权证书与申请推导；
+          // 状态未知（老数据未下发该字段）时不显示这一行，避免误报「未登记」。
+          if (work.copyrightRegistrationLabel != null)
+            _InfoRow(
+              label: '版权登记状态',
+              value: work.copyrightRegistrationLabel!,
+              valueColor: work.hasCopyright ? AppColors.primary : AppColors.text3,
+            ),
           _InfoRow(
             label: '试读',
             value: work.previewEnabled
@@ -936,10 +1002,13 @@ class _InfoBlock extends StatelessWidget {
 
 /// 「标签 - 值」信息行（信息区通用）。
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+  const _InfoRow({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;
+
+  /// 值文字颜色；为空时使用正文色。用于版权等需要强调的状态。
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -955,7 +1024,10 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               value.isEmpty ? '—' : value,
-              style: const TextStyle(fontSize: 13, color: AppColors.text1),
+              style: TextStyle(
+                fontSize: 13,
+                color: valueColor ?? AppColors.text1,
+              ),
             ),
           ),
         ],

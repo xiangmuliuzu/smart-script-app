@@ -1,8 +1,11 @@
-/// C 交易域数据模型（询盘/报价/订单/合作记录/需求标签/商务跟进）
-/// 
-/// 字段对齐后端 domain：SysInquiry / SysQuote / SysOrder / SysOfflineCooperation /
-/// SysDemandTag / SysBusinessFollow。
+/// C 交易域数据模型（询盘/报价/订单/合同/任务征集/收益账单）
+///
+/// 字段对齐后端 domain：SysInquiry / SysQuote / SysOrder / SysTradeContract /
+/// SysDemand 及轮次记录。
 /// 金额单位：分（后端 BigDecimal 序列化后为 double，前端展示时 /100）。
+library;
+
+import '../../../core/utils/app_time.dart';
 
 // ==================== 时长展示 ====================
 
@@ -20,156 +23,151 @@ String formatDurationHours(int totalHours) {
 
 /// 询盘状态（对齐后端 TradeInquiryService：accepted 已于 2026-09-29 并入 quoted）
 class InquiryStatus {
-  static const String pending = 'pending';           // 待处理
-  static const String quoted = 'quoted';             // 议价中（有报价在谈）
-  static const String rejected = 'rejected';         // 已拒绝
-  static const String deal = 'deal';                 // 已达成（一方接受报价后，同步生成订单）
-  static const String closed = 'closed';             // 已关闭
+  static const String pending = 'pending'; // 待处理
+  static const String quoted = 'quoted'; // 议价中（有报价在谈）
+  static const String rejected = 'rejected'; // 已拒绝
+  static const String deal = 'deal'; // 已达成（一方接受报价后，同步生成订单）
+  static const String closed = 'closed'; // 已关闭
 
   static String label(String? status) {
     switch (status) {
-      case pending: return '待处理';
-      case quoted: return '议价中';
-      case rejected: return '已拒绝';
-      case deal: return '已达成';
-      case closed: return '已关闭';
-      default: return status ?? '未知';
+      case pending:
+        return '待处理';
+      case quoted:
+        return '议价中';
+      case rejected:
+        return '已拒绝';
+      case deal:
+        return '已达成';
+      case closed:
+        return '已关闭';
+      default:
+        return '未知';
     }
   }
 }
 
 /// 报价状态
 class QuoteStatus {
-  static const String pending = 'pending';               // 待回复
-  static const String pendingSeller = 'pending_seller';  // 待卖方确认
-  static const String accepted = 'accepted';             // 已接受
-  static const String rejected = 'rejected';             // 已拒绝
-  static const String expired = 'expired';               // 已过期
+  static const String pending = 'pending'; // 待回复
+  static const String pendingSeller = 'pending_seller'; // 待卖方确认
+  static const String accepted = 'accepted'; // 已接受
+  static const String rejected = 'rejected'; // 已拒绝
+  static const String expired = 'expired'; // 已过期
 
   static String label(String? status) {
     switch (status) {
-      case pending: return '待回复';
-      case pendingSeller: return '待卖方确认';
-      case accepted: return '已接受';
-      case rejected: return '已拒绝';
-      case expired: return '已过期';
-      default: return status ?? '未知';
+      case pending:
+        return '待回复';
+      case pendingSeller:
+        return '待卖方确认';
+      case accepted:
+        return '已接受';
+      case rejected:
+        return '已拒绝';
+      case expired:
+        return '已过期';
+      default:
+        return '未知';
     }
   }
 }
 
 /// 订单状态（对齐后端状态机：confirmed(签合同) →双方签完自动→ paying →买方付款→ delivering →买方确认收货→ completed）
 class OrderStatus {
-  static const String confirmed = 'confirmed';            // 已确认（待双方签署合同）
-  static const String paying = 'paying';                  // 付款中（合同已签，待买方付款）
-  static const String delivering = 'delivering';          // 交割中
-  static const String completed = 'completed';            // 已完成（收益入账）
+  static const String confirmed = 'confirmed'; // 已确认（待双方签署合同）
+  static const String paying = 'paying'; // 付款中（合同已签，待买方付款）
+  static const String delivering = 'delivering'; // 交割中
+  static const String completed = 'completed'; // 已完成（收益入账）
   // 以下为遗留状态，仅历史数据只读展示，不再产生
-  static const String escrowPending = 'escrow_pending';   // 已托管
-  static const String cancelled = 'cancelled';            // 已取消
-  static const String refunded = 'refunded';              // 已退款
+  static const String escrowPending = 'escrow_pending'; // 已托管
+  static const String cancelled = 'cancelled'; // 已取消
+  static const String refunded = 'refunded'; // 已退款
 
   static String label(String? status) {
     switch (status) {
-      case confirmed: return '待签署';
-      case paying: return '付款中';
-      case delivering: return '交割中';
-      case completed: return '已完成';
-      case escrowPending: return '已托管';
-      case cancelled: return '已取消';
-      case refunded: return '已退款';
-      default: return status ?? '未知';
+      case confirmed:
+        return '待签署';
+      case paying:
+        return '付款中';
+      case delivering:
+        return '交割中';
+      case completed:
+        return '已完成';
+      case escrowPending:
+        return '已托管';
+      case cancelled:
+        return '已取消';
+      case refunded:
+        return '已退款';
+      default:
+        return '未知';
     }
   }
 }
 
 /// 合同签署状态
 class ContractStatus {
-  static const String pending = 'pending';                  // 待签署
-  static const String partialSigned = 'partial_signed';    // 部分签署（一方已签）
-  static const String completed = 'completed';              // 双方已签署
-  static const String cancelled = 'cancelled';              // 已取消
+  static const String pending = 'pending'; // 待签署
+  static const String partialSigned = 'partial_signed'; // 部分签署（一方已签）
+  static const String completed = 'completed'; // 双方已签署
+  static const String cancelled = 'cancelled'; // 已取消
 
   static String label(String? status) {
     switch (status) {
-      case pending: return '待签署';
-      case partialSigned: return '部分签署';
-      case completed: return '双方已签';
-      case cancelled: return '已取消';
-      default: return status ?? '未知';
+      case pending:
+        return '待签署';
+      case partialSigned:
+        return '部分签署';
+      case completed:
+        return '双方已签';
+      case cancelled:
+        return '已取消';
+      default:
+        return '未知';
     }
   }
 }
 
 /// 授权类型
 class LicenseType {
-  static const String exclusive = 'exclusive';           // 独家授权
-  static const String nonExclusive = 'non_exclusive';    // 非独家授权
-  static const String adaptation = 'adaptation';         // 改编授权
+  static const String exclusive = 'exclusive'; // 独家授权
+  static const String nonExclusive = 'non_exclusive'; // 非独家授权
+  static const String adaptation = 'adaptation'; // 改编授权
 
   static String label(String? type) {
     // 无版权作品询盘/订单不带授权类型，null 与空串统一显示「未指定」
     if (type == null || type.isEmpty) return '未指定';
     switch (type) {
-      case exclusive: return '独家授权';
-      case nonExclusive: return '非独家授权';
-      case adaptation: return '改编授权';
-      default: return type;
+      case exclusive:
+        return '独家授权';
+      case nonExclusive:
+        return '非独家授权';
+      case adaptation:
+        return '改编授权';
+      default:
+        return type;
     }
   }
 }
 
 /// 报价方
 class QuoteRole {
-  static const String buyer = 'buyer';     // 买方出价
-  static const String seller = 'seller';   // 卖方出价
+  static const String buyer = 'buyer'; // 买方出价
+  static const String seller = 'seller'; // 卖方出价
 
   static String label(String? role) {
     switch (role) {
-      case buyer: return '买方出价';
-      case seller: return '卖方出价';
-      default: return role ?? '未知';
+      case buyer:
+        return '买方出价';
+      case seller:
+        return '卖方出价';
+      default:
+        return '未知';
     }
   }
 }
 
-/// 跟进方式
-class FollowUpMethod {
-  static const String phone = 'phone';
-  static const String wechat = 'wechat';
-  static const String email = 'email';
-  static const String meeting = 'meeting';
-  static const String other = 'other';
-
-  static String label(String? method) {
-    switch (method) {
-      case phone: return '电话';
-      case wechat: return '微信';
-      case email: return '邮件';
-      case meeting: return '面谈';
-      case other: return '其他';
-      default: return method ?? '未知';
-    }
-  }
-}
-
-/// 合作记录来源（线上合作意向 / 线下谈判）
-class CooperationSource {
-  static const String online = 'online';
-  static const String offline = 'offline';
-
-  static String label(String? source) {
-    switch (source) {
-      case online: return '线上合作';
-      case offline: return '线下谈判';
-      default: return source ?? '未知';
-    }
-  }
-}
-
-// ==================== 数据模型 ====================
-
-/// 询盘
 class Inquiry {
   final int? inquiryId;
   final String? inquiryNo;
@@ -178,7 +176,7 @@ class Inquiry {
   final int? sellerId;
   final String? licenseType;
   final String? intendedUse;
-  final int? budget;        // 分
+  final int? budget; // 分
   final String? message;
   final String? status;
   final DateTime? expireAt;
@@ -256,11 +254,11 @@ class Quote {
   final int? quoteId;
   final int? inquiryId;
   final int? workId;
-  final String? role;         // buyer / seller (quoterRole)
-  final int? amount;          // 分 (price)
+  final String? role; // buyer / seller (quoterRole)
+  final int? amount; // 分 (price)
   final String? licenseType;
-  final int? validDays;       // 有效天数
-  final String? message;      // description
+  final int? validDays; // 有效天数
+  final String? message; // description
   final String? status;
   final DateTime? expireAt;
   final DateTime? createdAt;
@@ -334,11 +332,11 @@ class Order {
   final int? workId;
   final int? buyerId;
   final int? sellerId;
-  final int? amount;          // 分
+  final int? amount; // 分
   final String? licenseType;
   final String? status;
   final String? cancelReason;
-  final int? contractId;      // 关联合同 ID
+  final int? contractId; // 关联合同 ID
   final DateTime? createdAt;
   final DateTime? updatedAt;
   // Transient
@@ -394,292 +392,6 @@ class Order {
   }
 }
 
-/// 合作记录（线上合作意向 / 线下谈判）
-class Cooperation {
-  final int? cooperationId;
-  final String? source;       // online / offline
-  final int? workId;
-  final int? partnerId;
-  final String? contactName;
-  final String? contactPhone;
-  final String? contactEmail;
-  final DateTime? meetingTime;
-  final String? meetingPlace;
-  final String? content;
-  final String? remark;
-  final DateTime? createdAt;
-  // Transient
-  final String? workTitle;
-  final String? partnerName;
-
-  const Cooperation({
-    this.cooperationId,
-    this.source,
-    this.workId,
-    this.partnerId,
-    this.contactName,
-    this.contactPhone,
-    this.contactEmail,
-    this.meetingTime,
-    this.meetingPlace,
-    this.content,
-    this.remark,
-    this.createdAt,
-    this.workTitle,
-    this.partnerName,
-  });
-
-  factory Cooperation.fromJson(Map<String, dynamic> json) {
-    return Cooperation(
-      cooperationId: json['cooperationId'] as int?,
-      source: json['source'] as String?,
-      workId: json['workId'] as int?,
-      partnerId: json['partnerId'] as int?,
-      contactName: json['contactName'] as String?,
-      contactPhone: json['contactPhone'] as String?,
-      contactEmail: json['contactEmail'] as String?,
-      meetingTime: _parseDateTime(json['meetingTime']),
-      meetingPlace: json['meetingPlace'] as String?,
-      content: json['content'] as String?,
-      remark: json['remark'] as String?,
-      createdAt: _parseDateTime(json['createdAt']),
-      workTitle: json['workTitle'] as String?,
-      partnerName: json['partnerName'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (cooperationId != null) 'cooperationId': cooperationId,
-      if (source != null) 'source': source,
-      if (workId != null) 'workId': workId,
-      if (partnerId != null) 'partnerId': partnerId,
-      if (contactName != null) 'contactName': contactName,
-      if (contactPhone != null) 'contactPhone': contactPhone,
-      if (contactEmail != null) 'contactEmail': contactEmail,
-      if (meetingTime != null) 'meetingTime': meetingTime!.toIso8601String(),
-      if (meetingPlace != null) 'meetingPlace': meetingPlace,
-      if (content != null) 'content': content,
-      if (remark != null) 'remark': remark,
-    };
-  }
-}
-
-/// 需求标签
-class DemandTag {
-  final int? tagId;
-  final String? tagName;
-  final String? tagCode;
-  final int? sort;
-  final DateTime? createdAt;
-
-  const DemandTag({
-    this.tagId,
-    this.tagName,
-    this.tagCode,
-    this.sort,
-    this.createdAt,
-  });
-
-  factory DemandTag.fromJson(Map<String, dynamic> json) {
-    return DemandTag(
-      tagId: json['tagId'] as int?,
-      tagName: json['tagName'] as String?,
-      tagCode: json['tagCode'] as String?,
-      sort: json['sort'] as int?,
-      createdAt: _parseDateTime(json['createdAt']),
-    );
-  }
-}
-
-/// 商务跟进记录
-class BusinessFollow {
-  final int? followId;
-  final int? partnerId;
-  final int? workId;
-  final String? followMethod;   // phone/wechat/email/meeting/other
-  final String? content;
-  final String? result;
-  final String? nextPlan;
-  final DateTime? followTime;
-  final DateTime? createdAt;
-  // Transient
-  final String? partnerName;
-  final String? workTitle;
-  final String? creatorName;
-
-  const BusinessFollow({
-    this.followId,
-    this.partnerId,
-    this.workId,
-    this.followMethod,
-    this.content,
-    this.result,
-    this.nextPlan,
-    this.followTime,
-    this.createdAt,
-    this.partnerName,
-    this.workTitle,
-    this.creatorName,
-  });
-
-  factory BusinessFollow.fromJson(Map<String, dynamic> json) {
-    return BusinessFollow(
-      followId: json['followId'] as int?,
-      partnerId: json['partnerId'] as int?,
-      workId: json['workId'] as int?,
-      followMethod: json['followMethod'] as String?,
-      content: json['content'] as String?,
-      result: json['result'] as String?,
-      nextPlan: json['nextPlan'] as String?,
-      followTime: _parseDateTime(json['followTime']),
-      createdAt: _parseDateTime(json['createdAt']),
-      partnerName: json['partnerName'] as String?,
-      workTitle: json['workTitle'] as String?,
-      creatorName: json['creatorName'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (followId != null) 'followId': followId,
-      if (partnerId != null) 'partnerId': partnerId,
-      if (workId != null) 'workId': workId,
-      if (followMethod != null) 'followMethod': followMethod,
-      if (content != null) 'content': content,
-      if (result != null) 'result': result,
-      if (nextPlan != null) 'nextPlan': nextPlan,
-      if (followTime != null) 'followTime': followTime!.toIso8601String(),
-    };
-  }
-}
-
-/// 交易作品（sys_work 的交易视图）
-class TradeWork {
-  final int? workId;
-  final String? title;
-  final String? coverUrl;
-  final String? workType;
-  final String? authorName;
-  final bool? tradeEnabled;
-  final String? licenseType;
-  final int? price;           // 分
-  final bool? negotiable;
-  final String? status;
-  final DateTime? createdAt;
-
-  const TradeWork({
-    this.workId,
-    this.title,
-    this.coverUrl,
-    this.workType,
-    this.authorName,
-    this.tradeEnabled,
-    this.licenseType,
-    this.price,
-    this.negotiable,
-    this.status,
-    this.createdAt,
-  });
-
-  factory TradeWork.fromJson(Map<String, dynamic> json) {
-    return TradeWork(
-      workId: json['workId'] as int?,
-      title: json['title'] as String?,
-      coverUrl: json['coverUrl'] as String?,
-      workType: json['workType'] as String?,
-      authorName: json['authorName'] as String?,
-      tradeEnabled: json['tradeEnabled'] as bool?,
-      licenseType: json['licenseType'] as String?,
-      price: (json['price'] as num?)?.toInt(),
-      negotiable: json['negotiable'] as bool?,
-      status: json['status'] as String?,
-      createdAt: _parseDateTime(json['createdAt']),
-    );
-  }
-
-  String get priceYuan {
-    if (price == null) return '-';
-    return '¥${(price! / 100).toStringAsFixed(2)}';
-  }
-}
-
-// ==================== 财务域模型 ====================
-
-/// 托管状态
-class EscrowStatus {
-  static const String pending = 'pending';
-  static const String escrowed = 'escrowed';
-  static const String released = 'released';
-  static const String refunded = 'refunded';
-
-  static String label(String? status) {
-    switch (status) {
-      case pending: return '待托管';
-      case escrowed: return '托管中';
-      case released: return '已释放';
-      case refunded: return '已退款';
-      default: return status ?? '未知';
-    }
-  }
-}
-
-/// 资金托管记录
-class Escrow {
-  final int? escrowId;
-  final String? escrowNo;
-  final int? orderId;
-  final int? amount; // 分
-  final String? status;
-  final DateTime? paidAt;
-  final String? payChannel;
-  final DateTime? releaseTime;
-  final String? releaseReason;
-  final int? refundAmount; // 分
-  final DateTime? refundedAt;
-  final DateTime? createdAt;
-  final String? orderNo;
-  final String? workTitle;
-  final int? buyerId;
-  final int? sellerId;
-  final String? buyerName;
-  final String? sellerName;
-
-  Escrow({
-    this.escrowId, this.escrowNo, this.orderId, this.amount, this.status,
-    this.paidAt, this.payChannel, this.releaseTime, this.releaseReason,
-    this.refundAmount, this.refundedAt, this.createdAt,
-    this.orderNo, this.workTitle, this.buyerId, this.sellerId,
-    this.buyerName, this.sellerName,
-  });
-
-  factory Escrow.fromJson(Map<String, dynamic> json) {
-    return Escrow(
-      escrowId: json['escrowId'] as int?,
-      escrowNo: json['escrowNo'] as String?,
-      orderId: json['orderId'] as int?,
-      amount: (json['amount'] as num?)?.toInt(),
-      status: json['status'] as String?,
-      paidAt: _parseDateTime(json['paidAt']),
-      payChannel: json['payChannel'] as String?,
-      releaseTime: _parseDateTime(json['releaseTime']),
-      releaseReason: json['releaseReason'] as String?,
-      refundAmount: (json['refundAmount'] as num?)?.toInt(),
-      refundedAt: _parseDateTime(json['refundedAt']),
-      createdAt: _parseDateTime(json['createdAt']),
-      orderNo: json['orderNo'] as String?,
-      workTitle: json['workTitle'] as String?,
-      buyerId: json['buyerId'] as int?,
-      sellerId: json['sellerId'] as int?,
-      buyerName: json['buyerName'] as String?,
-      sellerName: json['sellerName'] as String?,
-    );
-  }
-
-  String get amountYuan => amount != null ? '¥${(amount! / 100).toStringAsFixed(2)}' : '-';
-}
-
-/// 账单流水
 class BillRecord {
   final int? billId;
   final String? billNo;
@@ -692,13 +404,23 @@ class BillRecord {
   final DateTime? createdAt;
   final String? orderNo;
   final String? workTitle;
+
   /// 验收轮次（仅 relatedType=demand_stage 的任务逐轮放款有值）
   final int? stageOrder;
 
   BillRecord({
-    this.billId, this.billNo, this.billType, this.amount, this.balanceAfter,
-    this.relatedType, this.relatedId, this.remark, this.createdAt,
-    this.orderNo, this.workTitle, this.stageOrder,
+    this.billId,
+    this.billNo,
+    this.billType,
+    this.amount,
+    this.balanceAfter,
+    this.relatedType,
+    this.relatedId,
+    this.remark,
+    this.createdAt,
+    this.orderNo,
+    this.workTitle,
+    this.stageOrder,
   });
 
   factory BillRecord.fromJson(Map<String, dynamic> json) {
@@ -726,11 +448,16 @@ class BillRecord {
 
   String get typeLabel {
     switch (billType) {
-      case 'income': return fromDemandStage ? '任务轮次收益' : '订单收入';
-      case 'withdraw': return '提现支出';
-      case 'freeze': return '冻结';
-      case 'settle': return '结算';
-      default: return billType ?? '未知';
+      case 'income':
+        return fromDemandStage ? '任务轮次收益' : '订单收入';
+      case 'withdraw':
+        return '提现支出';
+      case 'freeze':
+        return '冻结';
+      case 'settle':
+        return '结算';
+      default:
+        return '未知';
     }
   }
 
@@ -741,24 +468,11 @@ class BillRecord {
   String? get roundLabel => stageOrder != null ? '第$stageOrder轮' : null;
 }
 
-/// 资金托管汇总数据
-class EscrowSummary {
-  final List<Escrow> list;
-  final int totalAmount; // 分
-  final int pendingAmount; // 分
-  final int total;
-  EscrowSummary({required this.list, required this.totalAmount,
-    required this.pendingAmount, required this.total});
-}
-
-// ==================== 合同域模型 ====================
-
-/// 合同详情（含 HTML 内容、双方签署状态、签名/印章图片）
 class ContractDetail {
   final int contractId;
   final String? contractNo;
   final String? contractType;
-  final double? amount;          // 元（DECIMAL，保留小数，不可截断为 int）
+  final double? amount; // 元（DECIMAL，保留小数，不可截断为 int）
   final int? orderId;
   final String? orderNo;
   final int? buyerId;
@@ -774,13 +488,14 @@ class ContractDetail {
   final String? sellerSignatureImage;
   final String? sellerSealImage;
   final String? signedPdfUrl;
-  final String? status;       // pending / partial_signed / completed
-  final String? content;      // HTML 合同内容
-  final String? templateId;   // 平台模板：TPL_COPYRIGHT_TRANSFER / TPL_COPYRIGHT_LICENSE
-  final String? clausesText;  // 可编辑正文条款：富文本标记串或历史纯文本（null=模板默认）
-  final String? sourceType;   // template 平台模板 / uploaded 用户上传 PDF
+  final String? status; // pending / partial_signed / completed
+  final String? content; // HTML 合同内容
+  final String?
+      templateId; // 平台模板：TPL_COPYRIGHT_TRANSFER / TPL_COPYRIGHT_LICENSE
+  final String? clausesText; // 可编辑正文条款：富文本标记串或历史纯文本（null=模板默认）
+  final String? sourceType; // template 平台模板 / uploaded 用户上传 PDF
   final String? sourcePdfUrl; // 上传合同 PDF 文件 URL（uploaded 时）
-  final int? pageCount;       // 上传 PDF 页数（uploaded 时）
+  final int? pageCount; // 上传 PDF 页数（uploaded 时）
   final List<String> pageImageUrls; // 上传件分页渲染图 URL（uploaded 时，供拖拽定位）
   final String? workTitle;
   final String? licenseType;
@@ -881,7 +596,8 @@ class ContractDetail {
   String get statusLabel => ContractStatus.label(status);
 
   /// 金额展示（合同金额后端存元，保留两位小数）
-  String get amountYuan => amount != null ? '¥${amount!.toStringAsFixed(2)}' : '-';
+  String get amountYuan =>
+      amount != null ? '¥${amount!.toStringAsFixed(2)}' : '-';
 }
 
 /// 平台合同模板（供切换模板时填充默认条款）。
@@ -909,6 +625,9 @@ class ContractTemplate {
 
 /// 征集状态
 class DemandStatus {
+  // 审核态：买方建单后先落 pending_review，审核通过才进广场（open），不通过为 rejected。
+  static const String pendingReview = 'pending_review';
+  static const String rejected = 'rejected';
   static const String open = 'open';
   static const String inProgress = 'in_progress';
   static const String completed = 'completed';
@@ -916,15 +635,30 @@ class DemandStatus {
   static const String selected = 'selected';
   static const String failed = 'failed';
 
+  /// 审核态（未公开）：广场不曝光、只有任务参与方读得到，游客不得发起请求。
+  static bool isAuditState(String? status) =>
+      status == pendingReview || status == rejected;
+
   static String label(String? status) {
     switch (status) {
-      case open: return '待接单';
-      case inProgress: return '进行中';
-      case completed: return '已完成';
-      case closed: return '已关闭';
-      case selected: return '已选定';
-      case failed: return '已失败';
-      default: return status ?? '未知';
+      case pendingReview:
+        return '待审核';
+      case rejected:
+        return '审核未通过';
+      case open:
+        return '待接单';
+      case inProgress:
+        return '进行中';
+      case completed:
+        return '已完成';
+      case closed:
+        return '已关闭';
+      case selected:
+        return '已选定';
+      case failed:
+        return '已失败';
+      default:
+        return '未知';
     }
   }
 }
@@ -960,29 +694,68 @@ class DemandTask {
   final String? acceptedCreatorName;
   final String? failReason;
   final DateTime? failAt;
+  // 平台审核（买方建单 → 运营审核）：rejected 时 auditRemark 即驳回原因
+  final String? auditRemark;
+  final DateTime? auditAt;
 
   const DemandTask({
-    this.demandId, this.demandNo, this.clientId, this.title, this.genreId,
-    this.tags, this.budget, this.deadline, this.requirement, this.contactInfo,
-    this.totalEpisodes, this.status, this.createdAt, this.clientName,
-    this.taskType, this.sourceWorkId, this.sourceScriptUrl,
-    this.sourceScriptName, this.sourceWorkTitle,
-    this.acceptedCreatorId, this.acceptedAt, this.durationHours, this.dueAt,
-    this.isOverdue, this.acceptedCreatorName,
-    this.failReason, this.failAt,
+    this.demandId,
+    this.demandNo,
+    this.clientId,
+    this.title,
+    this.genreId,
+    this.tags,
+    this.budget,
+    this.deadline,
+    this.requirement,
+    this.contactInfo,
+    this.totalEpisodes,
+    this.status,
+    this.createdAt,
+    this.clientName,
+    this.taskType,
+    this.sourceWorkId,
+    this.sourceScriptUrl,
+    this.sourceScriptName,
+    this.sourceWorkTitle,
+    this.acceptedCreatorId,
+    this.acceptedAt,
+    this.durationHours,
+    this.dueAt,
+    this.isOverdue,
+    this.acceptedCreatorName,
+    this.failReason,
+    this.failAt,
+    this.auditRemark,
+    this.auditAt,
   });
 
-  /// 接单制状态文案；逾期优先于进行中展示。
+  /// 审核态（待审核 / 审核未通过）：不在广场曝光，仅参与方可见。
+  bool get isInAudit => DemandStatus.isAuditState(status);
+
+  /// 买方能否编辑重交：仅审核态可改，审核通过后只能走平台（后端同口径再校验）。
+  bool get isEditableByPublisher => isInAudit;
+
+  /// 接单制状态文案；审核态优先，其次逾期优先于进行中展示。
   String get statusLabel {
+    // 审核态先于逾期判定：未通过审核的单根本没进广场，谈不上逾期
+    if (isInAudit) return DemandStatus.label(status);
     if (isOverdue == 1) return '已逾期';
     switch (status) {
-      case 'open': return '待接单';
-      case 'in_progress': return '进行中';
-      case 'completed': return '已完成';
-      case 'selected': return '已选定';
-      case 'closed': return '已关闭';
-      case 'failed': return '已失败';
-      default: return status ?? '未知';
+      case 'open':
+        return '待接单';
+      case 'in_progress':
+        return '进行中';
+      case 'completed':
+        return '已完成';
+      case 'selected':
+        return '已选定';
+      case 'closed':
+        return '已关闭';
+      case 'failed':
+        return '已失败';
+      default:
+        return '未知';
     }
   }
 
@@ -1011,24 +784,27 @@ class DemandTask {
       acceptedAt: _parseDateTime(json['acceptedAt']),
       durationHours: (json['durationHours'] as num?)?.toInt(),
       dueAt: _parseDateTime(json['dueAt']),
-      isOverdue: (json['overdue'] as num?)?.toInt() ?? (json['isOverdue'] as num?)?.toInt(),
+      isOverdue: (json['overdue'] as num?)?.toInt() ??
+          (json['isOverdue'] as num?)?.toInt(),
       acceptedCreatorName: json['acceptedCreatorName'] as String?,
       failReason: json['failReason'] as String?,
       failAt: _parseDateTime(json['failAt']),
+      auditRemark: json['auditRemark'] as String?,
+      auditAt: _parseDateTime(json['auditAt']),
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'title': title,
-    'genreId': genreId,
-    'budget': budget,
-    'deadline': deadline != null ? '${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}' : null,
-    'requirement': requirement,
-    'contactInfo': contactInfo,
-    'tags': tags,
-    'totalEpisodes': totalEpisodes,
-    'durationHours': durationHours,
-  };
+        'title': title,
+        'genreId': genreId,
+        'budget': budget,
+        'deadline': deadline != null ? AppTime.formatDate(deadline) : null,
+        'requirement': requirement,
+        'contactInfo': contactInfo,
+        'tags': tags,
+        'totalEpisodes': totalEpisodes,
+        'durationHours': durationHours,
+      };
 }
 
 /// 分镜任务的源剧本（接单前评估用）：作品源给全本章节，文件源给相对地址与文件名，两者可并存。
@@ -1066,7 +842,8 @@ class SourceScript {
     final chapters = <DeliverableChapter>[];
     if (rows is List) {
       for (final r in rows) {
-        if (r is Map<String, dynamic>) chapters.add(DeliverableChapter.fromJson(r));
+        if (r is Map<String, dynamic>)
+          chapters.add(DeliverableChapter.fromJson(r));
       }
     }
     final wm = work is Map<String, dynamic> ? work : const <String, dynamic>{};
@@ -1087,29 +864,13 @@ class SourceScript {
 
 // ==================== 工具函数 ====================
 
-DateTime? _parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is String) {
-    if (value.isEmpty) return null;
-    return DateTime.tryParse(value);
-  }
-  if (value is int) {
-    return DateTime.fromMillisecondsSinceEpoch(value);
-  }
-  return null;
-}
+DateTime? _parseDateTime(dynamic value) => AppTime.parse(value);
 
 /// 格式化日期
-String formatDate(DateTime? dt) {
-  if (dt == null) return '-';
-  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-}
+String formatDate(DateTime? dt) => AppTime.formatDate(dt);
 
 /// 格式化日期时间
-String formatDateTime(DateTime? dt) {
-  if (dt == null) return '-';
-  return '${formatDate(dt)} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-}
+String formatDateTime(DateTime? dt) => AppTime.formatDateTime(dt);
 
 // ==================== 验收轮次模型 ====================
 
@@ -1135,24 +896,49 @@ class DemandStage {
   // 交付作品与延期
   final int? workId;
   final String? workTitle;
+
+  /// 关联作品的书城状态；任务验收不会修改该状态。
+  final String? workShelfStatus;
   // AI 审核（提交后、人工验收前的自动前置门）
   final int? aiScore;
   final String? aiResult;
   final DateTime? aiReviewedAt;
-  final String? extendStatus; // null=无申请 / pending / approved / rejected（最近一次快照）
+  final String?
+      extendStatus; // null=无申请 / pending / approved / rejected（最近一次快照）
   final int? extendDays;
   final int? extendHours;
   final String? extendReason;
   final DateTime? extendAppliedAt;
 
   const DemandStage({
-    this.stageId, this.demandId, this.stageOrder, this.episodeTo, this.amount,
-    this.status, this.deliverableDesc, this.deliverableUrl,
-    this.submittedAt, this.reviewedAt, this.rejectReason, this.releaseFlag,
-    this.durationDays, this.durationHours, this.startedAt, this.dueAt, this.isOverdue,
-    this.workId, this.workTitle, this.extendStatus, this.extendDays, this.extendHours,
-    this.extendReason, this.extendAppliedAt,
-    this.aiScore, this.aiResult, this.aiReviewedAt,
+    this.stageId,
+    this.demandId,
+    this.stageOrder,
+    this.episodeTo,
+    this.amount,
+    this.status,
+    this.deliverableDesc,
+    this.deliverableUrl,
+    this.submittedAt,
+    this.reviewedAt,
+    this.rejectReason,
+    this.releaseFlag,
+    this.durationDays,
+    this.durationHours,
+    this.startedAt,
+    this.dueAt,
+    this.isOverdue,
+    this.workId,
+    this.workTitle,
+    this.workShelfStatus,
+    this.extendStatus,
+    this.extendDays,
+    this.extendHours,
+    this.extendReason,
+    this.extendAppliedAt,
+    this.aiScore,
+    this.aiResult,
+    this.aiReviewedAt,
   });
 
   factory DemandStage.fromJson(Map<String, dynamic> json) {
@@ -1173,9 +959,11 @@ class DemandStage {
       durationHours: (json['durationHours'] as num?)?.toInt(),
       startedAt: _parseDateTime(json['startedAt']),
       dueAt: _parseDateTime(json['dueAt']),
-      isOverdue: (json['overdue'] as num?)?.toInt() ?? (json['isOverdue'] as num?)?.toInt(),
+      isOverdue: (json['overdue'] as num?)?.toInt() ??
+          (json['isOverdue'] as num?)?.toInt(),
       workId: (json['workId'] as num?)?.toInt(),
       workTitle: json['workTitle'] as String?,
+      workShelfStatus: json['workShelfStatus'] as String?,
       aiScore: (json['aiScore'] as num?)?.toInt(),
       aiResult: json['aiResult'] as String?,
       aiReviewedAt: _parseDateTime(json['aiReviewedAt']),
@@ -1190,12 +978,18 @@ class DemandStage {
   /// 状态标签文本
   String get statusLabel {
     switch (status) {
-      case 'pending': return '待交付';
-      case 'ai_reviewing': return 'AI审核中';
-      case 'submitted': return '待审核';
-      case 'approved': return '已通过';
-      case 'rejected': return '已驳回';
-      default: return status ?? '';
+      case 'pending':
+        return '待交付';
+      case 'ai_reviewing':
+        return 'AI审核中';
+      case 'submitted':
+        return '待审核';
+      case 'approved':
+        return '任务验收通过';
+      case 'rejected':
+        return '已驳回';
+      default:
+        return status ?? '';
     }
   }
 
@@ -1208,13 +1002,14 @@ class DemandStage {
   /// 绝对截止文案：“X月X日 HH:mm”；未激活返回 null。
   String? get absoluteDueText {
     if (dueAt == null) return null;
-    final dt = dueAt!.toLocal();
+    final dt = AppTime.beijing(dueAt!);
     return '${dt.month}月${dt.day}日 '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   /// 本轮是否处于审核暂停计时（AI审核中/待人工验收，审核耗时均不计入时限）。
-  bool get isPausedForReview => status == 'submitted' || status == 'ai_reviewing';
+  bool get isPausedForReview =>
+      status == 'submitted' || status == 'ai_reviewing';
 
   /// 是否处于 AI 审核中（后台跑完前不可交付/不可验收/不可延期）。
   bool get isAiReviewing => status == 'ai_reviewing';
@@ -1257,13 +1052,23 @@ class DemandExtendApply {
   final String? applyType; // request / self
   final DateTime? appliedAt;
   final DateTime? decidedAt;
+
   /// 本次动作生效后的轮次截止时间：自主延时/申请通过时有值，待处理与驳回为空
   final DateTime? dueAfter;
 
   const DemandExtendApply({
-    this.applyId, this.demandId, this.stageId, this.stageOrder,
-    this.days, this.hours, this.reason, this.status, this.applyType,
-    this.appliedAt, this.decidedAt, this.dueAfter,
+    this.applyId,
+    this.demandId,
+    this.stageId,
+    this.stageOrder,
+    this.days,
+    this.hours,
+    this.reason,
+    this.status,
+    this.applyType,
+    this.appliedAt,
+    this.decidedAt,
+    this.dueAfter,
   });
 
   factory DemandExtendApply.fromJson(Map<String, dynamic> json) {
@@ -1295,10 +1100,14 @@ class DemandExtendApply {
   String get statusLabel {
     if (isSelf) return '已生效';
     switch (status) {
-      case 'pending': return '待处理';
-      case 'approved': return '已同意';
-      case 'rejected': return '已拒绝';
-      default: return status ?? '';
+      case 'pending':
+        return '待处理';
+      case 'approved':
+        return '已同意';
+      case 'rejected':
+        return '已拒绝';
+      default:
+        return status ?? '';
     }
   }
 
@@ -1307,7 +1116,7 @@ class DemandExtendApply {
 
   /// 申请时间文案“X月X日 HH:mm”。
   String get appliedText {
-    final dt = appliedAt?.toLocal();
+    final dt = appliedAt != null ? AppTime.beijing(appliedAt!) : null;
     if (dt == null) return '';
     return '${dt.month}月${dt.day}日 '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -1315,14 +1124,14 @@ class DemandExtendApply {
 
   /// 顺延后新截止文案“X月X日 HH:mm”（待处理/驳回无值，返回空串）。
   String get dueAfterText {
-    final dt = dueAfter?.toLocal();
+    final dt = dueAfter != null ? AppTime.beijing(dueAfter!) : null;
     if (dt == null) return '';
     return '${dt.month}月${dt.day}日 '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
 
-/// 可交付作品（任务交付选择器：本人、非已上架售卖）。
+/// 可交付作品（任务交付选择器：本人、明确未上架作品）。
 class DeliverableWork {
   final int workId;
   final String? title;
@@ -1345,14 +1154,19 @@ class DeliverableWork {
     );
   }
 
-  /// 状态展示文案（交付选择器只展示非 on_shelf 作品）。
+  /// 状态展示文案（交付选择器只展示 off_shelf 作品）。
   String get statusLabel {
     switch (status) {
-      case 'draft': return '草稿';
-      case 'reviewing': return '审核中';
-      case 'rejected': return '审核驳回';
-      case 'off_shelf': return '已下架';
-      default: return status ?? '';
+      case 'draft':
+        return '草稿';
+      case 'reviewing':
+        return '审核中';
+      case 'rejected':
+        return '审核驳回';
+      case 'off_shelf':
+        return '已下架';
+      default:
+        return status ?? '';
     }
   }
 }
@@ -1391,6 +1205,71 @@ class DeliverableChapter {
     );
   }
 
-  String get displayTitle =>
-      (chapterTitle?.isNotEmpty ?? false) ? chapterTitle! : '第${chapterNo ?? '?'}集';
+  String get displayTitle => (chapterTitle?.isNotEmpty ?? false)
+      ? chapterTitle!
+      : '第${chapterNo ?? '?'}集';
+}
+
+/// 最终作品：需求方查看最后一轮交付的作品（正文仍只到本轮 episodeTo）。
+///
+/// 后端只在 `demand.status == completed` 且查的是最后一轮且该轮已验收通过时下发，
+/// 其余情况直接报错（文案由页面原样透出，不在端上另编一套规则）。
+class StageDeliverableView {
+  final int workId;
+  final String? title;
+  final String? authorName;
+  final int? episodeCount;
+  final int? wordCount;
+  final String? summary;
+  final int? stageOrder;
+  final int? episodeTo;
+  final String? stageStatus;
+  final String? deliverableDesc;
+  final String? deliverableUrl;
+  final int? aiScore;
+  final List<DeliverableChapter> chapters;
+
+  const StageDeliverableView({
+    required this.workId,
+    this.title,
+    this.authorName,
+    this.episodeCount,
+    this.wordCount,
+    this.summary,
+    this.stageOrder,
+    this.episodeTo,
+    this.stageStatus,
+    this.deliverableDesc,
+    this.deliverableUrl,
+    this.aiScore,
+    this.chapters = const [],
+  });
+
+  factory StageDeliverableView.fromJson(Map<String, dynamic> json) {
+    final raw = json['chapters'];
+    return StageDeliverableView(
+      workId: (json['workId'] as num?)?.toInt() ?? 0,
+      title: json['title'] as String?,
+      authorName: json['authorName'] as String?,
+      episodeCount: (json['episodeCount'] as num?)?.toInt(),
+      wordCount: (json['wordCount'] as num?)?.toInt(),
+      summary: json['summary'] as String?,
+      stageOrder: (json['stageOrder'] as num?)?.toInt(),
+      episodeTo: (json['episodeTo'] as num?)?.toInt(),
+      stageStatus: json['stageStatus'] as String?,
+      deliverableDesc: json['deliverableDesc'] as String?,
+      deliverableUrl: json['deliverableUrl'] as String?,
+      aiScore: (json['aiScore'] as num?)?.toInt(),
+      chapters: raw is List
+          ? raw
+              .whereType<Map>()
+              .map(
+                  (e) => DeliverableChapter.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+    );
+  }
+
+  /// 可见（已下发正文）的集数。
+  int get readableCount => chapters.where((c) => c.readable).length;
 }

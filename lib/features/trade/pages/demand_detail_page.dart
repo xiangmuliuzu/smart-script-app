@@ -9,6 +9,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -16,7 +17,11 @@ import '../data/demand_providers.dart';
 import '../data/trade_models.dart';
 import '../widgets/demand_stage_panel.dart';
 
-/// 任务详情页（平台发布 → 创作者先到先得接单 → 逐轮交付）。
+/// 任务详情页。
+///
+/// 需求方：建单/编辑重交（仅审核态）+ 看轮次进度 + 整单验收完成后查看最终作品；
+/// 创作者：接单 + 按轮交付/申请延时。
+/// 审核、逐轮验收、延时审批与关闭征集一律在平台运营端操作，本页不提供对应按钮。
 class DemandDetailPage extends ConsumerStatefulWidget {
   const DemandDetailPage({super.key, required this.demandId});
   final int demandId;
@@ -48,15 +53,30 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
       ),
       body: asyncTask.when(
         loading: () => const LoadingView(),
-        error: (e, _) => ErrorView(message: '加载失败：$e'),
+        error: (e, _) => _buildLoadError(e),
         data: (task) => _buildContent(task),
       ),
+    );
+  }
+
+  /// 加载失败视图。
+  ///
+  /// 审核态（待审核/审核未通过）与已过截止的 open 单，后端对非参与方一律回 404，
+  /// 这不是网络故障，按「任务不存在/已下架」渲染，别把后端堆栈直接甩给用户。
+  Widget _buildLoadError(Object e) {
+    if (e is ApiException && e.code == 404) {
+      return const ErrorView(message: '任务不存在或已下架');
+    }
+    return ErrorView(
+      message: '加载失败：${e is ApiException && e.message.isNotEmpty ? e.message : '请稍后重试'}',
+      onRetry: () => ref.invalidate(demandDetailProvider(widget.demandId)),
     );
   }
 
   Widget _buildContent(DemandTask task) {
     final budgetYuan = task.budget != null ? (task.budget! / 100).toStringAsFixed(2) : '-';
     final myId = ref.watch(authControllerProvider).user?.userId;
+    final isBuyer = myId != null && myId == task.clientId;
     final isClaimer = myId != null && task.acceptedCreatorId != null && myId == task.acceptedCreatorId;
     final inProgress = task.status == 'in_progress';
     final hasStages = task.totalEpisodes != null && task.totalEpisodes! > 0;
@@ -77,6 +97,11 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           ],
         ),
         const SizedBox(height: 12),
+        // 审核态提示：驳回要给书面意见，待审核要说清楚还没进广场；逐轮验收由平台处理
+        if (isBuyer && task.isInAudit) ...[
+          _buildAuditBanner(task),
+          const SizedBox(height: 12),
+        ],
         // 基本信息卡片
         Card(
           elevation: 1,
@@ -128,9 +153,10 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           ),
           const SizedBox(height: 16),
         ],
-        // 源剧本（分镜类任务）：接单方靠它评估工作量
+        // 源剧本（分镜类任务）：由需求方提供，接单方靠它评估工作量
         if (DemandTaskType.isStoryboard(task.taskType)) ...[
-          _buildSourceScriptBlock(task, isLoggedIn: myId != null),
+          _buildSourceScriptBlock(task,
+              isLoggedIn: myId != null, isBuyer: isBuyer),
           const SizedBox(height: 16),
         ],
         // 任务会话入口（创作者 ↔ 平台运营）
@@ -139,7 +165,25 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
             label: '联系平台',
             onTap: () => _openDemandChat(task),
           ),
-        // 操作区：平台已托管预算，创作者先到先得直接接单
+        // 需求方动作区：只有编辑重交与最终作品查看，验收/延时/关闭征集都在平台运营端
+        if (isBuyer && task.isEditableByPublisher) ...[
+          _primaryActionButton(
+            icon: Icons.edit_outlined,
+            label: task.status == DemandStatus.rejected ? '修改后重新提交审核' : '编辑任务',
+            loadingLabel: '跳转中...',
+            onSubmitting: _submitting,
+            onTap: () => context.push(RoutePath.demandPostEditUrl(task.demandId!)),
+          ),
+          const SizedBox(height: 2),
+          _hintBar(task.status == DemandStatus.rejected
+              ? '按审核意见改完再提交，提交后重新排队送审。'
+              : '审核通过前只有你我能看到这份任务，可随时修改。'),
+        ],
+        if (isBuyer && task.status == DemandStatus.completed) ...[
+          const SizedBox(height: 6),
+          _buildFinalWorkEntry(task),
+        ],
+        // 操作区：审核通过的任务在广场公开，创作者先到先得直接接单
         if (task.status == 'open') ...[
           _primaryActionButton(
             icon: Icons.gavel,
@@ -155,12 +199,90 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
         ],
         // 进行中的倒计时（仅接单人可见：后续验收与延时已收归平台运营）
         if (inProgress && isClaimer) _buildCountdown(task),
-        // 验收面板（已配置轮次且接单后/完成时可见；仅接单人可见）
-        if (hasStages && (inProgress || task.status == 'completed') && isClaimer) ...[
+        // 轮次面板：接单人可交付，需求方只读（审核态与进行中/已完成都看得到进度）
+        if (hasStages &&
+            (isClaimer || isBuyer) &&
+            (task.isInAudit || inProgress || task.status == 'completed')) ...[
           const SizedBox(height: 8),
-          DemandStagePanel(demandId: task.demandId!),
+          DemandStagePanel(demandId: task.demandId!, canDeliver: isClaimer),
         ],
       ],
+    );
+  }
+
+  /// 审核态横幅：待审核说明还在排队，驳回要把平台写的审核意见原样亮出来。
+  Widget _buildAuditBanner(DemandTask task) {
+    final rejected = task.status == DemandStatus.rejected;
+    final color = rejected ? AppColors.danger : Colors.orange;
+    final remark = (task.auditRemark ?? '').trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(rejected ? Icons.gpp_bad_outlined : Icons.hourglass_top_outlined,
+                  size: 18, color: color),
+              const SizedBox(width: 6),
+              Text(
+                rejected ? '审核未通过' : '待平台审核',
+                style: TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w700, color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            rejected
+                ? '审核意见：${remark.isEmpty ? '平台未填写具体意见，请调整后重新提交。' : remark}'
+                : '任务已提交平台审核，审核通过后才会进入任务广场并开放接单。',
+            style: const TextStyle(fontSize: 12.5, height: 1.5),
+          ),
+          if (rejected && task.auditAt != null) ...[
+            const SizedBox(height: 4),
+            Text('审核时间：${_fmtDateTime(task.auditAt)}',
+                style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 最终作品入口：仅需求方、仅整单验收完成后可用，点进去看最后一轮交付的正文。
+  ///
+  /// 集数/门槛判定全在后端（非最后一轮、最后一轮未通过都会被拒），
+  /// 这里只负责把最后一轮的 stageId/stageOrder 拼进路由。
+  Widget _buildFinalWorkEntry(DemandTask task) {
+    final stages = ref.watch(demandStagesProvider(task.demandId!)).valueOrNull ??
+        const <DemandStage>[];
+    if (stages.isEmpty) {
+      return _hintBar('轮次信息加载中，稍后再试。');
+    }
+    final last = stages.last;
+    final stageId = last.stageId;
+    if (stageId == null) {
+      return _hintBar('该任务未配置验收轮次，无法查看最终作品。');
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => context.push(RoutePath.demandDeliverableWorkUrl(
+            task.demandId!, stageId, last.stageOrder ?? stages.length)),
+        icon: const Icon(Icons.menu_book_outlined),
+        label: const Text('查看最终作品'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
     );
   }
 
@@ -293,7 +415,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
   }
 
   /// 源剧本区块：给出关联作品/上传文件的现状，并入口到全本查阅页。
-  Widget _buildSourceScriptBlock(DemandTask task, {required bool isLoggedIn}) {
+  Widget _buildSourceScriptBlock(DemandTask task,
+      {required bool isLoggedIn, required bool isBuyer}) {
     final hasWork = (task.sourceWorkTitle ?? '').isNotEmpty;
     // 游客视图不带 sourceScriptUrl（后端白名单），只认文件名，否则会误报「尚未提供源剧本」
     final hasFile =
@@ -315,9 +438,11 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
           const SizedBox(height: 6),
           if (!hasWork && !hasFile)
             Text(
-              isLoggedIn
-                  ? '平台尚未提供源剧本（可能已失效），请联系平台补充后再接单。'
-                  : '登录后可查看平台提供的源剧本。',
+              !isLoggedIn
+                  ? '登录后可查看发布者提供的源剧本。'
+                  : isBuyer
+                      ? '您尚未提供源剧本（可能已失效），请编辑任务重新关联。'
+                      : '发布者尚未提供源剧本（可能已失效），请联系平台协调后再接单。',
               style: TextStyle(fontSize: 12.5, height: 1.5, color: Colors.red.shade600))
           else
             Text(
@@ -365,6 +490,8 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
   Widget _chip(String? status) {
     Color color;
     switch (status) {
+      case DemandStatus.pendingReview: color = Colors.orange;
+      case DemandStatus.rejected: color = Colors.red;
       case 'open': color = Colors.green;
       case 'in_progress': color = AppColors.text2;
       case 'completed': color = AppColors.primary;
@@ -375,32 +502,14 @@ class _DemandDetailPageState extends ConsumerState<DemandDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-      child: Text(_statusLabel(status),
+      child: Text(DemandStatus.label(status),
           style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
     );
   }
 
-  static String _statusLabel(String? status) {
-    switch (status) {
-      case 'open': return '待接单';
-      case 'in_progress': return '进行中';
-      case 'completed': return '已完成';
-      case 'selected': return '已选定';
-      case 'closed': return '已关闭';
-      case 'failed': return '已失败';
-      default: return status ?? '未知';
-    }
-  }
+  static String _fmtDate(DateTime? dt) => AppTime.formatDate(dt);
 
-  static String _fmtDate(DateTime? dt) {
-    if (dt == null) return '-';
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-  }
-
-  static String _fmtDateTime(DateTime? dt) {
-    if (dt == null) return '-';
-    return '${_fmtDate(dt)} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
+  static String _fmtDateTime(DateTime? dt) => AppTime.formatDateTime(dt);
 }
 
 /// 进行中倒计时条：只展示当前活动轮的剩余时间（后续轮次时限见下方验收面板）。

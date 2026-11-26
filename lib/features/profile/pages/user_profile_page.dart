@@ -7,6 +7,7 @@ import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/utils/avatar_url.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../../bookstore/data/bookstore_models.dart';
@@ -276,9 +277,9 @@ class _Header extends StatelessWidget {
   }
 
   static String _formatDate(String iso) {
-    final parsed = DateTime.tryParse(iso);
+    final parsed = AppTime.parse(iso);
     if (parsed == null) return iso;
-    return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+    return AppTime.formatDate(parsed);
   }
 }
 
@@ -301,6 +302,8 @@ class _FollowButton extends StatelessWidget {
                 side: const BorderSide(color: AppColors.divider),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: const Text('已关注'),
             )
@@ -311,6 +314,8 @@ class _FollowButton extends StatelessWidget {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 elevation: 0,
               ),
               child: const Text('+ 关注'),

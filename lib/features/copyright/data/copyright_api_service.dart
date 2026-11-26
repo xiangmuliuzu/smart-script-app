@@ -106,12 +106,53 @@ class CopyrightApiService {
   Future<CopyrightPayOrder> resubmitApplication(CopyrightResubmitDTO dto) =>
       createResubmitPayOrder(dto);
 
-  /// 临时直付：跳过支付宝沙箱，直接履约并提交第三方
+  /// 临时直付：跳过支付宝沙箱，直接履约并提交第三方（开发默认开启）
   ///
   /// POST /content/copyright/application/pay-order/{id}/direct-pay
   Future<CopyrightPaymentConfirm> directPay(int payOrderId) async {
     final data = await _client.post(
       '/content/copyright/application/pay-order/$payOrderId/direct-pay',
+      data: const <String, dynamic>{},
+    );
+    return CopyrightPaymentConfirm.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
+  }
+
+  /// 创建支付宝沙箱支付，返回收款二维码。
+  ///
+  /// POST /trade/copyright/{payOrderId}/pay
+  /// 若已支付，返回的 [CopyrightPaymentQr.qrCode] 为空，且 [alreadyPaid]/[applyId] 有值。
+  Future<CopyrightPaymentQr> createPayment(int payOrderId) async {
+    final data = await _client.post(
+      ApiEndpoints.tradeCopyrightPay(payOrderId),
+      data: const <String, dynamic>{},
+    );
+    final map = Map<String, dynamic>.from(data as Map);
+    if (map['paid'] == true) {
+      final applyId = map['applyId'] == null
+          ? null
+          : int.tryParse(map['applyId'].toString());
+      return CopyrightPaymentQr(
+        qrCode: '',
+        sandbox: true,
+        alreadyPaid: true,
+        applyId: applyId,
+      );
+    }
+    final qr = CopyrightPaymentQr.fromJson(map);
+    if (qr.qrCode.isEmpty) {
+      throw Exception('创建支付失败');
+    }
+    return qr;
+  }
+
+  /// 查询沙箱支付结果（等待用户扫码期间轮询）。
+  ///
+  /// POST /trade/copyright/{payOrderId}/confirm
+  Future<CopyrightPaymentConfirm> confirmPayment(int payOrderId) async {
+    final data = await _client.post(
+      ApiEndpoints.tradeCopyrightConfirm(payOrderId),
       data: const <String, dynamic>{},
     );
     return CopyrightPaymentConfirm.fromJson(
@@ -150,15 +191,6 @@ class CopyrightApiService {
     String? content,
   }) =>
       syncApplicationStatus(applyId);
-
-  /// @deprecated 沙箱支付已停用，请用 [directPay]
-  Future<CopyrightPaymentQr> createPayment(int payOrderId) async {
-    throw UnsupportedError('支付宝沙箱已停用，请使用 directPay');
-  }
-
-  /// @deprecated 沙箱支付已停用，请用 [directPay]
-  Future<CopyrightPaymentConfirm> confirmPayment(int payOrderId) =>
-      directPay(payOrderId);
 
   /// 删除版权申请（仅限pending状态）
   ///

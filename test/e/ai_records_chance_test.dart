@@ -84,7 +84,7 @@ const _writeRecords = [
   ),
 ];
 
-/// 可控假仓库：实现 writeRecords。
+/// 可控假仓库：实现 writeRecords（支持真实分页断言）。
 class _FakeRecordsRepo implements AiRepository {
   _FakeRecordsRepo({
     this.records = const [],
@@ -93,14 +93,24 @@ class _FakeRecordsRepo implements AiRepository {
 
   final List<AiWriteRecord> records;
   final bool fail;
+  final List<(int page, int pageSize)> calls = [];
 
   @override
   Future<AiPageResult<AiWriteRecord>> writeRecords({
     int page = 1,
     int pageSize = 20,
   }) async {
+    calls.add((page, pageSize));
     if (fail) throw ApiException('加载失败');
-    return AiPageResult(total: records.length, list: records);
+    final start = (page - 1) * pageSize;
+    if (start >= records.length) {
+      return AiPageResult(total: records.length, list: const []);
+    }
+    final end = (start + pageSize).clamp(0, records.length);
+    return AiPageResult(
+      total: records.length,
+      list: records.sublist(start, end),
+    );
   }
 
   @override
@@ -353,6 +363,79 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('记录加载失败'), findsOneWidget);
+    });
+
+    testWidgets('首屏仅加载前 20 条，下滑到底部才加载下一页', (tester) async {
+      tester.view.physicalSize = const Size(412, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final allRecords = List<AiWriteRecord>.generate(
+        25,
+        (i) => AiWriteRecord(
+          recordId: 100 - i,
+          title: '第 ${i + 1} 条创作记录',
+          writeType: 'write',
+          inputPrompt: '输入 ${i + 1}',
+          outputContent: '输出 ${i + 1}',
+          wordCount: 100,
+          createdAt: '2026-11-25 10:${(59 - i).toString().padLeft(2, '0')}',
+        ),
+      );
+      final fake = _FakeRecordsRepo(records: allRecords);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [aiRepositoryProvider.overrideWithValue(fake)],
+          child: const MaterialApp(home: AiRecordPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 首屏只发一次请求且 pageSize = 20，不显示左上角「已加载 X / Y 条」
+      expect(fake.calls, [(1, 20)]);
+      expect(find.text('第 1 条创作记录'), findsOneWidget);
+      expect(find.textContaining('已加载 20'), findsNothing);
+
+      // 下滑到底部触发加载第 2 页
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+
+      expect(fake.calls, [(1, 20), (2, 20)]);
+      await tester.drag(find.byType(ListView), const Offset(0, -1500));
+      await tester.pumpAndSettle();
+      expect(find.text('第 25 条创作记录'), findsOneWidget);
+      expect(find.text('已加载全部记录'), findsOneWidget);
+    });
+
+    testWidgets('记录管理模式下选择框与记录标题不重合且点击可勾选', (tester) async {
+      tester.view.physicalSize = const Size(412, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final fake = _FakeRecordsRepo(records: _writeRecords);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [aiRepositoryProvider.overrideWithValue(fake)],
+          child: const MaterialApp(home: AiRecordPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('记录管理'));
+      await tester.pumpAndSettle();
+
+      final firstCheckbox = find.byType(Checkbox).first;
+      final firstTitle = find.text('大纲测试主题');
+      final checkboxRect = tester.getRect(firstCheckbox);
+      final titleRect = tester.getRect(firstTitle);
+
+      // 选择框完全位于标题左侧，不重叠
+      expect(checkboxRect.right, lessThanOrEqualTo(titleRect.left));
+
+      await tester.tap(firstCheckbox);
+      await tester.pumpAndSettle();
+      expect(find.text('删除所选 1'), findsOneWidget);
     });
   });
 }

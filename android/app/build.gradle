@@ -22,6 +22,23 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// 应用内更新的前提交：所有版本必须用同一把钥匙签名，否则新包覆盖安装会失败。
+// 把 keystore 放在 android/ 下，并新建 android/key.properties（不要提交）：
+//   storeFile=release.keystore
+//   storePassword=...
+//   keyAlias=...
+//   keyPassword=...
+// 换打包机时可以用环境变量指向别处的 key.properties（keystore 本身不进仓库）：
+//   set SMARTSCRIPT_KEY_PROPERTIES=C:\Users\<你>\smartscript-signing\key.properties
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file(
+        System.getenv('SMARTSCRIPT_KEY_PROPERTIES') ?: 'key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.example.script_app"
     compileSdk flutter.compileSdkVersion
@@ -40,16 +57,34 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.example.script_app"
         manifestPlaceholders.appLabel = "剧本创作"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion flutter.minSdkVersion
+        // 扫一扫（mobile_scanner 4.x / MLKit）要求 minSdk ≥ 21；
+        // Flutter 3.19 的默认值仍是 19，这里显式抬到 21（Android 5.0）。
+        minSdkVersion 21
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+    }
+
+    buildFeatures {
+        // 应用内更新需要读取本机 versionCode（MainActivity 用 BuildConfig.VERSION_CODE）。
+        buildConfig true
     }
 
     buildTypes {
@@ -60,9 +95,11 @@ android {
             }
         }
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
+            // 配了 key.properties 就用正式 keystore；没配时下面 taskGraph 检查会直接让 release 构建失败，
+            // 避免打出一个签名不一致、用户无法覆盖升级的包。
+            signingConfig keystorePropertiesFile.exists()
+                    ? signingConfigs.release
+                    : signingConfigs.debug
         }
     }
 }
@@ -72,3 +109,20 @@ flutter {
 }
 
 dependencies {}
+
+// 应用内更新的前提交：发布包必须用正式 keystore 签名。
+// 缺签名时只让 release 相关任务失败（debug / flutter run 照常），
+// 本地确实想用 debug 签名试跑 release 时设环境变量 SMARTSCRIPT_ALLOW_DEBUG_SIGNING=1。
+gradle.taskGraph.whenReady { graph ->
+    boolean wantsRelease = graph.allTasks.any {
+        it.project == project && it.name.toLowerCase().contains('release')
+    }
+    boolean allowDebugSigning = System.getenv('SMARTSCRIPT_ALLOW_DEBUG_SIGNING') == '1'
+    if (wantsRelease && !keystorePropertiesFile.exists() && !allowDebugSigning) {
+        throw new GradleException(
+                "缺少 release 签名配置: ${keystorePropertiesFile}\n" +
+                "发布包必须与已安装版本同签名，否则用户无法覆盖升级。\n" +
+                "请生成 keystore 并创建 key.properties（或用 SMARTSCRIPT_KEY_PROPERTIES 指向已有文件），" +
+                "仅在本地试跑时可用 SMARTSCRIPT_ALLOW_DEBUG_SIGNING=1 强制使用 debug 签名。")
+    }
+}

@@ -105,11 +105,13 @@ class ApiClient {
     String path, {
     dynamic data,
     Duration? receiveTimeout,
+    CancelToken? cancelToken,
   }) async {
     try {
       final resp = await _dio.post<ResponseBody>(
         path,
         data: data,
+        cancelToken: cancelToken,
         options: Options(
           responseType: ResponseType.stream,
           headers: const {'Accept': 'text/event-stream'},

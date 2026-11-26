@@ -2,6 +2,7 @@
 ///
 /// 字段对齐后端 domain：ChatSession / ChatMessage。
 /// 会话类型：ADMIN（用户与管理员沟通）/ TRADE（买卖双方交易沟通）/ DEMAND（平台运营与创作者就某任务沟通）。
+import '../../../core/utils/app_time.dart';
 
 // ==================== 会话类型 ====================
 
@@ -18,7 +19,7 @@ class SessionType {
       case trade: return '交易会话';
       case demand: return '任务会话';
       case chat: return '咨询会话';  // 旧 CHAT 类型归入咨询
-      default: return type ?? '未知';
+      default: return '未知';
     }
   }
 
@@ -205,6 +206,11 @@ class ChatMessage {
     this.content = '',
     this.msgType = MessageType.text,
     this.isRead = false,
+    this.recalled = false,
+    this.quoteMessageId,
+    this.quoteSender,
+    this.quoteText,
+    this.quoteRecalled = false,
     this.createdAt,
   });
 
@@ -216,6 +222,11 @@ class ChatMessage {
   final String content;
   final String msgType;   // TEXT / SYSTEM
   final bool isRead;
+  final bool recalled;    // 是否已被发送者撤回
+  final int? quoteMessageId;  // 被引用（回复）的消息ID，null=普通消息
+  final String? quoteSender;  // 被引消息发送者昵称快照
+  final String? quoteText;    // 被引消息内容快照；原文撤回后后端不再下发
+  final bool quoteRecalled;   // 被引原文是否已被撤回
   final DateTime? createdAt;
 
   bool get isSystem => msgType == MessageType.system;
@@ -232,22 +243,18 @@ class ChatMessage {
     content: json['content'] as String? ?? '',
     msgType: json['msgType'] as String? ?? MessageType.text,
     isRead: json['isRead'] as bool? ?? false,
+    recalled: json['recalled'] as bool? ?? false,
+    quoteMessageId: (json['quoteMessageId'] as num?)?.toInt(),
+    quoteSender: json['quoteSender'] as String?,
+    quoteText: json['quoteText'] as String?,
+    quoteRecalled: json['quoteRecalled'] as bool? ?? false,
     createdAt: _parseDateTime(json['createdAt']),
   );
 }
 
 // ==================== 工具函数 ====================
 
-DateTime? _parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is String && value.isNotEmpty) {
-    return DateTime.tryParse(value);
-  }
-  if (value is int) {
-    return DateTime.fromMillisecondsSinceEpoch(value);
-  }
-  return null;
-}
+DateTime? _parseDateTime(dynamic value) => AppTime.parse(value);
 
 // ==================== 交易会话定型文模板 ====================
 

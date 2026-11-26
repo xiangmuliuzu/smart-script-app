@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/router/auth_guard.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
+import '../data/demand_providers.dart';
 import 'demand_list_page.dart';
 import 'demand_my_tasks_page.dart';
 
 /// 底部导航「任务」板块根页面（任务广场大板块）。
 ///
-/// 结构：AppBar（标题）→ 分段 TabBar「广场 / 我的任务」→ 分段正文。
-/// 两个分段各是独立组件，本页只做装配与跨分段刷新。
+/// 结构：AppBar（标题 + 发布入口）→ 分段 TabBar「广场 / 我的任务」→ 分段正文。
+/// 两个分段各是独立组件，本页只做装配与跨分段刷新：
+/// 发布/接单流程 pop 回来后同时重拉列表与统计，避免卡片停在陈旧状态。
 ///
-/// 游客可见：广场分段直接浏览（后端对游客返回字段白名单）；
-/// 「我的任务」分段需要登录，未登录时只渲染登录引导占位，
+/// 游客可见：广场分段直接浏览（后端对游客返回字段白名单，审核态根本进不了广场）；
+/// 「我的任务」分段与发布动作需要登录，未登录时只渲染登录引导占位，
 /// 绝不发起 mine 请求——App 的 ApiClient 对任何 401 都按会话过期处理，
 /// 游客误触发会被踢去登录页。
 class TaskSquarePage extends ConsumerStatefulWidget {
@@ -60,6 +63,18 @@ class _TaskSquarePageState extends ConsumerState<TaskSquarePage>
     AuthGuard.requireLogin(context, ref, target: RoutePath.demandTab);
   }
 
+  /// 发布入口：过登录守卫后推发布页，pop 回来刷新广场与我的任务两个分段。
+  Future<void> _publishTask() async {
+    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.demandPost)) {
+      return;
+    }
+    await context.push(RoutePath.demandPost);
+    if (!mounted) return;
+    ref.invalidate(demandStatsProvider);
+    _squareKey.currentState?.reload();
+    _myTasksKey.currentState?.reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     // watch 而非 read：登录态在页面停留期间恢复/变更时，分段内容要跟着重算
@@ -79,6 +94,17 @@ class _TaskSquarePageState extends ConsumerState<TaskSquarePage>
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
+        actions: [
+          // 常驻发布入口：广场分段的 Hero 里也有同款 CTA，这里只留图标避免两处同字重
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.add_task_outlined, color: AppColors.text2),
+              tooltip: '发布任务',
+              onPressed: _publishTask,
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: AppColors.primary,
@@ -96,7 +122,7 @@ class _TaskSquarePageState extends ConsumerState<TaskSquarePage>
       body: TabBarView(
         controller: _tabCtrl,
         children: [
-          DemandSquareSection(key: _squareKey),
+          DemandSquareSection(key: _squareKey, onPublish: _publishTask),
           loggedIn
               ? DemandMyTasksSection(key: _myTasksKey)
               : _buildLoginRequired(),
@@ -111,7 +137,7 @@ class _TaskSquarePageState extends ConsumerState<TaskSquarePage>
       children: [
         const SizedBox(height: 96),
         const EmptyView(
-          message: '登录后即可查看我接取的任务',
+          message: '登录后即可查看我发布 / 我接取的任务',
           icon: Icons.lock_outline,
         ),
         const SizedBox(height: 8),

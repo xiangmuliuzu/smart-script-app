@@ -10,6 +10,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_time.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../shared/widgets/common_views.dart';
@@ -382,15 +383,14 @@ class OrderDetailPage extends ConsumerWidget {
 
     // 待签署：显示合同签署入口（双方签满后后端自动进入付款中）
     if (status == OrderStatus.confirmed) {
-      return _buildContractSignBar(context, ref, order);
+      return _buildContractSignBar(context, ref, order, isBuyer);
     }
 
-    // 付款中：买方付款，卖方等待（无版权单无合同，文案分流）；未付款前双方均可取消
+    // 付款中：买方付款并可取消；卖方只等待，无取消入口
     if (status == OrderStatus.paying) {
       if (isBuyer) return _buildPayBar(context, ref, order);
       return _buildContactBar(context, ref, order, isBuyer,
-          order.contractId == null ? '订单已达成，等待买方付款（本交易未签合同）' : '合同已签署，等待买方付款',
-          extra: _cancelButton(context, ref, order));
+          order.contractId == null ? '订单已达成，等待买方付款（本交易未签合同）' : '合同已签署，等待买方付款');
     }
 
     // 交割中：按交割单状态区分上传 / 待确认
@@ -458,7 +458,7 @@ class OrderDetailPage extends ConsumerWidget {
     return const SizedBox.shrink();
   }
 
-  /// 取消订单入口按钮（confirmed 与未付款 paying 均可发起，买卖双方任一方）
+  /// 取消订单入口按钮（仅买方，confirmed 与未付款 paying 可发起）
   Widget _cancelButton(BuildContext context, WidgetRef ref, Order order) {
     return SizedBox(
       width: double.infinity,
@@ -476,8 +476,8 @@ class OrderDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 合同签署栏：查看并签署合同
-  Widget _buildContractSignBar(BuildContext context, WidgetRef ref, Order order) {
+  /// 合同签署栏：查看并签署合同；仅买方可在付款前取消订单
+  Widget _buildContractSignBar(BuildContext context, WidgetRef ref, Order order, bool isBuyer) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: const BoxDecoration(
@@ -508,8 +508,8 @@ class OrderDetailPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // 取消订单：签署完成前与付款前均可发起，买卖双方任一方
-            _cancelButton(context, ref, order),
+            // 取消订单：仅买方在付款前可发起，卖方无取消入口
+            if (isBuyer) _cancelButton(context, ref, order),
           ],
         ),
       ),
@@ -708,20 +708,42 @@ class OrderDetailPage extends ConsumerWidget {
       if (!context.mounted) return;
       // 服务端发现旧收款码其实已付款时会直接结算并返回 paid，此时无需再弹码
       bool paid = data['paid'] == true;
+      final qrCode = data['qrCode'];
+      if (!paid && (data['sandbox'] != true || qrCode is! String || qrCode.isEmpty)) {
+        throw StateError('支付宝沙箱暂不可用');
+      }
       if (!paid) {
         paid = await showDialog<bool>(
           context: context,
-          builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: data['qrCode'] as String),
+          builder: (dialogContext) => _SandboxPaymentDialog(orderId: id, qrCode: qrCode),
         ) ??
             false;
       }
       if (paid && context.mounted) {
-        showAppToast(context, '沙箱支付已确认，订单进入交割');
+        showAppToast(context, '付款完成，订单进入交割');
         ref.invalidate(appOrderDetailProvider(id));
         ref.invalidate(deliveryByOrderProvider(id));
       }
     } catch (e) {
-      if (context.mounted) showAppToast(context, '发起沙箱支付失败：$e');
+      if (!context.mounted) return;
+      final message = e.toString();
+      if (!RegExp(r'沙箱.*(未配置|尚未配置|不可用|失败)').hasMatch(message)) {
+        showAppToast(context, '发起沙箱支付失败：$e');
+        return;
+      }
+      final paid = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => _SandboxPaymentDialog(
+          orderId: id,
+          qrCode: '',
+          sandboxAvailable: false,
+        ),
+      ) ?? false;
+      if (paid && context.mounted) {
+        showAppToast(context, '付款完成，订单进入交割');
+        ref.invalidate(appOrderDetailProvider(id));
+        ref.invalidate(deliveryByOrderProvider(id));
+      }
     }
   }
 
@@ -772,11 +794,7 @@ class OrderDetailPage extends ConsumerWidget {
     }
   }
 
-  String _formatDateTime(DateTime? dt) {
-    if (dt == null) return '-';
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
+  String _formatDateTime(DateTime? dt) => AppTime.formatDateTime(dt);
 }
 
 /// 合同内容全屏展示页（WebView 渲染 HTML，含签名/印章图片）。
@@ -876,9 +894,14 @@ class _ContractContentViewState extends State<_ContractContentView> {
 }
 
 class _SandboxPaymentDialog extends ConsumerStatefulWidget {
-  const _SandboxPaymentDialog({required this.orderId, required this.qrCode});
+  const _SandboxPaymentDialog({
+    required this.orderId,
+    required this.qrCode,
+    this.sandboxAvailable = true,
+  });
   final int orderId;
   final String qrCode;
+  final bool sandboxAvailable;
   @override
   ConsumerState<_SandboxPaymentDialog> createState() => _SandboxPaymentDialogState();
 }
@@ -895,6 +918,7 @@ class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
   @override
   void initState() {
     super.initState();
+    if (!widget.sandboxAvailable) return;
     _pollTimer = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _check(silent: true),
@@ -961,42 +985,66 @@ class _SandboxPaymentDialogState extends ConsumerState<_SandboxPaymentDialog> {
       if (mounted) setState(() => _refreshing = false);
     }
   }
+  Future<void> _directPay() async {
+    if (_busy) return;
+    setState(() { _busy = true; _message = null; });
+    try {
+      await ref.read(tradeRepositoryProvider).appDirectPayOrder(widget.orderId);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) setState(() { _busy = false; _message = '测试直付失败：$e'; });
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('支付宝沙箱支付'),
+    title: Text(widget.sandboxAvailable ? '支付宝沙箱支付' : '订单支付'),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Text('测试支付，不会产生真实资金。请使用另一台设备上的支付宝沙箱钱包扫码。'),
+      Text(
+        widget.sandboxAvailable
+            ? '测试支付，不会产生真实资金。请使用另一台设备上的支付宝沙箱钱包扫码。'
+            : '支付宝沙箱暂不可用，可点击下方「跳过支付」继续交易流程。',
+        style: const TextStyle(fontSize: 13, height: 1.5),
+      ),
       const SizedBox(height: 12),
-      // QrImageView 内部用 LayoutBuilder，AlertDialog 量固有宽度时会抛异常导致弹窗不显示，
-      // 这里直接用 QrPainter 绘制固定尺寸。
-      Container(
-        width: 200,
-        height: 200,
-        color: Colors.white,
-        child: CustomPaint(
-          painter: QrPainter(
-            data: _qrCode,
-            version: QrVersions.auto,
-            gapless: true,
+      if (widget.sandboxAvailable) ...[
+        // QrImageView 内部用 LayoutBuilder，AlertDialog 量固有宽度时会抛异常导致弹窗不显示，
+        // 这里直接用 QrPainter 绘制固定尺寸。
+        Container(
+          width: 200,
+          height: 200,
+          color: Colors.white,
+          child: CustomPaint(
+            painter: QrPainter(
+              data: _qrCode,
+              version: QrVersions.auto,
+              gapless: true,
+            ),
           ),
         ),
-      ),
-      TextButton.icon(
-        onPressed: (_busy || _refreshing) ? null : _refresh,
-        icon: const Icon(Icons.refresh, size: 16),
-        label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.text1,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          visualDensity: VisualDensity.compact,
+        TextButton.icon(
+          onPressed: (_busy || _refreshing) ? null : _refresh,
+          icon: const Icon(Icons.refresh, size: 16),
+          label: Text(_refreshing ? '生成新码中…' : '刷新二维码'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.text1,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            visualDensity: VisualDensity.compact,
+          ),
         ),
-      ),
-      Text(_message ?? '等待支付结果…扫码完成后会自动确认',
-          style: TextStyle(fontSize: 12, color: _message == null ? Colors.grey.shade600 : Colors.red.shade600)),
+      ],
+      if (_message != null)
+        Text(_message!,
+            style: TextStyle(fontSize: 12, color: Colors.red.shade600))
+      else if (widget.sandboxAvailable)
+        const Text('等待支付结果…扫码完成后会自动确认',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
     ])),
     actions: [
       TextButton(onPressed: _checking ? null : () => Navigator.pop(context, false), child: const Text('关闭')),
-      TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '我已完成支付')),
+      TextButton(onPressed: _busy ? null : _directPay, child: const Text('跳过支付（测试直付）')),
+      if (widget.sandboxAvailable)
+        TextButton(onPressed: _checking ? null : _check, child: Text(_checking ? '查询中…' : '我已完成支付')),
     ],
   );
 }

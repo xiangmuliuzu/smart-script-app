@@ -14,6 +14,7 @@ import '../ai_quota_dialog.dart';
 import '../data/ai_providers.dart';
 import '../data/ai_repository.dart';
 import '../data/script_outline.dart';
+import '../data/outline_sections.dart';
 import 'ai_model_selector.dart';
 import 'ai_skill_selector.dart';
 
@@ -69,7 +70,7 @@ class AiInlinePanel extends ConsumerStatefulWidget {
   ConsumerState<AiInlinePanel> createState() => _AiInlinePanelState();
 }
 
-enum _AiTab { outline, write, polish, storyboard }
+enum _AiTab { outline, polish, storyboard }
 
 class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   _AiTab _tab = _AiTab.outline;
@@ -81,7 +82,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   // 故事灵感讲「讲什么」，你的要求讲「怎么写」，两个字段分开传给大纲接口。
   final _idea = TextEditingController();
   final _genre = TextEditingController();
-  final _episodes = TextEditingController(text: '12');
+  final _episodes = TextEditingController(text: '3');
   // 一集时长（分钟）：1 / 1.5 / 2，默认 1，与 PC 用户端同一口径。
   double _episodeMinutes = 1;
 
@@ -112,6 +113,9 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   /// 卷级状态快照（每 10 集一卷）：续写只注入「本卷 + 上卷」，替代整份台账。
   Map<int, String> _volumes = const {};
 
+  /// 时间线事件（只追加）：约定/伏笔/道具转移等，按集号倒序，未兑现优先注入。
+  List<Map<String, dynamic>> _timeline = const [];
+
   @override
   void initState() {
     super.initState();
@@ -119,6 +123,19 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     _loadOutline();
     _loadLedger();
     _loadVolumes();
+    _loadTimeline();
+  }
+
+  /// 读取时间线事件；未生成或网络失败都静默跳过（少一层上下文，不影响续写）。
+  Future<void> _loadTimeline() async {
+    if (widget.workId <= 0) return;
+    try {
+      final rows = await ref.read(aiRepositoryProvider).workTimeline(widget.workId);
+      if (!mounted) return;
+      setState(() => _timeline = rows);
+    } catch (_) {
+      // 时间线读不到不阻塞续写。
+    }
   }
 
   Future<void> _loadOutline() async {
@@ -281,6 +298,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
   /// 台账块：六类各取尾部；按本集出场人物筛选人物卡与关系，其余四类全量。
   String _ledgerBlock({List<String> cast = const []}) {
     const labels = <String, String>{
+      'styleGuide': '写法基线／文体锁定（沿用，不得改）',
       'characters': '本集出场人物',
       'relations': '相关关系',
       'foreshadow': '伏笔（埋在哪集/是否回收）',
@@ -289,6 +307,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       'threads': '未解线索',
     };
     const budgets = <String, int>{
+      'styleGuide': 300,
       'characters': 700,
       'relations': 400,
       'foreshadow': 300,
@@ -345,6 +364,52 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     return parts.join('\n\n');
   }
 
+  /// 时间线块：未兑现优先 + 最近事件，与 PC/后端同一格式。
+  String _timelineBlock(int beforeNo) {
+    if (_timeline.isEmpty) return '';
+    final eligible = _timeline
+        .where((e) => ((e['chapterNo'] as num?)?.toInt() ?? 0) < beforeNo)
+        .toList();
+    if (eligible.isEmpty) return '';
+    final open =
+        eligible.where((e) => '${e['status'] ?? ''}' == '未兑现').take(12);
+    final recent = eligible.take(8);
+    final seen = <String>{};
+    final lines = <String>[];
+    for (final e in [...open, ...recent]) {
+      final key = '${e['eventId'] ?? '${e['chapterNo']}-${e['seq']}'}';
+      if (!seen.add(key)) continue;
+      final actors = '${e['actors'] ?? ''}'.trim();
+      final status = '${e['status'] ?? '未兑现'}';
+      final deadlineNo = (e['deadlineNo'] as num?)?.toInt();
+      final deadline = status == '未兑现' && deadlineNo != null && deadlineNo > 0
+          ? '，应在第$deadlineNo集兑现'
+          : '';
+      lines.add(
+        '第${e['chapterNo']}集｜${e['eventType'] ?? '其他'}｜${e['fact'] ?? ''}'
+        '${actors.isEmpty ? '' : '｜$actors'}（$status$deadline）',
+      );
+    }
+    if (lines.isEmpty) return '';
+    return '【时间线（已发生的事实，不可改写；括号内为状态）】\n'
+        '${lines.join('\n')}\n'
+        '未兑现的约定/伏笔/期限，如果本集剧情能自然兑现，优先兑现；不能自然兑现就保留，不许硬收。';
+  }
+
+  /// 本集之前最近一章有正文的末尾（≤800 字）；空占位章直接跳过，与后台队列同口径。
+  String _previousTailBefore(List<AuthorChapterItem> chapters, int no) {    AuthorChapterItem? previous;
+    for (final chapter in chapters) {
+      if (chapter.chapterNo >= no) continue;
+      if (chapter.content.trim().isEmpty) continue;
+      if (previous == null || chapter.chapterNo > previous.chapterNo) {
+        previous = chapter;
+      }
+    }
+    final text = (previous?.content ?? '').trim();
+    if (text.isEmpty) return '';
+    return text.length > 800 ? text.substring(text.length - 800) : text;
+  }
+
   /// 组装 AI 续写提示词（与 PC 内嵌「AI 续写」同一口径）：
   /// 本集事件卡 + 创作台账 + 上一章末尾 + 本集已有正文 + 续写要求。
   /// 正文过长时只取末尾 1500 字作为承接上下文（压缩注入，给模型留足输出额度）。
@@ -360,6 +425,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       _episodeNoFromTitle(title),
     );
     final volume = _volumeBlock();
+    final timeline = _timelineBlock(_episodeNoFromTitle(title));
     final summaries = (widget.previousSummaries?.call() ?? '').trim();
     final previous = (widget.previousChapter?.call() ?? '').trim();
     final parts = <String>[];
@@ -369,6 +435,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     if (summaries.isNotEmpty) parts.add(summaries);
     if (ledger.isNotEmpty) parts.add(ledger);
     if (schedule.isNotEmpty) parts.add(schedule);
+    if (timeline.isNotEmpty) parts.add(timeline);
     if (previous.isNotEmpty) {
       parts.add('【上一章末尾（承接语气与处境，勿重复）】\n$previous');
     }
@@ -394,31 +461,28 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       return;
     }
     final requiredEmpty = switch (_tab) {
-      _AiTab.outline =>
-        _idea.text.trim().isEmpty && _inspiration.text.trim().isEmpty,
-      _AiTab.write => _prompt.text.trim().isEmpty,
+      _AiTab.outline => false,
       _AiTab.polish => _content.text.trim().isEmpty,
       _AiTab.storyboard => _script.text.trim().isEmpty,
     };
     if (!feedbackMode && requiredEmpty) {
       final hint = switch (_tab) {
-        _AiTab.outline => '请先填写故事灵感（或你的要求）',
-        _AiTab.write => '请先输入续写要求',
+        _AiTab.outline => '请先填写你的要求',
         _AiTab.polish => '请先填写或粘贴需要润色的内容',
         _AiTab.storyboard => '请先填写或粘贴剧本文本',
       };
       showAppToast(context, hint);
       return;
     }
-    // 集数口径与 PC 用户端一致：1–50 的整数（单部作品硬上限 50 集），默认 12。
+    // 续写集数 1–10（与起稿页上限一致，只作用于续写这次要新增的集数）。
     final episodes = int.tryParse(_episodes.text.trim()) ?? 0;
     if (!feedbackMode &&
         _tab == _AiTab.outline &&
-        (episodes < 1 || episodes > 50)) {
-      showAppToast(context, '集数需为 1–50 的整数');
+        (episodes < 1 || episodes > 10)) {
+      showAppToast(context, '续写集数需为 1–10 的整数');
       return;
     }
-    final episodeCount = (episodes >= 1 && episodes <= 50) ? episodes : 12;
+    final episodeCount = (episodes >= 1 && episodes <= 10) ? episodes : 3;
 
     setState(() {
       _loading = true;
@@ -439,30 +503,50 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       var truncated = false;
       switch (_tab) {
         case _AiTab.outline:
-          final ideaText = _idea.text.trim();
+          final outlineText = _scriptOutline.trim();
           final askText = _inspiration.text.trim();
+          // 续写起点：已有大纲最大集号与已有正文章数取大者 +1。
+          var maxNo = 0;
+          for (final ep in parseScriptOutline(outlineText)) {
+            if (ep.no > maxNo) maxNo = ep.no;
+          }
+          final chapters = ref
+                  .read(authorWorkDetailProvider(widget.workId))
+                  .valueOrNull
+                  ?.chapters ??
+              const <AuthorChapterItem>[];
+          for (final chapter in chapters) {
+            if (chapter.chapterNo > maxNo) maxNo = chapter.chapterNo;
+          }
+          final startNo = maxNo + 1;
+          final ledgerText = _ledgerBlock();
           final brief = [
-            if (ideaText.isNotEmpty) '故事灵感：\n$ideaText',
-            if (askText.isNotEmpty) '写法要求：\n$askText',
-          ].join('\n');
+            '这是一次「续写」，不是重新起稿：下面给出的创作资料与已有剧本大纲都属于既定内容，必须沿用，不得改写、不得重写、不得重复输出。',
+            if (ledgerText.isNotEmpty) ledgerText,
+            if (outlineText.isNotEmpty)
+              '【已有剧本大纲（已写过的事件卡，禁止重复输出）】\n'
+                  '${outlineText.length > 9000 ? outlineText.substring(outlineText.length - 9000) : outlineText}',
+            if (askText.isNotEmpty) '你的要求：\n$askText',
+          ].join('\n\n');
           final core = feedbackMode
-              ? '$brief\n上一版大纲（大体满意，请在保留整体结构与事件走向的前提下按修改意见调整）：\n'
-                  '${previous.length > 12000 ? previous.substring(0, 12000) : previous}\n'
+              ? '$brief\n上一版续写结果（只保留新增的这几集，按修改意见调整）：\n'
+                  '${previous.length > 8000 ? previous.substring(0, 8000) : previous}\n'
                   '修改意见：${feedback.trim()}'
               : brief;
           final minuteLabel =
               _episodeMinutes == 1.5 ? '1.5 分钟' : '${_episodeMinutes.toInt()} 分钟';
           final result = await repo.outlineStream(
             inspiration: '$core\n'
-                '请按下面格式写 $episodeCount 集分集事件卡，从第1集起连续编号：\n'
-                '第1集：事件名\n本集事件：……\n冲突与推进：……\n'
+                '请只输出第$startNo集起、连续 $episodeCount 集的分集事件卡，已有集不要重复。\n'
+                '如需新增人物或人物状态变化，先在开头写一段「人物增补」，格式：姓名：身份 / 变化；没有就省略。\n'
+                '分集事件卡格式：\n'
+                '第$startNo集：事件名\n开场承接：……\n本集事件：……\n冲突与推进：……\n'
                 '结果或反转：……\n结尾钩子：……\n'
-                '每集是一件完整的事（有开场、交锋、结果），结尾钩子要具体；'
-                '不要写场景头、镜号、景别、运镜。\n'
-                '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋，'
-                '不要塞进多天多地的内容。',
-            genre: _genre.text.trim(),
-            style: '共 $episodeCount 集，每集 $minuteLabel',
+                '「开场承接」写清上一集停在哪、本集从哪个动作接起、隔了多久；换场要写明理由。\n'
+                '每集按一集 $minuteLabel 的短剧容量写：一集只承载一个场景或一次交锋；'
+                '不写场景头、镜号、景别、运镜；事件卡只写叙事摘要，不写成「角色名：台词」的剧本体。',
+            genre: '',
+            style: '续写 $episodeCount 集，每集 $minuteLabel',
             skillId: _skillId,
             model: _model,
             onDelta: onDelta,
@@ -470,31 +554,6 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           text = result.outlineText;
           _quotaUsed = result.quotaUsed;
           if (text.trim().isEmpty) emptyHint = '未生成剧本大纲，请重试';
-          break;
-        case _AiTab.write:
-          final promptText = feedbackMode
-              ? '上一版正文：\n$previous\n修改意见：${feedback.trim()}\n'
-                  '请按修改意见重写这一集：700-900 字，只写这一集，结尾留具体钩子。'
-              : _buildWritePrompt();
-          // 规则版生成后核查（模型档暂缓）：只提示，不阻断。
-          if (!feedbackMode &&
-              _scriptOutline.trim().isNotEmpty &&
-              _episodeCard().isEmpty) {
-            showAppToast(context, '生成后核查：大纲里没找到本集事件卡，续写可能偏离大纲，建议先在大纲里补齐本集');
-          }
-          final result = await repo.writeStream(
-            prompt: promptText,
-            type: _type.text.trim(),
-            skillId: _skillId,
-            model: _model,
-            onDelta: onDelta,
-          );
-          text = result.content;
-          truncated = result.truncated;
-          if (text.trim().isEmpty) emptyHint = '未生成内容，请重试';
-          if (mounted && text.trim().isNotEmpty && text.trim().length < 500) {
-            showAppToast(context, '生成后核查：本集正文不足 500 字，建议补写完整事件与结尾钩子');
-          }
           break;
         case _AiTab.polish:
           final contentText = feedbackMode
@@ -729,16 +788,20 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     return text;
   }
 
-  /// 把当前 AI 剧本结果存进作品级剧本大纲（已有不同内容时先确认覆盖）。
-  /// 故事简介、主要人物、人物关系属于创作资料，不写进大纲，只存分集事件卡。
+  /// 把「AI 剧本续写」结果并入创作资料：事件卡按集号并入本机大纲，
+  /// 简介更新、人物按姓名增量合并、人物关系逐行追加，不整段覆盖已有内容。
   Future<void> _createOutline() async {
     final text = _result.trim();
     if (text.isEmpty) {
       showAppToast(context, '还没有生成结果，请先完整生成一次');
       return;
     }
-    final outlineText = extractOutlineOnly(text);
-    if (outlineText.isEmpty) {
+    final sections = splitOutlineSections(text);
+    var outlineText = sections.outline;
+    if (outlineText.isEmpty) outlineText = extractOutlineOnly(text);
+    if (outlineText.isEmpty &&
+        sections.characters.isEmpty &&
+        sections.summary.isEmpty) {
       showAppToast(context, '结果里没有识别到「第N集：事件名」的分集事件卡，请重新生成');
       return;
     }
@@ -746,30 +809,56 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       showAppToast(context, '未识别作品，无法保存剧本大纲');
       return;
     }
-    final saved = _scriptOutline.trim();
-    if (saved.isNotEmpty && saved != outlineText) {
-      final replace = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('覆盖剧本大纲'),
-          content: const Text('剧本大纲里已有内容，覆盖后原内容不再保留。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('覆盖'),
-            ),
-          ],
-        ),
-      );
-      if (!mounted || replace != true) return;
+    // 事件卡按集号合并：同号替换、新号追加，已有集不会重复也不会被删。
+    final merged = outlineText.isEmpty
+        ? _scriptOutline
+        : mergeScriptOutline(_scriptOutline, outlineText);
+    await saveScriptOutline(widget.workId, merged);
+    // 台账写回：简介更新、人物按姓名合并、关系逐行追加。
+    var ledgerSaved = false;
+    try {
+      final ledger =
+          Map<String, String>.from(await ref.read(aiRepositoryProvider).workLedger(widget.workId));
+      final summary = sections.summary.trim();
+      if (summary.isNotEmpty &&
+          !RegExp(r'^[（(]?沿用原简介').hasMatch(summary)) {
+        ledger['storySummary'] = summary;
+      }
+      if (sections.characters.isNotEmpty) {
+        ledger['characters'] =
+            mergeCharacterText(ledger['characters'] ?? '', sections.characters);
+      }
+      final relations = sections.relations.trim();
+      if (relations.isNotEmpty) {
+        final known = (ledger['relations'] ?? '')
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty)
+            .toSet();
+        final added = relations
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty && !known.contains(line))
+            .join('\n');
+        if (added.isNotEmpty) {
+          ledger['relations'] = [
+            (ledger['relations'] ?? '').trim(),
+            added,
+          ].where((item) => item.isNotEmpty).join('\n');
+        }
+      }
+      await ref.read(aiRepositoryProvider).saveWorkLedger(widget.workId, ledger);
+      ledgerSaved = true;
+    } catch (_) {
+      // 台账保存失败不阻断大纲合并，提示后可稍后重试。
     }
-    await saveScriptOutline(widget.workId, outlineText);
     if (!mounted) return;
-    setState(() => _scriptOutline = outlineText);
+    setState(() => _scriptOutline = merged);
+    showAppToast(
+        context,
+        ledgerSaved
+            ? '已并入剧本大纲与人物便签（按集号/姓名合并）'
+            : '已并入剧本大纲；人物便签保存失败，请稍后重试');
     await _editOutline();
   }
 
@@ -787,7 +876,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
             minLines: 8,
             maxLines: 14,
             decoration: const InputDecoration(
-              hintText: '第1集：事件名\n本集事件：……\n冲突与推进：……\n结果或反转：……\n结尾钩子：……',
+              hintText: '第1集：事件名\n开场承接：……\n本集事件：……\n冲突与推进：……\n结果或反转：……\n结尾钩子：……',
               border: OutlineInputBorder(),
             ),
           ),
@@ -810,6 +899,18 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     if (!mounted) return;
     setState(() => _scriptOutline = text.trim());
     showAppToast(context, '剧本大纲已保存');
+  }
+
+  /// 选中集之前缺了哪些序号（用于提示会先建多少个空分集占位）。
+  int _missingBefore(
+      List<ScriptOutlineEpisode> targets, Map<int, AuthorChapterItem> byNo) {
+    if (targets.isEmpty) return 0;
+    final maxNo = targets.map((ep) => ep.no).reduce((a, b) => a > b ? a : b);
+    var count = 0;
+    for (var no = 1; no <= maxNo; no += 1) {
+      if (!byNo.containsKey(no)) count += 1;
+    }
+    return count;
   }
 
   /// 按大纲生成各章：来源二选一（当前输出 / 已保存的剧本大纲），只补空章节。
@@ -889,7 +990,8 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
         content: Text(
           '将生成 ${targets.length} 章：'
           '${targets.map((ep) => '第${ep.no}集').join('、')}。'
-          '仅补空正文章节，每章按实际 token 扣除积分。',
+          '仅补空正文章节，每章按实际 token 扣除积分。'
+          '${_missingBefore(targets, byNo) > 0 ? '前面空白的集会先建成空分集占位（${_missingBefore(targets, byNo)} 个），之后再选时会直接填进去。' : ''}',
           style: const TextStyle(fontSize: 13),
         ),
         actions: [
@@ -912,23 +1014,50 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
     try {
       final repo = ref.read(aiRepositoryProvider);
       final workRepo = ref.read(authorWorkRepositoryProvider);
+      // 靠后的集而前面空白时，先建空分集占位：后端只会按最大序号追加，否则第 15 集会落成第 1 集。
+      final missingBefore = _missingBefore(targets, byNo);
+      if (missingBefore > 0) {
+        final maxNo = targets.map((ep) => ep.no).reduce((a, b) => a > b ? a : b);
+        for (var no = 1; no <= maxNo; no += 1) {
+          if (byNo.containsKey(no)) continue;
+          await workRepo.addChapter(
+            widget.workId,
+            chapterNo: no,
+            chapterTitle: '第$no集',
+            content: '',
+          );
+        }
+        final detail =
+            await ref.read(authorWorkDetailProvider(widget.workId).future);
+        byNo.clear();
+        for (final chapter in detail.chapters) {
+          byNo[chapter.chapterNo] = chapter;
+        }
+      }
       for (final ep in targets) {
         if (!mounted) return;
         try {
-          // 与 PC「按大纲生成各章」同口径：事件卡 + 前情摘要 + 台账。
+          // 与后台续写队列、PC「AI 续写」同口径：事件卡 + 前情摘要 + 台账（含写法基线/文体锁定）+ 上一章末尾。
           final summaryText = _summaryBlock(chapters, ep.no);
           final ledgerText = _ledgerBlock();
           final scheduleText = _threadScheduleBlock(
             (_ledger['threads'] ?? '').trim(),
             ep.no,
           );
+          final prevText = _previousTailBefore(chapters, ep.no);
+          final timelineText = _timelineBlock(ep.no);
           final prompt = '${ep.label}\n${ep.body}\n'
-              '请据此事件卡写这一集的正文：700-900 字，开头一句自然交代地点时间，'
-              '动作与对白推进，对白用「角色：台词」，只写这一集，结尾留具体钩子，'
-              '不写场景头、镜号、景别、运镜。'
+              '请据此事件卡写这一集的正文（小说体，不是剧本格式）：不超过 1500 字，不设下限；'
+              '第一段必须接住上一集最后一句（由当事人当场回应），写清本集从哪个动作接起、隔了多久；'
+              '开头一句自然交代地点时间，动作与对白推进，对白用中文引号、不写「角色：」前缀；'
+              '只写这一集，结尾留具体钩子，不写场景头、镜号、景别、运镜。'
               + (summaryText.isEmpty ? '' : '\n\n$summaryText')
               + (ledgerText.isEmpty ? '' : '\n\n$ledgerText')
-              + (scheduleText.isEmpty ? '' : '\n\n$scheduleText');
+              + (scheduleText.isEmpty ? '' : '\n\n$scheduleText')
+              + (timelineText.isEmpty ? '' : '\n\n$timelineText')
+              + (prevText.isEmpty
+                  ? ''
+                  : '\n\n【上一章末尾（承接处境与语气，勿重复）】\n$prevText');
           final result = await repo.writeStream(
             prompt: prompt,
             skillId: _skillId,
@@ -1030,9 +1159,7 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
           const SizedBox(height: 8),
           Row(
             children: [
-              _tabChip(_AiTab.outline, '剧本'),
-              const SizedBox(width: 6),
-              _tabChip(_AiTab.write, '续写'),
+              _tabChip(_AiTab.outline, '剧本续写'),
               const SizedBox(width: 6),
               _tabChip(_AiTab.polish, '润色'),
               const SizedBox(width: 6),
@@ -1194,31 +1321,25 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
       _AiTab.outline => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _field(_idea, '故事灵感', 4, '这个故事大体讲了什么：谁、在什么处境、要解决什么…'),
-            const SizedBox(height: 10),
-            _field(_inspiration, '你的要求', 4, '写法上的要求，例如：节奏必须紧凑，前三集埋一个反转…'),
+            _field(_inspiration, '你的要求', 3, '续写方向，例如：下一集让男主身份暴露，别再拖节奏'),
             const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _field(_genre, '题材（可选）', 1, '例如：都市情感'),
-                ),
-                const SizedBox(width: 10),
                 SizedBox(
-                  width: 84,
+                  width: 110,
                   child: _field(
                     _episodes,
-                    '集数',
+                    '续写集数',
                     1,
-                    '12',
+                    '3',
                     keyboardType: TextInputType.number,
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(child: _durationField()),
               ],
             ),
-            const SizedBox(height: 10),
-            SizedBox(width: 120, child: _durationField()),
             if (_scriptOutline.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
               Align(
@@ -1230,14 +1351,6 @@ class _AiInlinePanelState extends ConsumerState<AiInlinePanel> {
                 ),
               ),
             ],
-          ],
-        ),
-      _AiTab.write => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _field(_prompt, '续写要求 *', 4, '例如：接着写下一段，男主与对手在雨夜对峙'),
-            const SizedBox(height: 10),
-            _field(_type, '续写侧重（可选）', 1, '例如：对话、旁白、动作描写'),
           ],
         ),
       _AiTab.polish => Column(
