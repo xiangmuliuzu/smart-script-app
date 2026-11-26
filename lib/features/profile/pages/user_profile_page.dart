@@ -302,6 +302,8 @@ class _FollowButton extends StatelessWidget {
                 side: const BorderSide(color: AppColors.divider),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: const Text('已关注'),
             )
@@ -312,6 +314,8 @@ class _FollowButton extends StatelessWidget {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 elevation: 0,
               ),
               child: const Text('+ 关注'),
