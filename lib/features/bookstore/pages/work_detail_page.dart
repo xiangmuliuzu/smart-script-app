@@ -45,10 +45,10 @@ class WorkDetailPage extends ConsumerWidget {
             children: [
               _Header(work: work),
               _RatingBar(workId: work.workId),
-              _ChapterEntry(work: work),
-              _StoryboardEntry(workId: work.workId, title: work.title),
               if (work.summary.isNotEmpty || work.tags.isNotEmpty)
                 _Block(title: '作品简介', content: work.summary, tags: work.tags),
+              _ChapterEntry(work: work),
+              _StoryboardEntry(workId: work.workId, title: work.title),
               _InfoBlock(work: work),
             ],
           ),
