@@ -216,12 +216,29 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
+    String? chapterTitle,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('storyboardStream:$script|$style|skill=$skillId');
     onDelta('【镜1】全景…');
     return AiWriteResult(content: '【镜1】全景…', recordId: 3);
   }
+
+  @override
+  Future<void> saveStoryboard({
+    required int workId,
+    required String title,
+    required String content,
+    String source = 'ai',
+    int? chapterId,
+    int? chapterNo,
+  }) async {
+    calls.add('saveStoryboard:$workId|$title');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> workTimeline(int workId) async => const [];
 
   @override
   Future<AiPageResult<AiWriteRecord>> writeRecords({
@@ -510,7 +527,7 @@ void main() {
   });
 
   group('写稿页集成', () {
-    testWidgets('正文上方出现「AI 创作」入口，展开可生成并插入正文末尾', (tester) async {
+    testWidgets('悬浮「AI 创作」胶囊：生成结果先预览，确认后才写入正文', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -534,48 +551,33 @@ void main() {
       await tester.pump(const Duration(milliseconds: 20));
       await tester.pump(const Duration(milliseconds: 20));
 
-      // 入口栏存在
-      expect(find.text('AI 创作'), findsOneWidget);
-      expect(find.text('展开'), findsOneWidget);
-
-      // 正文先写入一段
-      final bodyFields = find.byType(TextField);
-      // 标题字段（首个）+ 正文字段
-      await tester.enterText(bodyFields.first, '第一章');
-      await tester.enterText(bodyFields.at(1), '初始正文。');
-
-      // 展开面板
-      await tester.tap(find.text('展开'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AiInlinePanel), findsOneWidget);
-
-      // 大纲 tab 生成（默认），插入正文
-      // 面板内第一个输入框为主题框（面板展开后位于标题框之后）。
-      final panelThemeField = find.descendant(
-          of: find.byType(AiInlinePanel),
-          matching: find.byType(TextField));
-      await tester.enterText(panelThemeField.first, '都市青年逆袭');
+      // 正文先写入一段标题与正文（切到正文 Tab 并选择「自己写」）。
+      final titleField = find.byType(TextField).first;
+      await tester.enterText(titleField, '第一章');
+      await tester.tap(find.text('正文'));
       await tester.pump();
-      final themeField = tester.widget<TextField>(panelThemeField.first);
-      expect(themeField.controller!.text, '都市青年逆袭',
-          reason: '主题输入应写入面板内主题框');
-      await tester.tap(find.text('生成'));
-      await tester.pumpAndSettle();
-      expect(fake.calls, isNotEmpty, reason: '应已调用 outline 接口');
-      expect(find.textContaining('第一幕'), findsOneWidget,
-          reason: '生成结果应显示在面板中');
-      // 大纲 tab 不再直接插入正文，正文写回入口是「按大纲生成各章」。
-      expect(find.text('插入正文'), findsNothing);
-      expect(find.text('按大纲生成各章'), findsOneWidget);
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('自己写'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField).last, '初始正文。');
+      await tester.pump();
 
-      // 正文控制器保持原正文不变（未执行插入）
-      final contentField = find.byType(TextField).last;
-      final editor = tester.widget<TextField>(contentField);
-      final content = editor.controller!.text;
-      expect(content, contains('初始正文。'));
-      expect(content.contains('第一幕：跌落谷底'), isFalse,
-          reason: '大纲 tab 不再直接把大纲插入正文');
+      // 悬浮胶囊打开 AI 创作弹层。
+      await tester.tap(find.text('AI 创作'));
+      await tester.pumpAndSettle();
+      expect(find.text('AI 创作 · 章节正文'), findsOneWidget);
+      await tester.tap(find.text('✦ 生成正文草稿'));
+      await tester.pumpAndSettle();
+      expect(fake.calls.any((c) => c.startsWith('writeStream:')), isTrue);
+      expect(find.textContaining('夜色里，他站在'), findsWidgets);
+
+      // 预览阶段正文仍未写入。
+      expect(find.textContaining('初始正文。'), findsWidgets);
+      await tester.tap(find.text('插入到正文'));
+      await tester.pumpAndSettle();
+      // 确认后追加到正文末尾（不覆盖已有内容）。
+      final editor = tester.widget<TextField>(find.byType(TextField).last);
+      expect(editor.controller!.text, contains('初始正文。'));
+      expect(editor.controller!.text, contains('夜色里，他站在落地窗前，沉默良久。'));
     });
 
     testWidgets('悬浮窗已删除：写稿页无 floatingActionButton 悬浮球', (tester) async {

@@ -111,6 +111,33 @@ class ApiEndpoints {
   /// 作品分镜目录列表：公开返回审核通过分镜；正文按关联章节试读权限裁剪。
   static String contentWorkStoryboards(int workId) =>
       '/content/works/$workId/storyboards';
+
+  // ===== v3 作品资料 / 章节资料（与 PC 创作者端共用，需 App Token）=====
+  /// AI 起稿：生成作品资料（SSE，event:stage / data:{delta} / data:{done,sessionId,blueprint}）。
+  static const String aiBlueprintStream = '/content/ai/blueprint/stream';
+  /// 作品资料会话详情（未确认会话供资料确认页读取）。
+  static String aiBlueprintSession(int sessionId) =>
+      '/content/ai/blueprint/$sessionId';
+  /// 作品资料单项 / 全部重生成（SSE，done.blueprint 为最新资料）。
+  static const String aiBlueprintRegenerate = '/content/ai/blueprint/regenerate';
+  /// 确认作品资料并创建作品，返回 {workId}。
+  static String aiBlueprintConfirm(int sessionId) =>
+      '/content/ai/blueprint/$sessionId/confirm';
+  /// 作品已确认的资料会话（作品无会话时 data 为 null）。
+  static String contentWorkBlueprint(int workId) =>
+      '/content/works/$workId/blueprint';
+  /// 作品创作台账（十类自由文本，与 PC 共用；null 不改、空串清空）。
+  static String contentWorkLedger(int workId) => '/content/works/$workId/ledger';
+  /// 章节正文草稿（SSE，done.draft = {title,summary,cast,items,edges,...}）。
+  static const String aiChapterDraftStream = '/content/ai/chapter-draft/stream';
+  /// 依据本章概要与正文整理本章资料（非流式，结果直接落库）。
+  static const String aiChapterMeta = '/content/ai/chapter-meta';
+  /// 作品全部章节资料（{章号: 本章资料}）。
+  static String contentWorkChapterMeta(int workId) =>
+      '/content/works/$workId/chapter-meta';
+  /// 单章本章资料保存（整份覆盖）。
+  static String contentWorkChapterMetaByNo(int workId, int chapterNo) =>
+      '/content/works/$workId/chapter-meta/$chapterNo';
   /// 内容文件上传（需 App Token，multipart 字段 file；type=cover/script，接口 2.9.1）
   static const String contentUpload = '/content/upload';
   /// 作品版本列表 / 新建版本（需 App Token，接口 2.9.7 / 2.9.8）
@@ -132,6 +159,12 @@ class ApiEndpoints {
   /// 注意：与书城目录 [contentWorkChapters] 同路径、不同方法（游客 GET / 作者 POST）。
   static String contentAuthorChapterCreate(int workId) =>
       '/content/works/$workId/chapters';
+  /// 作者章节更新（A 套 PUT /users/me/works/{workId}/chapters/{chapterId}）。
+  ///
+  /// 摘要语义与 B 套不同：A 套 `summary == null` 不修改、空串清空，
+  /// 因此编辑概要走这里，避免「清空概要」被 B 套按 400 拒绝。
+  static String authorWorkChapterUpdate(int workId, int chapterId) =>
+      '/users/me/works/$workId/chapters/$chapterId';
   /// 作者章节更新 / 删除（B 套 PUT / DELETE /content/chapters/{chapterId}）
   /// 注意：与书城正文 [contentChapter] 同路径、不同方法（游客 GET / 作者 PUT、DELETE）。
   static String contentAuthorChapterById(int chapterId) =>

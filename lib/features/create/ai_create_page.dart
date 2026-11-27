@@ -1,7 +1,4 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,1248 +7,383 @@ import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_toast.dart';
 import '../ai/ai_quota_dialog.dart';
-import '../ai/data/ai_providers.dart';
-import '../ai/widgets/ai_model_selector.dart';
-import '../ai/widgets/ai_skill_selector.dart';
-import '../bookstore/data/content_providers.dart';
 import '../welfare/data/welfare_providers.dart';
-import 'data/ai_create_session.dart';
-import 'data/author_work_providers.dart';
-import 'data/create_providers.dart';
-import 'pages/ai_chapter_read_page.dart';
-import 'widgets/work_storyboard_tab.dart';
+import 'data/blueprint_models.dart';
+import 'data/blueprint_providers.dart';
+import 'pages/blueprint_page.dart';
+import 'widgets/blueprint_generation_view.dart';
+import 'widgets/blueprint_setup_form.dart';
 
-/// AI 创作页（创作者端）：设定 → 大纲 → 章节三步，与 PC 创作者端流程一致。
+/// AI 创作页（v3 流程）：作品设定 → 生成中 → 资料确认。
 ///
-/// - 设定：书名、灵感、题材、集数、导演(skill)、模型；展示剩余积分。
-/// - 大纲：流式生成并实时列出已出现的分集，可手动编辑后再确认。
-/// - 章节：确认大纲时创建草稿作品，逐章生成并逐章落库，完成后进入作品工作台。
+/// 与旧版三步（大纲 / 逐章生成）的区别：
+///   - 只生成作品级资料（故事核心、世界与规则、主要人物、关键物品、人物关系），
+///     不生成分集大纲；章节内容全部在作品工作台里逐章生成；
+///   - 生成走 `POST /content/ai/blueprint/stream`，按 SSE `event:stage` 推进 5 项进度；
+///   - 生成完成后进入资料确认页，确认后才创建作品（`confirm` 返回 workId）。
 ///
-/// 章节 prompt 带 [kAiCreateMark] 前缀，供「AI 记录」按会话合并成一条。
+/// 从 AI 记录点「继续这次创作」时，[draft] 里旧记录的设定会预填表单，
+/// 作者重新生成资料（历史记录只作参考，不直接作为新作品的资料）。
 class AiCreatePage extends ConsumerStatefulWidget {
   const AiCreatePage({super.key, this.draft});
 
+  /// 从「AI 使用记录」带回的设定（旧版记录只带设定与大纲，用于预填表单）。
   final AiCreateDraft? draft;
 
   @override
   ConsumerState<AiCreatePage> createState() => _AiCreatePageState();
 }
 
-class _ChapterTask {
-  _ChapterTask({required this.title, required this.summary});
+/// 旧版 AI 记录恢复时的草稿：只用于预填设定，不再承载大纲 / 章节。
+class AiCreateDraft {
+  const AiCreateDraft({
+    this.title = '',
+    this.idea = '',
+    this.genre = '',
+  });
 
   final String title;
-  String summary;
-  bool selected = true;
-  String state = 'idle'; // idle / generating / generated / failed
-  String content = '';
-  String streaming = '';
-  int chapterId = 0;
-  bool remote = false;
-  bool recovered = false;
-  String error = '';
-
-  int get streamingChars => streaming.length;
+  final String idea;
+  final String genre;
 }
 
 class _AiCreatePageState extends ConsumerState<AiCreatePage> {
-  int _step = 1;
-
   final _titleCtrl = TextEditingController();
   final _ideaCtrl = TextEditingController();
-  final _genreCtrl = TextEditingController();
-  final _episodesCtrl = TextEditingController(text: '10');
-  final _requireCtrl = TextEditingController();
-  // 一集时长（分钟）：AI 起稿时按这个容量规划每集事件量。
-  double _minutes = 1;
-  int? _skillId;
+  final _requirementCtrl = TextEditingController();
+
+  final Set<String> _genres = <String>{};
   String? _model;
+  int? _skillId;
 
-  String _outline = '';
-  bool _outlineBusy = false;
-  bool _outlineEditing = false;
-  // 大纲局部改写：选中段落 + 作者意见，流式期间原位替换。
-  ({int start, int end, String passage})? _reviseSelection;
-  String _reviseInstruction = '';
-  final _reviseCtrl = TextEditingController();
-  bool _revising = false;
+  /// idle → generating → done → failed。
+  String _phase = 'idle';
+  BlueprintStageProgress _progress = BlueprintStageProgress.idle;
+  String _error = '';
+  int _sessionId = 0;
+  int _generatedBytes = 0;
+  bool _leaving = false;
 
-  int _workId = 0;
-  // 本次新建作品已写入的章节数：章节序号从这里顺延，避免详情缓存未刷新时重号。
-  int _writtenChapters = 0;
-  bool _creating = false;
-  String _createError = '';
-  final List<_ChapterTask> _chapters = [];
-  bool _running = false;
-  bool _stopping = false;
-  int _runningIndex = -1;
-  bool _saving = false;
+  bool get _generating => _phase == 'generating';
+
+  bool get _done => _phase == 'done';
+
+  /// 剩余积分：未加载 / 加载失败时为 null（不显示成 0 误导用户）。
+  int? get _quota => ref.watch(welfareAssetProvider).valueOrNull?.points.balance;
 
   @override
   void initState() {
     super.initState();
     final draft = widget.draft;
     if (draft == null) return;
-    // 从 AI 记录恢复：带回设定、大纲与已生成章节，直接进入章节步骤。
     _titleCtrl.text = draft.title;
     _ideaCtrl.text = draft.idea;
-    _genreCtrl.text = draft.genre;
-    _episodesCtrl.text = '${draft.episodes}';
-    _outline = draft.outline;
-    _step = 3;
-    _chapters.addAll(draft.chapters.map((c) => _ChapterTask(title: c.title, summary: '')
-      ..state = 'generated'
-      ..content = c.content
-      ..recovered = true));
+    if (draft.genre.isNotEmpty) _genres.add(draft.genre);
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _ideaCtrl.dispose();
-    _genreCtrl.dispose();
-    _episodesCtrl.dispose();
-    _requireCtrl.dispose();
-    _reviseCtrl.dispose();
+    _requirementCtrl.dispose();
     super.dispose();
   }
 
-  int get _episodes => int.tryParse(_episodesCtrl.text.trim()) ?? 0;
+  /// 校验设定，返回错误文案；通过返回空串。
+  String _validate() {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return '请输入书名';
+    if (title.length > 100) return '书名最多 100 字';
+    final idea = _ideaCtrl.text.trim();
+    if (idea.length < BlueprintSetupForm.ideaMinLength) {
+      return '故事灵感请至少写 ${BlueprintSetupForm.ideaMinLength} 个字';
+    }
+    if (idea.length > BlueprintSetupForm.ideaMaxLength) {
+      return '故事灵感最多 ${BlueprintSetupForm.ideaMaxLength} 字';
+    }
+    if (_requirementCtrl.text.trim().length >
+        BlueprintSetupForm.requirementMaxLength) {
+      return '创作要求最多 ${BlueprintSetupForm.requirementMaxLength} 字';
+    }
+    return '';
+  }
 
-  List<AiCreateChapterSeed> get _parsed => parseOutlineChapters(_outline);
+  String get _genreText => _genres.join('、');
 
-  List<String> get _streamingTitles => listOutlineEpisodeTitles(_outline);
-
-  int get _generatedCount => _chapters.where((c) => c.state == 'generated').length;
-
-  int get _selectedCount => _chapters.where((c) => c.selected).length;
-
-  /// 还有勾选但未生成的章节：是则主按钮为「开始生成」，全部完成则变为「进入作品工作台」。
-  bool get _hasPending => _chapters.any((c) => c.selected && c.state != 'generated');
-
-  double get _progress => _chapters.isEmpty ? 0 : _generatedCount / _chapters.length;
-
-  /// 剩余积分：未加载 / 加载失败时返回 null，避免短暂显示成 0 误导用户。
-  int? get _quota => ref.watch(welfareAssetProvider).valueOrNull?.points.balance;
-
-  Future<void> _generateOutline() async {
-    if (_titleCtrl.text.trim().isEmpty) {
-      showAppToast(context, '请输入书名');
+  Future<void> _generate() async {
+    if (_generating) return;
+    final invalid = _validate();
+    if (invalid.isNotEmpty) {
+      showAppToast(context, invalid);
       return;
     }
-    if (_ideaCtrl.text.trim().isEmpty) {
-      showAppToast(context, '请先输入故事灵感');
-      return;
-    }
-    if (_episodes < 1 || _episodes > 10) {
-      showAppToast(context, '集数需为 1–10 的整数');
+    if (_quota == 0) {
+      await showAiQuotaInsufficientDialog(context);
       return;
     }
     FocusScope.of(context).unfocus();
     setState(() {
-      _step = 2;
-      _outlineBusy = true;
-      _outline = '';
+      _phase = 'generating';
+      _progress = BlueprintStageProgress.idle;
+      _error = '';
+      _generatedBytes = 0;
+      _sessionId = 0;
     });
-    final minutesLabel = _minutes == 1.5 ? '1.5 分钟' : '${_minutes.toInt()} 分钟';
-    final askText = _requireCtrl.text.trim();
-    final inspiration = '书名：${_titleCtrl.text.trim()}\n'
-        '故事灵感（已定内容，必须沿用）：${_ideaCtrl.text.trim()}\n'
-        '${askText.isEmpty ? '' : '你的要求：\n$askText\n'}';
     try {
-      final result = await ref.read(aiRepositoryProvider).outlineStream(
-            inspiration: inspiration,
-            genre: _genreCtrl.text.trim(),
-            style: '共 $_episodes 集，每集 $minutesLabel',
+      final session = await ref.read(blueprintRepositoryProvider).generate(
+            title: _titleCtrl.text.trim(),
+            inspiration: _ideaCtrl.text.trim(),
+            genre: _genreText,
+            prompt: _requirementCtrl.text,
             skillId: _skillId,
             model: _model,
+            onStage: (stage) {
+              if (mounted) {
+                setState(() => _progress = BlueprintStageProgress.fromStage(stage));
+              }
+            },
             onDelta: (delta) {
-              if (mounted) setState(() => _outline += delta);
+              if (mounted) setState(() => _generatedBytes += delta.length);
             },
           );
       if (!mounted) return;
-      setState(() => _outline = result.outlineText);
+      setState(() {
+        _phase = 'done';
+        _progress = BlueprintStageProgress.done;
+        _sessionId = session.sessionId;
+      });
       ref.invalidate(welfareAssetProvider);
     } on ApiException catch (e) {
       if (!mounted) return;
+      setState(() {
+        _phase = 'failed';
+        _error = e.message;
+      });
       if (isQuotaInsufficientError(e)) {
         await showAiQuotaInsufficientDialog(context, message: e.message);
-      } else {
-        showAppToast(context, e.message);
       }
     } catch (_) {
-      if (mounted) showAppToast(context, '大纲生成失败，请稍后重试');
-    } finally {
-      if (mounted) setState(() => _outlineBusy = false);
+      if (mounted) {
+        setState(() {
+          _phase = 'failed';
+          _error = '生成失败，请稍后重试';
+        });
+      }
     }
   }
 
-  /// 设定页主按钮：已有大纲时只是进入下一步，不重复生成（要重来用右上角「重置」）。
-  void _nextFromSetup() {
-    FocusScope.of(context).unfocus();
-    setState(() => _step = 2);
+  /// 生成完成后进入资料确认页（替换当前页，返回不再回到设定）。
+  Future<void> _openConfirmation() async {
+    if (_sessionId <= 0 || _leaving) return;
+    _leaving = true;
+    final router = GoRouter.of(context);
+    await router.pushReplacement(RoutePath.aiBlueprintUrl(
+      sessionId: _sessionId,
+      title: _titleCtrl.text.trim(),
+    ));
+    _leaving = false;
   }
 
-  /// 顶部步骤条切换。章节步骤复用 [_goChapters]，会校验大纲并建好草稿作品。
-  Future<void> _goToStep(int step) async {
-    if (_running || step == _step) return;
-    if (step == 3) {
-      await _goChapters();
-      return;
-    }
-    if (step == 2 && _outline.trim().isEmpty) return;
-    FocusScope.of(context).unfocus();
-    setState(() => _step = step);
+  /// 生成中返回：二次确认（已生成部分不会丢，可稍后在 AI 使用记录里找回）。
+  Future<bool> _confirmLeaveGenerating() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('正在生成作品资料'),
+        content: const Text('离开会停止生成；已经生成的内容不会写入作品，需要重新生成才能得到资料。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('继续等待'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('放弃生成'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
   }
 
-  /// 重来：清空大纲与章节进度，回到设定页；已保存进作品的章节不会被删除。
   Future<void> _reset() async {
-    if (_running || _outlineBusy) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重置创作'),
-        content: const Text('会清空当前大纲和章节生成进度，需要重新生成；已保存到作品的章节不受影响。'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('重置')),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
+    if (_generating) return;
     setState(() {
-      _step = 1;
-      _outline = '';
-      _outlineEditing = false;
-      _chapters.clear();
-      _workId = 0;
-      _writtenChapters = 0;
-      _createError = '';
-      _reviseSelection = null;
-      _reviseInstruction = '';
-      _reviseCtrl.clear();
+      _phase = 'idle';
+      _progress = BlueprintStageProgress.idle;
+      _sessionId = 0;
+      _error = '';
+      _generatedBytes = 0;
     });
-  }
-
-  Future<void> _goChapters() async {
-    if (_outlineBusy) return;
-    final parsed = _parsed;
-    if (parsed.isEmpty) {
-      showAppToast(context, '未识别到分集标题，请按「第1集：章节名称」每行一个标题修改');
-      return;
-    }
-    setState(() {
-      _step = 3;
-      // 返回大纲再确认时保留已生成（或已落库）的章节，避免重复生成、重复扣积分。
-      final existing = {for (final task in _chapters) task.title: task};
-      final tasks = <_ChapterTask>[];
-      for (final seed in parsed) {
-        final kept = existing[seed.title];
-        if (kept != null && (kept.state == 'generated' || kept.chapterId > 0)) {
-          kept.summary = seed.summary;
-          tasks.add(kept);
-        } else {
-          tasks.add(_ChapterTask(title: seed.title, summary: seed.summary));
-        }
-      }
-      _chapters
-        ..clear()
-        ..addAll(tasks);
-    });
-    await _ensureWork();
-  }
-
-  Future<int> _ensureWork() async {
-    if (_workId > 0) return _workId;
-    if (_creating) return 0;
-    setState(() {
-      _creating = true;
-      _createError = '';
-    });
-    try {
-      final description = outlineSummaryText(_outline);
-      final id = await ref.read(createRepositoryProvider).createWork(
-            title: _titleCtrl.text.trim(),
-            description:
-                description.isEmpty ? '由 AI 创作的《${_titleCtrl.text.trim()}》。' : description,
-          );
-      if (!mounted) return 0;
-      setState(() => _workId = id);
-      ref.invalidate(myWorksProvider);
-      ref.invalidate(authorWorkDetailProvider(id));
-      return id;
-    } on ApiException catch (e) {
-      if (!mounted) return 0;
-      setState(() => _createError = e.message);
-      return 0;
-    } catch (_) {
-      if (!mounted) return 0;
-      setState(() => _createError = '作品创建失败，请重试');
-      return 0;
-    } finally {
-      if (mounted) setState(() => _creating = false);
-    }
-  }
-
-  String _writePrompt(_ChapterTask task) => '请根据以下完整大纲，为“${task.title}”创作正文，只写这一章。\n'
-      '完整大纲：\n$_outline\n'
-      '本章剧情概要：\n${task.summary}';
-
-  String _continuePrompt(_ChapterTask task, String generated) {
-    final tail = generated.length > 8000 ? generated.substring(generated.length - 8000) : generated;
-    return '请根据大纲和本章概要，从已有正文的末尾接着写完“${task.title}”。不要重复已有正文，不要写其他章节。\n'
-        '完整大纲：\n$_outline\n'
-        '本章概要：\n${task.summary}\n'
-        '已有正文末尾：\n$tail';
-  }
-
-  Future<void> _runChapter(_ChapterTask task) async {
-    setState(() {
-      task
-        ..state = 'generating'
-        ..streaming = ''
-        ..error = '';
-      _runningIndex = _chapters.indexOf(task);
-    });
-    try {
-      final repo = ref.read(aiRepositoryProvider);
-      var output = await repo.writeStream(
-        prompt: markAiCreatePrompt(_writePrompt(task)),
-        type: 'script',
-        skillId: _skillId,
-        model: _model,
-        workId: _workId > 0 ? _workId : null,
-        onDelta: (delta) {
-          if (mounted) setState(() => task.streaming += delta);
-        },
-      );
-      var generated = output.content;
-      _truncatedThisChapter = output.content.length >= 4000;
-      // 续写只在模型达到长度上限（生成被截断）时询问；其余情况直接成章。
-      while (!_stopping && _truncatedThisChapter && await _confirmContinue(task.title)) {
-        output = await repo.writeStream(
-          prompt: markAiCreatePrompt(_continuePrompt(task, generated)),
-          type: 'script',
-          skillId: _skillId,
-          model: _model,
-          workId: _workId > 0 ? _workId : null,
-          onDelta: (delta) {
-            if (mounted) setState(() => task.streaming += delta);
-          },
-        );
-        generated += output.content;
-        _truncatedThisChapter = output.content.isNotEmpty && output.content.length >= 4000;
-      }
-      if (!mounted) return;
-      final works = ref.read(authorWorkRepositoryProvider);
-      if (task.remote && task.chapterId > 0) {
-        await works.updateChapter(task.chapterId, content: generated);
-      } else {
-        final chapterId = await works.addChapter(
-          _workId,
-          chapterNo: _nextChapterNo(),
-          chapterTitle: task.title,
-          content: generated,
-        );
-        if (mounted) setState(() => task.chapterId = chapterId);
-        _writtenChapters += 1;
-      }
-      setState(() {
-        task
-          ..content = generated
-          ..streaming = ''
-          ..state = 'generated'
-          ..remote = true;
-      });
-      ref.invalidate(authorWorkDetailProvider(_workId));
-      ref.invalidate(welfareAssetProvider);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      if (isQuotaInsufficientError(e)) {
-        await showAiQuotaInsufficientDialog(context, message: e.message);
-      } else if (mounted) {
-        showAppToast(context, e.message);
-      }
-      if (!mounted) return;
-      setState(() {
-        task
-          ..state = 'failed'
-          ..error = e.message;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          task
-            ..state = 'failed'
-            ..error = '生成失败，请重试';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          task.streaming = '';
-          _runningIndex = -1;
-        });
-      }
-    }
-  }
-
-  /// 新建作品内下一个章节序号（新建作品从 1 开始，按本地写入计数顺延）。
-  int _nextChapterNo() => _writtenChapters + 1;
-
-  /// 流结束后询问是否续写（与 PC 创作工作台一致）。不需要续写时返回 false。
-  Future<bool> _confirmContinue(String title) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('章节需要续写'),
-        content: Text('「$title」达到单次生成长度上限。续写会额外消耗积分，是否继续？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('暂时停止')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('续写本章')),
-        ],
-      ),
-    );
-    return ok ?? false;
-  }
-
-  bool _truncatedThisChapter = false;
-
-  Future<void> _startGeneration() async {
-    if (_running || _selectedCount == 0) return;
-    if (_workId == 0 && await _ensureWork() == 0) return;
-    setState(() {
-      _running = true;
-      _stopping = false;
-    });
-    try {
-      for (final task in _chapters) {
-        if (_stopping) break;
-        if (!task.selected || task.state == 'generated') continue;
-        await _runChapter(task);
-      }
-      if (mounted && _generatedCount > 0) {
-        showAppToast(context, '已生成 $_generatedCount 章并保存到作品');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _running = false;
-          _stopping = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _finishToWork() async {
-    if (_running || _saving) return;
-    if (_workId == 0 && await _ensureWork() == 0) return;
-    setState(() => _saving = true);
-    try {
-      if (!mounted) return;
-      final router = GoRouter.of(context);
-      // AI 起稿已经完成，作品工作台应替换当前 AI 流程页。
-      // 这样点击工作台左上角返回或使用系统返回时，会回到「我的作品」，
-      // 不会重新回到设定、大纲、章节这几个已完成的步骤。
-      await router.pushReplacement(
-        RoutePath.workWorkspaceUrl(workId: _workId, title: _titleCtrl.text.trim()),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<bool> _confirmLeave() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('正在生成章节'),
-        content: const Text('离开会停止生成；已生成的章节会保存在作品中。'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('继续等待')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('离开')),
-        ],
-      ),
-    );
-    return ok ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // 流程内返回先回上一步，不在章节/大纲步骤直接退出整个创作流程。
-      canPop: _step == 1 && !_running,
+      canPop: !_generating,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (_step > 1) {
-          if (_running) {
-            final router = GoRouter.of(context);
-            final leave = await _confirmLeave();
-            if (!leave) return;
-            if (mounted) router.pop();
-            return;
-          }
-          setState(() => _step -= 1);
-          return;
-        }
-        final router = GoRouter.of(context);
-        final leave = await _confirmLeave();
+        final leave = await _confirmLeaveGenerating();
         if (!leave) return;
-        if (mounted) router.pop();
+        setState(() => _phase = 'idle');
+        if (context.mounted) GoRouter.of(context).pop();
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const Text('AI 创作'),
-          backgroundColor: Colors.white,
-          elevation: 0.5,
+          title: Text(switch (_phase) {
+            'generating' => '生成中',
+            'done' => '生成完成',
+            'failed' => '生成失败',
+            _ => 'AI 创作',
+          }),
           actions: [
-            if (_step == 1 && !_running && !_outlineBusy && (_outline.isNotEmpty || _chapters.isNotEmpty))
-              TextButton(onPressed: _reset, child: const Text('重置')),
+            if ((_done || _phase == 'failed') && _sessionId == 0)
+              TextButton(onPressed: _reset, child: const Text('重来')),
           ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(44),
-            child: _StepBar(
-              step: _step,
-              outlineReady: _outline.trim().isNotEmpty,
-              onTap: _running ? null : _goToStep,
-            ),
-          ),
         ),
-        body: ListView(
-          padding: const EdgeInsets.all(12),
+        body: SafeArea(
+          top: false,
+          child: _buildBody(),
+        ),
+        bottomNavigationBar: _buildBottomBar(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_phase) {
+      case 'generating':
+      case 'done':
+      case 'failed':
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
           children: [
-            if (_step == 1) _buildSetup(),
-            if (_step == 2) _buildOutline(),
-            if (_step == 3) _buildChapters(),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSetup() {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _CardTitle('作品设定', subtitle: '先写清楚要讲的故事，AI 会据此生成剧本大纲。'),
-          _Labeled(
-            '书名 *',
-            TextField(
-              controller: _titleCtrl,
-              maxLength: 100,
-              decoration: const InputDecoration(hintText: '例如：深夜频率', counterText: ''),
+            BlueprintGenerationView(
+              title: _titleCtrl.text.trim(),
+              progress: _progress,
+              failed: _phase == 'failed',
+              error: _error,
+              onRetry: _phase == 'failed' ? _generate : null,
             ),
-          ),
-          _Labeled(
-            '我的要求 *',
-            TextField(
-              controller: _ideaCtrl,
-              maxLines: 4,
-              minLines: 3,
-              decoration: const InputDecoration(hintText: '例如：一位深夜电台主播在听众留言里听到了十年前的自己'),
-            ),
-          ),
-          _Labeled(
-            '题材',
-            TextField(controller: _genreCtrl, decoration: const InputDecoration(hintText: '例如：都市情感、悬疑')),
-          ),
-          _Labeled(
-            '集数',
-            TextField(
-              controller: _episodesCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(hintText: '1–10'),
-            ),
-          ),
-          _Labeled(
-            '一集时长',
-            DropdownButtonFormField<double>(
-              value: _minutes,
-              items: const [
-                DropdownMenuItem(value: 1, child: Text('1 分钟')),
-                DropdownMenuItem(value: 1.5, child: Text('1.5 分钟')),
-                DropdownMenuItem(value: 2, child: Text('2 分钟')),
-              ],
-              onChanged: (value) =>
-                  setState(() => _minutes = value ?? 1),
-              decoration: const InputDecoration(isDense: true),
-            ),
-          ),
-          _Labeled(
-            '你的要求',
-            TextField(
-              controller: _requireCtrl,
-              maxLines: 3,
-              minLines: 2,
-              decoration: const InputDecoration(
-                  hintText: '写法上的要求，例如：前三集必须埋一个反转；不要血腥'),
-            ),
-          ),
-          AiSkillSelector(
-            selectedSkillId: _skillId,
-            onChanged: (v) => setState(() => _skillId = v),
-            skillTypeFilter: 'write',
-          ),
-          const SizedBox(height: 12),
-          AiModelSelector(selectedModel: _model, onChanged: (v) => setState(() => _model = v)),
-          const SizedBox(height: 18),
-          // 积分与主按钮各占一行：窄屏下按钮文字不会挤压积分文本。
-          Row(
-            children: [
-              const Icon(Icons.stars_rounded, size: 14, color: AppColors.text3),
-              const SizedBox(width: 4),
-              Expanded(
+            if (_generating)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 14, 6, 0),
                 child: Text(
-                  _quota == null ? '积分加载中…' : '剩余 $_quota 积分',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                  _generatedBytes > 0
+                      ? '已接收约 $_generatedBytes 字符资料，请保持页面在前台。'
+                      : '生成过程中可以离开，但需要重新生成才会得到资料。',
+                  style: const TextStyle(
+                      fontSize: 11.5, height: 1.8, color: AppColors.text3),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _outline.trim().isEmpty ? _generateOutline : _nextFromSetup,
-              child: Text(_outline.trim().isEmpty ? '下一步：生成大纲' : '下一步'),
+          ],
+        );
+      default:
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+          children: [
+            BlueprintSetupForm(
+              titleController: _titleCtrl,
+              ideaController: _ideaCtrl,
+              requirementController: _requirementCtrl,
+              selectedGenres: _genres,
+              onGenresChanged: (next) => setState(() {
+                _genres
+                  ..clear()
+                  ..addAll(next);
+              }),
+              selectedModel: _model,
+              onModelChanged: (value) => setState(() => _model = value),
+              selectedSkillId: _skillId,
+              onSkillChanged: (value) => setState(() => _skillId = value),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        );
+    }
   }
 
-  Widget _buildOutline() {
-    final titles = _streamingTitles;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _CardTitle(
-                '剧本大纲',
-                subtitle: _outlineBusy
-                    ? '正在生成${titles.isEmpty ? '' : ' · 已写出 ${titles.length} 集'}'
-                    : '可直接修改，确认后再逐章生成正文',
-                trailing: _outline.isNotEmpty && !_outlineBusy
-                    ? TextButton(
-                        onPressed: () => setState(() => _outlineEditing = !_outlineEditing),
-                        child: Text(_outlineEditing ? '完成编辑' : '手动编辑'),
-                      )
-                    : null,
-              ),
-              if (_outlineBusy)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 10),
-                  child: LinearProgressIndicator(minHeight: 2),
-                ),
-              if (titles.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final title in titles)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                          decoration: BoxDecoration(color: AppColors.fill, borderRadius: BorderRadius.circular(12)),
-                          child: Text(title, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
-                        ),
-                    ],
-                  ),
-                ),
-              if (_outlineEditing)
-                TextField(
-                  controller: TextEditingController(text: _outline),
-                  onChanged: (v) => _outline = v,
-                  maxLines: null,
-                  minLines: 14,
-                  decoration: const InputDecoration(hintText: 'AI 生成的大纲会出现在这里'),
-                )
-              else
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 120),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: AppColors.fill, borderRadius: BorderRadius.circular(AppRadius.rSmall)),
-                  child: SelectableText(
-                    _outline.isEmpty ? '正在生成大纲…' : _outline,
-                    style: const TextStyle(fontSize: 14, height: 1.8, color: AppColors.text2),
-                    contextMenuBuilder: (context, state) {
-                      final buttons = state.contextMenuButtonItems;
-                      if (state.textEditingValue.selection.isValid &&
-                          !state.textEditingValue.selection.isCollapsed) {
-                        buttons.insert(
-                          0,
-                          ContextMenuButtonItem(
-                            label: '修改这段',
-                            onPressed: () {
-                              state.hideToolbar();
-                              _pickPassageForRevise(state.textEditingValue);
-                            },
-                          ),
-                        );
-                      }
-                      return AdaptiveTextSelectionToolbar.buttonItems(
-                        anchors: state.contextMenuAnchors,
-                        buttonItems: buttons,
-                      );
-                    },
-                  ),
-                ),
-              if (_reviseSelection != null) _buildRevisePanel(),
-              if (_revising)
-                const Padding(
-                  padding: EdgeInsets.only(top: 10),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                      SizedBox(width: 8),
-                      Text('正在改写选中段落…', style: TextStyle(fontSize: 12, color: AppColors.text2)),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: _outlineBusy ? null : _generateOutline,
-                    child: Text(_outline.isEmpty ? '开始生成' : '重新生成'),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _parsed.isEmpty ? '未识别到分集' : '已识别 ${_parsed.length} 个分集',
+  Widget _buildBottomBar() {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_phase == 'idle') ...[
+            Row(
+              children: [
+                const Icon(Icons.stars_rounded, size: 14, color: AppColors.text3),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    _quota == null ? '积分加载中…' : '剩余 $_quota 积分',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: AppColors.text3),
                   ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(onPressed: () => setState(() => _step = 1), child: const Text('上一步')),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 2,
-              child: FilledButton(
-                onPressed: _outlineBusy || _outline.trim().isEmpty ? null : _goChapters,
-                child: const Text('确认大纲，进入章节生成'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _pickPassageForRevise(TextEditingValue value) {
-    final start = value.selection.start;
-    final end = value.selection.end;
-    if (start < 0 || end <= start) return;
-    setState(() {
-      _reviseSelection = (start: start, end: end, passage: _outline.substring(start, end));
-      _reviseInstruction = '';
-      _reviseCtrl.clear();
-    });
-  }
-
-  Widget _buildRevisePanel() {
-    final selection = _reviseSelection!;
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.primaryTint,
-        borderRadius: BorderRadius.circular(AppRadius.rSmall),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('选中段落 · ${selection.passage.length} 字', style: const TextStyle(fontSize: 12, color: AppColors.text1)),
-          const SizedBox(height: 6),
-          Text(selection.passage, style: const TextStyle(fontSize: 12.5, height: 1.7, color: AppColors.text2)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _reviseCtrl,
-            onChanged: (v) => _reviseInstruction = v,
-            enabled: !_revising,
-            decoration: const InputDecoration(hintText: '哪里不合理、希望怎么改（只改这一段）'),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              TextButton(
-                onPressed: _revising ? null : () => setState(() => _reviseSelection = null),
-                child: const Text('取消'),
-              ),
-              const Spacer(),
-              // 主题按钮最小宽度无穷大，放 Row 里必须给有界宽度。
-              SizedBox(
-                width: 150,
-                child: FilledButton(
-                  onPressed: _revising || _reviseInstruction.trim().isEmpty ? null : _runRevise,
-                  child: Text(_revising ? '正在改写…' : '让 AI 改这一段'),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _generate,
+              child: const Text('生成作品资料'),
+            ),
+          ] else if (_generating)
+            FilledButton(
+              onPressed: null,
+              child: Text(
+                _progress.allDone ? '正在保存资料…' : '正在生成…',
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _runRevise() async {
-    final selection = _reviseSelection;
-    if (selection == null || _revising || _reviseInstruction.trim().isEmpty) return;
-    setState(() => _revising = true);
-    var start = selection.start;
-    var end = selection.end;
-    final original = _outline;
-    try {
-      final repo = ref.read(aiRepositoryProvider);
-      final result = await repo.writeStream(
-        prompt: outlineRevisePrompt(
-          passage: selection.passage,
-          instruction: _reviseInstruction.trim(),
-          context: _outline.length > 1200 ? _outline.substring(0, 1200) : _outline,
-        ),
-        type: 'script',
-        skillId: _skillId,
-        model: _model,
-        onDelta: (delta) {
-          if (!mounted) return;
-          setState(() {
-            _outline = replaceTextRange(_outline, start, end, delta);
-            end = start + delta.length;
-          });
-        },
-      );
-      if (!mounted) return;
-      final text = cleanRevisedPassage(result.content);
-      if (text.isEmpty) throw ApiException('AI 没有返回改写内容，请重试');
-      setState(() {
-        _outline = replaceTextRange(_outline, start, end, text);
-        _reviseSelection = null;
-        _reviseInstruction = '';
-        _reviseCtrl.clear();
-      });
-      showAppToast(context, '这一段已按意见改写');
-      ref.invalidate(welfareAssetProvider);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      // 失败时还原原文，避免留下半截内容。
-      setState(() => _outline = original);
-      if (isQuotaInsufficientError(e)) {
-        await showAiQuotaInsufficientDialog(context, message: e.message);
-      } else if (mounted) {
-        showAppToast(context, e.message);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _outline = original);
-        showAppToast(context, '改写失败，请重试');
-      }
-    } finally {
-      if (mounted) setState(() => _revising = false);
-    }
-  }
-
-  Widget _buildChapters() {
-    if (_creating) {
-      return const _Card(
-        child: Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
-      );
-    }
-    if (_createError.isNotEmpty) {
-      return _Card(
-        child: Column(
-          children: [
-            Text(_createError, style: const TextStyle(color: AppColors.danger)),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: _ensureWork, child: const Text('重试')),
-          ],
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _CardTitle(
-                '逐章生成',
-                subtitle: _running
-                    ? '生成中 $_generatedCount/${_chapters.where((c) => c.selected).length}'
-                    : '已生成 $_generatedCount/${_chapters.length} 章，每章都已保存',
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(value: _progress, minHeight: 3, backgroundColor: AppColors.fill),
-              ),
-              const SizedBox(height: 12),
-              if (_running && _runningIndex >= 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _stopping
-                              ? '当前章写完后停止'
-                              : '正在写「${_chapters[_runningIndex].title}」 · 已收到 ${_chapters[_runningIndex].streamingChars} 字',
-                          style: const TextStyle(fontSize: 12, color: AppColors.text2),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Row(
-                children: [
-                  Text('已勾选 $_selectedCount 章', style: const TextStyle(fontSize: 12, color: AppColors.text3)),
-                  const Spacer(),
-                  if (_generatedCount > 0)
-                    Text('已完成 $_generatedCount 章',
-                        style: const TextStyle(fontSize: 12, color: AppColors.success)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        for (var i = 0; i < _chapters.length; i++) _chapterTile(i),
-        const SizedBox(height: 14),
-        // 主按钮固定在底部：生成中显示停止，尚有未生成章节显示开始生成，全部完成变为进入工作台。
-        FilledButton(
-          onPressed: _running
-              ? (_stopping ? null : () => setState(() => _stopping = true))
-              : _hasPending
-                  ? (_selectedCount == 0 ? null : _startGeneration)
-                  : (_saving || _generatedCount == 0 ? null : _finishToWork),
-          child: Text(
-            _running
-                ? (_stopping ? '正在停止…' : '停止生成')
-                : _hasPending
-                    ? '开始生成'
-                    : (_saving ? '正在保存…' : '进入作品工作台'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _chapterTile(int index) {
-    final task = _chapters[index];
-    final saved = _workId > 0 && task.remote && task.chapterId > 0;
-    final storyboards = saved
-        ? ref.watch(workStoryboardsProvider(_workId)).valueOrNull
-        : null;
-    final storyboard = storyboardForChapter(storyboards, task.chapterId);
-    final tone = switch (task.state) {
-      'generating' => AppColors.warning,
-      'generated' => AppColors.success,
-      'failed' => AppColors.danger,
-      _ => AppColors.text3,
-    };
-    final label = switch (task.state) {
-      'generating' => '生成中',
-      'generated' => '已完成',
-      'failed' => '生成失败',
-      _ => '待生成',
-    };
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.r),
-        side: BorderSide(color: tone.withOpacity(0.28)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            )
+          else if (_done)
+            FilledButton(
+              onPressed: _openConfirmation,
+              child: const Text('查看作品资料'),
+            )
+          else
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Checkbox(
-                  value: task.selected,
-                  onChanged: _running || task.state == 'generating'
-                      ? null
-                      : (v) => setState(() => task.selected = v ?? false),
-                ),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(task.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text1)),
-                      if (task.recovered)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 3),
-                          child: Text('来自 AI 记录 · 进入工作台时保存', style: TextStyle(fontSize: 11, color: AppColors.text1)),
-                        ),
-                      if (task.summary.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 3),
-                          child: Text(task.summary, style: const TextStyle(fontSize: 12, height: 1.6, color: AppColors.text2)),
-                        ),
-                    ],
+                  child: OutlinedButton(
+                    onPressed: _reset,
+                    child: const Text('修改设定'),
                   ),
                 ),
-                Container(
-                  margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: tone.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                  child: Text(label, style: TextStyle(fontSize: 11, color: tone)),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton(
+                    onPressed: _generate,
+                    child: const Text('重新生成'),
+                  ),
                 ),
               ],
             ),
-            if (task.state == 'generating' && task.streaming.isNotEmpty)
-              _PreviewBox(
-                text: task.streaming.length > 600
-                    ? task.streaming.substring(task.streaming.length - 600)
-                    : task.streaming,
-              ),
-            if (task.state == 'failed')
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(task.error, style: const TextStyle(fontSize: 12, color: AppColors.danger))),
-                    TextButton(onPressed: _running ? null : () => _runChapter(task), child: const Text('重试本章')),
-                  ],
-                ),
-              ),
-            if (task.state == 'generated')
-                InkWell(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AiChapterReadPage(title: task.title, content: task.content),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 4),
-                    child: Row(
-                      children: [
-                        Text('查看正文 · ${task.content.length} 字',
-                            style: const TextStyle(fontSize: 12, color: AppColors.text1)),
-                        const Spacer(),
-                        const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
-                      ],
-                    ),
-                  ),
-                ),
-            if (saved)
-              Wrap(
-                spacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (storyboard != null)
-                    TextButton(
-                      onPressed: () =>
-                          openAuthorStoryboard(context, _workId, storyboard),
-                      child: Text('查看分镜 · ${authorStoryboardStatus(storyboard['status'])}'),
-                    ),
-                  TextButton.icon(
-                    onPressed: _running || _saving
-                        ? null
-                        : () => context.push(RoutePath.aiStoryboardUrl(
-                              workId: _workId,
-                              chapterId: task.chapterId,
-                            )),
-                    icon: const Icon(Icons.movie_filter_outlined, size: 16),
-                    label: const Text('为本章创作分镜'),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StepBar extends StatelessWidget {
-  const _StepBar({required this.step, required this.outlineReady, this.onTap});
-
-  final int step;
-
-  /// 没有大纲时只能停在设定步骤；生成中 [onTap] 为 null，锁定切换。
-  final bool outlineReady;
-  final ValueChanged<int>? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = ['设定', '大纲', '章节'];
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Row(
-        children: [
-          // 左中右三格均分：每个步骤在自己的三分之一里居中。
-          for (var i = 0; i < items.length; i++)
-            Expanded(
-              child: Center(
-                child: _StepChip(
-                  index: i + 1,
-                  label: items[i],
-                  current: step == i + 1,
-                  enabled: onTap != null && step != i + 1 && (i == 0 || outlineReady),
-                  onTap: onTap,
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-class _StepChip extends StatelessWidget {
-  const _StepChip({
-    required this.index,
-    required this.label,
-    required this.current,
-    required this.enabled,
-    this.onTap,
-  });
-
-  final int index;
-  final String label;
-  final bool current;
-  final bool enabled;
-  final ValueChanged<int>? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: current ? AppColors.primaryTint : AppColors.fill,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Text(
-        '$index $label',
-        style: TextStyle(
-          fontSize: 12,
-          color: current || enabled ? AppColors.text1 : AppColors.text3,
-          fontWeight: current ? FontWeight.w600 : FontWeight.w400,
-        ),
-      ),
-    );
-    if (!enabled) return chip;
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () => onTap?.call(index),
-      child: chip,
-    );
-  }
+/// 兼容旧引用：蓝色资料弹层入口（AI 创作首页的「作品资料」快捷入口使用）。
+Future<void> openWorkBlueprint(BuildContext context, int workId, {String? title}) {
+  return context.push(RoutePath.aiBlueprintUrl(workId: workId, title: title));
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.r),
-        boxShadow: AppColors.cardShadow,
-      ),
-      child: child,
-    );
-  }
+/// 兼容旧引用：从资料会话打开确认页。
+Future<void> openBlueprintConfirmation(
+  BuildContext context, {
+  required int sessionId,
+  String? title,
+}) {
+  return context.push(RoutePath.aiBlueprintUrl(sessionId: sessionId, title: title));
 }
 
-class _CardTitle extends StatelessWidget {
-  const _CardTitle(this.title, {this.subtitle, this.trailing});
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text1)),
-                if (subtitle != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.text3)),
-                  ),
-              ],
-            ),
-          ),
-          if (trailing != null) trailing!,
-        ],
-      ),
-    );
-  }
-}
-
-class _Labeled extends StatelessWidget {
-  const _Labeled(this.label, this.child);
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.text1, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 6),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _PreviewBox extends StatelessWidget {
-  const _PreviewBox({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      constraints: const BoxConstraints(maxHeight: 220),
-      decoration: BoxDecoration(color: AppColors.fill, borderRadius: BorderRadius.circular(AppRadius.rSmall)),
-      child: SingleChildScrollView(
-        child: Text(text, style: const TextStyle(fontSize: 13, height: 1.8, color: AppColors.text2)),
-      ),
-    );
-  }
-}
+/// 资料页本身（外部可复用）。
+typedef AiBlueprintPage = BlueprintPage;

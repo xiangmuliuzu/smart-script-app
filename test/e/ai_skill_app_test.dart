@@ -61,6 +61,8 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
+    String? chapterTitle,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('storyboardStream:$script|$style|skill=$skillId');

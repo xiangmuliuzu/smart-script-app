@@ -196,32 +196,6 @@ class AiCreateChapterSeed {
   final String summary;
 }
 
-/// 从「AI 记录」带回 AI 创作页的草稿：设定 + 大纲 + 已生成章节（只作预览）。
-class AiCreateDraft {
-  const AiCreateDraft({
-    this.title = '',
-    this.idea = '',
-    this.genre = '',
-    this.episodes = 12,
-    this.outline = '',
-    this.chapters = const [],
-  });
-
-  final String title;
-  final String idea;
-  final String genre;
-  final int episodes;
-  final String outline;
-  final List<AiCreateDraftChapter> chapters;
-}
-
-/// 恢复的章节（标题 + 正文）。
-class AiCreateDraftChapter {
-  const AiCreateDraftChapter({required this.title, required this.content});
-  final String title;
-  final String content;
-}
-
 /// 大纲局部改写提示词：只重写选中段落，保持分集格式与前后衔接。
 String outlineRevisePrompt({
   required String passage,

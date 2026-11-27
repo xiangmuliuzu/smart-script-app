@@ -8,18 +8,22 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/common_views.dart';
 import '../data/author_work_models.dart';
 import '../data/author_work_providers.dart';
+import '../data/chapter_meta_models.dart';
 
 /// 工作台 Tab1：章节目录（写作范式，默认选中）。
 ///
 /// 数据源为工作台详情的章节列表（随 A 套作品详情一次下发，含正文与 isFree/status）；
 /// 点击章节进入全屏写作编辑器；可编辑状态下支持滑动删除（删除走 B 套章节接口）。
 /// 章节行展示中文审核状态和试读标记，便于作者核对章节审核结果。
+///
+/// 新建章节入口由工作台底部按钮统一提供（本组件不再挂 FAB，避免重复入口）。
 class WorkChapterTab extends ConsumerWidget {
   const WorkChapterTab({
     super.key,
     required this.workId,
     required this.chapters,
     required this.editable,
+    this.metas = ChapterMetaTable.empty,
   });
 
   final int workId;
@@ -28,38 +32,32 @@ class WorkChapterTab extends ConsumerWidget {
   /// 是否可编辑（草稿 / 待修改 / 已驳回）；审核中为只读。
   final bool editable;
 
+  /// 作品全部章节资料（本章概要与关系由它派生，列表只读展示状态）。
+  final ChapterMetaTable metas;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (chapters.isEmpty) {
-      return Stack(
-        children: [
-          const EmptyView(
-            message: '还没有章节，点击右下角开始写第一章',
-            icon: Icons.edit_note_outlined,
-          ),
-          if (editable) _WriteButton(onTap: () => _openEditor(context, null)),
-        ],
+      return const EmptyView(
+        message: '还没有章节，点底部「新建章节」开始写第一章',
+        icon: Icons.edit_note_outlined,
       );
     }
-    return Stack(
-      children: [
-        ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          itemCount: chapters.length,
-          separatorBuilder: (_, __) =>
-              const Divider(height: 0.5, color: AppColors.divider),
-          itemBuilder: (context, index) {
-            final chapter = chapters[index];
-            return _ChapterTile(
-              chapter: chapter,
-              editable: editable,
-              onTap: () => _openEditor(context, chapter),
-              onDelete: () => _confirmDelete(context, ref, chapter),
-            );
-          },
-        ),
-        if (editable) _WriteButton(onTap: () => _openEditor(context, null)),
-      ],
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: chapters.length,
+      separatorBuilder: (_, __) =>
+          const Divider(height: 0.5, color: AppColors.divider),
+      itemBuilder: (context, index) {
+        final chapter = chapters[index];
+        return _ChapterTile(
+          chapter: chapter,
+          meta: metas.of(chapter.chapterNo),
+          editable: editable,
+          onTap: () => _openEditor(context, chapter),
+          onDelete: () => _confirmDelete(context, ref, chapter),
+        );
+      },
     );
   }
 
@@ -123,36 +121,18 @@ class WorkChapterTab extends ConsumerWidget {
   }
 }
 
-class _WriteButton extends StatelessWidget {
-  const _WriteButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      right: 16,
-      bottom: 16,
-      child: FloatingActionButton.extended(
-        onPressed: onTap,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('写新章节', style: TextStyle(color: Colors.white)),
-      ),
-    );
-  }
-}
-
 /// 章节行：滑动删除 + 点击进入编辑。
 class _ChapterTile extends StatelessWidget {
   const _ChapterTile({
     required this.chapter,
+    required this.meta,
     required this.editable,
     required this.onTap,
     required this.onDelete,
   });
 
   final AuthorChapterItem chapter;
+  final ChapterMeta meta;
   final bool editable;
   final VoidCallback onTap;
 
@@ -198,7 +178,7 @@ class _ChapterTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${chapter.wordCount} 字',
+                      _statusLine(chapter, meta),
                       style:
                           const TextStyle(fontSize: 12, color: AppColors.text3),
                     ),
@@ -229,6 +209,20 @@ class _ChapterTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 章节进度一句话：已写正文 / 概要已定待写正文 / 待定概要。
+String _statusLine(AuthorChapterItem chapter, ChapterMeta meta) {
+  final words = chapter.wordCount > 0
+      ? chapter.wordCount
+      : chapter.content.replaceAll(RegExp(r'\s'), '').length;
+  if (words > 0) {
+    final hasSummary = chapter.summary.trim().isNotEmpty || meta.isAiDrafted;
+    return hasSummary ? '已写 $words 字 · 概要已定' : '已写 $words 字';
+  }
+  if (chapter.summary.trim().isNotEmpty) return '概要已定 · 待写正文';
+  if (meta.isAiDrafted) return 'AI 已起草概要 · 待写正文';
+  return '待定概要';
 }
 
 /// 章节状态徽标。

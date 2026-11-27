@@ -270,6 +270,24 @@ class AiOutlineResult {
       );
 }
 
+/// 写作类型中文标签（作品资料 / 大纲 / 正文 / 润色 / 分镜）；未知类型原样返回。
+String aiWriteTypeLabel(String type) {
+  switch (type) {
+    case 'blueprint':
+      return '作品资料';
+    case 'outline':
+      return 'AI 剧本';
+    case 'write':
+      return 'AI 续写';
+    case 'polish':
+      return 'AI 润色';
+    case 'storyboard':
+      return 'AI 分镜';
+    default:
+      return type.isEmpty ? '记录' : type;
+  }
+}
+
 /// AI 写作记录项（write-records 列表元素）。
 class AiWriteRecord {
   const AiWriteRecord({
@@ -299,20 +317,7 @@ class AiWriteRecord {
   final String createdAt;
 
   /// 写作类型中文标签。
-  String get writeTypeLabel {
-    switch (writeType) {
-      case 'write':
-        return 'AI 续写';
-      case 'polish':
-        return 'AI 润色';
-      case 'outline':
-        return 'AI 剧本';
-      case 'storyboard':
-        return 'AI 分镜';
-      default:
-        return writeType.isEmpty ? '记录' : writeType;
-    }
-  }
+  String get writeTypeLabel => aiWriteTypeLabel(writeType);
 
   factory AiWriteRecord.fromJson(Map<String, dynamic> json) => AiWriteRecord(
         recordId: _int(json['recordId']),

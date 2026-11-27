@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../create/ai_create_page.dart' show AiCreateDraft;
 import '../create/data/ai_create_session.dart';
+import '../create/data/blueprint_models.dart';
 import 'data/ai_models.dart';
 import 'data/ai_providers.dart';
 
@@ -262,10 +264,9 @@ class _AiRecordPageState extends ConsumerState<AiRecordPage> {
     }
   }
 
-  /// 「继续这次创作」：按记录里的设定、大纲和已生成章节重新打开 AI 创作页。
+  /// 「继续这次创作」：按旧版记录的设定重新打开 AI 创作页（预填设定，重新生成资料）。
   ///
-  /// 章节只作为预览恢复到页面（不会重复落库）；继续点「进入作品工作台」时
-  /// 才为新作品补建章节。参数经 extra 传递，避免把整份大纲塞进 URL。
+  /// v3 取消了资料阶段的分集大纲：旧记录里的章节只作历史，不再恢复成可生成列表。
   Future<void> _continueSession(AiCreateSession session) async {
     final setup = session.setup;
     await context.push(
@@ -274,18 +275,29 @@ class _AiRecordPageState extends ConsumerState<AiRecordPage> {
         title: setup.title,
         idea: setup.idea,
         genre: setup.genre,
-        episodes: setup.episodes,
-        outline: session.outline,
-        chapters: [
-          for (final chapter in session.chapters)
-            AiCreateDraftChapter(
-              title: chapterTitleFromPrompt(chapter.inputPrompt),
-              content:
-                  chapter.outputContent.replaceFirst(kAiCreateMark, '').trim(),
-            ),
-        ],
       ),
     );
+  }
+
+  /// 「查看作品资料」：按 blueprint 记录打开资料确认 / 查看页。
+  ///
+  /// 记录输出里带 status=confirmed + workId 时视为已确认作品（已创建作品后不再变更）；
+  /// 否则按会话编号打开待确认页。
+  Future<void> _openBlueprintRecord(AiWriteRecord record) async {
+    final parsed = parseBlueprintRecord(record);
+    if (parsed == null) {
+      showAppToast(context, '这条作品资料记录无法解析，请稍后重试');
+      return;
+    }
+    if (parsed.isConfirmed && parsed.workId > 0) {
+      final title = record.title.replaceAll(RegExp(r'^\[起稿\]《|》$'), '');
+      await context.push(RoutePath.aiBlueprintUrl(
+        workId: parsed.workId,
+        title: title == '未命名作品' ? null : title,
+      ));
+      return;
+    }
+    await context.push(RoutePath.aiBlueprintUrl(sessionId: record.recordId));
   }
 
   @override
@@ -436,7 +448,12 @@ class _AiRecordPageState extends ConsumerState<AiRecordPage> {
                               session: item,
                               onContinue: _continueSession,
                             )
-                          : _RecordCard(record: (item as _Entry).write);
+                          : (item as _Entry).write.writeType == 'blueprint'
+                              ? _BlueprintRecordCard(
+                                  record: item.write,
+                                  onConfirm: _openBlueprintRecord,
+                                )
+                              : _RecordCard(record: item.write);
                       if (!_managing) return content;
                       return GestureDetector(
                         behavior: HitTestBehavior.opaque,
@@ -548,6 +565,7 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     const options = [
       ('all', '全部'),
+      ('blueprint', '作品资料'),
       ('outline', 'AI 剧本'),
       ('storyboard', 'AI 分镜'),
       ('write', 'AI 续写'),
@@ -872,6 +890,109 @@ class _SessionTypeTag extends StatelessWidget {
           color: AppColors.primaryTint, borderRadius: BorderRadius.circular(4)),
       child: const Text('AI 创作',
           style: TextStyle(fontSize: 11, color: AppColors.text1)),
+    );
+  }
+}
+
+/// 解析记录 output 里的作品资料（数据层实现，便于测试）。
+BlueprintRecordData? parseBlueprintRecord(AiWriteRecord record) =>
+    parseBlueprintRecordContent(record.outputContent);
+
+/// 作品资料记录卡：概要 + 关键要素计数 + 查看资料入口。
+class _BlueprintRecordCard extends StatelessWidget {
+  const _BlueprintRecordCard({required this.record, required this.onConfirm});
+
+  final AiWriteRecord record;
+  final ValueChanged<AiWriteRecord> onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final parsed = parseBlueprintRecord(record);
+    final blueprint = parsed?.blueprint;
+    final title = record.title.isEmpty
+        ? '未命名作品'
+        : record.title.replaceAll(RegExp(r'^\[起稿\]《|》$'), '');
+    final summary = blueprint?.storySummary ?? '';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.r),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          title: Text(
+            title == '未命名作品' ? title : '《$title》',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.text1),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTint,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('作品资料',
+                      style:
+                          TextStyle(fontSize: 11, color: AppColors.text1)),
+                ),
+                const SizedBox(width: 8),
+                if (blueprint != null)
+                  Text(
+                    '${blueprint.characters.length} 人 · '
+                    '${blueprint.items.length} 件 · '
+                    '${blueprint.relations.length} 条关系',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.text3),
+                  ),
+                const Spacer(),
+                Text(
+                  record.createdAt,
+                  style: const TextStyle(fontSize: 12, color: AppColors.text3),
+                ),
+              ],
+            ),
+          ),
+          children: [
+            _Section(label: '故事简介', value: summary),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (record.tokensUsed > 0)
+                  Text('消耗 ${record.tokensUsed} token',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.text3)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => onConfirm(record),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.text1,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(
+                    parsed?.isConfirmed == true && parsed!.workId > 0
+                        ? '继续这次创作'
+                        : '去确认作品资料',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -377,6 +377,35 @@ class RoutePath {
 
   /// AI 创作页（设定 → 大纲 → 章节，创作链路专用）。
   static const String aiCreate = '/ai/create';
+
+  /// 作品资料（v3）：待确认会话走 `sessionId`，已建作品走 `workId`。
+  static const String aiBlueprint = '/ai/blueprint';
+  static String aiBlueprintUrl({int sessionId = 0, int workId = 0, String? title}) => Uri(
+        path: aiBlueprint,
+        queryParameters: <String, String>{
+          if (sessionId > 0) 'sessionId': '$sessionId',
+          if (workId > 0) 'workId': '$workId',
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      ).toString();
+
+  /// 人物档案（作品资料里的人物详情 / 三视图 / 编辑）。
+  ///
+  /// 已建作品传 `workId`（可编辑）；资料确认前传 `sessionId`（只读浏览）。
+  static const String blueprintCharacter = '/ai/blueprint/character';
+  static String blueprintCharacterUrl({
+    int workId = 0,
+    int sessionId = 0,
+    required String key,
+  }) =>
+      Uri(
+        path: blueprintCharacter,
+        queryParameters: <String, String>{
+          if (workId > 0) 'workId': '$workId',
+          if (sessionId > 0) 'sessionId': '$sessionId',
+          'key': key,
+        },
+      ).toString();
   static const String aiPolish = '/ai/polish';
   static const String aiStoryboard = '/ai/storyboard';
   static String aiStoryboardUrl({required int workId, int? chapterId}) => Uri(
@@ -523,6 +552,8 @@ class RouteName {
   static const String aiCenter = 'aiCenter';
   static const String aiOutline = 'aiOutline';
   static const String aiCreate = 'aiCreate';
+  static const String aiBlueprint = 'aiBlueprint';
+  static const String blueprintCharacter = 'blueprintCharacter';
   static const String aiPolish = 'aiPolish';
   static const String aiStoryboard = 'aiStoryboard';
   static const String aiRecords = 'aiRecords';
@@ -591,6 +622,7 @@ class ProtectedRoutes {
     RoutePath.welfareRecharge,
     RoutePath.aiCenter,
     RoutePath.aiCreate,
+    RoutePath.aiBlueprint,
     // 印章管理（需登录）
     RoutePath.mySeal,
     // 版权模块（需登录）

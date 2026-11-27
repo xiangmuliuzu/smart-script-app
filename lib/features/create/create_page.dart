@@ -43,15 +43,20 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   String _status = 'all';
 
-  /// 新建入口：AI 创作走独立流程，自己编辑进入原来的新建作品表单。
+  /// 新建入口：AI 创作走 v3 资料流程，创作分镜需要先选作品，自己编辑走新建作品表单。
   Future<void> _showStartChoice(BuildContext context) async {
     final choice = await showCreateChoice(context);
     if (!context.mounted || choice == null) return;
-    context.push(choice == 'ai'
-        ? RoutePath.aiCreate
-        : choice == 'storyboard'
-            ? RoutePath.aiStoryboard
-            : RoutePath.workUpload);
+    switch (choice) {
+      case 'ai':
+        context.push(RoutePath.aiCreate);
+      case 'storyboard':
+        // 分镜必须挂到已有作品的一个章节上（后端分镜目录按作品 + 章节存储），
+        // 因此先让作者挑一部作品，再进入 AI 分镜页（与底部导航「创作」共用）。
+        await pickWorkForStoryboard(context, ref);
+      default:
+        context.push(RoutePath.workUpload);
+    }
   }
 
   @override

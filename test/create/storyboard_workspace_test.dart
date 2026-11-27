@@ -45,6 +45,8 @@ class _StoryboardRepository extends AiRepository {
     required String title,
     required String content,
     String source = 'ai',
+    int? chapterId,
+    int? chapterNo,
   }) async {
     savedTitle = title;
     savedWork = workId;
@@ -134,8 +136,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('第 1 章 · 第一章 雨夜'));
     await tester.pumpAndSettle();
-    expect(find.text('分镜：未通过审核'), findsOneWidget);
-    await tester.tap(find.text('AI 分镜'));
+    // v3 章节页把分镜收进「分镜」Tab：状态与正文在 Tab 内展示。
+    await tester.tap(find.text('分镜'));
+    await tester.pumpAndSettle();
+    expect(find.text('镜头一：列车进站'), findsOneWidget);
+    expect(find.textContaining('未通过审核'), findsWidgets);
+    await tester.tap(find.text('独立分镜页'));
     await tester.pumpAndSettle();
     expect(find.byType(AiStoryboardPage), findsOneWidget);
     final script = tester.widget<TextField>(find.byType(TextField).first);
@@ -150,6 +156,8 @@ void main() {
     expect(repository.savedTitle, '第一章 雨夜');
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('分镜：AI 审核中'), findsOneWidget);
+    await tester.tap(find.text('分镜'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('AI 审核中'), findsWidgets);
   });
 }

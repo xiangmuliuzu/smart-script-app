@@ -101,22 +101,29 @@ class AuthorWorkRepository {
   ///
   /// [chapterNo] 为作品内唯一正整数，由调用方按当前最大序号 +1 计算；
   /// [isFree] 为 true 时标记为免费试读章节（后端落 is_free="1"）。
+  /// [summary] 只在调用方显式给出字符串时下发（新建章节时即写概要草稿；
+  /// 不传 = 后端按空摘要建章）。
   /// 返回新建章节的 chapterId；序号重复或标题非法时后端按 400 拒绝。
   Future<int> addChapter(
     int workId, {
     required int chapterNo,
     required String chapterTitle,
     String? content,
+    String? summary,
     bool isFree = false,
   }) async {
+    final body = _compact({
+      'chapterNo': chapterNo,
+      'chapterTitle': chapterTitle,
+      'content': content,
+      'summary': summary,
+      'isFree': isFree ? '1' : '0',
+    });
+    // 摘要：空串表示「本章概要清空」，不能被 _compact 丢掉。
+    if (summary != null) body['summary'] = summary;
     final data = await _api.post<Map<String, dynamic>>(
       ApiEndpoints.contentAuthorChapterCreate(workId),
-      data: _compact({
-        'chapterNo': chapterNo,
-        'chapterTitle': chapterTitle,
-        'content': content,
-        'isFree': isFree ? '1' : '0',
-      }),
+      data: body,
       parser: _mapParser,
     );
     final chapterId = _intOrNull(data?['chapterId']);
@@ -124,25 +131,37 @@ class AuthorWorkRepository {
     return chapterId;
   }
 
-  /// 更新章节（B 套 PUT /content/chapters/{chapterId}）。
+  /// 更新章节。
   ///
-  /// 标题 / 正文 / 试读标记 / 隐藏状态均可选，null 表示不更新；wordCount 由后端重算。
+  /// - 传 [workId]：走 A 套 `PUT /users/me/works/{workId}/chapters/{chapterId}`，
+  ///   支持「摘要 null=不改、空串=清空」的完整语义；
+  /// - 不传 [workId]：走 B 套 `PUT /content/chapters/{chapterId}`（兼容旧调用点）。
+  ///
+  /// 标题 / 正文 / 摘要 / 试读标记均可选，null 表示不更新；wordCount 由后端重算。
+  /// [summary] 与其它字段语义不同：只有调用方显式传字符串时才下发（编辑正文时不会误清空概要）。
   /// 至少需提供一个待更新字段，否则后端按 400 拒绝。
   Future<void> updateChapter(
     int chapterId, {
+    int? workId,
     String? chapterTitle,
     String? content,
+    String? summary,
     bool? isFree,
     String? status,
   }) async {
+    final body = _compact({
+      'chapterTitle': chapterTitle,
+      'content': content,
+      'isFree': isFree == null ? null : (isFree ? '1' : '0'),
+      'status': status,
+    });
+    if (summary != null) body['summary'] = summary;
+    final useAuthorPath = workId != null && workId > 0;
     await _api.put<Map<String, dynamic>>(
-      ApiEndpoints.contentAuthorChapterById(chapterId),
-      data: _compact({
-        'chapterTitle': chapterTitle,
-        'content': content,
-        'isFree': isFree == null ? null : (isFree ? '1' : '0'),
-        'status': status,
-      }),
+      useAuthorPath
+          ? ApiEndpoints.authorWorkChapterUpdate(workId, chapterId)
+          : ApiEndpoints.contentAuthorChapterById(chapterId),
+      data: body,
       parser: _mapParser,
     );
   }

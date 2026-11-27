@@ -198,12 +198,29 @@ class _FakeAiRepository implements AiRepository {
     String? style,
     int? skillId,
     String? model,
+    int? workId,
+    String? chapterTitle,
     required void Function(String delta) onDelta,
   }) async {
     calls.add('storyboardStream:$script|$style|skill=$skillId');
     onDelta('【镜1】全景…');
     return AiWriteResult(content: '【镜1】全景…', recordId: 33);
   }
+
+  @override
+  Future<void> saveStoryboard({
+    required int workId,
+    required String title,
+    required String content,
+    String source = 'ai',
+    int? chapterId,
+    int? chapterNo,
+  }) async {
+    calls.add('saveStoryboard:$workId|$title');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> workTimeline(int workId) async => const [];
 
   @override
   Future<AiPageResult<AiWriteRecord>> writeRecords({

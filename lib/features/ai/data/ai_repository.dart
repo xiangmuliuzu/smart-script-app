@@ -500,15 +500,26 @@ class AiRepository {
   }
 
   /// 将已生成的分镜保存到作品分镜目录；未选择作品时不调用此接口，AI 记录仍会保留。
+  ///
+  /// [chapterId]/[chapterNo] 二选一：与章节关联后分镜才会出现在该章的「分镜」Tab
+  /// （后端要求分镜必须关联当前作品已有章节）；都不传时按标题匹配章节。
   Future<void> saveStoryboard({
     required int workId,
     required String title,
     required String content,
     String source = 'ai',
+    int? chapterId,
+    int? chapterNo,
   }) async {
     await _api.post<Map<String, dynamic>>(
       '/content/works/$workId/storyboards',
-      data: <String, dynamic>{'title': title, 'content': content, 'source': source},
+      data: <String, dynamic>{
+        'title': title,
+        'content': content,
+        'source': source,
+        if (chapterId != null && chapterId > 0) 'chapterId': chapterId,
+        if (chapterNo != null && chapterNo > 0) 'chapterNo': chapterNo,
+      },
       parser: _map,
     );
   }

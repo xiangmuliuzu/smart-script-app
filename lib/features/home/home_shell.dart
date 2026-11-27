@@ -25,22 +25,23 @@ class HomeShell extends ConsumerWidget {
     _TabItem('我的', Icons.person_outline, Icons.person),
   ];
 
-  /// 从底部导航进入创作工具：与「我的作品」右上角「新建」共用入口面板。
+  /// 从底部导航进入创作工具：与「我的作品」右上角「新建」共用入口面板与后续流程。
   ///
-  /// 「创作分镜」是基于已有作品的 AI 工具，不是新建作品，因此必须进入
-  /// AI 分镜页，不能落到作品新建表单。
+  /// 「创作分镜」是基于已有作品的 AI 工具：与「我的作品」一致，先选一部作品再进入分镜页。
   Future<void> _startCreate(BuildContext context, WidgetRef ref) async {
-    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.workUpload))
+    if (!AuthGuard.requireLogin(context, ref, target: RoutePath.workUpload)) {
       return;
+    }
     final choice = await showCreateChoice(context);
     if (choice == null || !context.mounted) return;
-    context.push(
-      choice == 'ai'
-          ? RoutePath.aiCreate
-          : choice == 'storyboard'
-              ? RoutePath.aiStoryboard
-              : RoutePath.workUpload,
-    );
+    switch (choice) {
+      case 'ai':
+        context.push(RoutePath.aiCreate);
+      case 'storyboard':
+        await pickWorkForStoryboard(context, ref);
+      default:
+        context.push(RoutePath.workUpload);
+    }
   }
 
   void _onTap(BuildContext context, WidgetRef ref, int index) {

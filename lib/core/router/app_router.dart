@@ -33,7 +33,9 @@ import '../../features/comic/pages/drama_report_page.dart';
 import '../../features/comic/pages/drama_subscription_page.dart';
 import '../../features/create/ai_create_page.dart';
 import '../../features/create/create_page.dart';
+import '../../features/create/pages/blueprint_page.dart';
 import '../../features/create/pages/chapter_write_page.dart';
+import '../../features/create/pages/character_profile_page.dart';
 import '../../features/create/pages/work_upload_page.dart';
 import '../../features/create/pages/work_version_detail_page.dart';
 import '../../features/create/pages/work_workspace_page.dart';
@@ -596,7 +598,38 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePath.aiCreate,
         name: RouteName.aiCreate,
-        builder: (_, __) => const AiCreatePage(),
+        builder: (_, state) => AiCreatePage(
+          draft: state.extra is AiCreateDraft
+              ? state.extra as AiCreateDraft
+              : null,
+        ),
+      ),
+      // v3 作品资料：待确认会话（sessionId）与已建作品（workId）共用一页。
+      GoRoute(
+        path: RoutePath.aiBlueprint,
+        name: RouteName.aiBlueprint,
+        builder: (_, state) {
+          final query = state.uri.queryParameters;
+          return BlueprintPage(
+            sessionId: int.tryParse(query['sessionId'] ?? '') ?? 0,
+            workId: int.tryParse(query['workId'] ?? '') ?? 0,
+            workTitle: query['title'] ?? '',
+            isConfirmation: (int.tryParse(query['sessionId'] ?? '') ?? 0) > 0,
+          );
+        },
+      ),
+      // 人物档案：作品资料里的人物详情 / 三视图 / 编辑。
+      GoRoute(
+        path: RoutePath.blueprintCharacter,
+        name: RouteName.blueprintCharacter,
+        builder: (_, state) {
+          final query = state.uri.queryParameters;
+          return CharacterProfilePage(
+            workId: int.tryParse(query['workId'] ?? '') ?? 0,
+            sessionId: int.tryParse(query['sessionId'] ?? '') ?? 0,
+            characterKey: query['key'] ?? '',
+          );
+        },
       ),
       GoRoute(
         path: RoutePath.aiPolish,
